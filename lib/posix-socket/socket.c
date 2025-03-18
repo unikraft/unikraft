@@ -93,7 +93,7 @@ static struct uk_ofile *socketfd_get(int fd)
 	if (unlikely(!of))
 		return ERR2PTR(-EBADF);
 	if (unlikely(of->file->vol != POSIX_SOCKET_VOLID)) {
-		uk_fdtab_ret(of);
+		uk_ofile_release(of);
 		return ERR2PTR(-ENOTSOCK);
 	}
 	return of;
@@ -420,7 +420,7 @@ int do_accept4(int sock, struct sockaddr *addr, socklen_t *addr_len,
 	mode = of->mode;
 	ret = uk_sys_accept(of->file, _SHOULD_BLOCK(mode),
 			    addr, addr_len, flags);
-	uk_fdtab_ret(of);
+	uk_ofile_release(of);
 
 out:
 	if (ret >= 0)
@@ -468,7 +468,7 @@ UK_SYSCALL_R_DEFINE(int, bind, int, sock, const struct sockaddr *, addr,
 	uk_file_wlock(of->file);
 	ret = posix_socket_bind(of->file, addr, addr_len);
 	uk_file_wunlock(of->file);
-	uk_fdtab_ret(of);
+	uk_ofile_release(of);
 
 out:
 	if (ret) {
@@ -511,7 +511,7 @@ UK_SYSCALL_R_DEFINE(int, shutdown, int, sock, int, how)
 	uk_file_wlock(of->file);
 	ret = posix_socket_shutdown(of->file, how);
 	uk_file_wunlock(of->file);
-	uk_fdtab_ret(of);
+	uk_ofile_release(of);
 
 out:
 	if (ret)
@@ -544,7 +544,7 @@ UK_SYSCALL_R_DEFINE(int, getpeername, int, sock,
 	uk_file_rlock(of->file);
 	ret = posix_socket_getpeername(of->file, addr, addr_len);
 	uk_file_runlock(of->file);
-	uk_fdtab_ret(of);
+	uk_ofile_release(of);
 
 out:
 	if (ret)
@@ -577,7 +577,7 @@ UK_SYSCALL_R_DEFINE(int, getsockname, int, sock,
 	uk_file_rlock(of->file);
 	ret = posix_socket_getsockname(of->file, addr, addr_len);
 	uk_file_runlock(of->file);
-	uk_fdtab_ret(of);
+	uk_ofile_release(of);
 
 out:
 	if (ret)
@@ -609,7 +609,7 @@ UK_SYSCALL_R_DEFINE(int, getsockopt, int, sock, int, level, int, optname,
 	uk_file_rlock(of->file);
 	ret = posix_socket_getsockopt(of->file, level, optname, optval, optlen);
 	uk_file_runlock(of->file);
-	uk_fdtab_ret(of);
+	uk_ofile_release(of);
 
 out:
 	if (ret)
@@ -644,7 +644,7 @@ UK_SYSCALL_R_DEFINE(int, setsockopt, int, sock, int, level, int, optname,
 	uk_file_rlock(of->file);
 	ret = posix_socket_setsockopt(of->file, level, optname, optval, optlen);
 	uk_file_runlock(of->file);
-	uk_fdtab_ret(of);
+	uk_ofile_release(of);
 
 out:
 	if (ret)
@@ -691,7 +691,7 @@ UK_SYSCALL_R_DEFINE(int, connect, int, sock, const struct sockaddr *, addr,
 					&ret, &_opsz);
 		uk_file_runlock(of->file);
 	}
-	uk_fdtab_ret(of);
+	uk_ofile_release(of);
 
 out:
 	if (ret && ret != -EINPROGRESS) {
@@ -727,7 +727,7 @@ UK_SYSCALL_R_DEFINE(int, listen, int, sock, int, backlog)
 	uk_file_wlock(of->file);
 	ret = posix_socket_listen(of->file, backlog);
 	uk_file_wunlock(of->file);
-	uk_fdtab_ret(of);
+	uk_ofile_release(of);
 
 out:
 	if (ret) {
@@ -776,7 +776,7 @@ UK_SYSCALL_R_DEFINE(ssize_t, recvfrom, int, sock, void *, buf, size_t, len,
 			break;
 		(void)uk_file_poll(of->file, UKFD_POLLIN);
 	}
-	uk_fdtab_ret(of);
+	uk_ofile_release(of);
 
 out:
 	if (ret < 0 && ret != -EAGAIN)
@@ -825,7 +825,7 @@ UK_SYSCALL_R_DEFINE(ssize_t, recvmsg, int, sock, struct msghdr *, msg,
 			break;
 		(void)uk_file_poll(of->file, UKFD_POLLIN);
 	}
-	uk_fdtab_ret(of);
+	uk_ofile_release(of);
 
 out:
 	if (ret < 0 && ret != -EAGAIN)
@@ -867,7 +867,7 @@ UK_SYSCALL_R_DEFINE(ssize_t, sendmsg, int, sock, const struct msghdr *, msg,
 			break;
 		(void)uk_file_poll(of->file, UKFD_POLLOUT);
 	}
-	uk_fdtab_ret(of);
+	uk_ofile_release(of);
 
 out:
 	if (ret < 0 && ret != -EAGAIN)
@@ -912,7 +912,7 @@ UK_SYSCALL_R_DEFINE(ssize_t, sendto, int, sock, const void *, buf, size_t, len,
 			break;
 		(void)uk_file_poll(of->file, UKFD_POLLOUT);
 	}
-	uk_fdtab_ret(of);
+	uk_ofile_release(of);
 
 out:
 	if (ret < 0 && ret != -EAGAIN)

@@ -1,5 +1,13 @@
-config LIBPOSIX_FD
+menuconfig LIBPOSIX_FD
 	bool "posix-fd: Open file descriptions"
 	select LIBUKFILE
 	select LIBUKLOCK
 	select LIBUKLOCK_MUTEX
+
+if LIBPOSIX_FD
+
+config LIBPOSIX_FD_HEAPOFD
+	bool "Heap-allocated open file descriptions"
+	select LIBUKALLOC
+
+endif

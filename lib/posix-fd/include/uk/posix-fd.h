@@ -15,15 +15,21 @@
 #include <uk/essentials.h>
 #include <uk/file.h>
 #include <uk/mutex.h>
+
+#if CONFIG_LIBPOSIX_FD_HEAPOFD
+#include <uk/alloc.h>
 #include <uk/refcount.h>
+#endif /* CONFIG_LIBPOSIX_FD_HEAPOFD */
 
 /* Open file description */
 struct uk_ofile {
 	const struct uk_file *file;
-	unsigned int mode;
-	__atomic refcnt;
 	size_t pos; /* Current file read/write offset position */
 	struct uk_mutex lock; /* Lock for modifying open file state */
+	unsigned int mode;
+#if CONFIG_LIBPOSIX_FD_HEAPOFD
+	__atomic refcnt;
+#endif /* CONFIG_LIBPOSIX_FD_HEAPOFD */
 	char name[]; /* Name of open file description; driver dependent */
 	/* Filesystem-backed files should be named after the path they were
 	 * opened with. Pseudo-files should be named something descriptive.
@@ -44,43 +50,15 @@ static inline
 void uk_ofile_init(struct uk_ofile *of,
 		   const struct uk_file *f, unsigned int mode)
 {
+#if CONFIG_LIBPOSIX_FD_HEAPOFD
 	uk_refcount_init(&of->refcnt, 1);
+#endif /* CONFIG_LIBPOSIX_FD_HEAPOFD */
 	uk_mutex_init(&of->lock);
 	of->file = f;
-	of->mode = mode;
+	/* O_CLOEXEC is uniquely not a file description flag; ignore */
+	of->mode = mode & ~O_CLOEXEC;
 	of->pos = 0;
 }
-
-/**
- * Acquire a reference on open file description `of`.
- *
- * @param of Open file description
- */
-static inline
-void uk_ofile_acquire(struct uk_ofile *of)
-{
-	uk_refcount_acquire(&of->refcnt);
-}
-
-/**
- * Release a reference held on open file description `of`.
- *
- * Do not call directly unless you are prepared to handle cleanup after the last
- * reference is dropped. Instead use the release function provided by the lib
- * where you got the open file reference from.
- *
- * @param of Open file description
- *
- * @return
- *  == 0: There are remaining references held
- *  != 0: The last reference has just been released
- */
-static inline
-int uk_ofile_release(struct uk_ofile *of)
-{
-	return uk_refcount_release(&of->refcnt);
-}
-
 
 /* Mode bits from fcntl.h that open files are interested in */
 #define UKFD_MODE_MASK \
@@ -114,5 +92,73 @@ const char *uk_ofile_name(const struct uk_ofile *of, const char *fallback)
 #define UKFD_POLL_ALWAYS (EPOLLERR|EPOLLHUP)
 #define UKFD_POLLIN (EPOLLIN|EPOLLRDNORM|EPOLLRDBAND)
 #define UKFD_POLLOUT (EPOLLOUT|EPOLLWRNORM|EPOLLWRBAND)
+
+/* Heap-allocated open file descriptions */
+
+#if CONFIG_LIBPOSIX_FD_HEAPOFD
+
+/**
+ * Allocate heap memory for an open file description with name of length `len`
+ * and initialize its fields.
+ *
+ * The caller is responsible for populating the .name field.
+ *
+ * @return
+ *   != NULL: Success
+ *   == NULL: Failed to allocate memory
+ */
+static inline
+struct uk_ofile *uk_ofile_new(const struct uk_file *f, unsigned int mode,
+			      size_t len)
+{
+	struct uk_ofile *ret = uk_malloc(uk_alloc_get_default(),
+					 UKFD_OFILE_SIZE(len));
+
+	if (unlikely(!ret))
+		return NULL;
+
+	if (len)
+		mode |= UKFD_O_NAMED;
+	uk_file_acquire(f);
+	uk_ofile_init(ret, f, mode);
+	return ret;
+}
+
+/**
+ * Free a heap-allocated open file description `of`.
+ */
+static inline
+void uk_ofile_free(struct uk_ofile *of)
+{
+	return uk_free(uk_alloc_get_default(), of);
+}
+
+/**
+ * Acquire a reference on open file description `of`.
+ *
+ * @param of Open file description
+ */
+static inline
+void uk_ofile_acquire(struct uk_ofile *of)
+{
+	uk_refcount_acquire(&of->refcnt);
+}
+
+/**
+ * Release a reference held on open file description `of`, freeing resources
+ * if needed.
+ */
+static inline
+void uk_ofile_release(struct uk_ofile *of)
+{
+	const int last_ref = uk_refcount_release(&of->refcnt);
+
+	if (unlikely(last_ref)) {
+		uk_file_release(of->file);
+		uk_ofile_free(of);
+	}
+}
+
+#endif /* CONFIG_LIBPOSIX_FD_HEAPOFD */
 
 #endif /* __UK_POSIX_FD_H__ */

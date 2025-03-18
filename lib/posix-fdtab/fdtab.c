@@ -128,41 +128,6 @@ static inline struct fdval fdtab_decode(void *p)
 	};
 }
 
-/* struct uk_ofile allocation & refcounting */
-static inline struct uk_ofile *ofile_new(struct uk_fdtab *tab,
-					 const struct uk_file *f,
-					 unsigned int mode,
-					 size_t len)
-{
-	struct uk_ofile *of;
-
-	of = uk_malloc(tab->alloc, UKFD_OFILE_SIZE(len));
-	if (of) {
-		if (len)
-			mode |= UKFD_O_NAMED;
-		uk_ofile_init(of, f, mode);
-	}
-	return of;
-}
-static inline void ofile_del(struct uk_fdtab *tab, struct uk_ofile *of)
-{
-	uk_free(tab->alloc, of);
-}
-
-static inline void ofile_acq(struct uk_ofile *of)
-{
-	uk_ofile_acquire(of);
-}
-static inline void ofile_rel(struct uk_fdtab *tab, struct uk_ofile *of)
-{
-	if (uk_ofile_release(of)) {
-		uk_file_release(of->file);
-		ofile_del(tab, of);
-	}
-}
-
-#if CONFIG_LIBPOSIX_FDTAB_LEGACY_SHIM
-
 static inline void file_acq(void *p, int flags __maybe_unused)
 {
 #if CONFIG_LIBVFSCORE
@@ -170,39 +135,20 @@ static inline void file_acq(void *p, int flags __maybe_unused)
 		fhold((struct vfscore_file *)p);
 	else
 #endif /* CONFIG_LIBVFSCORE */
-		ofile_acq((struct uk_ofile *)p);
+		uk_ofile_acquire((struct uk_ofile *)p);
 }
 
-static inline
-void file_rel(struct uk_fdtab *tab, void *p, int flags __maybe_unused)
+static inline void file_rel(void *p, int flags __maybe_unused)
 {
 #if CONFIG_LIBVFSCORE
 	if (flags & UK_FDTAB_VFSCORE)
 		fdrop((struct vfscore_file *)p);
 	else
 #endif /* CONFIG_LIBVFSCORE */
-		ofile_rel(tab, (struct uk_ofile *)p);
+		uk_ofile_release((struct uk_ofile *)p);
 }
-
-#else /* !CONFIG_LIBPOSIX_FDTAB_LEGACY_SHIM */
-
-#define file_acq(p, f) ofile_acq((struct uk_ofile *)(p))
-#define file_rel(t, p, f) ofile_rel((t), (struct uk_ofile *)(p))
-
-#endif /* !CONFIG_LIBPOSIX_FDTAB_LEGACY_SHIM */
 
 /* Ops */
-
-struct uk_ofile *uk_fdtab_new_desc(const struct uk_file *f, unsigned int mode,
-				   size_t len)
-{
-	struct uk_ofile *of;
-
-	of = ofile_new(active_fdtab, f, mode & ~O_CLOEXEC, len);
-	if (of)
-		uk_file_acquire(f);
-	return of;
-}
 
 int uk_fdtab_open_desc(struct uk_ofile *of, unsigned int mode)
 {
@@ -226,7 +172,7 @@ int uk_fdtab_open_named(const struct uk_file *f, unsigned int mode,
 	if (!name)
 		len = 0;
 
-	of = uk_fdtab_new_desc(f, mode, len);
+	of = uk_ofile_new(f, mode, len);
 	if (unlikely(!of))
 		return -ENOMEM;
 	if (len) {
@@ -237,7 +183,7 @@ int uk_fdtab_open_named(const struct uk_file *f, unsigned int mode,
 	/* Place the file in fdtab */
 	fd = uk_fdtab_open_desc(of, mode);
 	if (unlikely(fd < 0))
-		ofile_rel(active_fdtab, of);
+		uk_ofile_release(of);
 	return fd;
 }
 
@@ -351,7 +297,7 @@ int uk_fdtab_shim_get(int fd, union uk_shim_file *out)
 		{
 			struct uk_ofile *of = (struct uk_ofile *)v.p;
 
-			ofile_acq(of);
+			uk_ofile_acquire(of);
 			uk_fmap_critical_put(fmap, fd, p);
 			out->ofile = of;
 			return UK_SHIM_OFILE;
@@ -386,17 +332,11 @@ struct uk_ofile *uk_fdtab_get(int fd)
 #if CONFIG_LIBPOSIX_FDTAB_LEGACY_SHIM
 	/* Report legacy files as not present if called through new API */
 	if (v.p && v.flags & UK_FDTAB_VFSCORE) {
-		file_rel(active_fdtab, v.p, v.flags);
+		file_rel(v.p, v.flags);
 		return NULL;
 	}
 #endif /* CONFIG_LIBPOSIX_FDTAB_LEGACY_SHIM */
 	return (struct uk_ofile *)v.p;
-}
-
-void uk_fdtab_ret(struct uk_ofile *of)
-{
-	UK_ASSERT(of);
-	ofile_rel(active_fdtab, of);
 }
 
 static void fdtab_cleanup(struct uk_fdtab *tab, int all)
@@ -414,7 +354,7 @@ static void fdtab_cleanup(struct uk_fdtab *tab, int all)
 
 				pp = uk_fmap_take(fmap, i);
 				UK_ASSERT(p == pp);
-				file_rel(tab, v.p, v.flags);
+				file_rel(v.p, v.flags);
 			}
 		}
 	}
@@ -574,7 +514,7 @@ int uk_sys_close(int fd)
 	if (!p)
 		return -EBADF;
 	v = fdtab_decode(p);
-	file_rel(active_fdtab, v.p, v.flags);
+	file_rel(v.p, v.flags);
 	return 0;
 }
 
@@ -606,7 +546,7 @@ int uk_sys_dup3(int oldfd, int newfd, int flags)
 	if (prevp) {
 		struct fdval prevv = fdtab_decode(prevp);
 
-		file_rel(active_fdtab, prevv.p, prevv.flags);
+		file_rel(prevv.p, prevv.flags);
 	}
 	return newfd;
 }
@@ -642,7 +582,7 @@ int uk_sys_dup_min(int oldfd, int min, int flags)
 	newent = fdtab_encode(dup.p, dup.flags);
 	fd = uk_fmap_put(&active_fdtab->fmap, newent, min);
 	if (fd >= UK_FDTAB_SIZE) {
-		file_rel(active_fdtab, dup.p, dup.flags);
+		file_rel(dup.p, dup.flags);
 		return -ENFILE;
 	}
 	return fd;

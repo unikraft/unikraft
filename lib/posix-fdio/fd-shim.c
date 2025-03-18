@@ -28,7 +28,7 @@ UK_SYSCALL_R_DEFINE(ssize_t, preadv2, int, fd, const struct iovec *, iov,
 	switch (uk_fdtab_shim_get(fd, &sf)) {
 	case UK_SHIM_OFILE:
 		r = uk_sys_preadv2(sf.ofile, iov, iovcnt, offset, flags);
-		uk_fdtab_ret(sf.ofile);
+		uk_ofile_release(sf.ofile);
 		break;
 #if CONFIG_LIBVFSCORE
 	case UK_SHIM_LEGACY:
@@ -53,7 +53,7 @@ UK_SYSCALL_R_DEFINE(ssize_t, preadv, int, fd, const struct iovec *, iov,
 	switch (uk_fdtab_shim_get(fd, &sf)) {
 	case UK_SHIM_OFILE:
 		r = uk_sys_preadv(sf.ofile, iov, iovcnt, offset);
-		uk_fdtab_ret(sf.ofile);
+		uk_ofile_release(sf.ofile);
 		break;
 #if CONFIG_LIBVFSCORE
 	case UK_SHIM_LEGACY:
@@ -85,7 +85,7 @@ UK_SYSCALL_R_DEFINE(ssize_t, pread64, int, fd,
 	switch (uk_fdtab_shim_get(fd, &sf)) {
 	case UK_SHIM_OFILE:
 		r = uk_sys_pread(sf.ofile, buf, count, offset);
-		uk_fdtab_ret(sf.ofile);
+		uk_ofile_release(sf.ofile);
 		break;
 #if CONFIG_LIBVFSCORE
 	case UK_SHIM_LEGACY:
@@ -111,7 +111,7 @@ UK_SYSCALL_R_DEFINE(ssize_t, readv, int, fd,
 	switch (uk_fdtab_shim_get(fd, &sf)) {
 	case UK_SHIM_OFILE:
 		r = uk_sys_readv(sf.ofile, iov, iovcnt);
-		uk_fdtab_ret(sf.ofile);
+		uk_ofile_release(sf.ofile);
 		break;
 #if CONFIG_LIBVFSCORE
 	case UK_SHIM_LEGACY:
@@ -133,7 +133,7 @@ UK_SYSCALL_R_DEFINE(ssize_t, read, int, fd,
 	switch (uk_fdtab_shim_get(fd, &sf)) {
 	case UK_SHIM_OFILE:
 		r = uk_sys_read(sf.ofile, buf, count);
-		uk_fdtab_ret(sf.ofile);
+		uk_ofile_release(sf.ofile);
 		break;
 #if CONFIG_LIBVFSCORE
 	case UK_SHIM_LEGACY:
@@ -155,7 +155,7 @@ UK_SYSCALL_R_DEFINE(ssize_t, pwritev2, int, fd, const struct iovec*, iov,
 	switch (uk_fdtab_shim_get(fd, &sf)) {
 	case UK_SHIM_OFILE:
 		r = uk_sys_pwritev2(sf.ofile, iov, iovcnt, offset, flags);
-		uk_fdtab_ret(sf.ofile);
+		uk_ofile_release(sf.ofile);
 		break;
 #if CONFIG_LIBVFSCORE
 	case UK_SHIM_LEGACY:
@@ -180,7 +180,7 @@ UK_SYSCALL_R_DEFINE(ssize_t, pwritev, int, fd, const struct iovec*, iov,
 	switch (uk_fdtab_shim_get(fd, &sf)) {
 	case UK_SHIM_OFILE:
 		r = uk_sys_pwritev(sf.ofile, iov, iovcnt, offset);
-		uk_fdtab_ret(sf.ofile);
+		uk_ofile_release(sf.ofile);
 		break;
 #if CONFIG_LIBVFSCORE
 	case UK_SHIM_LEGACY:
@@ -207,7 +207,7 @@ UK_SYSCALL_R_DEFINE(ssize_t, pwrite64, int, fd,
 	switch (uk_fdtab_shim_get(fd, &sf)) {
 	case UK_SHIM_OFILE:
 		r = uk_sys_pwrite(sf.ofile, buf, count, offset);
-		uk_fdtab_ret(sf.ofile);
+		uk_ofile_release(sf.ofile);
 		break;
 #if CONFIG_LIBVFSCORE
 	case UK_SHIM_LEGACY:
@@ -233,7 +233,7 @@ UK_SYSCALL_R_DEFINE(ssize_t, writev, int, fd, const struct iovec *, iov,
 	switch (uk_fdtab_shim_get(fd, &sf)) {
 	case UK_SHIM_OFILE:
 		r = uk_sys_writev(sf.ofile, iov, iovcnt);
-		uk_fdtab_ret(sf.ofile);
+		uk_ofile_release(sf.ofile);
 		break;
 #if CONFIG_LIBVFSCORE
 	case UK_SHIM_LEGACY:
@@ -254,7 +254,7 @@ UK_SYSCALL_R_DEFINE(ssize_t, write, int, fd, const void *, buf, size_t, count)
 	switch (uk_fdtab_shim_get(fd, &sf)) {
 	case UK_SHIM_OFILE:
 		r = uk_sys_write(sf.ofile, buf, count);
-		uk_fdtab_ret(sf.ofile);
+		uk_ofile_release(sf.ofile);
 		break;
 #if CONFIG_LIBVFSCORE
 	case UK_SHIM_LEGACY:
@@ -275,7 +275,7 @@ UK_SYSCALL_R_DEFINE(off_t, lseek, int, fd, off_t, offset, int, whence)
 	switch (uk_fdtab_shim_get(fd, &sf)) {
 	case UK_SHIM_OFILE:
 		r = uk_sys_lseek(sf.ofile, offset, whence);
-		uk_fdtab_ret(sf.ofile);
+		uk_ofile_release(sf.ofile);
 		break;
 #if CONFIG_LIBVFSCORE
 	case UK_SHIM_LEGACY:
@@ -307,7 +307,7 @@ UK_SYSCALL_R_DEFINE(int, fstat, int, fd, struct stat *, statbuf)
 	switch (uk_fdtab_shim_get(fd, &sf)) {
 	case UK_SHIM_OFILE:
 		r = uk_sys_fstat(sf.ofile, statbuf);
-		uk_fdtab_ret(sf.ofile);
+		uk_ofile_release(sf.ofile);
 		break;
 #if CONFIG_LIBVFSCORE
 	case UK_SHIM_LEGACY:
@@ -330,7 +330,7 @@ UK_SYSCALL_R_DEFINE(int, fchmod, int, fd, mode_t, mode)
 	switch (uk_fdtab_shim_get(fd, &sf)) {
 	case UK_SHIM_OFILE:
 		r = uk_sys_fchmod(sf.ofile, mode);
-		uk_fdtab_ret(sf.ofile);
+		uk_ofile_release(sf.ofile);
 		break;
 #if CONFIG_LIBVFSCORE
 	case UK_SHIM_LEGACY:
@@ -353,7 +353,7 @@ UK_SYSCALL_R_DEFINE(int, fchown, int, fd, uid_t, owner, gid_t, group)
 	switch (uk_fdtab_shim_get(fd, &sf)) {
 	case UK_SHIM_OFILE:
 		r = uk_sys_fchown(sf.ofile, owner, group);
-		uk_fdtab_ret(sf.ofile);
+		uk_ofile_release(sf.ofile);
 		break;
 #if CONFIG_LIBVFSCORE
 	case UK_SHIM_LEGACY:
@@ -378,7 +378,7 @@ UK_SYSCALL_R_DEFINE(int, fsync, int, fd)
 	switch (uk_fdtab_shim_get(fd, &sf)) {
 	case UK_SHIM_OFILE:
 		r = uk_sys_fsync(sf.ofile);
-		uk_fdtab_ret(sf.ofile);
+		uk_ofile_release(sf.ofile);
 		break;
 #if CONFIG_LIBVFSCORE
 	case UK_SHIM_LEGACY:
@@ -401,7 +401,7 @@ UK_SYSCALL_R_DEFINE(int, fdatasync, int, fd)
 	switch (uk_fdtab_shim_get(fd, &sf)) {
 	case UK_SHIM_OFILE:
 		r = uk_sys_fdatasync(sf.ofile);
-		uk_fdtab_ret(sf.ofile);
+		uk_ofile_release(sf.ofile);
 		break;
 #if CONFIG_LIBVFSCORE
 	case UK_SHIM_LEGACY:
@@ -425,7 +425,7 @@ UK_SYSCALL_R_DEFINE(int, ftruncate, int, fd, off_t, len)
 	switch (uk_fdtab_shim_get(fd, &sf)) {
 	case UK_SHIM_OFILE:
 		r = uk_sys_ftruncate(sf.ofile, len);
-		uk_fdtab_ret(sf.ofile);
+		uk_ofile_release(sf.ofile);
 		break;
 #if CONFIG_LIBVFSCORE
 	case UK_SHIM_LEGACY:
@@ -448,7 +448,7 @@ UK_SYSCALL_R_DEFINE(int, fallocate, int, fd, int, mode, off_t, off, off_t, len)
 	switch (uk_fdtab_shim_get(fd, &sf)) {
 	case UK_SHIM_OFILE:
 		r = uk_sys_fallocate(sf.ofile, mode, off, len);
-		uk_fdtab_ret(sf.ofile);
+		uk_ofile_release(sf.ofile);
 		break;
 #if CONFIG_LIBVFSCORE
 	case UK_SHIM_LEGACY:
@@ -472,7 +472,7 @@ UK_SYSCALL_R_DEFINE(int, fadvise64,
 	switch (uk_fdtab_shim_get(fd, &sf)) {
 	case UK_SHIM_OFILE:
 		r = uk_sys_fadvise(sf.ofile, off, len, advice);
-		uk_fdtab_ret(sf.ofile);
+		uk_ofile_release(sf.ofile);
 		break;
 #if CONFIG_LIBVFSCORE
 	case UK_SHIM_LEGACY:
@@ -514,7 +514,7 @@ UK_LLSYSCALL_R_DEFINE(int, fcntl, int, fd,
 		switch (uk_fdtab_shim_get(fd, &sf)) {
 		case UK_SHIM_OFILE:
 			r = uk_sys_fcntl(sf.ofile, cmd, arg);
-			uk_fdtab_ret(sf.ofile);
+			uk_ofile_release(sf.ofile);
 			break;
 #if CONFIG_LIBVFSCORE
 		case UK_SHIM_LEGACY:
@@ -587,7 +587,7 @@ UK_LLSYSCALL_R_DEFINE(int, ioctl, int, fd, unsigned int, request, void *, arg)
 		switch (uk_fdtab_shim_get(fd, &sf)) {
 		case UK_SHIM_OFILE:
 			r = uk_sys_ioctl(sf.ofile, request, arg);
-			uk_fdtab_ret(sf.ofile);
+			uk_ofile_release(sf.ofile);
 			break;
 #if CONFIG_LIBVFSCORE
 		case UK_SHIM_LEGACY:

@@ -410,7 +410,7 @@ UK_SYSCALL_R_DEFINE(int, timerfd_settime, int, fd, int, flags,
 	if (unlikely(!of))
 		return -EBADF;
 	r = uk_sys_timerfd_settime(of->file, flags, new_value, old_value);
-	uk_fdtab_ret(of);
+	uk_ofile_release(of);
 	return r;
 }
 
@@ -427,7 +427,7 @@ UK_SYSCALL_R_DEFINE(int, timerfd_gettime, int, fd,
 	if (unlikely(!of))
 		return -EBADF;
 	r = uk_sys_timerfd_gettime(of->file, curr_value);
-	uk_fdtab_ret(of);
+	uk_ofile_release(of);
 	return r;
 }
 #endif /* CONFIG_LIBPOSIX_FDTAB */
