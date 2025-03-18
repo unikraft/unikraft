@@ -43,7 +43,6 @@
 
 #if CONFIG_LIBPOSIX_PROCESS_PIDS
 #include <uk/thread.h>
-#endif /* CONFIG_LIBPOSIX_PROCESS_PIDS */
 
 #define TIDMAP_SIZE (CONFIG_LIBPOSIX_PROCESS_MAX_PID + 1)
 
@@ -111,16 +110,15 @@ extern __uk_tls struct posix_thread *pthread_self;
 #define uk_pprocess_current()						\
 	uk_pthread_current()->process
 
-#if CONFIG_LIBPOSIX_PROCESS_PIDS
 struct posix_process *pid2pprocess(pid_t pid);
 struct uk_thread *tid2ukthread(pid_t tid);
 struct posix_thread *tid2pthread(pid_t tid);
 struct posix_process *tid2pprocess(pid_t tid);
 pid_t ukthread2tid(struct uk_thread *thread);
 pid_t ukthread2pid(struct uk_thread *thread);
-#endif /* CONFIG_LIBPOSIX_PROCESS_PIDS */
 
 void pprocess_kill_siblings(struct uk_thread *thread);
+#endif /* CONFIG_LIBPOSIX_PROCESS_PIDS */
 
 #if CONFIG_LIBPOSIX_PROCESS_CLONE
 int uk_clone(struct clone_args *cl_args, size_t cl_args_len,
