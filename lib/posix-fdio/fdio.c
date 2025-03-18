@@ -409,8 +409,6 @@ off_t uk_sys_lseek(struct uk_ofile *of, off_t offset, int whence)
 
 	mode = of->mode;
 
-	if (unlikely(!_CAN_WRITE(mode)))
-		return -EINVAL;
 	if (unlikely(!_IS_SEEKABLE(mode)))
 		return -ESPIPE;
 
