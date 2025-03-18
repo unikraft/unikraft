@@ -1,0 +1,3 @@
+$(eval $(call addlib_s,libukfs_ramfs,$(CONFIG_LIBUKFS_RAMFS)))
+
+LIBUKFS_RAMFS_SRCS-y += $(LIBUKFS_RAMFS_BASE)/ramfs.c

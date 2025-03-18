@@ -1,0 +1,13 @@
+config LIBUKFS_RAMFS
+	bool "ukfs-ramfs: Memory resident volatile filesystem"
+	select LIBUKFILE
+	select LIBUKFS
+	select LIBUKATOMIC
+	select LIBUKALLOC
+	select LIBUKLOCK
+	select LIBUKPOD
+	select LIBUKPOD_ANON
+	select LIBUKPOD_DEFAULT
+	select LIBUKSPARSEBUF
+	select LIBPOSIX_FD
+	select LIBPOSIX_TIME
