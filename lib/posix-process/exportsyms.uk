@@ -42,3 +42,4 @@ uk_posix_process_create
 uk_posix_process_kill
 clone
 vfork
+sigprocmask
