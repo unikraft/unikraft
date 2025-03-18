@@ -499,7 +499,10 @@ UK_LLSYSCALL_R_DEFINE(int, fcntl, int, fd,
 	case F_DUPFD:
 		return uk_sys_dup_min(fd, (int)arg, fdflags);
 	case F_GETFD:
-		return (uk_fdtab_getflags(fd) & O_CLOEXEC) ? FD_CLOEXEC : 0;
+		fdflags = uk_fdtab_getflags(fd);
+		if (unlikely(fdflags < 0))
+			return fdflags;
+		return (fdflags & O_CLOEXEC) ? FD_CLOEXEC : 0;
 	case F_SETFD:
 		return uk_fdtab_setflags(fd,
 			((int)arg & FD_CLOEXEC) ? O_CLOEXEC : 0);
