@@ -305,8 +305,10 @@ uk_pollevent uk_file_state_event_assign(struct uk_file_state *st,
 #if CONFIG_LIBUKFILE_FINALIZERS
 typedef struct uk_file_finref uk_file_refcnt;
 
-#define UK_FILE_REFCNT_INITIALIZER(name) UK_FILE_FINREF_INITIALIZER((name), 1)
-#define UK_FILE_REFCNT_INIT_VALUE(name) UK_FILE_FINREF_INIT_VALUE((name), 1)
+#define UK_FILE_REFCNT_INITIALIZER_V(name, v) \
+	UK_FILE_FINREF_INITIALIZER((name), (v))
+#define UK_FILE_REFCNT_INIT_VALUE_V(name, v) \
+	UK_FILE_FINREF_INIT_VALUE((name), (v))
 
 #define uk_file_refcnt_finalize uk_file_finref_finalize
 
@@ -319,8 +321,10 @@ typedef struct uk_file_finref uk_file_refcnt;
 #else /* !CONFIG_LIBUKFILE_FINALIZERS */
 typedef struct uk_swrefcount uk_file_refcnt;
 
-#define UK_FILE_REFCNT_INITIALIZER(name) UK_SWREFCOUNT_INITIALIZER(1, 1)
-#define UK_FILE_REFCNT_INIT_VALUE(name) UK_SWREFCOUNT_INIT_VALUE(1, 1)
+#define UK_FILE_REFCNT_INITIALIZER_V(name, v) \
+	UK_SWREFCOUNT_INITIALIZER((v), (v))
+#define UK_FILE_REFCNT_INIT_VALUE_V(name, v) \
+	UK_SWREFCOUNT_INIT_VALUE((v), (v))
 
 #define uk_file_refcnt_finalize(_) do { } while (0)
 
@@ -333,6 +337,8 @@ typedef struct uk_swrefcount uk_file_refcnt;
 #endif /* !CONFIG_LIBUKFILE_FINALIZERS */
 /* Files always get created with one strong reference held */
 /* See above comment for file state on initializers vs initial values */
+#define UK_FILE_REFCNT_INITIALIZER(name) UK_FILE_REFCNT_INITIALIZER_V((name), 1)
+#define UK_FILE_REFCNT_INIT_VALUE(name) UK_FILE_REFCNT_INIT_VALUE_V((name), 1)
 
 #if CONFIG_LIBUKFS
 struct uk_fs_ops;
