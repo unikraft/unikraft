@@ -454,7 +454,7 @@ typedef long uk_syscall_arg_t;
 
 #define __UK_LLSYSCALL_R_E_DEFINE(x, rtype, name, ename, rname, doname, ...)\
 	long rname(long _execenv);					\
-	long __used ename(long _execenv)				\
+	long ename(long _execenv)					\
 	{								\
 		long ret;						\
 									\
@@ -468,7 +468,7 @@ typedef long uk_syscall_arg_t;
 	static inline rtype __##rname(UK_EXECENV_DECLMAPx(UK_S_EXECENV_ARG_ACTUAL,\
 						      x, UK_S_ARG_ACTUAL,\
 						      __VA_ARGS__));	\
-	long __used rname(long _execenv)				\
+	long rname(long _execenv)					\
 	{								\
 		struct ukarch_execenv *execenv;				\
 		long ret;						\
@@ -488,7 +488,7 @@ typedef long uk_syscall_arg_t;
 		return ret;						\
 	}								\
 									\
-	long __used doname(long _execenv)				\
+	long doname(long _execenv)					\
 	{								\
 		struct ukarch_execenv *execenv;				\
 		long ret;						\
@@ -503,7 +503,7 @@ typedef long uk_syscall_arg_t;
 									\
 		return ret;						\
 	}								\
-	static inline rtype __used __##rname(UK_EXECENV_DECLMAPx(	\
+	static inline rtype __##rname(UK_EXECENV_DECLMAPx(		\
 					     UK_S_EXECENV_ARG_ACTUAL_MAYBE_UNUSED,\
 					     x, UK_S_ARG_ACTUAL_MAYBE_UNUSED,\
 					     __VA_ARGS__))
