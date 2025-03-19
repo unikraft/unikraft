@@ -77,9 +77,9 @@ static int pprocess_cleanup(struct uk_thread *thread __maybe_unused)
 	return 0;
 }
 
-UK_LLSYSCALL_R_E_DEFINE(int, execve, const char *, pathname,
-			char *const *, argv,
-			char *const *, envp)
+UK_SYSCALL_R_E_DEFINE(int, execve, const char *, pathname,
+		      char *const *, argv,
+		      char *const *, envp)
 {
 	struct posix_process_execve_event_data event_data;
 	struct uk_binfmt_loader_args loader_args;
