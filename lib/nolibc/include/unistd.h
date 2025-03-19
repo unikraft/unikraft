@@ -117,7 +117,9 @@ ssize_t pwrite(int fd, const void *buf, size_t count, off_t offset);
 ssize_t read(int fd, void *buf, size_t count);
 ssize_t pread(int fd, void *buf, size_t count, off_t offset);
 int fsync(int fd);
+int fdatasync(int fd);
 off_t lseek(int fd, off_t offset, int whence);
+int ftruncate(int fd, off_t length);
 #endif /* CONFIG_LIBPOSIX_FDIO */
 #endif /* CONFIG_LIBPOSIX_FDTAB */
 
