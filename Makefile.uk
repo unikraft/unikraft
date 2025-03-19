@@ -96,7 +96,7 @@ endif
 COMPFLAGS-$(call gcc_version_ge,7,0)	+= -fPIE
 LDFLAGS-$(call gcc_version_ge,7,0)	+= -static-pie
 LDFLAGS-$(call gcc_version_ge,7,0)	+= -Wl,--no-dynamic-linker
-LDFLAGS-$(call gcc_version_ge,7,0)	+= -z notext -z norelro
+LDFLAGS-$(call gcc_version_ge,7,0)	+= -z notext
 COMPFLAGS-$(call have_clang)	+= -fPIE
 LDFLAGS-$(call have_clang)	+= -static-pie
 LDFLAGS-$(call have_clang)	+= -Wl,--no-dynamic-linker
