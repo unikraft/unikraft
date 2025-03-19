@@ -6,6 +6,7 @@
 
 #include <string.h>
 #include <fcntl.h>
+#include <sys/stat.h>
 
 #include <uk/atomic.h>
 #include <uk/alloc.h>
@@ -318,10 +319,21 @@ out_full:
 	return -EAGAIN;
 }
 
+static int pipe_getstat(const struct uk_file *f, unsigned mask __unused,
+			struct uk_statx *arg)
+{
+	/* All data is immediately available, ignore mask */
+	arg->stx_mask = UK_STATX_TYPE | UK_STATX_MODE | UK_STATX_INO;
+	arg->stx_blksize = 1;
+	arg->stx_mode = S_IFIFO | 0600;
+	arg->stx_ino = (uintptr_t)f;
+	return 0;
+}
+
 static const struct uk_file_ops rpipe_ops = {
 	.read = pipe_read,
 	.write = uk_file_nop_write,
-	.getstat = uk_file_nop_getstat,
+	.getstat = pipe_getstat,
 	.setstat = uk_file_nop_setstat,
 	.ctl = uk_file_nop_ctl
 };
@@ -329,7 +341,7 @@ static const struct uk_file_ops rpipe_ops = {
 static const struct uk_file_ops wpipe_ops = {
 	.read = uk_file_nop_read,
 	.write = pipe_write,
-	.getstat = uk_file_nop_getstat,
+	.getstat = pipe_getstat,
 	.setstat = uk_file_nop_setstat,
 	.ctl = uk_file_nop_ctl
 };
