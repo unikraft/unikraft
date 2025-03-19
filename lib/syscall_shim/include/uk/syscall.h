@@ -567,6 +567,74 @@ typedef long uk_syscall_arg_t;
 			       __VA_ARGS__)
 #endif /* UK_LIBC_SYSCALLS */
 
+/*
+ * UK_SYSCALL_R_E_DEFINE()
+ * Based on UK_LLSYSCALL_R_E_DEFINE and provides a libc-style wrapper
+ * in case UK_LIBC_SYSCALLS is enabled
+ */
+#if UK_LIBC_SYSCALLS
+#define __UK_SYSCALL_R_E_DEFINE(x, rtype, name, ename, rname, doname, ...)\
+	long ename(UK_ARG_MAPx(x, UK_S_ARG_LONG, __VA_ARGS__));		\
+	rtype name(UK_ARG_MAPx(x, UK_S_ARG_ACTUAL, __VA_ARGS__))	\
+	{								\
+		rtype ret;						\
+									\
+		ret = (rtype) ename(					\
+			UK_ARG_MAPx(x, UK_S_ARG_CAST_LONG, __VA_ARGS__)); \
+		return ret;						\
+	}								\
+	_UK_LLSYSCALL_R_E_DEFINE(x,					\
+				 rtype,					\
+				 name,					\
+				 __UK_NAME2SCALLE_FN(e_##name),		\
+				 __UK_NAME2SCALLR_FN(e_##name),		\
+				 __UK_NAME2SCALLDO_FN(e_##name),	\
+				 __VA_ARGS__)
+#define _UK_SYSCALL_R_E_DEFINE(...) __UK_SYSCALL_R_E_DEFINE(__VA_ARGS__)
+#define UK_SYSCALL_R_E_DEFINE(rtype, name, ...)				\
+	UK_SYSCALL_EXECENV_PROLOGUE_DEFINE(__UK_NAME2SCALLE_FN(name),	\
+				       __UK_NAME2SCALLE_FN(e_##name),	\
+				       UK_NARGS(__VA_ARGS__),		\
+				       __VA_ARGS__)			\
+	UK_SYSCALL_EXECENV_PROLOGUE_DEFINE(__UK_NAME2SCALLR_FN(name),	\
+				       __UK_NAME2SCALLR_FN(e_##name),	\
+				       UK_NARGS(__VA_ARGS__),		\
+				       __VA_ARGS__)			\
+	UK_SYSCALL_EXECENV_PROLOGUE_DEFINE(__UK_NAME2SCALLDO_FN(name),	\
+				       __UK_NAME2SCALLDO_FN(e_##name),	\
+				       UK_NARGS(__VA_ARGS__),		\
+				       __VA_ARGS__)			\
+	_UK_SYSCALL_R_E_DEFINE(UK_NARGS(__VA_ARGS__),			\
+			     rtype,					\
+			     name,					\
+			     __UK_NAME2SCALLE_FN(name),			\
+			     __UK_NAME2SCALLR_FN(name),			\
+			     __UK_NAME2SCALLDO_FN(name),		\
+			     __VA_ARGS__)
+#else
+#define UK_SYSCALL_R_E_DEFINE(rtype, name, ...)				\
+	UK_SYSCALL_EXECENV_PROLOGUE_DEFINE(__UK_NAME2SCALLE_FN(name),	\
+				       __UK_NAME2SCALLE_FN(e_##name),	\
+				       UK_NARGS(__VA_ARGS__),		\
+				       __VA_ARGS__)			\
+	UK_SYSCALL_EXECENV_PROLOGUE_DEFINE(__UK_NAME2SCALLR_FN(name),	\
+				       __UK_NAME2SCALLR_FN(e_##name),	\
+				       UK_NARGS(__VA_ARGS__),		\
+				       __VA_ARGS__)			\
+	UK_SYSCALL_EXECENV_PROLOGUE_DEFINE(__UK_NAME2SCALLDO_FN(name),	\
+				       __UK_NAME2SCALLDO_FN(e_##name),	\
+				       UK_NARGS(__VA_ARGS__),		\
+				       __VA_ARGS__)			\
+	_UK_LLSYSCALL_R_E_DEFINE(UK_NARGS(__VA_ARGS__),			\
+				 rtype,					\
+				 name,					\
+				 __UK_NAME2SCALLE_FN(e_##name),		\
+				 __UK_NAME2SCALLR_FN(e_##name),		\
+				 __UK_NAME2SCALLDO_FN(e_##name),	\
+				 __VA_ARGS__)
+
+#endif /* UK_LIBC_SYSCALLS */
+
 
 #define __UK_SPROTO_ARGS_TYPE long
 #define __UK_SPROTO_ARGS0()  void
