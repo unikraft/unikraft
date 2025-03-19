@@ -506,6 +506,7 @@ name##_RB_IDENTKEY(struct type *a)					\
 	UK_RB_GENERATE_REMOVE(name, type, field, attr)			\
 	UK_RB_GENERATE_FIND(name, type, field, cmp, key, attr)		\
 	UK_RB_GENERATE_NFIND(name, type, field, cmp, key, attr)		\
+	UK_RB_GENERATE_PFIND(name, type, field, cmp, key, attr)		\
 	UK_RB_GENERATE_NEXT(name, type, field, attr)			\
 	UK_RB_GENERATE_INSERT_NEXT(name, type, field, cmp, key, attr)	\
 	UK_RB_GENERATE_PREV(name, type, field, attr)			\
@@ -945,6 +946,28 @@ name##_RB_NFIND(struct name *head, __typeof(key(__NULL)) elm)		\
 	return (res);							\
 }
 
+#define UK_RB_GENERATE_PFIND(name, type, field, cmp, key, attr)		\
+/* Finds the largest node lesser than or equal to the search key */	\
+attr struct type *							\
+name##_RB_PFIND(struct name *head, __typeof(key(__NULL)) elm)		\
+{									\
+	struct type *tmp = UK_RB_ROOT(head);				\
+	struct type *res = __NULL;					\
+	UK__RB_CMPTYPE(cmp, key) comp;					\
+	while (tmp) {							\
+		comp = cmp(elm, (key)(tmp));				\
+		if (comp < 0)						\
+			tmp = UK_RB_LEFT(tmp, field);			\
+		else if (comp > 0) {					\
+			res = tmp;					\
+			tmp = UK_RB_RIGHT(tmp, field);			\
+		}							\
+		else							\
+			return (tmp);					\
+	}								\
+	return (res);							\
+}
+
 #define UK_RB_GENERATE_NEXT(name, type, field, attr)			\
 /* ARGSUSED */								\
 attr struct type *							\
@@ -1063,6 +1086,7 @@ name##_RB_REINSERT(struct name *head, struct type *elm)			\
 #define UK_RB_REMOVE(name, x, y)	name##_RB_REMOVE(x, y)
 #define UK_RB_FIND(name, x, y)	name##_RB_FIND(x, y)
 #define UK_RB_NFIND(name, x, y)	name##_RB_NFIND(x, y)
+#define UK_RB_PFIND(name, x, y)	name##_RB_PFIND(x, y)
 #define UK_RB_NEXT(name, x, y)	name##_RB_NEXT(y)
 #define UK_RB_PREV(name, x, y)	name##_RB_PREV(y)
 #define UK_RB_MIN(name, x)		name##_RB_MINMAX(x, UK_RB_NEGINF)
