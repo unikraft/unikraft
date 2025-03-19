@@ -6,6 +6,8 @@ config LIBUKFILE
 	select LIBUKSCHED
 	select LIBNOLIBC if !HAVE_LIBC
 
+if LIBUKFILE
+
 # Hidden, selected by core components when required
 config LIBUKFILE_CHAINUPDATE
 	bool
@@ -17,3 +19,5 @@ config LIBUKFILE_FINALIZERS
 
 config LIBUKFILE_POLLED
 	bool
+
+endif
