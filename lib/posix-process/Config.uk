@@ -4,40 +4,17 @@ menuconfig LIBPOSIX_PROCESS
 
 if LIBPOSIX_PROCESS
 
-menuconfig LIBPOSIX_PROCESS_PIDS
-	bool "Process and thread IDs"
-	select LIBUKSCHED
+menuconfig LIBPOSIX_PROCESS_MULTITHREADING
+	bool "Multithreading support"
 
-if LIBPOSIX_PROCESS_PIDS
-
+if LIBPOSIX_PROCESS_MULTITHREADING
 config LIBPOSIX_PROCESS_MAX_PID
-	int "Largest PID"
+	int "Largest TID"
 	range 1 32767
 	default 31
 
-config LIBPOSIX_PROCESS_INIT_PIDS
-	bool "Assign PID during boot"
-
-endif
-
-config LIBPOSIX_PROCESS_SIGNAL
-	bool "POSIX signals (EXPERIMENTAL)"
-	select LIBPOSIX_PROCESS_PIDS
-	select LIBSYSCALL_SHIM
-	select LIBUKLOCK
-
-config LIBPOSIX_PROCESS_CLONE
-	bool "clone() system call"
-	select LIBPOSIX_PROCESS_PIDS
-
-config LIBPOSIX_PROCESS_SIGNALFD
-	bool "signalfd4() and signalfd() syscalls"
-	depends on LIBPOSIX_PROCESS_SIGNAL
-	select LIBUKFILE_POLLED
-
 config LIBPOSIX_PROCESS_CLONE_PREFER_CHILD
 	bool "Prefer scheduling of child"
-	depends on LIBPOSIX_PROCESS_CLONE
 	help
 		If enabled, clone will context switch away from the clone
 		caller. This is necessary for some applications that assume that
@@ -46,13 +23,35 @@ config LIBPOSIX_PROCESS_CLONE_PREFER_CHILD
 
 config LIBPOSIX_PROCESS_EXECVE
 	bool "execve() system call"
-	select LIBPOSIX_PROCESS_PIDS
+	depends on HAVE_VFS
 	select LIBUKBINFMT
 
-config LIBPOSIX_PROCESS_VFORK
-	bool "vfork() system call"
-	select LIBPOSIX_PROCESS_PIDS
-	select LIBPOSIX_PROCESS_CLONE
+endif
+
+menuconfig LIBPOSIX_PROCESS_MULTIPROCESS
+	bool "Multiprocess support"
+	depends on HAVE_VFS
+	select LIBPOSIX_PROCESS_MULTITHREADING
+	select LIBPOSIX_PROCESS_EXECVE
+
+if LIBPOSIX_PROCESS_MULTIPROCESS
+
+config LIBPOSIX_PROCESS_INIT_PIDS
+	bool "Assign PID during boot"
+
+endif
+
+config LIBPOSIX_PROCESS_SIGNAL
+	bool "POSIX signals (EXPERIMENTAL)"
+	select LIBPOSIX_PROCESS_MULTITHREADING
+	select LIBPOSIX_PROCESS_EXECVE
+	select LIBSYSCALL_SHIM
+	select LIBUKLOCK
+
+config LIBPOSIX_PROCESS_SIGNALFD
+	bool "signalfd4() and signalfd() syscalls"
+	depends on LIBPOSIX_PROCESS_SIGNAL
+	select LIBUKFILE_POLLED
 
 config LIBPOSIX_PROCESS_DEBUG
 	bool "Enable debug messages"

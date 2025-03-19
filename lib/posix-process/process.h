@@ -33,20 +33,20 @@
 #ifndef __PROCESS_H_INTERNAL__
 #define __PROCESS_H_INTERNAL__
 
-#include <uk/config.h>
 #include <sys/types.h>
+#include <uk/config.h>
 
-#if CONFIG_LIBPOSIX_PROCESS_CLONE
+#if CONFIG_LIBPOSIX_PROCESS_MULTITHREADING
 #include <linux/sched.h>
 #include <uk/arch/ctx.h>
-#endif /* CONFIG_LIBPOSIX_PROCESS_CLONE */
-
-#if CONFIG_LIBPOSIX_PROCESS_PIDS
 #include <uk/thread.h>
-
-#define TIDMAP_SIZE (CONFIG_LIBPOSIX_PROCESS_MAX_PID + 1)
+#endif /* CONFIG_LIBPOSIX_PROCESS_MULTITHREADING */
 
 extern struct uk_thread *pprocess_thread_main;
+
+#if CONFIG_LIBPOSIX_PROCESS_MULTITHREADING
+
+#define TIDMAP_SIZE (CONFIG_LIBPOSIX_PROCESS_MAX_PID + 1)
 
 /* Notice: The RUNNING state is not necessarily in sync with the state
  * of the underlying uk_thread (may be blocked by the scheduler).
@@ -120,11 +120,9 @@ pid_t ukthread2tid(struct uk_thread *thread);
 pid_t ukthread2pid(struct uk_thread *thread);
 
 void pprocess_kill_siblings(struct uk_thread *thread);
-#endif /* CONFIG_LIBPOSIX_PROCESS_PIDS */
 
-#if CONFIG_LIBPOSIX_PROCESS_CLONE
 int uk_clone(struct clone_args *cl_args, size_t cl_args_len,
 	     struct ukarch_execenv *execenv);
-#endif /* CONFIG_LIBPOSIX_PROCESS_CLONE */
+#endif /* CONFIG_LIBPOSIX_PROCESS_MULTITHREADING */
 
 #endif /* __PROCESS_H_INTERNAL__ */

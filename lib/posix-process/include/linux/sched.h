@@ -42,7 +42,7 @@
 extern "C" {
 #endif
 
-#if CONFIG_LIBPOSIX_PROCESS_CLONE
+#if CONFIG_LIBPOSIX_PROCESS_MULTITHREADING
 /* Clone arguments for SYS_clone3
  * long syscall(SYS_clone3, struct clone_args *cl_args, size_t size);
  */
@@ -65,7 +65,7 @@ struct clone_args {
 			     * of child (since Linux 5.7)
 			     */
 };
-#endif /* CONFIG_LIBPOSIX_PROCESS_CLONE */
+#endif /* CONFIG_LIBPOSIX_PROCESS_MULTITHREADING */
 
 #ifdef __cplusplus
 }

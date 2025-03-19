@@ -103,7 +103,7 @@ struct uk_sigaction {
 	__atomic refcnt;
 };
 
-#if CONFIG_LIBPOSIX_PROCESS_PIDS
+#if CONFIG_LIBPOSIX_PROCESS_MULTITHREADING
 
 /* Descriptor of a pending signal.
  *
@@ -364,6 +364,6 @@ bool pprocess_signal_should_drop(struct posix_process *pproc, int signum)
 #endif /* !CONFIG_LIBPOSIX_PROCESS_SIGNALFD */
 #endif /* CONFIG_LIBPOSIX_PROCESS_SIGNAL */
 
-#endif /* CONFIG_LIBPOSIX_PROCESS_PIDS */
+#endif /* CONFIG_LIBPOSIX_PROCESS_MULTITHREADING */
 
 #endif /* __UK_PROCESS_SIGNAL_H__ */

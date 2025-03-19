@@ -324,6 +324,7 @@ static void _clone_child_gc(struct uk_thread *t)
 int uk_clone(struct clone_args *cl_args, size_t cl_args_len,
 	     struct ukarch_execenv *execenv)
 {
+	struct posix_process *pprocess;
 	struct posix_thread *pthread;
 	struct uk_thread *child = NULL;
 	struct uk_thread *t;
@@ -397,6 +398,13 @@ int uk_clone(struct clone_args *cl_args, size_t cl_args_len,
 	uk_pr_debug(" <return>: %p\n", (void *)execenv->regs.rip);
 	uk_pr_debug(")\n");
 #endif /* UK_DEBUG */
+
+#if !CONFIG_LIBPOSIX_PROCESS_MULTIPROCESS
+	if (unlikely(flags & !CLONE_THREAD)) {
+		uk_pr_err("Multiprocess support not enabled\n");
+		return -ENOTSUP;
+	}
+#endif /* !CONFIG_LIBPOSIX_PROCESS_MULTIPROCESS */
 
 	/* CLONE_VM requires that the child operates on the same memory
 	 * space as the parent.
@@ -478,6 +486,7 @@ int uk_clone(struct clone_args *cl_args, size_t cl_args_len,
 #endif /* CONFIG_LIBUKDEBUG_ENABLE_ASSERT */
 
 	if (flags & CLONE_VFORK) {
+#if CONFIG_LIBPOSIX_PROCESS_MULTIPROCESS
 		/* We will be blocking the parent and pass control to the child
 		 * via the scheduler. Therefore we need to set the child's TLS
 		 * pointer the Unikraft TLS.
@@ -492,6 +501,10 @@ int uk_clone(struct clone_args *cl_args, size_t cl_args_len,
 
 		/* Also inherit the parent's stack allocator */
 		child->_mem.stack_a = t->_mem.stack_a;
+#else /* CONFIG_LIBPOSIX_PROCESS_MULTIPROCESS */
+		ret = -ENOTSUP;
+		goto err_free_child;
+#endif /* CONFIG_LIBPOSIX_PROCESS_MULTIPROCESS */
 	} else  {
 		/* CLONE_SETTLS: Instead of just activating the Unikraft TLS
 		 * we activate the passed TLS pointer as soon as the child
@@ -508,13 +521,27 @@ int uk_clone(struct clone_args *cl_args, size_t cl_args_len,
 		    (void *) child->tlsp,
 		    (child->tlsp != child->uktlsp) ? "custom" : "Unikraft");
 
-	if (!(cl_args->flags & CLONE_THREAD)) {
-		uk_pr_debug("Creating new process for child\n");
-		ret = uk_posix_process_create(uk_alloc_get_default(), child, t);
-		if (unlikely(ret)) {
-			uk_pr_err("Could not create child process\n");
+	if (cl_args->flags & CLONE_THREAD) {
+		pprocess = uk_pprocess_current();
+		UK_ASSERT(pprocess);
+
+		pthread = pprocess_create_pthread(pprocess, child);
+		if (unlikely(PTRISERR(pthread))) {
+			ret = PTR2ERR(pthread);
+			uk_pr_err("Could not create pthread (%d)\n", ret);
 			goto err_free_child;
 		}
+	} else {
+#if CONFIG_LIBPOSIX_PROCESS_MULTIPROCESS
+		ret = pprocess_create(uk_alloc_get_default(), child, t);
+		if (unlikely(ret)) {
+			uk_pr_err("Could not create process (%d)\n", ret);
+			goto err_free_child;
+		}
+#else /* CONFIG_LIBPOSIX_PROCESS_MULTIPROCESS */
+		ret = -ENOTSUP;
+		goto err_free_child;
+#endif /* CONFIG_LIBPOSIX_PROCESS_MULTIPROCESS */
 	}
 
 	/* Call clone handler table but treat CLONE_SETTLS as handled */

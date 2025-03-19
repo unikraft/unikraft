@@ -43,7 +43,7 @@
 
 struct uk_thread *pprocess_thread_main;
 
-#if CONFIG_LIBPOSIX_PROCESS_PIDS
+#if CONFIG_LIBPOSIX_PROCESS_MULTITHREADING
 #include <uk/bitmap.h>
 #include <uk/list.h>
 #include <uk/alloc.h>
@@ -52,9 +52,7 @@ struct uk_thread *pprocess_thread_main;
 #include <uk/init.h>
 #include <uk/errptr.h>
 #include <uk/essentials.h>
-#if CONFIG_LIBPOSIX_PROCESS_CLONE
 #include <uk/process.h>
-#endif /* CONFIG_LIBPOSIX_PROCESS_CLONE */
 
 #if CONFIG_LIBPOSIX_PROCESS_SIGNAL
 #include "signal/signal.h"
@@ -485,7 +483,6 @@ void uk_posix_process_kill(struct uk_thread *thread)
 	pprocess_kill(pprocess);
 }
 
-#if CONFIG_LIBPOSIX_PROCESS_INIT_PIDS
 static int posix_process_init(struct uk_init_ctx *ictx)
 {
 	struct uk_thread *t;
@@ -509,7 +506,6 @@ static int posix_process_init(struct uk_init_ctx *ictx)
 }
 
 uk_late_initcall(posix_process_init, 0x0);
-#endif /* CONFIG_LIBPOSIX_PROCESS_INIT_PIDS */
 
 /* Thread initialization: Assign posix thread only if parent is part of a
  * process
@@ -712,7 +708,6 @@ __noreturn void exit_group(int status)
 }
 #endif /* UK_LIBC_SYSCALLS */
 
-#if CONFIG_LIBPOSIX_PROCESS_CLONE
 /* Store child PID at given location for parent */
 static int pprocess_parent_settid(const struct clone_args *cl_args,
 				  size_t cl_args_len __unused,
@@ -759,8 +754,7 @@ static int pprocess_clone_thread(const struct clone_args *cl_args __unused,
 	return 0;
 }
 UK_POSIX_CLONE_HANDLER(CLONE_THREAD, false, pprocess_clone_thread, 0x0);
-#endif /* CONFIG_LIBPOSIX_PROCESS_CLONE */
-#else  /* !CONFIG_LIBPOSIX_PROCESS_PIDS */
+#else  /* !CONFIG_LIBPOSIX_PROCESS_MULTITHREADING */
 
 #define UNIKRAFT_PID      1
 #define UNIKRAFT_TID      1
@@ -781,7 +775,7 @@ pid_t uk_sys_getppid(void)
 	return UNIKRAFT_PPID;
 }
 
-#endif /* !CONFIG_LIBPOSIX_PROCESS_PIDS */
+#endif /* !CONFIG_LIBPOSIX_PROCESS_MULTITHREADING */
 
 UK_SYSCALL_R_DEFINE(pid_t, gettid)
 {
