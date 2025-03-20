@@ -30,6 +30,11 @@ config LIBPOSIX_PROCESS_CLONE
 	bool "clone() system call"
 	select LIBPOSIX_PROCESS_PIDS
 
+config LIBPOSIX_PROCESS_SIGNALFD
+	bool "signalfd4() and signalfd() syscalls"
+	depends on LIBPOSIX_PROCESS_SIGNAL
+	select LIBUKFILE_POLLED
+
 config LIBPOSIX_PROCESS_CLONE_PREFER_CHILD
 	bool "Prefer scheduling of child"
 	depends on LIBPOSIX_PROCESS_CLONE

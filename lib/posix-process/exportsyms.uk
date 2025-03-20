@@ -53,3 +53,4 @@ sigfillset
 sigismember
 sigprocmask
 tgkill
+signalfd

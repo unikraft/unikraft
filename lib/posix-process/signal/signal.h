@@ -20,6 +20,10 @@
 #include "process.h"
 #include "sigset.h"
 
+#if CONFIG_LIBPOSIX_PROCESS_SIGNALFD
+#include "signal_file.h"
+#endif /* CONFIG_LIBPOSIX_PROCESS_SIGNALFD */
+
 #define SIG_ARRAY_COUNT		_NSIG /* SIGRTMAX + 1 */
 
 /* Check if signal number is valid */
@@ -162,6 +166,9 @@ struct uk_signal_pdesc {
 	 * share the same set of handlers.
 	 */
 	struct uk_sigaction *sigaction;
+#if CONFIG_LIBPOSIX_PROCESS_SIGNALFD
+	struct uk_signal_files_ctx sigfiles_ctx;
+#endif /* CONFIG_LIBPOSIX_PROCESS_SIGNALFD */
 };
 
 /* Signal descriptor of a posix_thread.
@@ -294,6 +301,24 @@ void pprocess_signal_arch_get_ucontext(ucontext_t *ucontext,
  * Does NOT check permissions.
  */
 bool pprocess_signal_is_deliverable(struct posix_thread *pthread, int signum);
+
+#if CONFIG_LIBPOSIX_PROCESS_SIGNALFD
+/* Add a signal file to a process in order to track it */
+static inline
+void pprocess_signal_file_add(struct posix_process *pproc,
+			      struct uk_signal_file *sigf)
+{
+	uk_signal_files_ctx_add(&pproc->signal->sigfiles_ctx, sigf);
+}
+
+/* Remove a signal file from a process */
+static inline
+void pprocess_signal_file_del(struct posix_process *pproc,
+			      struct uk_signal_file *sigf)
+{
+	uk_signal_files_ctx_del(&pproc->signal->sigfiles_ctx, sigf);
+}
+#endif /* CONFIG_LIBPOSIX_PROCESS_SIGNALFD */
 
 #endif /* CONFIG_LIBPOSIX_PROCESS_PIDS */
 
