@@ -9,6 +9,7 @@
 
 #include <limits.h>
 #include <signal.h>
+#include <stdbool.h>
 
 #include <arch/signal.h>
 #include <uk/alloc.h>
@@ -318,7 +319,50 @@ void pprocess_signal_file_del(struct posix_process *pproc,
 {
 	uk_signal_files_ctx_del(&pproc->signal->sigfiles_ctx, sigf);
 }
+
+/* Notify the signal files of a process */
+static inline
+void pprocess_signal_files_notify(struct posix_process *pproc, int signum)
+{
+	uk_signal_files_ctx_notify(&pproc->signal->sigfiles_ctx, signum);
+}
+
+/* Notify the signal files of a thread */
+static inline
+void pthread_signal_files_notify(struct posix_process *pproc,
+				 struct posix_thread *pthread __unused,
+				 int signum)
+{
+	/*
+	 * TODO: Set file event for one specific thread only.
+	 * We do it like this for now because we don't have individual
+	 * thread notification yet
+	 */
+	uk_signal_files_ctx_notify(&pproc->signal->sigfiles_ctx, signum);
+}
 #endif /* CONFIG_LIBPOSIX_PROCESS_SIGNALFD */
+
+/*
+ * Check if a signal should be dropped: it is ignored by the process and
+ * there are no signal files that are monitoring for this signal.
+ */
+#if CONFIG_LIBPOSIX_PROCESS_SIGNAL
+#if CONFIG_LIBPOSIX_PROCESS_SIGNALFD
+static inline
+bool pprocess_signal_should_drop(struct posix_process *pproc, int signum)
+{
+	return IS_IGNORED(pproc, signum) &&
+	       !uk_signal_files_ctx_is_set(&pproc->signal->sigfiles_ctx,
+					   signum);
+}
+#else /* !CONFIG_LIBPOSIX_PROCESS_SIGNALFD */
+static inline
+bool pprocess_signal_should_drop(struct posix_process *pproc, int signum)
+{
+	return IS_IGNORED(pproc, signum);
+}
+#endif /* !CONFIG_LIBPOSIX_PROCESS_SIGNALFD */
+#endif /* CONFIG_LIBPOSIX_PROCESS_SIGNAL */
 
 #endif /* CONFIG_LIBPOSIX_PROCESS_PIDS */
 

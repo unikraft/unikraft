@@ -196,6 +196,10 @@ int pprocess_signal_send(struct posix_process *proc, int signum,
 		return -EAGAIN;
 	}
 
+#if CONFIG_LIBPOSIX_PROCESS_SIGNALFD
+	pprocess_signal_files_notify(proc, signum);
+#endif /* CONFIG_LIBPOSIX_PROCESS_SIGNALFD */
+
 	return 0;
 }
 
@@ -231,7 +235,7 @@ int pprocess_signal_process_do(pid_t pid, int signum, siginfo_t *siginfo)
 			if (!signal_check_perm(pproc))
 				continue;
 
-			if (IS_IGNORED(pproc, signum))
+			if (pprocess_signal_should_drop(pproc, signum))
 				continue;
 
 			rc = pprocess_signal_send(pproc, signum, siginfo);
@@ -254,7 +258,7 @@ int pprocess_signal_process_do(pid_t pid, int signum, siginfo_t *siginfo)
 		return 0;
 
 	/* If this signal is currently ignored, don't even try */
-	if (IS_IGNORED(pproc, signum))
+	if (pprocess_signal_should_drop(pproc, signum))
 		return 0;
 
 	rc = pprocess_signal_send(pproc, signum, siginfo);
@@ -305,6 +309,10 @@ int pprocess_signal_thread_do(int tid, int signum, siginfo_t *siginfo)
 
 	if (pthread->state == POSIX_THREAD_BLOCKED_SIGNAL)
 		uk_semaphore_up(&pthread->signal->deliver_semaphore);
+
+#if CONFIG_LIBPOSIX_PROCESS_SIGNALFD
+	pthread_signal_files_notify(pproc, pthread, signum);
+#endif /* CONFIG_LIBPOSIX_PROCESS_SIGNALFD */
 
 	return 0;
 }
