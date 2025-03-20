@@ -364,6 +364,10 @@ int pprocess_signal_pdesc_init(struct posix_process *process)
 
 	pd->altstack.ss_flags = SS_DISABLE;
 
+#if CONFIG_LIBPOSIX_PROCESS_SIGNALFD
+	uk_signal_files_ctx_init(&pd->sigfiles_ctx);
+#endif /* CONFIG_LIBPOSIX_PROCESS_SIGNALFD */
+
 	return 0;
 }
 

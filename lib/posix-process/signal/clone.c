@@ -153,6 +153,16 @@ static int uk_posix_clone_sighand(const struct clone_args *cl_args,
 	if ((cl_args->flags & CLONE_VM) && !(cl_args->flags & CLONE_VFORK))
 		cp->signal->altstack.ss_flags = SS_DISABLE;
 
+#if CONFIG_LIBPOSIX_PROCESS_SIGNALFD
+	/*
+	 * TODO: At this time we do not support proper open file inheritance
+	 * across vfork/execve for those that do not have the O_CLOEXEC flag.
+	 * Therefore, for now, simply just initialize child process' signal
+	 * descriptor signal file context as empty.
+	 */
+	uk_signal_files_ctx_init(&cp->signal->sigfiles_ctx);
+#endif /* CONFIG_LIBPOSIX_PROCESS_SIGNALFD */
+
 	return 0;
 
 fail_malloc:
