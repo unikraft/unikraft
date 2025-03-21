@@ -121,6 +121,18 @@ int fdatasync(int fd);
 off_t lseek(int fd, off_t offset, int whence);
 int ftruncate(int fd, off_t length);
 #endif /* CONFIG_LIBPOSIX_FDIO */
+
+#if CONFIG_LIBPOSIX_VFS_SYSCALLS
+void sync(void);
+int unlink(const char *pathname);
+int chdir(const char *path);
+int fchdir(int fd);
+int chroot(const char *path);
+int rmdir(const char *pathname);
+char *getcwd(char *buf, size_t size);
+int symlink(const char *path, const char *linkpath);
+int truncate(const char *path, off_t length);
+#endif /* CONFIG_LIBPOSIX_VFS_SYSCALLS */
 #endif /* CONFIG_LIBPOSIX_FDTAB */
 
 #endif /* !CONFIG_LIBVFSCORE */

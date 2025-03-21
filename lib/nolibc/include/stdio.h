@@ -94,7 +94,7 @@ int putchar(int c);
 int fputs(const char *restrict s, FILE *restrict stream);
 int puts(const char *s);
 
-#if CONFIG_LIBVFSCORE
+#if CONFIG_HAVE_VFS
 void clearerr(FILE *stream);
 int rename(const char *oldpath, const char *newpath);
 int feof(FILE *stream);
@@ -105,7 +105,7 @@ FILE *fopen(const char *pathname, const char *mode);
 FILE *fdopen(int fd, const char *mode);
 size_t fread(void *ptr, size_t size, size_t nmemb, FILE *stream);
 size_t fwrite(const void *ptr, size_t size, size_t nmemb, FILE *stream);
-#endif /* CONFIG_LIBVFSCORE */
+#endif /* CONFIG_HAVE_VFS */
 
 #ifdef __STDIO_H_DEFINED_va_list
 #undef va_list

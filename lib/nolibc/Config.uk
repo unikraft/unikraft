@@ -32,5 +32,6 @@ if LIBNOLIBC
 	config LIBNOLIBC_HAVE_VFS
 		bool
 		depends on !LIBVFSCORE
+		default y if LIBPOSIX_VFS_SYSCALLS
 
 endif
