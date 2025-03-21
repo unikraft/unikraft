@@ -34,6 +34,14 @@ LIBNOLIBC_SRCS-y += $(LIBNOLIBC_BASE)/ctype.c
 LIBNOLIBC_SRCS-y += $(LIBNOLIBC_BASE)/stdlib.c
 LIBNOLIBC_SRCS-y += $(LIBNOLIBC_BASE)/string.c
 LIBNOLIBC_STRING_FLAGS-$(CONFIG_OPTIMIZE_PERF) += -O3
+ifeq ($(CONFIG_LIBNOLIBC_HAVE_VFS),y)
+LIBNOLIBC_SRCS-y += $(LIBNOLIBC_BASE)/musl-imported/src/dirent/closedir.c
+LIBNOLIBC_SRCS-y += $(LIBNOLIBC_BASE)/musl-imported/src/dirent/dirfd.c
+LIBNOLIBC_SRCS-y += $(LIBNOLIBC_BASE)/musl-imported/src/dirent/fdopendir.c
+LIBNOLIBC_SRCS-y += $(LIBNOLIBC_BASE)/musl-imported/src/dirent/opendir.c
+LIBNOLIBC_SRCS-y += $(LIBNOLIBC_BASE)/musl-imported/src/dirent/readdir.c
+LIBNOLIBC_SRCS-y += $(LIBNOLIBC_BASE)/musl-imported/src/dirent/scandir.c
+endif
 LIBNOLIBC_SRCS-y += $(LIBNOLIBC_BASE)/musl-imported/src/string/strsignal.c
 LIBNOLIBC_SRCS-y += $(LIBNOLIBC_BASE)/musl-imported/src/string/strstr.c
 LIBNOLIBC_SRCS-y += $(LIBNOLIBC_BASE)/musl-imported/src/signal/psignal.c

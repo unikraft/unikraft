@@ -27,4 +27,10 @@ if LIBNOLIBC
 		default 64
 		help
 			Determines the largest fd that can be passed to select().
+
+# Hidden, autoselected based on config
+	config LIBNOLIBC_HAVE_VFS
+		bool
+		depends on !LIBVFSCORE
+
 endif

@@ -35,6 +35,7 @@
 #define __STDDEF_H__
 
 #include <uk/arch/types.h>
+#include <uk/essentials.h>
 
 #ifdef __cplusplus
 extern "C" {

@@ -55,6 +55,14 @@ fdopen
 fread
 fwrite
 
+# dirent
+closedir
+dirfd
+fdopendir
+opendir
+readdir
+scandir
+
 # stdlib
 abort
 exit
