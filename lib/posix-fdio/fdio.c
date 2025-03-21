@@ -13,8 +13,8 @@
 #include "fdio-impl.h"
 
 /* Stable mode bits to pass onto the read/write implementations */
-#define _READ_MODEMASK (O_DIRECT)
-#define _WRITE_MODEMASK (O_DIRECT|O_SYNC|O_DSYNC)
+#define _READ_MODEMASK (O_DIRECT | O_NOATIME)
+#define _WRITE_MODEMASK (O_DIRECT | O_NOATIME | O_SYNC | O_DSYNC)
 
 
 #define _buf2iov(buf, count) \
