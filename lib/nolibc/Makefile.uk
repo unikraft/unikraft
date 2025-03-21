@@ -41,6 +41,7 @@ LIBNOLIBC_SRCS-y += $(LIBNOLIBC_BASE)/musl-imported/src/dirent/fdopendir.c
 LIBNOLIBC_SRCS-y += $(LIBNOLIBC_BASE)/musl-imported/src/dirent/opendir.c
 LIBNOLIBC_SRCS-y += $(LIBNOLIBC_BASE)/musl-imported/src/dirent/readdir.c
 LIBNOLIBC_SRCS-y += $(LIBNOLIBC_BASE)/musl-imported/src/dirent/scandir.c
+LIBNOLIBC_SRCS-y += $(LIBNOLIBC_BASE)/musl-imported/src/unistd/getcwd.c
 endif
 LIBNOLIBC_SRCS-y += $(LIBNOLIBC_BASE)/musl-imported/src/string/strsignal.c
 LIBNOLIBC_SRCS-y += $(LIBNOLIBC_BASE)/musl-imported/src/string/strstr.c
