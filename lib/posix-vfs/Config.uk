@@ -1,0 +1,84 @@
+menuconfig LIBPOSIX_VFS
+	bool "posix-vfs: Filesystem support"
+	select LIBPOSIX_FD
+	select LIBPOSIX_FD_HEAPOFD
+	select LIBPOSIX_FDIO
+	select LIBUKFS
+	select LIBUKATOMIC
+	select LIBUKLOCK
+	select LIBUKLOCK_MUTEX
+
+if LIBPOSIX_VFS
+
+config LIBPOSIX_VFS_SYSCALLS
+	bool "Provide filesystem syscalls"
+	depends on !LIBVFSCORE
+	select HAVE_VFS
+	select LIBPOSIX_FDTAB
+	default y
+	help
+	  This enables VFS syscalls to be provided by this library in addition
+	  to the internal `uk_sys_*` API.
+
+config LIBPOSIX_VFS_PERMISSIONS
+	bool "Enforce filesystem permissions"
+	select LIBUKFS_PERMISSIONS
+
+config LIBPOSIX_VFS_MOUNT_CLEANUP
+	bool "Unmount filesystems on shutdown"
+
+comment "VFS limits:"
+
+config LIBPOSIX_VFS_MAX_MOUNTS
+	int "Maximum number of mount points"
+	range 1 1022
+	default 8
+
+choice LIBPOSIX_VFS_SYMLIMIT
+	prompt "Symlink limit on lookup"
+	default LIBPOSIX_VFS_SYMLIMIT_DEPTH
+
+config LIBPOSIX_VFS_SYMLIMIT_DEPTH
+	bool "Nesting depth of symlinks"
+	help
+	 Lookup is limited by symlink nesting depth -- symlinks whose target
+	 path contains other symlinks. This reflects actual resource usage
+	 during lookup and supports long symlink chains.
+
+config LIBPOSIX_VFS_SYMLIMIT_NUM
+	bool "Number of symlinks traversed"
+	help
+	  Lookup is limited by the total number of symlinks encountered,
+	  regardless of nesting. This sets more restrictive limits on symlink
+	  traversal, but more closely mirrors the behavior of other POSIX
+	  systems.
+
+endchoice
+
+config LIBPOSIX_VFS_MAX_SYMDEPTH
+	int "Maximum depth when resolving symlinks"
+	range 0 1024
+	default 32
+	depends on LIBPOSIX_VFS_SYMLIMIT_DEPTH
+
+config LIBPOSIX_VFS_MAX_SYMNUM
+	int "Maximum number of symlinks on lookup"
+	range 0 1024
+	default 32
+	depends on LIBPOSIX_VFS_SYMLIMIT_NUM
+
+comment "Nonstandard API relaxations (require driver support):"
+
+config LIBPOSIX_VFS_RELAX_UNLINK
+	bool "unlink(): Treat directories like files"
+
+config LIBPOSIX_VFS_RELAX_RMDIR
+	bool "Allow deletion of non-empty directories"
+
+# Hidden, will autoselect when required
+config LIBPOSIX_VFS_MULTICTX
+	bool
+	default y if LIBPOSIX_PROCESS_MULTITHREADING
+	select LIBUKSCHED
+
+endif

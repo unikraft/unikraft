@@ -89,6 +89,7 @@ int uk_sys_fchmod(struct uk_ofile *of, mode_t mode)
 	int r;
 	const int iolock = _SHOULD_LOCK(of->mode);
 
+	/* TODO: check if uid is root or file owner */
 	if (iolock)
 		uk_file_wlock(of->file);
 	r = uk_file_setstat(of->file, UK_STATX_MODE, &(const struct uk_statx){
@@ -105,8 +106,10 @@ int uk_sys_fchown(struct uk_ofile *of, uid_t owner, gid_t group)
 	unsigned int mask = 0;
 	const int iolock = _SHOULD_LOCK(of->mode);
 
+	/* TODO: check uid is root for changing owner */
 	if (owner != (uid_t)-1)
 		mask |= UK_STATX_UID;
+	/* TODO: check uid is file owner for changing group */
 	if (group != (gid_t)-1)
 		mask |= UK_STATX_GID;
 	if (iolock)

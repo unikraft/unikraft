@@ -1,0 +1,113 @@
+# uk_sys_* API
+# FS-wide ops
+uk_sys_sync
+uk_sys_statfs
+# VFS context
+uk_sys_fchdir
+uk_sys_chdir
+uk_sys_getcwd
+uk_sys_chroot
+uk_sys_umask
+# Read node metadata
+uk_sys_faccessat
+uk_sys_statx
+uk_sys_fstatat
+# Change node metadata
+uk_sys_fchownat
+uk_sys_fchmodat
+uk_sys_futimesat
+uk_sys_utime
+uk_sys_utimensat
+# Read node contents
+uk_sys_getdents64
+uk_sys_readlinkat
+# Change node contents
+uk_sys_truncate
+# Change node state
+uk_sys_mkdirat
+uk_sys_linkat
+uk_sys_symlinkat
+uk_sys_mknodat
+# Remove/rename node
+uk_sys_unlinkat
+uk_sys_renameat
+# Mounting
+uk_sys_mount
+uk_sys_umount
+# Open
+uk_sys_openat
+
+# libc API
+# FS-wide ops
+sync
+syncfs
+statfs
+statfs64
+fstatfs
+fstatfs64
+# VFS context
+fchdir
+chdir
+getcwd
+chroot
+umask
+# Read node metadata
+faccessat2
+faccessat
+access
+statx
+newfstatat
+fstatat
+fstatat64
+stat
+stat64
+lstat
+lstat64
+# Change node metadata
+fchownat
+chown
+lchown
+fchmodat2
+fchmodat
+chmod
+futimesat
+utimes
+utime
+utimensat
+# Read node contents
+getdents64
+getdents
+readlinkat
+readlink
+# Change node contents
+truncate
+truncate64
+# Change node state
+mkdirat
+mkdir
+linkat
+link
+symlinkat
+symlink
+mknodat
+mknod
+# Remove/rename node
+unlinkat
+unlink
+rmdir
+renameat2
+renameat
+rename
+# Mounting
+mount
+umount2
+umount
+# Open
+openat
+openat64
+open
+open64
+creat
+creat64
+
+# syscalls are added automatically
