@@ -485,9 +485,15 @@ static int fdtab_clone(const struct clone_args *cl_args,
 		return 0;
 	} else {
 		/* Duplicate parent's fdtab */
+		int r __maybe_unused;
+
 		newtab = fdtab_duplicate(tab);
 		if (unlikely(!newtab))
 			return -ENOMEM;
+		/* Compat stop-gap: release previous duplicate ref */
+		UK_ASSERT(uk_thread_uktls_var(child, active_fdtab) == tab);
+		r = uk_refcount_release(&tab->refcnt);
+		UK_ASSERT(!r); /* Cannot have been the last ref */
 	}
 	uk_thread_uktls_var(child, active_fdtab) = newtab;
 	return 0;
