@@ -138,6 +138,14 @@ int lchmod(const char *, mode_t);
 #define off64_t off_t
 #endif
 
+/* LSB compatibility functions */
+int __xstat(int ver, const char *path, struct stat *buf);
+int __lxstat(int ver, const char *path, struct stat *buf);
+int __fxstat(int ver, int fd, struct stat *buf);
+int __xstat64(int ver, const char *path, struct stat *buf);
+int __lxstat64(int ver, const char *path, struct stat *buf);
+int __fxstat64(int ver, int fd, struct stat *buf);
+
 #ifdef __cplusplus
 }
 #endif

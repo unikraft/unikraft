@@ -254,15 +254,13 @@ UK_TRACEPOINT(trace_vfs_mknod, "\"%s\" 0%0o %#x", const char*, mode_t, dev_t);
 UK_TRACEPOINT(trace_vfs_mknod_ret, "");
 UK_TRACEPOINT(trace_vfs_mknod_err, "%d", int);
 
-static int __xmknod_helper(int ver __maybe_unused, const char *pathname,
-			   mode_t mode, dev_t *dev __maybe_unused)
+UK_SYSCALL_R_DEFINE(int, mknod, const char*, pathname, mode_t, mode, dev_t, dev)
 {
-	UK_ASSERT(ver == 0); // On x86-64 Linux, _MKNOD_VER_LINUX is 0.
 	struct task *t = main_task;
 	char path[PATH_MAX];
 	int error;
 
-	trace_vfs_mknod(pathname, mode, *dev);
+	trace_vfs_mknod(pathname, mode, dev);
 	if ((error = task_conv(t, pathname, VWRITE, path)) != 0)
 		goto out_error;
 
@@ -276,19 +274,6 @@ static int __xmknod_helper(int ver __maybe_unused, const char *pathname,
 	out_error:
 	trace_vfs_mknod_err(error);
 	return -error;
-}
-
-#if UK_LIBC_SYSCALLS
-int __xmknod(int ver, const char *pathname,
-		mode_t mode, dev_t *dev __unused)
-{
-	return __xmknod_helper(ver, pathname, mode, dev);
-}
-#endif /* UK_LIBC_SYSCALLS */
-
-UK_SYSCALL_R_DEFINE(int, mknod, const char*, pathname, mode_t, mode, dev_t, dev)
-{
-	return __xmknod_helper(0, pathname, mode, &dev);
 }
 
 /**
@@ -629,26 +614,45 @@ ssize_t vfscore_write(struct vfscore_file *fp, const void *buf, size_t count)
 	return bytes;
 }
 
-static int __fxstatat_helper(int ver __unused, int dirfd, const char *pathname,
-		struct stat *st, int flags);
-
-#if UK_LIBC_SYSCALLS
-int __fxstatat(int ver __unused, int dirfd, const char *pathname,
-		struct stat *st, int flags)
-{
-	return __fxstatat_helper(ver, dirfd, pathname, st, flags);
-}
-#ifdef __fxstatat64
-#undef __fxstatat64
-#endif
-
-LFS64(__fxstatat);
-#endif /* UK_LIBC_SYSCALLS */
-
 UK_SYSCALL_R_DEFINE(int, fstatat, int, dirfd, const char*, path,
 				struct stat*, st, int, flags)
 {
-	return __fxstatat_helper(1, dirfd, path, st, flags);
+	if (!pathname || !st)
+		return -EFAULT;
+	if (pathname[0] == '/' || dirfd == AT_FDCWD)
+		return uk_syscall_do_stat((long)pathname, (long)st);
+	/* If AT_EMPTY_PATH and pathname is an empty string, fstatat() operates
+	 * on */
+	/* dirfd itself, and in that case it doesn't have to be a directory. */
+	if ((flags & AT_EMPTY_PATH) && !pathname[0])
+		return uk_syscall_do_fstat((long)dirfd, (long)st);
+
+	struct vfscore_file *fp;
+	int error = fget(dirfd, &fp);
+
+	if (error)
+		return -error;
+
+	struct vnode *vp = fp->f_dentry->d_vnode;
+
+	vn_lock(vp);
+
+	char p[PATH_MAX];
+	/* build absolute path */
+	strlcpy(p, fp->f_dentry->d_mount->m_path, PATH_MAX);
+	strlcat(p, fp->f_dentry->d_path, PATH_MAX);
+	strlcat(p, "/", PATH_MAX);
+	strlcat(p, pathname, PATH_MAX);
+
+	vn_unlock(vp);
+	fdrop(fp);
+
+	if (flags & AT_SYMLINK_NOFOLLOW)
+		error = uk_syscall_do_lstat((long)p, (long)st);
+	else
+		error = uk_syscall_do_stat((long)p, (long)st);
+
+	return error;
 }
 
 #if UK_LIBC_SYSCALLS
@@ -663,7 +667,42 @@ LFS64(fstatat);
 UK_SYSCALL_R_DEFINE(int, newfstatat, int, dirfd, const char*, path,
 				struct stat*, st, int, flags)
 {
-	return __fxstatat_helper(1, dirfd, path, st, flags);
+	if (!pathname || !st)
+		return -EFAULT;
+	if (pathname[0] == '/' || dirfd == AT_FDCWD)
+		return uk_syscall_do_stat((long)pathname, (long)st);
+	/* If AT_EMPTY_PATH and pathname is an empty string, fstatat() operates
+	 * on */
+	/* dirfd itself, and in that case it doesn't have to be a directory. */
+	if ((flags & AT_EMPTY_PATH) && !pathname[0])
+		return uk_syscall_do_fstat((long)dirfd, (long)st);
+
+	struct vfscore_file *fp;
+	int error = fget(dirfd, &fp);
+
+	if (error)
+		return -error;
+
+	struct vnode *vp = fp->f_dentry->d_vnode;
+
+	vn_lock(vp);
+
+	char p[PATH_MAX];
+	/* build absolute path */
+	strlcpy(p, fp->f_dentry->d_mount->m_path, PATH_MAX);
+	strlcat(p, fp->f_dentry->d_path, PATH_MAX);
+	strlcat(p, "/", PATH_MAX);
+	strlcat(p, pathname, PATH_MAX);
+
+	vn_unlock(vp);
+	fdrop(fp);
+
+	if (flags & AT_SYMLINK_NOFOLLOW)
+		error = uk_syscall_do_lstat((long)p, (long)st);
+	else
+		error = uk_syscall_do_stat((long)p, (long)st);
+
+	return error;
 }
 
 UK_SYSCALL_R_DEFINE(int, flock, int, fd, int, operation)
@@ -1561,9 +1600,11 @@ UK_TRACEPOINT(trace_vfs_stat, "\"%s\" %#x", const char*, struct stat*);
 UK_TRACEPOINT(trace_vfs_stat_ret, "");
 UK_TRACEPOINT(trace_vfs_stat_err, "%d", int);
 
-static int __xstat_helper(int ver __unused, const char *pathname,
-		struct stat *st)
+UK_SYSCALL_R_DEFINE(int, stat, const char*, pathname, struct stat*, st)
 {
+	if (!pathname) {
+		return -EINVAL;
+	}
 	struct task *t = main_task;
 	char path[PATH_MAX];
 	int error;
@@ -1585,27 +1626,6 @@ static int __xstat_helper(int ver __unused, const char *pathname,
 	return -error;
 }
 
-#if UK_LIBC_SYSCALLS
-static int __xstat(int ver __unused, const char *pathname,
-		struct stat *st)
-{
-	return __xstat_helper(ver, pathname, st);
-}
-#ifdef __xstat64
-#undef __xstat64
-#endif
-
-LFS64(__xstat);
-#endif /* UK_LIBC_SYSCALLS */
-
-UK_SYSCALL_R_DEFINE(int, stat, const char*, pathname, struct stat*, st)
-{
-	if (!pathname) {
-		return -EINVAL;
-	}
-	return __xstat_helper(1, pathname, st);
-}
-
 #ifdef stat64
 #undef stat64
 #endif
@@ -1616,8 +1636,7 @@ UK_TRACEPOINT(trace_vfs_lstat, "pathname=%s, stat=%#x", const char*,
 	      struct stat*);
 UK_TRACEPOINT(trace_vfs_lstat_ret, "");
 UK_TRACEPOINT(trace_vfs_lstat_err, "errno=%d", int);
-
-int __lxstat_helper(int ver __unused, const char *pathname, struct stat *st)
+UK_SYSCALL_R_DEFINE(int, lstat, const char*, pathname, struct stat*, st)
 {
 	struct task *t = main_task;
 	char path[PATH_MAX];
@@ -1643,68 +1662,8 @@ int __lxstat_helper(int ver __unused, const char *pathname, struct stat *st)
 	return -error;
 }
 
-#if UK_LIBC_SYSCALLS
-int __lxstat(int ver __unused, const char *pathname, struct stat *st)
-{
-	return __lxstat_helper(1, pathname, st);
-}
-
-#ifdef __lxstat64
-#undef __lxstat64
-#endif
-
-LFS64(__lxstat);
-#else
-int __lxstat(int ver, const char *pathname, struct stat *st);
-#endif /* UK_LIBC_SYSCALLS */
-
-UK_SYSCALL_R_DEFINE(int, lstat, const char*, pathname, struct stat*, st)
-{
-	return __lxstat_helper(1, pathname, st);
-}
-
 /* The fstat syscall is no longer implemented here; need to declare */
 long uk_syscall_do_fstat(long dirfd, long st);
-
-static int __fxstatat_helper(int ver __unused, int dirfd, const char *pathname,
-		struct stat *st, int flags)
-{
-	if (!pathname || !st)
-		return -EFAULT;
-	if (pathname[0] == '/' || dirfd == AT_FDCWD) {
-		return uk_syscall_do_stat((long) pathname, (long) st);
-	}
-	// If AT_EMPTY_PATH and pathname is an empty string, fstatat() operates on
-	// dirfd itself, and in that case it doesn't have to be a directory.
-	if ((flags & AT_EMPTY_PATH) && !pathname[0]) {
-		return uk_syscall_do_fstat((long) dirfd, (long) st);
-	}
-
-	struct vfscore_file *fp;
-	int error = fget(dirfd, &fp);
-	if (error)
-		return -error;
-
-	struct vnode *vp = fp->f_dentry->d_vnode;
-	vn_lock(vp);
-
-	char p[PATH_MAX];
-	/* build absolute path */
-	strlcpy(p, fp->f_dentry->d_mount->m_path, PATH_MAX);
-	strlcat(p, fp->f_dentry->d_path, PATH_MAX);
-	strlcat(p, "/", PATH_MAX);
-	strlcat(p, pathname, PATH_MAX);
-
-	vn_unlock(vp);
-	fdrop(fp);
-
-	if (flags & AT_SYMLINK_NOFOLLOW)
-		error = uk_syscall_do_lstat((long) p, (long) st);
-	else
-		error = uk_syscall_do_stat((long) p, (long) st);
-
-	return error;
-}
 
 #ifdef lstat64
 #undef lstat64
