@@ -31,6 +31,7 @@
  */
 
 #define _GNU_SOURCE
+
 #include <sys/statvfs.h>
 #include <sys/stat.h>
 #include <sys/ioctl.h>
@@ -56,7 +57,7 @@
 #include <uk/essentials.h>
 
 #ifdef DEBUG_VFS
-int vfs_debug = VFSDB_FLAGS;
+int	vfs_debug = VFSDB_FLAGS;
 #endif
 
 /* This macro is for defining an alias of the 64bit version of a
@@ -73,7 +74,8 @@ int vfs_debug = VFSDB_FLAGS;
  *       ```
  */
 #if UK_LIBC_SYSCALLS
-#define LFS64(x) __alias(x, x##64)
+#define LFS64(x) 
+		__alias(x, x##64)
 #else
 #define LFS64(x)
 #endif /* !UK_LIBC_SYSCALLS */
@@ -82,17 +84,14 @@ static mode_t global_umask = S_IWGRP | S_IWOTH;
 
 static inline int libc_error(int err)
 {
-	errno = err;
-	return -1;
-}
+    errno = err;
+    return -1;
 
-/* In BSD's internal implementation of read() and write() code, for example */
-/* sosend_generic(), a partial read or write returns both an EWOULDBLOCK error
- */
-/* *and* a non-zero number of written bytes. In that case, we need to zero the
- */
-/* error, so the system call appear a successful partial read/write. */
-/* In FreeBSD, dofilewrite() and dofileread() (sys_generic.c) do this too. */
+// In BSD's internal implementation of read() and write() code, for example
+// sosend_generic(), a partial read or write returns both an EWOULDBLOCK error
+// *and* a non-zero number of written bytes. In that case, we need to zero the
+// error, so the system call appear a successful partial read/write.
+// In FreeBSD, dofilewrite() and dofileread() (sys_generic.c) do this too.
 static inline int has_error(int error, int bytes)
 {
 	/* TODO: OSv checks also for ERESTART */
