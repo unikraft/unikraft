@@ -134,3 +134,11 @@ random
 srandom
 initstate
 setstate
+
+# stat compatibility
+__xstat
+__lxstat
+__fxstat
+__xstat64
+__lxstat64
+__fxstat64
