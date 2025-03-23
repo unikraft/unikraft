@@ -614,7 +614,7 @@ ssize_t vfscore_write(struct vfscore_file *fp, const void *buf, size_t count)
 	return bytes;
 }
 
-UK_SYSCALL_R_DEFINE(int, fstatat, int, dirfd, const char*, path,
+UK_SYSCALL_R_DEFINE(int, fstatat, int, dirfd, const char*, pathname,
 				struct stat*, st, int, flags)
 {
 	if (!pathname || !st)
@@ -664,7 +664,7 @@ UK_SYSCALL_R_DEFINE(int, fstatat, int, dirfd, const char*, path,
 LFS64(fstatat);
 #endif /* UK_LIBC_SYSCALLS */
 
-UK_SYSCALL_R_DEFINE(int, newfstatat, int, dirfd, const char*, path,
+UK_SYSCALL_R_DEFINE(int, newfstatat, int, dirfd, const char*, pathname,
 				struct stat*, st, int, flags)
 {
 	if (!pathname || !st)
