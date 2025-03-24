@@ -590,17 +590,6 @@ UK_LLSYSCALL_R_E_DEFINE(int, clone,
 	return uk_clone(&cl_args, sizeof(cl_args), execenv);
 }
 
-#if UK_LIBC_SYSCALLS
-int clone(int (*fn)(void *) __unused, void *sp __unused,
-	  int flags __unused, void *arg __unused,
-	  ... /* pid_t *parent_tid, void *tls, pid_t *child_tid */)
-{
-	/* TODO */
-	errno = EINVAL;
-	return -1;
-}
-#endif /* UK_LIBC_SYSCALLS */
-
 /*
  * Checks that the CLONE_VM is set so that we make sure that
  * the address space is shared. Unikraft does currently not support
