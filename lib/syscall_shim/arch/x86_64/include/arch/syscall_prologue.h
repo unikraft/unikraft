@@ -121,13 +121,32 @@
 		"popq	%r13\n\t"					\
 		"popq	%r12\n\t"					\
 		"popq	%rbp\n\t"					\
-		"popq	%rbx\n\t"					\
-		"/* Restore rsp from where it was stored */\n\t"	\
-		"movq   104(%rsp), %rsp\n\t"				\
+		"/* Now when we pop we get the old rbx but we hold\n\t"	\
+		" * onto it for a little while so that we can do\n\t"	\
+		" * what we do below.\n\t"				\
+		" */\n\t"						\
+		"/* Restore rsp from where it was stored, but put\n\t"	\
+		" * it for now in the r11 scratch register so that\n\t"	\
+		" * we can still have access to the auxstack\n\t"	\
+		" */\n\t"						\
+		"movq   112(%rsp), %r11\n\t"				\
+		"/* Put in rbx the rip we are supposed to return\n\t"	\
+		" * to.\n\t"						\
+		" */\n\t"						\
+		"movq	88(%rsp), %rbx\n\t"				\
+		"/* Exchange stacks: after this we will have in\n\t"	\
+		" * r11 the auxstack and in rsp the stack our\n\t"	\
+		" * caller had.\n\t"					\
+		" */\n\t"						\
+		"xchgq	%r11, %rsp\n\t"					\
 		"/* Adjust saved stack to original value; ret\n\t"      \
 		" * expects return address on top of stack\n\t"         \
 		" */\n\t"						\
-		"subq	$8, %rsp\n\t"					\
+		"pushq	%rbx\n\t"					\
+		"/* Lastly, restore the callee-saved rbx we did not\n\t"\
+		" * previously pop together with the others.\n\t"	\
+		" */\n\t"						\
+		"movq	(%r11), %rbx\n\t"				\
 		"ret\n\t"						\
 	);
 
