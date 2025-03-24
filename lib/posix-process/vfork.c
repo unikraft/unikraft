@@ -16,9 +16,7 @@
 
 #include "process.h"
 
-UK_LLSYSCALL_R_E_DEFINE(pid_t, vfork,
-			unsigned long __unused, a0,
-			unsigned long __unused, a1)
+UK_LLSYSCALL_R_E_DEFINE(pid_t, vfork)
 {
 	struct posix_process *child_proc;
 	struct clone_args cl_args = {0};
