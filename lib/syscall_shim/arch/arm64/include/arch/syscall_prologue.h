@@ -92,13 +92,28 @@
 		"stp	x24, x25, [sp, #16 * 12]\n\t"			\
 		"stp	x26, x27, [sp, #16 * 13]\n\t"			\
 		"stp	x28, x29, [sp, #16 * 14]\n\t"			\
-		"/* Here we should push lr and elr_el1, however\n\t"	\
+		"/* Here we should push elr_el1, however\n\t"		\
 		" * we are not in an actual exception, but instead\n\t"	\
 		" * we are trying to emulate a SVC with a function\n\t"	\
 		" * call which makes elr_el1 invalid and we instead\n\t"\
-		" * double push lr (x30).\n\t"				\
+		" * push lr (x30).\n\t"					\
 		" */\n\t"						\
-		"stp	x30, x30, [sp, #16 * 15]\n\t"			\
+		"str	x30, [sp, #16 * 15 + 8]\n\t"			\
+		"/* Here we should push lr, however\n\t"		\
+		" * our lr has been overwritten with the return\n\t"	\
+		" * address back to the caller itself, so we will\n\t"	\
+		" * have to do a little bit of a level 1 stack\n\t"	\
+		" * stack unwinding. In the process we\n\t"		\
+		" * are dirtying lr but this is fine because we are\n\t"\
+		" * restoring it at the end anyway.\n\t"		\
+		" */\n\t"						\
+		"/* Get previous frame address */\n\t"			\
+		"ldr	x30, [x29]\n\t"					\
+		"/* lr is typically saved at offset 8 from new\n\t"	\
+		" * frame\n\t"						\
+		" */\n\t"						\
+		"ldr	x30, [x29, #8]\n\t"				\
+		"str	x30, [sp, #16 * 15]\n\t"			\
 		"/* Just like above for elr_el1, spsr_el1 is also\n\t"	\
 		" * invalid. Therefore we use a sane default value\n\t"	\
 		" * which one would normally see in spsr_el1\n\t"	\
@@ -134,7 +149,7 @@
 		"ldp	x22, x23, [sp, #16 * 11]\t\n"			\
 		"ldp	x20, x21, [sp, #16 * 10]\t\n"			\
 		"ldp	x18, x19, [sp, #16 * 9]\t\n"			\
-		"/* Restore rsp from where it was stored */\n\t"	\
+		"/* Restore sp from where it was stored */\n\t"		\
 		"ldr	x9, [sp, #" STRINGIFY(__SP_OFFSET) "]\n\t"	\
 		"mov	sp, x9\n\t"					\
 		"ret\n\t"						\
