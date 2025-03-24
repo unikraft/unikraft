@@ -45,6 +45,11 @@ clone
 vfork
 kill
 pause
+sigaddset
 sigaltstack
+sigdelset
+sigemptyset
+sigfillset
+sigismember
 sigprocmask
 tgkill
