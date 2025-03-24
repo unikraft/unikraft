@@ -195,6 +195,25 @@ unsigned char tcr_ips_bits[] = {32, 36, 40, 42, 44, 48, 52};
 #include <uk/arch/types.h>
 
 /*
+ * Mappings of `struct __regs` register fields
+ * according to AAPCS64 definition for function calls
+ *  rargX    - Arguments 0..7
+ *  rretX    - Function call return value
+ */
+
+#define __fn_rarg0		x[0]
+#define __fn_rarg1		x[1]
+#define __fn_rarg2		x[2]
+#define __fn_rarg3		x[3]
+#define __fn_rarg4		x[4]
+#define __fn_rarg5		x[5]
+#define __fn_rarg6		x[6]
+#define __fn_rarg7		x[7]
+
+#define __fn_rret0		x[0]
+#define __fn_rret1		x[1]
+
+/*
  * Change this structure must update TRAP_STACK_SIZE at the same time.
  * This data structure must be 16-byte alignment.
  */
