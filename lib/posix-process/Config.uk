@@ -44,6 +44,10 @@ config LIBPOSIX_PROCESS_SIGNAL
 	select LIBUKLOCK
 	select LIBUKLOCK_SEMAPHORE
 
+config LIBPOSIX_PROCESS_ARCH_PRCTL
+	bool "arch_prctl() system call"
+	depends on ARCH_X86_64
+
 config LIBPOSIX_PROCESS_SIGNALFD
 	bool "signalfd4() and signalfd() syscalls"
 	depends on LIBPOSIX_PROCESS_SIGNAL
