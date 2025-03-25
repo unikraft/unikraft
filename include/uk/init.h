@@ -39,6 +39,10 @@
 #include <uk/essentials.h>
 #include <uk/prio.h>
 
+#if CONFIG_LIBUKSCHED
+#include <uk/thread.h>
+#endif /* CONFIG_LIBUKSCHED */
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -48,6 +52,12 @@ struct uk_init_ctx {
 		int    argc;
 		char **argv;
 	} cmdline;
+#if CONFIG_LIBUKSCHED
+	/* Set if main() executes on a separate thread,
+	 * otherwise NULL.
+	 */
+	struct uk_thread *tmain;
+#endif /* CONFIG_LIBUKSCHED */
 
 	/* reserved for future additions */
 };
