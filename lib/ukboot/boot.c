@@ -114,8 +114,9 @@ int main(int argc, char *argv[]) __weak;
 static inline int do_main(int argc, char *argv[]);
 
 #if CONFIG_LIBUKBOOT_MAINTHREAD
-static __noreturn void main_thread(void *, void *);
+static __noreturn void main_thread(void *);
 static void main_thread_dtor(struct uk_thread *m);
+struct uk_semaphore main_sema;
 #endif /* CONFIG_LIBUKBOOT_MAINTHREAD */
 
 #if defined(CONFIG_LIBUKBOOT_HEAP_BASE) && defined(CONFIG_LIBUKVMEM)
@@ -269,6 +270,8 @@ void uk_boot_entry(void)
 	UK_ASSERT(boot_argc);
 
 #if CONFIG_LIBUKBOOT_MAINTHREAD
+	/* Initialize main thread semaphore */
+	uk_semaphore_init(&main_sema, 0);
 	/* Initialize shutdown control structure */
 	uk_boot_shutdown_ctl_init();
 #endif /* CONFIG_LIBUKBOOT_MAINTHREAD */
@@ -364,6 +367,21 @@ void uk_boot_entry(void)
 	ictx.cmdline.argc = boot_argc;
 	ictx.cmdline.argv = boot_argv;
 
+#if CONFIG_LIBUKBOOT_MAINTHREAD
+	/* Start main thread (will block on semaphore) */
+	m = uk_sched_thread_create_fn1(s, main_thread,
+				       &ictx,
+				       0x0 /* default stack size */,
+				       0x0 /* default auxiliary stack size */,
+				       false, false,
+				       "main", NULL,
+				       main_thread_dtor);
+	if (unlikely(!m || PTRISERR(m)))
+		UK_CRASH("Failed to launch application's main()\n");
+
+	ictx.tmain = m;
+#endif /* CONFIG_LIBUKBOOT_MAINTHREAD */
+
 	/* Enable interrupts before starting the application */
 	ukplat_lcpu_enable_irq();
 
@@ -400,18 +418,8 @@ void uk_boot_entry(void)
 	tctx.target = UKPLAT_HALT;
 
 #else /* CONFIG_LIBUKBOOT_MAINTHREAD */
-	m = uk_sched_thread_create_fn2(s, main_thread,
-				       (void *)((long)ictx.cmdline.argc),
-				       (void *)ictx.cmdline.argv,
-				       0x0 /* default stack size */,
-				       0x0 /* default auxiliary stack size */,
-				       false, false,
-				       "main", NULL,
-				       main_thread_dtor);
-	if (unlikely(!m || PTRISERR(m))) {
-		uk_pr_err("Failed to launch application's main()\n");
-		goto exit;
-	}
+	/* Unblock main thread (will execute main()) */
+	uk_semaphore_up(&main_sema);
 
 	/* Block execution of "init" until we receive the first request */
 	tctx.target = uk_boot_shutdown_barrier();
@@ -505,12 +513,17 @@ static inline int do_main(int argc, char *argv[])
 }
 
 #if CONFIG_LIBUKBOOT_MAINTHREAD
-static __noreturn void main_thread(void *a_argc, void *a_argv)
+/* Pass ictx so that inittab handlers can update args */
+static __noreturn void main_thread(void *ictx)
 {
-	int argc = (int)((__uptr)a_argc);
-	char **argv = (char **)a_argv;
+	UK_ASSERT(ictx);
 
-	do_main(argc, argv);
+	/* block until we are allowed to execute main() */
+	uk_semaphore_down(&main_sema);
+
+	do_main(((struct uk_init_ctx *)ictx)->cmdline.argc,
+		((struct uk_init_ctx *)ictx)->cmdline.argv);
+
 #if !CONFIG_LIBUKBOOT_MAINTHREAD_NOHALT
 	/* NOTE: The scheduler's garbage collector would also initiate a
 	 *       shutdown request via `main_thread_dtor()`.
