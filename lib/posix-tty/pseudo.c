@@ -6,12 +6,13 @@
 
 /* Pseudo-files: files with constant input and discarding output */
 
-#include <string.h>
+#include <limits.h>
 #include <sys/stat.h>
 
 #include <uk/assert.h>
 #include <uk/file.h>
 #include <uk/file/nops.h>
+#include <uk/file/iovutil.h>
 #include <uk/posix-fd.h>
 
 /* Null file: input is always at EOF */
@@ -43,31 +44,26 @@ static ssize_t zero_read(const struct uk_file *f __maybe_unused,
 			 const struct iovec *iov, size_t iovcnt,
 			 size_t off __unused, long flags __unused)
 {
-	ssize_t total = 0;
+	size_t iovi = 0;
+	size_t cur = 0;
 
 	UK_ASSERT(f->vol == ZERO_VOLID);
+	if (unlikely(!iov))
+		return -EFAULT;
 
-	for (size_t i = 0; i < iovcnt; i++) {
-		if (unlikely(!iov[i].iov_base && iov[i].iov_len))
-			return -EFAULT;
-		memset(iov[i].iov_base, 0, iov[i].iov_len);
-		total += iov[i].iov_len;
-	}
-	return total;
+	return uk_iov_zero(iov, iovcnt, SSIZE_MAX, &iovi, &cur);
 }
 
 static ssize_t null_write(const struct uk_file *f __maybe_unused,
 			  const struct iovec *iov, size_t iovcnt,
 			  size_t off __unused, long flags __unused)
 {
-	ssize_t total = 0;
-
 	UK_ASSERT(f->vol == NULL_VOLID || f->vol == ZERO_VOLID ||
 		  f->vol == VOID_VOLID);
+	if (unlikely(!iov))
+		return -EFAULT;
 
-	for (size_t i = 0; i < iovcnt; i++)
-		total += iov[i].iov_len;
-	return total;
+	return uk_iov_len(iov, iovcnt);
 }
 
 #define PSEUDO_STATX_MASK \
