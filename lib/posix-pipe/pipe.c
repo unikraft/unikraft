@@ -12,6 +12,7 @@
 #include <uk/alloc.h>
 #include <uk/essentials.h>
 #include <uk/file/nops.h>
+#include <uk/file/iovutil.h>
 #include <uk/posix-fd.h>
 #include <uk/posix-pipe.h>
 
@@ -33,7 +34,8 @@
 #define PIPE_IDX(x) ((x) & _PIPE_SZMASK)
 
 #define PIPE_SPACE(start, lim) \
-	(((start) <= (lim)) ? ((lim) - (start)) : (PIPE_SIZE - (start) + (lim)))
+	(((start) <= (lim)) ? (size_t)((lim) - (start)) : \
+			      (size_t)(PIPE_SIZE - (start) + (lim)))
 #define PIPE_USED(start, lim) \
 	(((start) == (lim)) ? PIPE_SIZE : PIPE_SPACE(start, lim))
 
@@ -75,97 +77,60 @@ struct pipe_alloc {
 	struct pipe_node node;
 };
 
-
-static void _pipebuf_read(const char *buf, pipeidx head, char *out, size_t n)
+static void pipebuf_iovread(const char *buf, pipeidx head, size_t toread,
+			    const struct iovec *iov, size_t iovcnt)
 {
-	if (head + n > PIPE_SIZE) {
-		/* pipebuf not contiguous, need 2 copies */
-		size_t l = PIPE_SIZE - head;
+	size_t iovi = 0;
+	size_t cur = 0;
+	size_t canread = MIN(toread, (size_t)(PIPE_SIZE - head));
+	size_t read;
 
-		memcpy(out, &buf[head], l);
-		memcpy(&out[l], buf, n - l);
-	} else {
-		memcpy(out, &buf[head], n);
+	read = uk_iov_scatter(iov, iovcnt, &buf[head], canread, &iovi, &cur);
+	toread -= read;
+	if (toread) {
+		head = PIPE_IDX(head + read);
+		(void)uk_iov_scatter(iov, iovcnt, &buf[head], toread,
+				     &iovi, &cur);
 	}
 }
 
-static void _pipebuf_write(char *buf, pipeidx head, const char *in, size_t n)
+static void pipebuf_iovwrite(char *buf, pipeidx head, size_t towrite,
+			     const struct iovec *iov, size_t iovcnt)
 {
-	if (head + n > PIPE_SIZE) {
-		/* pipebuf not contiguous, need 2 copies */
-		size_t l = PIPE_SIZE - head;
+	size_t iovi = 0;
+	size_t cur = 0;
+	size_t canwrite = MIN(towrite, (size_t)(PIPE_SIZE - head));
+	size_t written;
 
-		memcpy(&buf[head], in, l);
-		memcpy(buf, &in[l], n - l);
-	} else {
-		memcpy(&buf[head], in, n);
+	written = uk_iov_gather(&buf[head], iov, iovcnt, canwrite, &iovi, &cur);
+	towrite -= written;
+	if (towrite) {
+		head = PIPE_IDX(head + written);
+		(void)uk_iov_gather(&buf[head], iov, iovcnt, towrite,
+				    &iovi, &cur);
 	}
-}
-
-static void pipebuf_iovread(const char *buf, pipeidx head,
-			    const struct iovec *iov, size_t n)
-{
-	int i;
-
-	for (i = 0; iov[i].iov_len <= n; i++) {
-		size_t len = iov[i].iov_len;
-
-		_pipebuf_read(buf, head, (char *)iov[i].iov_base, len);
-		n -= len;
-		head = PIPE_IDX(head + len);
-	}
-	if (n)
-		_pipebuf_read(buf, head, (char *)iov[i].iov_base, n);
-}
-
-static void pipebuf_iovwrite(char *buf, pipeidx head,
-			     const struct iovec *iov, size_t n)
-{
-	int i;
-
-	for (i = 0; iov[i].iov_len <= n; i++) {
-		size_t len = iov[i].iov_len;
-
-		_pipebuf_write(buf, head, (const char *)iov[i].iov_base, len);
-		n -= len;
-		head = PIPE_IDX(head + len);
-	}
-	if (n)
-		_pipebuf_write(buf, head, (const char *)iov[i].iov_base, n);
-}
-
-static ssize_t _iovsz(const struct iovec *iov, size_t iovcnt)
-{
-	size_t ret = 0;
-
-	for (size_t i = 0; i < iovcnt; i++)
-		if (iov[i].iov_len) {
-			if (likely(iov[i].iov_base))
-				ret += iov[i].iov_len;
-			else
-				return -EFAULT;
-		}
-	return ret;
 }
 
 static ssize_t pipe_read(const struct uk_file *f,
 			 const struct iovec *iov, size_t iovcnt,
 			 size_t off, long flags __unused)
 {
-	ssize_t toread;
+	size_t toread;
 	struct pipe_node *d;
 	struct pipe_msg *m;
 	struct pipe_msg *prev;
-	ssize_t canread;
+	size_t canread;
 	pipeidx start;
 
 	UK_ASSERT(f->vol == PIPE_VOLID);
 	if (unlikely(off))
 		return -ESPIPE;
+	if (unlikely(!iov))
+		return -EFAULT;
 
-	toread = _iovsz(iov, iovcnt);
-	if (unlikely(toread <= 0))
-		return toread;
+	toread = uk_iov_len(iov, iovcnt);
+	if (unlikely(!toread))
+		return 0;
 
 	d = (struct pipe_node *)f->node;
 	m = d->head;
@@ -192,7 +157,7 @@ static ssize_t pipe_read(const struct uk_file *f,
 			prev = uk_exchange_n(&d->free, m);
 			m->next = prev;
 		} else { /* Stream msg; always last in queue */
-			ssize_t avail;
+			size_t avail;
 
 			start = m->start;
 			if (start == PIPE_SIZE) {
@@ -230,7 +195,7 @@ static ssize_t pipe_read(const struct uk_file *f,
 		break;
 	}
 	UK_ASSERT(canread);
-	pipebuf_iovread(d->buf, start, iov, canread);
+	pipebuf_iovread(d->buf, start, canread, iov, iovcnt);
 	uk_file_event_set(f, UKFD_POLLOUT);
 
 	return canread;
@@ -242,9 +207,9 @@ static ssize_t pipe_write(const struct uk_file *f,
 {
 	struct pipe_node *d;
 	struct pipe_msg *tail;
-	ssize_t towrite;
-	ssize_t canwrite;
-	ssize_t capacity;
+	size_t towrite;
+	size_t canwrite;
+	size_t capacity;
 	pipeidx whead;
 	pipeidx wend;
 	int empty = 0;
@@ -252,14 +217,16 @@ static ssize_t pipe_write(const struct uk_file *f,
 	UK_ASSERT(f->vol == PIPE_VOLID);
 	if (unlikely(off))
 		return -ESPIPE;
+	if (unlikely(!iov))
+		return -EFAULT;
 
 	d = (struct pipe_node *)f->node;
 	if (unlikely(d->flags & PIPE_HUP))
 		return -EPIPE;
 
-	towrite = _iovsz(iov, iovcnt);
-	if (unlikely(towrite <= 0))
-		return towrite;
+	towrite = uk_iov_len(iov, iovcnt);
+	if (unlikely(!towrite))
+		return 0;
 
 	tail = d->tail;
 	if (!tail || tail->next != tail) { /* Empty or last msg is packet */
@@ -307,7 +274,7 @@ static ssize_t pipe_write(const struct uk_file *f,
 		tail->end = PIPE_IDX(whead + canwrite);
 	}
 	UK_ASSERT(canwrite);
-	pipebuf_iovwrite(d->buf, whead, iov, canwrite);
+	pipebuf_iovwrite(d->buf, whead, canwrite, iov, iovcnt);
 	if (canwrite == capacity)
 		uk_file_event_clear(f, UKFD_POLLOUT);
 	if (empty)
