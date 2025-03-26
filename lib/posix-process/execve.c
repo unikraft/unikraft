@@ -46,7 +46,7 @@ static void __noreturn execve_ctx_switch(long arg0, long arg1)
 	 */
 	if (!pthread_parent) {
 		UK_ASSERT(pthread->process);
-		UK_ASSERT(pthread->process->pid == 0);
+		UK_ASSERT(pthread->process->pid == UK_PID_INIT);
 		goto switch_ctx;
 	}
 
