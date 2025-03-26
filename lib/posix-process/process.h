@@ -77,6 +77,7 @@ struct posix_thread {
 #if CONFIG_LIBPOSIX_PROCESS_SIGNAL
 	struct uk_signal_tdesc *signal;
 #endif /* CONFIG_LIBPOSIX_PROCESS_SIGNAL */
+	pid_t wait_pid;
 
 	/* TODO: Mutex */
 };
@@ -94,6 +95,10 @@ extern __uk_tls struct posix_thread *pthread_self;
 #define uk_pprocess_foreach_pthread(_proc, _pthread, _pthreadn)		\
 	uk_list_for_each_entry_safe((_pthread), (_pthreadn),		\
 				    &(_proc)->threads, thread_list_entry)
+
+#define uk_pprocess_foreach_child(_proc, _pchild, _pchildn)		\
+	uk_list_for_each_entry_safe((_pchild), (_pchildn),		\
+				    &(_proc)->children, child_list_entry)
 
 #define uk_pthread_current()						\
 	uk_thread_uktls_var(uk_thread_current(), pthread_self)
