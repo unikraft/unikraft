@@ -49,6 +49,8 @@
 
 #define TIDMAP_SIZE (CONFIG_LIBPOSIX_PROCESS_MAX_PID + 1)
 
+extern struct uk_thread *pprocess_thread_main;
+
 /* Notice: The RUNNING state is not necessarily in sync with the state
  * of the underlying uk_thread (may be blocked by the scheduler).
  * On the other hand, the BLOCKED state implies that the underlying

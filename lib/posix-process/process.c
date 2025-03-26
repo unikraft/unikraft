@@ -41,6 +41,8 @@
 #include <uk/config.h>
 #include <uk/syscall.h>
 
+struct uk_thread *pprocess_thread_main;
+
 #if CONFIG_LIBPOSIX_PROCESS_PIDS
 #include <uk/bitmap.h>
 #include <uk/list.h>
@@ -406,11 +408,26 @@ void uk_posix_process_kill(struct uk_thread *thread)
 }
 
 #if CONFIG_LIBPOSIX_PROCESS_INIT_PIDS
-static int posix_process_init(struct uk_init_ctx *ictx __unused)
+static int posix_process_init(struct uk_init_ctx *ictx)
 {
+	struct uk_thread *t;
+
+	UK_ASSERT(ictx);
+
+	/* If ictx->tmain in set, main() executes on a
+	 * separate uk_thread. Instantiate PID_INIT from
+	 * that thread, and set pprocess_thread_main, as
+	 * we will need that information later.
+	 */
+	if (ictx->tmain) {
+		t = ictx->tmain;
+		pprocess_thread_main = ictx->tmain;
+	} else {
+		t = uk_thread_current();
+	}
+
 	/* Create a POSIX process without parent ("init" process) */
-	return uk_posix_process_create(uk_alloc_get_default(),
-				       uk_thread_current(), NULL);
+	return uk_posix_process_create(uk_alloc_get_default(), t, NULL);
 }
 
 uk_late_initcall(posix_process_init, 0x0);
