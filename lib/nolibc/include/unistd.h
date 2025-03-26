@@ -41,6 +41,7 @@ extern "C" {
 #endif
 
 #define __NEED_NULL
+#define __NEED_pid_t
 #define __NEED_size_t
 #define __NEED_ssize_t
 #define __NEED_off_t
@@ -83,6 +84,7 @@ int execvpe(const char *file, char *const argv[],
 		char *const envp[]);
 int execve(const char *filename, char *const argv[],
 		char *const envp[]);
+pid_t vfork(void);
 #endif
 
 #if CONFIG_LIBVFSCORE
