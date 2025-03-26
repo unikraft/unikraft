@@ -168,4 +168,32 @@ size_t uk_iov_gather(char *buf, const struct iovec *iov, size_t iovcnt,
 	return ret;
 }
 
+/**
+ * Check how many bytes the memory regions described by `iov[iovcnt]`,
+ * starting at `cur` offset from the buffer at `iov[iovi]` can fit.
+ *
+ * @return total bytes the iov can fit
+ */
+static inline
+size_t uk_iov_remaining(const struct iovec *iov, size_t iovcnt,
+			size_t iovi, size_t cur)
+{
+	size_t len = 0, i = iovi;
+
+	UK_ASSERT(i < iovcnt);
+	UK_ASSERT(cur < iov[i].iov_len);
+
+	if (cur) {
+		len += iov[i].iov_len - cur;
+		i++;
+	}
+
+	while (i < iovcnt) {
+		len += iov[i].iov_len;
+		i++;
+	}
+
+	return len;
+}
+
 #endif /* __UKFILE_IOVUTIL_H__ */
