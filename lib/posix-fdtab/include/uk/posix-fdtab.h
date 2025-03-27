@@ -69,7 +69,7 @@ int uk_fdtab_open_desc(struct uk_ofile *of, unsigned int mode);
 /**
  * Gets the open file description associated with descriptor `fd`.
  *
- * Users should call uk_fdtab_ret when done with the open file reference.
+ * Users should call uk_ofile_release when done with the open file reference.
  *
  * @param fd
  *   File descriptor to look up
