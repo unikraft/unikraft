@@ -38,6 +38,20 @@
 #include <uk/arch/ctx.h>
 #include <arch/syscall_prologue.h>
 
+/*
+ * Whenever the hidden Config.uk option LIBSYSCALL_SHIM_NOWRAPPER
+ * is set, the creation of libc-style wrappers are disable by the
+ * UK_SYSCALL_DEFINE() and UK_SYSCALL_R_DEFINE() macros. Alternatively,
+ * UK_LIBC_SYSCALLS can be set to 0 through compilation flags.
+ */
+#ifndef UK_LIBC_SYSCALLS
+#if CONFIG_LIBSYSCALL_SHIM && CONFIG_LIBSYSCALL_SHIM_NOWRAPPER
+#define UK_LIBC_SYSCALLS (0)
+#else
+#define UK_LIBC_SYSCALLS (1)
+#endif /* CONFIG_LIBSYSCALL_SHIM && CONFIG_LIBSYSCALL_SHIM_NOWRAPPER */
+#endif /* UK_LIBC_SYSCALLS */
+
 #if !__ASSEMBLY__
 #include <uk/config.h>
 #include <uk/essentials.h>
@@ -94,20 +108,6 @@ static inline
 void _uk_syscall_wrapper_do_exittab(struct ukarch_execenv *execenv __unused)
 { }
 #endif /* !CONFIG_LIBSYSCALL_SHIM */
-
-/*
- * Whenever the hidden Config.uk option LIBSYSCALL_SHIM_NOWRAPPER
- * is set, the creation of libc-style wrappers are disable by the
- * UK_SYSCALL_DEFINE() and UK_SYSCALL_R_DEFINE() macros. Alternatively,
- * UK_LIBC_SYSCALLS can be set to 0 through compilation flags.
- */
-#ifndef UK_LIBC_SYSCALLS
-#if CONFIG_LIBSYSCALL_SHIM && CONFIG_LIBSYSCALL_SHIM_NOWRAPPER
-#define UK_LIBC_SYSCALLS (0)
-#else
-#define UK_LIBC_SYSCALLS (1)
-#endif /* CONFIG_LIBSYSCALL_SHIM && CONFIG_LIBSYSCALL_SHIM_NOWRAPPER */
-#endif /* UK_LIBC_SYSCALLS */
 
 #define __uk_scc(X) ((long) (X))
 typedef long uk_syscall_arg_t;
