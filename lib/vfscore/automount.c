@@ -864,7 +864,7 @@ static int vfscore_automount_volumes(const struct vfscore_volume *vvs[],
 #endif /* CONFIG_LIBVFSCORE_AUTOMOUNT */
 
 #if CONFIG_LIBVFSCORE_AUTOMOUNT || CONFIG_LIBVFSCORE_AUTOUNMOUNT
-static void vfscore_autoumount(const struct uk_term_ctx *tctx __unused)
+static void vfscore_autoumount(struct uk_term_ctx *tctx __unused)
 {
 	struct mount *mp;
 	int rc;
