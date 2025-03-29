@@ -388,7 +388,7 @@ UK_EVENT_HANDLER_PRIO(POSIX_PROCESS_EXECVE_EVENT, fdtab_handle_execve,
 #endif /* CONFIG_LIBPOSIX_PROCESS_EXECVE */
 
 /* Cleanup all leftover open fds in the initial fdtab */
-static void term_posix_fdtab(const struct uk_term_ctx *tctx __unused)
+static void term_posix_fdtab(struct uk_term_ctx *tctx __unused)
 {
 	fdtab_cleanup(&init_fdtab, 1);
 }
