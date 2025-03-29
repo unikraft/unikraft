@@ -114,7 +114,7 @@ int main(int argc, char *argv[]) __weak;
 static inline int do_main(int argc, char *argv[]);
 
 #if CONFIG_LIBUKBOOT_MAINTHREAD
-static __noreturn void main_thread(void *);
+static __noreturn void main_thread(void *, void *);
 static void main_thread_dtor(struct uk_thread *m);
 struct uk_semaphore main_sema;
 #endif /* CONFIG_LIBUKBOOT_MAINTHREAD */
@@ -369,8 +369,8 @@ void uk_boot_entry(void)
 
 #if CONFIG_LIBUKBOOT_MAINTHREAD
 	/* Start main thread (will block on semaphore) */
-	m = uk_sched_thread_create_fn1(s, main_thread,
-				       &ictx,
+	m = uk_sched_thread_create_fn2(s, main_thread,
+				       &ictx, &tctx,
 				       0x0 /* default stack size */,
 				       0x0 /* default auxiliary stack size */,
 				       false, false,
@@ -414,14 +414,16 @@ void uk_boot_entry(void)
 	fflush(stdout);
 
 #if !CONFIG_LIBUKBOOT_MAINTHREAD
-	do_main(ictx.cmdline.argc, ictx.cmdline.argv);
+	tctx.exit_code = do_main(ictx.cmdline.argc, ictx.cmdline.argv);
 	tctx.target = UKPLAT_HALT;
 
 #else /* CONFIG_LIBUKBOOT_MAINTHREAD */
 	/* Unblock main thread (will execute main()) */
 	uk_semaphore_up(&main_sema);
 
-	/* Block execution of "init" until we receive the first request */
+	/* Block execution of "init" until we receive the first request.
+	 * The exit code will be set by the main thread.
+	 */
 	tctx.target = uk_boot_shutdown_barrier();
 #endif /* CONFIG_LIBUKBOOT_MAINTHREAD */
 
@@ -446,6 +448,8 @@ exit:
 		(*init_entry->term)(&tctx);
 	}
 
+	uk_pr_debug("Unikraft terminates with exit status %d (target: %d)\n",
+		    tctx.exit_code, tctx.target);
 	ukplat_terminate(tctx.target); /* does not return */
 }
 
@@ -514,15 +518,18 @@ static inline int do_main(int argc, char *argv[])
 
 #if CONFIG_LIBUKBOOT_MAINTHREAD
 /* Pass ictx so that inittab handlers can update args */
-static __noreturn void main_thread(void *ictx)
+static __noreturn void main_thread(void *a0, void *a1)
 {
+	struct uk_init_ctx *ictx = (struct uk_init_ctx *)a0;
+	struct uk_term_ctx *tctx = (struct uk_term_ctx *)a1;
+
 	UK_ASSERT(ictx);
+	UK_ASSERT(tctx);
 
 	/* block until we are allowed to execute main() */
 	uk_semaphore_down(&main_sema);
 
-	do_main(((struct uk_init_ctx *)ictx)->cmdline.argc,
-		((struct uk_init_ctx *)ictx)->cmdline.argv);
+	tctx->exit_code = do_main(ictx->cmdline.argc, ictx->cmdline.argv);
 
 #if !CONFIG_LIBUKBOOT_MAINTHREAD_NOHALT
 	/* NOTE: The scheduler's garbage collector would also initiate a
