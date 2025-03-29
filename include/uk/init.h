@@ -64,12 +64,14 @@ struct uk_init_ctx {
 
 struct uk_term_ctx {
 	enum ukplat_gstate target;
+	/* Application exit code */
+	int exit_code;
 
 	/* reserved for future additions */
 };
 
 typedef int (*uk_init_func_t)(struct uk_init_ctx *);
-typedef void (*uk_term_func_t)(const struct uk_term_ctx *);
+typedef void (*uk_term_func_t)(struct uk_term_ctx *);
 
 struct uk_inittab_entry {
 	uk_init_func_t init;
