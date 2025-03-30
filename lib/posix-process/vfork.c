@@ -18,21 +18,17 @@
 
 UK_LLSYSCALL_R_E_DEFINE(pid_t, vfork)
 {
-	struct posix_process *child_proc;
 	struct clone_args cl_args = {0};
-	pid_t child_tid;
+	pid_t pid; /* child */
 
 	cl_args.flags       = CLONE_VM | CLONE_VFORK;
 	cl_args.exit_signal = SIGCHLD;
 
-	child_tid = uk_clone(&cl_args, sizeof(cl_args), execenv);
-	if (unlikely(child_tid < 0)) {
-		uk_pr_err("Could not clone thread\n");
-		return child_tid;
+	pid = uk_clone(&cl_args, sizeof(cl_args), execenv);
+	if (unlikely(pid < 0)) {
+		uk_pr_err("vfork error (%d)\n", pid);
+		return pid;
 	}
 
-	child_proc = tid2pprocess(child_tid);
-	UK_ASSERT(child_proc);
-
-	return child_proc->pid;
+	return pid;
 }
