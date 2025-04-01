@@ -11,7 +11,7 @@
 
 #include "sigset.h"
 
-#if !HAVE_LIBC
+#if !CONFIG_HAVE_LIBC
 int sigaddset(sigset_t *set, int signo)
 {
 	if (unlikely(signo <= 0 || signo >= NSIG)) {
@@ -53,4 +53,4 @@ int sigismember(const sigset_t *set, int signo)
 
 	return uk_sigismember(set, signo);
 }
-#endif /* !HAVE_LIBC */
+#endif /* !CONFIG_HAVE_LIBC */
