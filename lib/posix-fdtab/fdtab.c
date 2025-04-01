@@ -28,9 +28,9 @@
 #include <uk/posix-fdtab-legacy.h>
 #endif /* CONFIG_LIBPOSIX_FDTAB_LEGACY_SHIM */
 
-#if CONFIG_LIBPOSIX_PROCESS_CLONE
+#if CONFIG_LIBPOSIX_PROCESS_MULTITHREADING
 #include <uk/process.h>
-#endif /* CONFIG_LIBPOSIX_PROCESS_CLONE */
+#endif /* CONFIG_LIBPOSIX_PROCESS_MULTITHREADING */
 
 #if CONFIG_LIBPOSIX_PROCESS_EXECVE
 #include <uk/event.h>
@@ -475,7 +475,7 @@ static void fdtab_thread_term(struct uk_thread *child)
 
 UK_THREAD_INIT(fdtab_thread_init, fdtab_thread_term);
 
-#if CONFIG_LIBPOSIX_PROCESS_CLONE
+#if CONFIG_LIBPOSIX_PROCESS_MULTITHREADING
 static int fdtab_clone(const struct clone_args *cl_args,
 		       size_t cl_args_len __unused,
 		       struct uk_thread *child,
@@ -512,7 +512,7 @@ static int fdtab_clone(const struct clone_args *cl_args,
 
 UK_POSIX_CLONE_HANDLER(CLONE_FILES, 0, fdtab_clone, 0);
 
-#endif /* CONFIG_LIBPOSIX_PROCESS_CLONE */
+#endif /* CONFIG_LIBPOSIX_PROCESS_MULTITHREADING */
 #endif /* CONFIG_LIBPOSIX_FDTAB_MULTITAB */
 
 /* Init fdtab as early as possible, to enable functions that rely on fds */
