@@ -39,9 +39,9 @@
 #include <vfscore/file.h>
 #include <uk/plat/lcpu.h>
 #include <errno.h>
-#if CONFIG_LIBPOSIX_PROCESS_CLONE
+#if CONFIG_LIBPOSIX_PROCESS_MULTITHREADING
 #include <uk/process.h>
-#endif /* CONFIG_LIBPOSIX_PROCESS_CLONE */
+#endif /* CONFIG_LIBPOSIX_PROCESS_MULTITHREADING */
 
 #include <uk/posix-fdtab-legacy.h>
 
@@ -73,7 +73,7 @@ int fdalloc(struct vfscore_file *fp, int *newfd)
 	return 0;
 }
 
-#if CONFIG_LIBPOSIX_PROCESS_CLONE
+#if CONFIG_LIBPOSIX_PROCESS_MULTITHREADING
 static int uk_posix_clone_files(const struct clone_args *cl_args,
 				size_t cl_args_len __unused,
 				struct uk_thread *child __unused,
@@ -91,4 +91,4 @@ static int uk_posix_clone_files(const struct clone_args *cl_args,
 	return 0;
 }
 UK_POSIX_CLONE_HANDLER(CLONE_FILES, false, uk_posix_clone_files, 0x0);
-#endif /* CONFIG_LIBPOSIX_PROCESS_CLONE */
+#endif /* CONFIG_LIBPOSIX_PROCESS_MULTITHREADING */
