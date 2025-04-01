@@ -580,7 +580,7 @@ static inline void param_msgflags(struct uk_streambuf *sb, int fmtf, int flags)
 }
 #endif /* CONFIG_LIBPOSIX_SOCKET */
 
-#if CONFIG_LIBPOSIX_PROCESS_CLONE
+#if CONFIG_LIBPOSIX_PROCESS_MULTITHREADING
 #include <uk/process.h>
 
 static inline void param_cloneflags(struct uk_streambuf *sb, int fmtf,
@@ -615,7 +615,7 @@ static inline void param_cloneflags(struct uk_streambuf *sb, int fmtf,
 	PR_FLAG(sb, fmtf, orig_seek, CLONE_, IO,             flags);
 	PR_FLAG_END(sb, fmtf, orig_seek, flags);
 }
-#endif /* CONFIG_LIBPOSIX_PROCESS_CLONE */
+#endif /* CONFIG_LIBPOSIX_PROCESS_MULTITHREADING */
 
 /* Pretty print a single parameter */
 static void pr_param(struct uk_streambuf *sb, int fmtf,
@@ -786,11 +786,11 @@ static void pr_param(struct uk_streambuf *sb, int fmtf,
 		param_msgflags(sb, fmtf, param);
 		break;
 #endif /* CONFIG_LIBPOSIX_SOCKET */
-#if CONFIG_LIBPOSIX_PROCESS_CLONE
+#if CONFIG_LIBPOSIX_PROCESS_MULTITHREADING
 	case PT_CLONEFLAGS:
 		param_cloneflags(sb, fmtf, param);
 		break;
-#endif /* CONFIG_LIBPOSIX_PROCESS_CLONE */
+#endif /* CONFIG_LIBPOSIX_PROCESS_MULTITHREADING */
 	case PT_STRUCT(timespec):
 		PR_STRUCT(sb, fmtf, timespec, flags, param, 0, succ,
 			  PT_UDEC, tv_sec,
