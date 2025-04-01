@@ -51,9 +51,9 @@
 #include <uk/thread.h>
 #include <uk/thread.h>
 #include <uk/list.h>
-#if CONFIG_LIBPOSIX_PROCESS_CLONE
+#if CONFIG_LIBPOSIX_PROCESS_MULTITHREADING
 #include <uk/process.h>
-#endif /* CONFIG_LIBPOSIX_PROCESS_CLONE */
+#endif /* CONFIG_LIBPOSIX_PROCESS_MULTITHREADING */
 #include <uk/sched.h>
 #include <uk/list.h>
 #include <uk/assert.h>
@@ -345,7 +345,7 @@ UK_LLSYSCALL_R_DEFINE(int, futex, uint32_t *, uaddr, int, futex_op,
 	}
 }
 
-#if CONFIG_LIBPOSIX_PROCESS_CLONE
+#if CONFIG_LIBPOSIX_PROCESS_MULTITHREADING
 /*
  * Reference to child TID that should be cleared on thread exit
  * (if not NULL):
@@ -407,4 +407,4 @@ static void thread_exit_handler(struct uk_thread *child)
 
 UK_THREAD_INIT_PRIO(0x0, thread_exit_handler, UK_PRIO_EARLIEST);
 
-#endif /* CONFIG_LIBPOSIX_PROCESS_CLONE */
+#endif /* CONFIG_LIBPOSIX_PROCESS_MULTITHREADING */
