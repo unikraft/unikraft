@@ -35,7 +35,7 @@
 extern "C" {
 #endif
 
-#if CONFIG_LIBPOSIX_PROCESS_CLONE
+#if CONFIG_LIBPOSIX_PROCESS_MULTITHREADING
 #ifdef _GNU_SOURCE
 #define CLONE_NEWTIME		0x00000080
 #define CLONE_VM		0x00000100
@@ -65,7 +65,7 @@ extern "C" {
 
 int clone(int (*fn)(void *), void *sp, int flags, void *arg, ...);
 #endif /* _GNU_SOURCE */
-#endif /* CONFIG_LIBPOSIX_PROCESS_CLONE */
+#endif /* CONFIG_LIBPOSIX_PROCESS_MULTITHREADING */
 
 #ifdef __cplusplus
 }
