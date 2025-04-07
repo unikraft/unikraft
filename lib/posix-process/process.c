@@ -149,8 +149,11 @@ struct posix_thread *pprocess_create_pthread(struct posix_process *pprocess,
 
 	pthread->_a = a;
 	pthread->process = pprocess;
+	pthread->parent = uk_pthread_current();
 	pthread->tid = tid;
 	pthread->thread = th;
+
+	uk_thread_uktls_var(th, pthread_self) = pthread;
 
 #if CONFIG_LIBPOSIX_PROCESS_SIGNAL
 	err = pprocess_signal_tdesc_alloc(pthread);
@@ -202,6 +205,8 @@ static void pprocess_release_pthread(struct posix_thread *pthread)
 #if CONFIG_LIBPOSIX_PROCESS_SIGNAL
 	pprocess_signal_tdesc_free(pthread);
 #endif /* CONFIG_LIBPOSIX_PROCESS_SIGNAL */
+
+	uk_thread_uktls_var(pthread->thread, pthread_self) = NULL;
 
 	/* remove from process' thread list */
 	uk_list_del_init(&pthread->thread_list_entry);
@@ -312,6 +317,8 @@ int pprocess_create(struct uk_alloc *a,
 		uk_list_add_tail(&(*pthread)->thread_list_entry,
 				 &pprocess->threads);
 
+		/* Update parent */
+		(*pthread)->parent = parent_pthread;
 #if CONFIG_LIBPOSIX_PROCESS_SIGNAL
 		/* Reset signal state of this thread */
 		ret = pprocess_signal_tdesc_init(*pthread);
@@ -332,8 +339,6 @@ int pprocess_create(struct uk_alloc *a,
 		ret = -EAGAIN;
 		goto err_free_pprocess;
 	}
-
-	(*pthread)->parent = parent_pthread;
 
 	pprocess->parent = parent_pprocess;
 	if (parent_pprocess) {
@@ -523,7 +528,6 @@ static void posix_thread_fini(struct uk_thread *child)
 		    child, child->name, (int) pthread_self->tid,
 		    (int) pprocess->pid);
 	pprocess_release_pthread(pthread_self);
-	pthread_self = NULL;
 
 	/* Release process if it became empty of threads */
 	if (uk_list_empty(&pprocess->threads))
