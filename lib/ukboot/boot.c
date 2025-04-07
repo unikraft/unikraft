@@ -107,11 +107,12 @@
 #include <uk/intctlr.h>
 #endif /* CONFIG_LIBUKINTCTLR */
 
+#include "init.h"
+
 extern char **boot_argv;
 extern int boot_argc;
 
 int main(int argc, char *argv[]) __weak;
-static inline int do_main(int argc, char *argv[]);
 
 #if CONFIG_LIBUKBOOT_MAINTHREAD
 static __noreturn void main_thread(void *, void *);
@@ -453,7 +454,7 @@ exit:
 	ukplat_terminate(tctx.target); /* does not return */
 }
 
-static inline int do_main(int argc, char *argv[])
+int do_main(int argc, char *argv[])
 {
 	char **envp __maybe_unused;
 	uk_ctor_func_t *ctorfn;
@@ -528,8 +529,11 @@ static __noreturn void main_thread(void *a0, void *a1)
 
 	/* block until we are allowed to execute main() */
 	uk_semaphore_down(&main_sema);
-
+#if CONFIG_LIBUKBOOT_INIT
+	tctx->exit_code = do_init(ictx->cmdline.argc, ictx->cmdline.argv);
+#else /* !CONFIG_LIBUKBOOT_INIT */
 	tctx->exit_code = do_main(ictx->cmdline.argc, ictx->cmdline.argv);
+#endif /* !CONFIG_LIBUKBOOT_INIT */
 
 #if !CONFIG_LIBUKBOOT_MAINTHREAD_NOHALT
 	/* NOTE: The scheduler's garbage collector would also initiate a

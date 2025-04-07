@@ -196,6 +196,46 @@ config LIBUKBOOT_SHUTDOWNREQ_HANDLER
 	  if it is requested by a driver on the shutdown_req event queue
 	  (e.g., ACPI power button event).
 
+config LIBUKBOOT_INIT
+	bool "Provide /sbin/init logic"
+	depends on LIBPOSIX_PROCESS_MULTIPROCESS
+	select LIBPOSIX_FDTAB
+	select LIBPOSIX_PROCESS_SIGNAL
+	select LIBPOSIX_PROCESS_SIGNALFD
+	select LIBUKBOOT_MAINTHREAD
+	help
+		Provides /sbin/init logic to handle orphan processes
+		and manage shutdown. When this option is selected, the
+		application is executed on a new process. If you don't
+		select this in a multiprocess configuration, you need
+		to provide your own init.
+
+menuconfig LIBUKBOOT_GRACEFUL_SHUTDOWN
+	bool "Graceful shutdown"
+	depends on LIBUKBOOT_INIT
+	select LIBPOSIX_POLL
+	help
+		Signal the application on system shutdown to give it
+		a chance to terminate gracefully. If timeout is reached,
+		all processes are killed forecefully.
+
+if LIBUKBOOT_GRACEFUL_SHUTDOWN
+config LIBUKBOOT_GRACEFUL_SHUTDOWN_SIGNAL
+	int "Termination signal"
+	default 15 if (ARCH_ARM_64 || ARCH_X86_64)
+	help
+		Signal to send the application to gracefully terminate
+		before shutting down. Defaults to SIGTERM.
+
+config LIBUKBOOT_GRACEFUL_SHUTDOWN_TIMEOUT
+	int "Termination timeout (msec)"
+	default 5000
+	help
+		Time (msec) to wait for children to gracefully terminate
+		before shutting down. Setting a negative value causes an
+		indefinite wait.
+endif
+
 config LIBUKBOOT_ALLOCSTACK
 	bool
 	default y if LIBUKBOOT_INITALLOC
