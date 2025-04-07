@@ -512,7 +512,7 @@ int uk_clone(struct clone_args *cl_args, size_t cl_args_len,
 		 * NOTE: If SETTLS is not set, we do not activate any TLS
 		 * although a Unikraft TLS was allocated.
 		 */
-		if ((flags & CLONE_SETTLS) || (flags & CLONE_VM))
+		if ((flags & CLONE_SETTLS))
 			child->tlsp = tls;
 		else
 			child->tlsp = 0;
