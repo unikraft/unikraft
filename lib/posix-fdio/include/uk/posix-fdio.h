@@ -57,6 +57,8 @@ ssize_t uk_sys_pwritev2(struct uk_ofile *of, const struct iovec *iov,
 
 off_t uk_sys_lseek(struct uk_ofile *of, off_t offset, int whence);
 
+ssize_t uk_sys_sendfile(struct uk_ofile *outof, struct uk_ofile *inof,
+			off_t *offset, size_t count);
 /* Metadata */
 
 int uk_sys_fstat(struct uk_ofile *of, struct stat *statbuf);

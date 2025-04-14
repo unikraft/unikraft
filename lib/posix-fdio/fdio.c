@@ -439,3 +439,14 @@ off_t uk_sys_lseek(struct uk_ofile *of, off_t offset, int whence)
 
 	return offset;
 }
+
+ssize_t uk_sys_sendfile(struct uk_ofile *outof __unused,
+			struct uk_ofile *inof __unused,
+			off_t *offset __unused, size_t count __unused)
+{
+	/* True sendfile requires ukfile direct memory I/O.
+	 *
+	 * Until then, error (truthfully) that input files are un-mmap-able.
+	 */
+	return -EINVAL;
+}
