@@ -226,8 +226,26 @@ int uk_posix_process_create_pthread(struct uk_thread *thread);
 
 #endif /* CONFIG_LIBPOSIX_PROCESS_MULTITHREADING */
 
-#if CONFIG_LIBPOSIX_PROCESS_EXECVE
+#if CONFIG_LIBPOSIX_PROCESS_MULTIPROCESS
 
+typedef int (*uk_posix_process_mainlike_func)(int argc, char *argv[]);
+
+/**
+ * Spawn a process that jumps into function.
+ *
+ * DO NOT USE. This is only necessary when we create a new process
+ * for main() in multiprocess.
+ *
+ * @param fn      Function to jump to.
+ * @param argc    Arg count
+ * @param argv    Arg vector
+ * @return        Child pid to parent, or negative value on failure.
+ */
+pid_t uk_posix_process_run(uk_posix_process_mainlike_func fn,
+			   int argc, const char **argv);
+#endif /* CONFIG_LIBPOSIX_PROCESS_MULTIPROCESS */
+
+#if CONFIG_LIBPOSIX_PROCESS_EXECVE
 /* Data delivered to the handlers of the POSIX_PROCESS_EXECVE_EVENT */
 struct posix_process_execve_event_data {
 	struct uk_thread *thread;

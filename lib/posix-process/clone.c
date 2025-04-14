@@ -122,11 +122,11 @@ static int _clonetab_term_call(void *argp)
 	return 0;
 }
 /** Iterates over registered thread initialization functions */
-static int _uk_posix_clonetab_init(const struct clone_args *cl_args,
-				   size_t cl_args_len,
-				   __u64 cl_flags_optional,
-				   struct uk_thread *child,
-				   struct uk_thread *parent)
+int pprocess_clonetab_init(const struct clone_args *cl_args,
+			   size_t cl_args_len,
+			   __u64 cl_flags_optional,
+			   struct uk_thread *child,
+			   struct uk_thread *parent)
 {
 	struct uk_posix_clonetab_entry *itr;
 	struct _clonetab_init_call_args init_args;
@@ -227,7 +227,7 @@ out:
  *  were created with clone
  * NOTE: This function is called from child TLS context
  */
-static void uk_posix_clonetab_term(struct uk_thread *child)
+void pprocess_clonetab_term(struct uk_thread *child)
 {
 	struct uk_posix_clonetab_entry *itr;
 
@@ -258,7 +258,8 @@ static void uk_posix_clonetab_term(struct uk_thread *child)
 	cl_status.is_cloned = false;
 	cl_status.cl_flags = 0x0;
 }
-UK_THREAD_INIT_PRIO(0x0, uk_posix_clonetab_term, UK_PRIO_LATEST);
+
+UK_THREAD_INIT_PRIO(0x0, pprocess_clonetab_term, UK_PRIO_LATEST);
 
 /*
  * NOTE: From man pages about clone(2)
@@ -545,9 +546,9 @@ int uk_clone(struct clone_args *cl_args, size_t cl_args_len,
 	}
 
 	/* Call clone handler table but treat CLONE_SETTLS as handled */
-	ret = _uk_posix_clonetab_init(cl_args, cl_args_len,
-				      CLONE_SETTLS,
-				      child, t);
+	ret = pprocess_clonetab_init(cl_args, cl_args_len,
+				     CLONE_SETTLS,
+				     child, t);
 	if (ret < 0)
 		goto err_free_child;
 	uk_pr_debug("Thread cloned %p (%s) -> %p (%s): %d\n",

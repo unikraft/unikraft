@@ -83,6 +83,11 @@ static int pprocess_cleanup(struct posix_process *pprocess)
 	return 0;
 }
 
+int pprocess_raise_execve_event(struct posix_process_execve_event_data *data)
+{
+	return uk_raise_event(POSIX_PROCESS_EXECVE_EVENT, data);
+}
+
 UK_SYSCALL_R_E_DEFINE(int, execve, const char *, pathname,
 		      char *const *, argv,
 		      char *const *, envp)
@@ -170,7 +175,7 @@ UK_SYSCALL_R_E_DEFINE(int, execve, const char *, pathname,
 	 * internal cleanup.
 	 */
 	event_data.thread = this_thread;
-	rc = uk_raise_event(POSIX_PROCESS_EXECVE_EVENT, &event_data);
+	rc = pprocess_raise_execve_event(&event_data);
 	if (unlikely(rc < 0)) {
 		uk_pr_err("execve event error (%d)\n", rc);
 		goto err_free_stack_new;

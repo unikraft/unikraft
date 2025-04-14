@@ -14,6 +14,7 @@
 #if CONFIG_LIBPOSIX_PROCESS_MULTITHREADING
 #include <linux/sched.h>
 #include <uk/arch/ctx.h>
+#include <uk/process.h>
 #include <uk/semaphore.h>
 #include <uk/thread.h>
 #endif /* CONFIG_LIBPOSIX_PROCESS_MULTITHREADING */
@@ -194,6 +195,17 @@ int pprocess_create(struct uk_alloc *a, struct uk_thread *thread,
 
 int uk_clone(struct clone_args *cl_args, size_t cl_args_len,
 	     struct ukarch_execenv *execenv);
+
+int pprocess_clonetab_init(const struct clone_args *cl_args, size_t cl_args_len,
+			   __u64 cl_flags_optional, struct uk_thread *child,
+			   struct uk_thread *parent);
+
+void pprocess_clonetab_term(struct uk_thread *child);
+
+#if CONFIG_LIBPOSIX_PROCESS_EXECVE
+int pprocess_raise_execve_event(struct posix_process_execve_event_data *data);
+#endif /* CONFIG_LIBPOSIX_PROCESS_EXECVE */
+
 #endif /* CONFIG_LIBPOSIX_PROCESS_MULTITHREADING */
 
 #endif /* __PROCESS_H_INTERNAL__ */

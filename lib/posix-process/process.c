@@ -18,6 +18,8 @@
 struct uk_thread *pprocess_thread_main;
 
 #if CONFIG_LIBPOSIX_PROCESS_MULTITHREADING
+#include <signal.h> /* SIGCHLD */
+
 #include <uk/bitmap.h>
 #include <uk/list.h>
 #include <uk/alloc.h>
@@ -26,6 +28,7 @@ struct uk_thread *pprocess_thread_main;
 #include <uk/init.h>
 #include <uk/errptr.h>
 #include <uk/essentials.h>
+#include <uk/plat/config.h>
 #include <uk/process.h>
 
 #if CONFIG_LIBPOSIX_PROCESS_SIGNAL
@@ -342,6 +345,91 @@ err_free_pprocess:
 err_out:
 	return ret;
 }
+
+#if CONFIG_LIBPOSIX_PROCESS_MULTIPROCESS
+pid_t uk_posix_process_run(uk_posix_process_mainlike_func fn,
+			   int argc, const char *argv[])
+{
+	struct posix_process_execve_event_data event_data;
+	struct uk_sched *s = uk_sched_current();
+	struct clone_args cl_args;
+	struct uk_thread *thread;
+	struct uk_thread *parent;
+	pid_t parent_tid;
+	pid_t tid;
+	int ret;
+
+	UK_ASSERT(s);
+
+	parent = uk_thread_current();
+	parent_tid = ukthread2tid(parent);
+	UK_ASSERT(parent_tid > 0);
+
+	/* Create container thread */
+	thread = uk_thread_create_container(uk_alloc_get_default(),
+					    s->a_stack,
+					    STACK_SIZE,
+					    s->a_auxstack, 0, s->a_uktls,
+					    false, "application", NULL, NULL);
+	if (unlikely(!thread)) {
+		uk_pr_err("Could not create thread\n");
+		return -ENOMEM;
+	}
+
+	/* Create new process */
+	ret = pprocess_create(uk_alloc_get_default(), thread, parent);
+	if (unlikely(ret)) {
+		uk_pr_err("Could not create process (%d)\n", ret);
+		goto err_free_thread;
+	}
+
+	tid = ukthread2tid(thread);
+
+	/* Iterate clonetab. We pass the flags used when creating
+	 * a new process, i.e. CLONE_VM | CLONE_VFORK | SIGCHLD.
+	 */
+	cl_args = (struct clone_args) {
+		.flags       = CLONE_VM | CLONE_VFORK,
+		.child_tid   = tid,
+		.parent_tid  = parent_tid,
+		.exit_signal = SIGCHLD,
+	};
+	ret = pprocess_clonetab_init(&cl_args, sizeof(cl_args), 0,
+				     thread, parent);
+	if (unlikely(ret)) {
+		uk_pr_err("clonetab execution error (%d)\n", ret);
+		goto err_free_process;
+	}
+
+	/* Raise the execve event */
+	event_data.thread = thread;
+	ret = pprocess_raise_execve_event(&event_data);
+	if (unlikely(ret < 0)) {
+		uk_pr_err("exeve event error (%d)\n", ret);
+		goto err_term_clonetab;
+	}
+
+	/* Schedule the process */
+	uk_thread_container_init_fn2(thread,
+				     (uk_thread_fn2_t)fn,
+				     (void *)(unsigned long)argc,
+				     (void *)argv);
+	uk_sched_thread_add(s, thread);
+
+	return ukthread2pid(thread);
+
+err_term_clonetab:
+	pprocess_clonetab_term(thread);
+
+err_free_process:
+	pprocess_release(tid2pprocess(tid));
+
+err_free_thread:
+	uk_thread_release(thread);
+
+	return ret;
+}
+#endif /* CONFIG_LIBPOSIX_PROCESS_MULTIPROCESS */
 
 /* Releases pprocess memory and other resources.
  * NOTE: All pthreads must be removed already
