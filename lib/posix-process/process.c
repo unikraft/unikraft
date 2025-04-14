@@ -530,7 +530,7 @@ static void posix_thread_fini(struct uk_thread *child)
 		pprocess_release(pprocess);
 }
 
-UK_THREAD_INIT_PRIO(posix_thread_init, posix_thread_fini, UK_PRIO_EARLIEST);
+UK_THREAD_INIT_PRIO(0, posix_thread_fini, UK_PRIO_EARLIEST);
 
 struct posix_process *pid2pprocess(pid_t pid)
 {
