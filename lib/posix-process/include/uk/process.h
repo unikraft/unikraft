@@ -155,13 +155,6 @@ pid_t uk_sys_gettid(void);
 pid_t uk_sys_getppid(void);
 pid_t uk_sys_getpid(void);
 
-#if CONFIG_LIBPOSIX_PROCESS_MULTIPROCESS
-int uk_posix_process_create(struct uk_alloc *a,
-			    struct uk_thread *thread,
-			    struct uk_thread *parent);
-void uk_posix_process_kill(struct uk_thread *thread);
-#endif /* CONFIG_LIBPOSIX_PROCESS_MULTIPROCESS */
-
 #if CONFIG_LIBPOSIX_PROCESS_MULTITHREADING
 typedef int  (*uk_posix_clone_init_func_t)(const struct clone_args *cl_args,
 					   size_t cl_args_len,
@@ -221,6 +214,15 @@ struct uk_posix_clonetab_entry {
 #define UK_POSIX_CLONE_HANDLER(flags_mask, presence_only, init_fn, term_fn)    \
 	_UK_POSIX_CLONETAB_ENTRY(flags_mask, presence_only, init_fn, term_fn,  \
 				 UK_PRIO_LATEST)
+
+/* Creates a pthread and attaches it to the current process
+ *
+ * DO NOT USE. This is only necessary when loading an ELF via initrd,
+ * where we want to POSIXise the kernel thread, as initrd does not
+ * support paths and therefore we cannot execve(). For more details
+ * see the implementation of app-elfloader.
+ */
+int uk_posix_process_create_pthread(struct uk_thread *thread);
 
 #endif /* CONFIG_LIBPOSIX_PROCESS_MULTITHREADING */
 

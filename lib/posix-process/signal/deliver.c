@@ -21,7 +21,7 @@ void pprocess_signal_call_handler_with_stack(int signum, siginfo_t *si,
 static void uk_sigact_term(int __unused sig)
 {
 	uk_pr_warn("tid %d terminated by signal\n", uk_sys_gettid());
-	uk_posix_process_kill(uk_thread_current());
+	pprocess_kill(uk_pprocess_current());
 }
 
 static void uk_sigact_ign(int __unused sig)

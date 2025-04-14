@@ -121,8 +121,8 @@ static void release_tid(pid_t tid)
 }
 
 /* Allocate a thread for a process */
-static struct posix_thread *pprocess_create_pthread(
-			struct posix_process *pprocess, struct uk_thread *th)
+struct posix_thread *pprocess_create_pthread(struct posix_process *pprocess,
+					     struct uk_thread *th)
 {
 	struct posix_thread *pthread;
 	struct uk_alloc *a;
@@ -214,12 +214,26 @@ static void pprocess_release_pthread(struct posix_thread *pthread)
 	uk_free(pthread->_a, pthread);
 }
 
+int uk_posix_process_create_pthread(struct uk_thread *thread)
+{
+	struct posix_process *pprocess;
+	struct posix_thread *pthread;
+
+	pprocess = uk_pprocess_current();
+	UK_ASSERT(pprocess);
+
+	pthread = pprocess_create_pthread(pprocess, thread);
+	if (unlikely(PTRISERR(pthread)))
+		return PTR2ERR(pthread);
+
+	return 0;
+}
 static void pprocess_release(struct posix_process *pprocess);
 
 /* Create a new posix process for a given thread */
-int uk_posix_process_create(struct uk_alloc *a,
-			    struct uk_thread *thread,
-			    struct uk_thread *parent)
+int pprocess_create(struct uk_alloc *a,
+		    struct uk_thread *thread,
+		    struct uk_thread *parent)
 {
 	struct posix_thread  *parent_pthread  = NULL;
 	struct posix_process *parent_pprocess = NULL;
@@ -422,7 +436,7 @@ void pprocess_kill_siblings(struct uk_thread *thread)
 	}
 }
 
-static void pprocess_kill(struct posix_process *pprocess)
+void pprocess_kill(struct posix_process *pprocess)
 {
 	struct posix_thread *pthread, *pthreadn, *pthread_self = NULL;
 
@@ -469,20 +483,6 @@ static void pprocess_kill(struct posix_process *pprocess)
 	}
 }
 
-void uk_posix_process_kill(struct uk_thread *thread)
-{
-	struct posix_thread  **pthread;
-	struct posix_process *pprocess;
-
-	pthread = &uk_thread_uktls_var(thread, pthread_self);
-
-	UK_ASSERT(*pthread);
-	UK_ASSERT((*pthread)->process);
-
-	pprocess = (*pthread)->process;
-	pprocess_kill(pprocess);
-}
-
 static int posix_process_init(struct uk_init_ctx *ictx)
 {
 	struct uk_thread *t;
@@ -502,46 +502,10 @@ static int posix_process_init(struct uk_init_ctx *ictx)
 	}
 
 	/* Create a POSIX process without parent ("init" process) */
-	return uk_posix_process_create(uk_alloc_get_default(), t, NULL);
+	return pprocess_create(uk_alloc_get_default(), t, NULL);
 }
 
 uk_late_initcall(posix_process_init, 0x0);
-
-/* Thread initialization: Assign posix thread only if parent is part of a
- * process
- */
-static int posix_thread_init(struct uk_thread *child, struct uk_thread *parent)
-{
-	struct posix_thread *parent_pthread = NULL;
-	struct posix_thread *pthread;
-
-	if (parent) {
-		parent_pthread = uk_thread_uktls_var(parent,
-						     pthread_self);
-	}
-	if (!parent_pthread) {
-		/* parent has no posix thread, do not setup one for the child */
-		uk_pr_debug("thread %p (%s): Parent %p (%s) without process context, skipping...\n",
-			    child, child->name, parent,
-			    parent ? parent->name : "<n/a>");
-		pthread_self = NULL;
-		return 0;
-	}
-
-	UK_ASSERT(parent_pthread->process);
-
-	pthread = pprocess_create_pthread(parent_pthread->process,
-					  child);
-	if (PTRISERR(pthread))
-		return PTR2ERR(pthread);
-
-	pthread_self = pthread;
-
-	uk_pr_debug("thread %p (%s): New thread with TID: %d (PID: %d)\n",
-		    child, child->name, (int) pthread->tid,
-		    (int) pthread->process->pid);
-	return 0;
-}
 
 /* Thread release: Release TID and posix_thread */
 static void posix_thread_fini(struct uk_thread *child)
@@ -684,7 +648,7 @@ UK_LLSYSCALL_R_DEFINE(int, exit, int, status)
 
 static int pprocess_exit(int status __unused)
 {
-	uk_posix_process_kill(uk_thread_current()); /* won't return */
+	pprocess_kill(uk_pprocess_current()); /* won't return */
 	UK_CRASH("sys_exit_group() unexpectedly returned\n");
 	return -EFAULT;
 }

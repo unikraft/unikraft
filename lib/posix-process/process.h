@@ -120,7 +120,29 @@ struct posix_process *tid2pprocess(pid_t tid);
 pid_t ukthread2tid(struct uk_thread *thread);
 pid_t ukthread2pid(struct uk_thread *thread);
 
+void pprocess_kill(struct posix_process *pprocess);
+
 void pprocess_kill_siblings(struct uk_thread *thread);
+
+/**
+ * INTERNAL. Create pthread
+ *
+ * @param pprocess process to assign thread to
+ * @param thread   backing uk_thread to create pthread from
+ * @return pthread on success or negative value on failure
+ */
+struct posix_thread *pprocess_create_pthread(struct posix_process *pprocess,
+					     struct uk_thread *thread);
+/**
+ * INTERNAL. Create process
+ *
+ * @param alloc  allocator to assign process
+ * @param thread backing uk_thread to create process from
+ * @param parent parent processs
+ * @return process on success or negative value on failure
+ */
+int pprocess_create(struct uk_alloc *a, struct uk_thread *thread,
+		    struct uk_thread *parent);
 
 int uk_clone(struct clone_args *cl_args, size_t cl_args_len,
 	     struct ukarch_execenv *execenv);
