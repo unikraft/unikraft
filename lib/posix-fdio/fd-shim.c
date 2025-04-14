@@ -279,17 +279,9 @@ UK_SYSCALL_R_DEFINE(off_t, lseek, int, fd, off_t, offset, int, whence)
 		break;
 #if CONFIG_LIBVFSCORE
 	case UK_SHIM_LEGACY:
-	{
-		/* vfscore_lseek returns positive error codes */
-		int err = vfscore_lseek(sf.vfile, offset, whence, &r);
-
-		if (err) {
-			UK_ASSERT(err > 0);
-			r = -err;
-		}
+		r = vfscore_lseek(sf.vfile, offset, whence);
 		fdrop(sf.vfile);
 		break;
-	}
 #endif /* CONFIG_LIBVFSCORE */
 	default:
 		r = -EBADF;

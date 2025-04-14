@@ -348,8 +348,8 @@ sys_write(struct vfscore_file *fp, const struct iovec *iov, size_t niov,
 	return error;
 }
 
-int
-vfscore_lseek(struct vfscore_file *fp, off_t off, int type, off_t *origin)
+off_t
+vfscore_lseek(struct vfscore_file *fp, off_t off, int type)
 {
 	struct vnode *vp;
 
@@ -359,11 +359,11 @@ vfscore_lseek(struct vfscore_file *fp, off_t off, int type, off_t *origin)
 	if (!fp->f_dentry) {
 	    // Linux doesn't implement lseek() on pipes, sockets, or ttys.
 	    // In OSV, we only implement lseek() on regular files, backed by vnode
-	    return ESPIPE;
+		return -ESPIPE;
 	}
 
 	vp = fp->f_dentry->d_vnode;
-	int error = EINVAL;
+	int error = -EINVAL;
 	vn_lock(vp);
 	switch (type) {
 	case SEEK_CUR:
@@ -375,8 +375,11 @@ vfscore_lseek(struct vfscore_file *fp, off_t off, int type, off_t *origin)
 	}
 	if (off >= 0) {
 		error = VOP_SEEK(vp, fp, fp->f_offset, off);
-		if (!error) {
-			*origin      = off;
+		if (error) {
+			UK_ASSERT(error > 0);
+			error = -error;
+		} else {
+			error        = off;
 			fp->f_offset = off;
 		}
 	}

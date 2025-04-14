@@ -26,7 +26,7 @@ ssize_t vfscore_pwrite64(struct vfscore_file *fp, const void *buf,
 ssize_t vfscore_writev(struct vfscore_file *fp,
 		       const struct iovec *vec, int vlen);
 ssize_t vfscore_write(struct vfscore_file *fp, const void *buf, size_t count);
-int vfscore_lseek(struct vfscore_file *fp, off_t off, int type, off_t *origin);
+off_t vfscore_lseek(struct vfscore_file *fp, off_t off, int type);
 
 int vfscore_fstat(struct vfscore_file *fp, struct stat *st);
 int vfscore_fchmod(struct vfscore_file *fp, mode_t mode);
