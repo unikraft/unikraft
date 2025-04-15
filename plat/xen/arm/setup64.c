@@ -208,6 +208,54 @@ int uk_intctlr_plat_probe(void *arg)
 	return 0;
 }
 
+/* Taken from plat/common/bootinfo_fdt.c and adapted for Xen
+ * because we need to translate the initrd address from the
+ * device tree to the virtual address.
+ */
+#define initrd_addr(val, len)                          \
+	(len == 4 ? fdt32_to_cpu(val) : fdt64_to_cpu(val))
+
+static int _get_ramdisk(struct ukplat_bootinfo *bi, void *fdtp)
+{
+	struct ukplat_memregion_desc mrd = {0};
+	const __u64 *fdt_initrd_start;
+	const __u64 *fdt_initrd_end;
+	int start_len, end_len;
+	__u64 initrd_base, initrd_end;
+	int nchosen;
+
+	nchosen = fdt_path_offset(fdtp, "/chosen");
+	if (unlikely(nchosen < 0))
+		return 0;
+
+	fdt_initrd_start = fdt_getprop(fdtp, nchosen, "linux,initrd-start",
+				       &start_len);
+	if (unlikely(!fdt_initrd_start || start_len <= 0))
+		return 0;
+
+	fdt_initrd_end = fdt_getprop(fdtp, nchosen, "linux,initrd-end",
+				     &end_len);
+	if (unlikely(!fdt_initrd_end || end_len <= 0))
+		return 0;
+
+	initrd_base = initrd_addr(fdt_initrd_start[0], start_len);
+	initrd_end = initrd_addr(fdt_initrd_end[0], end_len);
+
+	mrd.vbase = (__vaddr_t)to_virt(PAGE_ALIGN_DOWN(initrd_base));
+	mrd.pbase = (__paddr_t)mrd.vbase;
+	mrd.pg_off = initrd_base - mrd.pbase;
+	mrd.len = initrd_end - initrd_base;
+	mrd.pg_count = PAGE_COUNT(mrd.pg_off + mrd.len);
+	mrd.type = UKPLAT_MEMRT_INITRD;
+	mrd.flags = UKPLAT_MEMRF_READ;
+
+#if CONFIG_UKPLAT_MEMRNAME
+	memcpy(mrd.name, "initrd", sizeof(mrd.name) - 1);
+#endif
+
+	return ukplat_memregion_list_insert(&bi->mrds, &mrd);
+}
+
 static int _init_mem(struct ukplat_bootinfo *const bi, paddr_t physical_offset)
 {
 	int rc;
@@ -279,6 +327,10 @@ static int _init_mem(struct ukplat_bootinfo *const bi, paddr_t physical_offset)
 #endif
 	rc = ukplat_memregion_list_insert(&bi->mrds, &mrd);
 	if (rc < 0)
+		return rc;
+
+	rc = _get_ramdisk(bi, HYPERVISOR_dtb);
+	if (unlikely(rc < 0))
 		return rc;
 
 	ukplat_memregion_list_coalesce(&bi->mrds);
