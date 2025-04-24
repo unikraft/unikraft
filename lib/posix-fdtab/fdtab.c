@@ -366,11 +366,22 @@ void uk_fdtab_cloexec(void)
 }
 
 #if CONFIG_LIBPOSIX_PROCESS_EXECVE
-static int fdtab_handle_execve(void *data __unused)
+#if CONFIG_LIBPOSIX_FDTAB_MULTITAB
+static int fdtab_handle_execve(void *data)
+{
+	struct posix_process_execve_event_data *edat = data;
+	struct uk_fdtab *tab = uk_thread_uktls_var(edat->thread, active_fdtab);
+
+	fdtab_cleanup(tab, 0);
+	return UK_EVENT_HANDLED_CONT;
+}
+#else /* !CONFIG_LIBPOSIX_FDTAB_MULTITAB */
+static int fdtab_handle_execve(void *data)
 {
 	uk_fdtab_cloexec();
 	return UK_EVENT_HANDLED_CONT;
 }
+#endif /* !CONFIG_LIBPOSIX_FDTAB_MULTITAB */
 
 UK_EVENT_HANDLER_PRIO(POSIX_PROCESS_EXECVE_EVENT, fdtab_handle_execve,
 		      UK_PRIO_EARLIEST);
