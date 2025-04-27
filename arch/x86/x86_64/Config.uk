@@ -104,6 +104,9 @@ config X86_64_CET_IBT
 
 config X86_64_CET_SS
 	bool "CET Shadow Stack"
+	select LIBUKCET
+	select LIBUKVMEM
+	select LIBPOSIX_MMAP
 	help
 	 Enable CET Shadow Stack
 endmenu

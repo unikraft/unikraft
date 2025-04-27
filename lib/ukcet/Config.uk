@@ -1,0 +1,2 @@
+config LIBUKCET
+	bool "ukcet: Library to interact with Intel CET (or AMD Shadow Stacks)"

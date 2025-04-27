@@ -60,6 +60,9 @@
 struct ukarch_ctx {
 	__uptr ip;	/**< instruction pointer */
 	__uptr sp;	/**< stack pointer */
+	#if (CONFIG_X86_64_CET_SS && (__CET__ & 1))
+	__uptr ssp; /**< shadow stack pointer */
+	#endif
 } __packed;
 
 /*

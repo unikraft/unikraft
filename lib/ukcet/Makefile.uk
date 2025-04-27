@@ -1,0 +1,6 @@
+$(eval $(call addlib_s,libukcet,$(CONFIG_LIBUKCET)))
+
+CINCLUDES-$(CONFIG_LIBUKCET) += -I$(LIBUKCET_BASE)/include
+CXXINCLUDES-$(CONFIG_LIBUKCET) += -I$(LIBUKCET_BASE)/include
+
+LIBUKCET_SRCS-y += $(LIBUKCET_BASE)/cet.c
