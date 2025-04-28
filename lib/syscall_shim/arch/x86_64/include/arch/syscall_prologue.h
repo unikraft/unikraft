@@ -40,6 +40,9 @@
 		" */\n\t"                                               \
 		"movq   %rsp, %r11\n\t"					\
 		"movq	%gs:(" STRINGIFY(LCPU_AUXSP_OFFSET) "), %rsp\n\t"\
+		"subq	$(" STRINGIFY(UKARCH_AUXSPCB_SIZE) "), %rsp\n\t"\
+		"movq	" STRINGIFY(UKARCH_AUXSPCB_OFFSETOF_CURR_FP)	\
+						"(%rsp), %rsp\n\t"	\
 		"/* Auxiliary stack is already ECTX aligned */\n\t"	\
 		"/* Make room for `struct UKARCH_EXECENV` */\n\t"	\
 		"subq	$(" STRINGIFY(UKARCH_EXECENV_SIZE -		\
