@@ -42,7 +42,15 @@ UK_SYSCALL_R_DEFINE(ssize_t, getrandom,
 {
 	int rc;
 
-	UK_ASSERT(buf);
+	/* Observed behavior is that for a 0-length buffer, the value in buf is
+	 * never checked and the syscall shortcuts to success.
+	 * Documentation does not specifically state this, but userspace apps
+	 * have been seen to rely on getrandom(NULL, 0, ...) returning success.
+	 */
+	if (unlikely(!buflen))
+		return 0;
+	if (unlikely(!buf))
+		return -EFAULT;
 
 	rc = uk_random_fill_buffer(buf, buflen);
 	if (unlikely(rc))
