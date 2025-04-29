@@ -568,18 +568,19 @@ static int vfscore_extract_volume(const struct vfscore_volume *vv)
 #endif /* CONFIG_LIBUKCPIO */
 
 /* Handle `mkmp` Unikraft Mount Option */
-static int vfscore_ukopt_mkmp(char *path)
+static int vfscore_ukopt_mkmp(const char *path_arg)
 {
+	char path[strlen(path_arg) + 1];
 	char *pos, *prev_pos;
 	int rc;
 
-	UK_ASSERT(path);
-	UK_ASSERT(path[0] == '/');
+	UK_ASSERT(path_arg[0] == '/');
 
-	if (path[1] == '\0') {
+	if (path_arg[1] == '\0') {
 		uk_pr_debug(" mkmp: Called on '/', nothing to pre-create\n");
 		return 0;
 	}
+	strcpy(path, path_arg);
 
 	uk_pr_debug(" mkmp: Ensure mount path \"%s\" exists\n", path);
 	pos = path;
