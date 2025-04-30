@@ -12,6 +12,11 @@
 #include <uk/syscall.h>
 #include <uk/timeutil.h>
 
+#if !CONFIG_LIBPOSIX_PROCESS_SIGNAL
+#include <uk/plat/time.h>
+#include <uk/sched.h>
+#endif /* !CONFIG_LIBPOSIX_PROCESS_SIGNAL */
+
 #include "process.h"
 #include "signal.h"
 
@@ -64,9 +69,31 @@ UK_LLSYSCALL_R_DEFINE(int, rt_sigtimedwait,
 		      const struct timespec *, timeout,
 		      size_t, sigsetsize)
 {
-	UK_WARN_STUBBED();
+	struct uk_thread *current = uk_thread_current();
+	__nsec timeout_ns;
+	int rc;
+
+	if (timeout) {
+		if (unlikely(!(uk_time_spec_canonical(timeout) &&
+			       uk_time_spec_positive(timeout))))
+			return -EINVAL;
+		timeout_ns = ukplat_monotonic_clock() +
+			ukarch_time_sec_to_nsec(timeout->tv_sec) +
+			timeout->tv_nsec;
+		uk_thread_block_until(current, (__snsec)timeout_ns);
+		uk_sched_yield();
+		rc = -EAGAIN;
+	} else {
+		uk_thread_block(current);
+		uk_sched_yield();
+		/* If this ever returns then just return an EINTR to not
+		 * confuse the application
+		 */
+		rc = -EINTR;
+	}
+
+	/* We currently never return a signal */
 	*info = (siginfo_t){0};
-	info->si_signo = SIGINT;
-	return 0;
+	return rc;
 }
 #endif /* !CONFIG_LIBPOSIX_PROCESS_SIGNAL */
