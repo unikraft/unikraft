@@ -46,11 +46,15 @@ UK_LLSYSCALL_R_DEFINE(int, rt_sigtimedwait,
 	if ((sig = pprocess_signal_next_pending_t(pthread)))
 		goto out;
 
-	if (timeout)
+	if (timeout) {
+		if (unlikely(!(uk_time_spec_canonical(timeout) &&
+			       uk_time_spec_positive(timeout))))
+			return -EINVAL;
 		uk_semaphore_down_to(&pthread->signal->pending_semaphore,
 				     uk_time_spec_to_nsec(timeout));
-	else
+	} else {
 		uk_semaphore_down(&pthread->signal->pending_semaphore);
+	}
 
 	if ((sig = pprocess_signal_next_pending_t(pthread)))
 		goto out;
