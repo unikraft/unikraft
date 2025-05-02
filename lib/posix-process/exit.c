@@ -131,12 +131,16 @@ void pprocess_exit_pthread(struct posix_thread *pthread,
 		parent_pthread->state = POSIX_THREAD_RUNNING;
 	}
 
-	/* Release pthread and terminate the undelying uk_thread
-	 * unless it's the current one.
+	/* Release pthread and terminate the underlying uk_thread
+	 * unless it's the current one or if it hasn't been associated
+	 * with a scheduler yet (may happen if a thread is released
+	 * before being added to the scheduler, e.g. on some error path
+	 * that cleans up created threads that didn't get the chance to
+	 * be added).
 	 */
 	thread = pthread->thread;
 	pprocess_release_pthread(pthread);
-	if (thread != uk_thread_current())
+	if (thread != uk_thread_current() && thread->sched)
 		uk_sched_thread_terminate(thread);
 }
 
