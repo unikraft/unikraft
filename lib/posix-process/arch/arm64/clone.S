@@ -20,10 +20,16 @@
 #if UK_LIBC_SYSCALLS
 .global clone
 clone:
+	/* We must also save the link/frame register because no one else will
+	 * do it for us since we are invoking a function call not a system call
+	 */
+	stp	x29, x30, [sp, #-32]!
+	mov	x29, sp
+
 	/* Save fn and arg in callee-saved registers, but first make sure
 	 * we can also restore them before returning in the parent.
 	 */
-	stp	x20, x21, [sp, #-16]
+	stp	x20, x21, [sp, #16]
 	mov	x20, x0
 	mov	x21, x3
 
@@ -65,6 +71,8 @@ clone:
 
 1:
 	/* Restore the registers saved in the beginning */
-	ldp	x20, x21, [sp, #-16]
+	ldp	x20, x21, [sp, #16]
+	ldp	x29, x30, [sp], #32
+
 	ret
 #endif /* UK_LIBC_SYSCALLS */
