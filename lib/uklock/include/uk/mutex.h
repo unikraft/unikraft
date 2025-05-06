@@ -35,6 +35,7 @@
 #define __UK_MUTEX_H__
 
 #include <uk/config.h>
+#include <uk/preempt.h>
 
 #if CONFIG_LIBUKLOCK_MUTEX
 #include <uk/assert.h>
@@ -60,9 +61,9 @@ extern "C" {
  * uses wait queues for threads
  */
 struct uk_mutex {
+	__uptr lock;
 	int lock_count;
 	unsigned int flags;
-	struct uk_thread *owner;
 	struct uk_waitq wait;
 };
 
@@ -70,6 +71,51 @@ static inline int uk_mutex_is_recursive(const struct uk_mutex *m)
 {
 	return (m->flags & UK_MUTEX_CONFIG_RECURSE);
 }
+
+#define _UK_MUTEX_UNOWNED	0x1
+#define _UK_MUTEX_CONTESTED	0x2
+#define _UK_MUTEX_STATE_MASK	(_UK_MUTEX_UNOWNED | _UK_MUTEX_CONTESTED)
+
+#if CONFIG_LIBUKLOCK_MUTEX_ATOMIC
+#define _uk_mutex_lock_fetch(m, v, tid)					\
+	__atomic_compare_exchange_n(&(m)->lock,				\
+		v, tid, 0, __ATOMIC_ACQUIRE, __ATOMIC_RELAXED)
+#define _uk_mutex_unlock_fetch(m, v)					\
+	__atomic_compare_exchange_n(&(m)->lock,				\
+		v, _UK_MUTEX_UNOWNED, 0,				\
+		__ATOMIC_RELEASE, __ATOMIC_RELAXED)
+#else
+#define _uk_mutex_lock_fetch(m, v, tid)					\
+	({								\
+		int _success;						\
+		uk_preempt_disable();					\
+		if ((m)->lock == *(v)) {				\
+			(m)->lock = tid;				\
+			_success = 1;					\
+		} else {						\
+			*(v) = (m)->lock;				\
+			_success = 0;					\
+		}							\
+		uk_preempt_enable();					\
+		_success;						\
+	})
+
+#define _uk_mutex_unlock_fetch(m, v)					\
+	({								\
+		int _success;						\
+		uk_preempt_disable();					\
+		if ((m)->lock == *(v)) {				\
+			(m)->lock = _UK_MUTEX_UNOWNED;			\
+			_success = 1;					\
+		} else {						\
+			*(v) = (m)->lock;				\
+			_success = 0;					\
+		}							\
+		uk_preempt_enable();					\
+		_success;						\
+	})
+
+#endif
 
 /*
  * Mutex statistics for ukstore.
@@ -99,10 +145,10 @@ extern __spinlock              _uk_mutex_metrics_lock;
 #endif /* CONFIG_LIBUKLOCK_MUTEX_METRICS */
 
 #define	UK_MUTEX_INITIALIZER(name)				\
-	{ 0, 0, NULL, __WAIT_QUEUE_INITIALIZER((name).wait) }
+	{ _UK_MUTEX_UNOWNED, 0, 0, __WAIT_QUEUE_INITIALIZER((name).wait) }
 
 #define	UK_MUTEX_INITIALIZER_RECURSIVE(name)			\
-	{ 0, UK_MUTEX_CONFIG_RECURSE, 0,			\
+	{ _UK_MUTEX_UNOWNED, 0, UK_MUTEX_CONFIG_RECURSE,	\
 	__WAIT_QUEUE_INITIALIZER((name).wait) }
 
 void uk_mutex_init_config(struct uk_mutex *m, unsigned int flags);
@@ -110,32 +156,24 @@ void uk_mutex_get_metrics(struct uk_mutex_metrics *dst);
 
 #define uk_mutex_init(m) uk_mutex_init_config(m, 0)
 
+void _uk_mutex_lock_wait(struct uk_mutex *m, __uptr tid, __uptr v);
+int _uk_mutex_trylock_wait(struct uk_mutex *m, __uptr tid, __uptr v);
+void _uk_mutex_unlock_wait(struct uk_mutex *m);
+
 static inline void uk_mutex_lock(struct uk_mutex *m)
 {
-	struct uk_thread *cur;
+	__uptr tid, v;
 
 	UK_ASSERT(m);
 
-	cur = uk_thread_current();
+	v = _UK_MUTEX_UNOWNED;
+	tid = (__uptr)uk_thread_current();
 
-	/* If the owner is the current thread, just increment the lock count */
-	if (unlikely(uk_mutex_is_recursive(m) && m->owner == cur)) {
-		UK_ASSERT(m->lock_count > 0);
-		m->lock_count++;
-		return;
-	}
-
-	UK_ASSERT(m->owner != cur);
-
-	for (;;) {
-		uk_waitq_wait_event(&m->wait, m->owner == NULL);
-
-		/* If there is no owner, we can acquire the lock */
-		if (uk_compare_exchange_sync(&m->owner, NULL, cur) == cur) {
-			UK_ASSERT(m->lock_count == 0);
-			m->lock_count = 1;
-			break;
-		}
+	if (_uk_mutex_lock_fetch(m, &v, tid)) {
+		UK_ASSERT(m->lock_count == 0);
+		m->lock_count = 1;
+	} else {
+		_uk_mutex_lock_wait(m, tid, v);
 	}
 
 #ifdef CONFIG_LIBUKLOCK_MUTEX_METRICS
@@ -147,75 +185,61 @@ static inline void uk_mutex_lock(struct uk_mutex *m)
 #endif /* CONFIG_LIBUKLOCK_MUTEX_METRICS */
 }
 
+
 static inline int uk_mutex_trylock(struct uk_mutex *m)
 {
-	struct uk_thread *cur;
+	__uptr tid, v;
 
 	UK_ASSERT(m);
 
-	cur = uk_thread_current();
+	v = _UK_MUTEX_UNOWNED;
+	tid = (__uptr)uk_thread_current();
 
-	/* If the owner is the current thread, just increment the lock count */
-	if (unlikely(uk_mutex_is_recursive(m) && m->owner == cur)) {
-		UK_ASSERT(m->lock_count > 0);
-		m->lock_count++;
-
+	if (_uk_mutex_lock_fetch(m, &v, tid)) {
+		UK_ASSERT(m->lock_count == 0);
+		m->lock_count = 1;
 #ifdef CONFIG_LIBUKLOCK_MUTEX_METRICS
 		ukarch_spin_lock(&_uk_mutex_metrics_lock);
-		_uk_mutex_metrics.total_ok_trylocks++;
-		ukarch_spin_unlock(&_uk_mutex_metrics_lock);
-#endif /* CONFIG_LIBUKLOCK_MUTEX_METRICS */
-
-		return 1;
-	}
-
-	UK_ASSERT(m->owner != cur);
-
-	if (m->owner == NULL) {
-		if (uk_compare_exchange_sync(&m->owner, NULL, cur) == cur) {
-			UK_ASSERT(m->lock_count == 0);
-			m->lock_count = 1;
-
-#ifdef CONFIG_LIBUKLOCK_MUTEX_METRICS
-			ukarch_spin_lock(&_uk_mutex_metrics_lock);
 			_uk_mutex_metrics.active_locked++;
 			_uk_mutex_metrics.active_unlocked--;
 			_uk_mutex_metrics.total_ok_trylocks++;
 			ukarch_spin_unlock(&_uk_mutex_metrics_lock);
 #endif /* CONFIG_LIBUKLOCK_MUTEX_METRICS */
 
-			return 1;
-		}
+		return 1;
 	}
-
-#ifdef CONFIG_LIBUKLOCK_MUTEX_METRICS
-	ukarch_spin_lock(&_uk_mutex_metrics_lock);
-	_uk_mutex_metrics.total_failed_trylocks++;
-	ukarch_spin_unlock(&_uk_mutex_metrics_lock);
-#endif /* CONFIG_LIBUKLOCK_MUTEX_METRICS */
-
-	return 0;
+	return _uk_mutex_trylock_wait(m, tid, v);
 }
 
 static inline int uk_mutex_is_locked(struct uk_mutex *m)
 {
+	__uptr tid;
+
 	UK_ASSERT(m);
-	return m->owner != NULL;
+	tid = (__uptr)uk_thread_current();
+
+	return (m->lock & ~_UK_MUTEX_STATE_MASK) ==
+	       (tid & ~_UK_MUTEX_STATE_MASK);
 }
+
 
 static inline void uk_mutex_unlock(struct uk_mutex *m)
 {
+	__uptr v;
+
+	v = (__uptr)uk_thread_current();
+
 	UK_ASSERT(m);
 	UK_ASSERT(m->lock_count > 0);
-	UK_ASSERT(m->owner == uk_thread_current());
+	UK_ASSERT((m->lock & ~_UK_MUTEX_STATE_MASK) ==
+		  (v & ~_UK_MUTEX_STATE_MASK));
 
 	if (--m->lock_count == 0) {
 		/* Make sure lock_count is visible before resetting the
 		 * owner. The lock can be acquired afterwards.
 		 */
-		wmb();
-		m->owner = NULL;
-		uk_waitq_wake_up(&m->wait);
+		if (!_uk_mutex_unlock_fetch(m, &v))
+			_uk_mutex_unlock_wait(m);
 	}
 
 #ifdef CONFIG_LIBUKLOCK_MUTEX_METRICS
