@@ -41,7 +41,7 @@ ENTRY(ukarch_execenv_load)
 	 * of execenv.
 	 */
 	addq	$(__REGS_SIZEOF + UKARCH_SYSCTX_SIZE), %rdi
-	call	ukarch_ectx_load
+	call	*ukarch_ectx_load(%rip)
 	/**
 	 * As stated previously, after function calls, %r12 preserved value of
 	 * execenv pointer so restore that into %rdi.

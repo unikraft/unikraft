@@ -7,6 +7,7 @@
 #include <uk/arch/ctx.h>
 #include <uk/arch/lcpu.h>
 #include <uk/asm.h>
+#include <uk/reloc.h>
 
 /**
  * Loads a given execution environment on the currently executing CPU.
@@ -35,7 +36,9 @@ ENTRY(ukarch_execenv_load)
 	 * of execenv.
 	 */
 	add	x0, x0, #(__REGS_SIZEOF + UKARCH_SYSCTX_SIZE)
-	bl	ukarch_ectx_load
+	ur_ldr	x20, ukarch_ectx_load
+	ldr	x20, [x20]
+	blr	x20
 	/**
 	 * As stated previously, after function calls, x19 preserved value of
 	 * execenv pointer so restore that into %rdi.

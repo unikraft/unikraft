@@ -60,7 +60,7 @@ __sz ukarch_ectx_align(void)
 	return ECTX_ALIGN;
 }
 
-void ukarch_ectx_sanitize(struct ukarch_ectx *state __maybe_unused)
+void do_ectx_sanitize(struct ukarch_ectx *state __maybe_unused)
 {
 	UK_ASSERT(state);
 	UK_ASSERT(IS_ALIGNED((__uptr) state, ECTX_ALIGN));
@@ -78,7 +78,7 @@ void ukarch_ectx_init(struct ukarch_ectx *state)
 	ukarch_ectx_store(state);
 }
 
-void ukarch_ectx_store(struct ukarch_ectx *state)
+void do_ectx_store(struct ukarch_ectx *state)
 {
 	UK_ASSERT(state);
 	UK_ASSERT(IS_ALIGNED((__uptr) state, ECTX_ALIGN));
@@ -86,10 +86,14 @@ void ukarch_ectx_store(struct ukarch_ectx *state)
 	save_extregs(state);
 }
 
-void ukarch_ectx_load(struct ukarch_ectx *state)
+void do_ectx_load(struct ukarch_ectx *state)
 {
 	UK_ASSERT(state);
 	UK_ASSERT(IS_ALIGNED((__uptr) state, ECTX_ALIGN));
 
 	restore_extregs(state);
 }
+
+void (*ukarch_ectx_sanitize)(struct ukarch_ectx *state) = do_ectx_sanitize;
+void (*ukarch_ectx_load)(struct ukarch_ectx *state) = do_ectx_load;
+void (*ukarch_ectx_store)(struct ukarch_ectx *state) = do_ectx_store;

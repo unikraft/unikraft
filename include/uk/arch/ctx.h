@@ -487,7 +487,7 @@ __sz ukarch_ectx_align(void);
  * @param state
  *   Reference to extended context
  */
-void ukarch_ectx_sanitize(struct ukarch_ectx *state);
+extern void (*ukarch_ectx_sanitize)(struct ukarch_ectx *state);
 
 /**
  * Initializes an extended context so that it can be loaded
@@ -505,7 +505,7 @@ void ukarch_ectx_init(struct ukarch_ectx *state);
  * @param state
  *   Reference to extended context to save to
  */
-void ukarch_ectx_store(struct ukarch_ectx *state);
+extern void (*ukarch_ectx_store)(struct ukarch_ectx *state);
 
 /**
  * Restores a given extended context on the currently executing CPU.
@@ -513,7 +513,7 @@ void ukarch_ectx_store(struct ukarch_ectx *state);
  * @param state
  *   Reference to extended context to restore
  */
-void ukarch_ectx_load(struct ukarch_ectx *state);
+extern void (*ukarch_ectx_load)(struct ukarch_ectx *state);
 
 /**
  * Loads a given execution environment on the currently executing CPU.

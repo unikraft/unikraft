@@ -230,14 +230,14 @@ ENTRY(_ukplat_syscall)
 	 * header is not dirty.
 	 */
 	addq	$(__REGS_SIZEOF + UKARCH_SYSCTX_SIZE), %rdi
-	call	ukarch_ectx_sanitize
+	call	*ukarch_ectx_sanitize(%rip)
 	/**
 	 * After function calls, %rsp preserved value of execenv pointer so
 	 * restore that into %rdi.
 	 */
 	movq	%rsp, %rdi
 	addq	$(__REGS_SIZEOF + UKARCH_SYSCTX_SIZE), %rdi
-	call	ukarch_ectx_store
+	call	*ukarch_ectx_store(%rip)
 
 	/**
 	 * After function calls, %rsp preserved value of execenv pointer so
@@ -282,7 +282,7 @@ ENTRY(_ukplat_syscall)
 	 * of execenv.
 	 */
 	addq	$(__REGS_SIZEOF + UKARCH_SYSCTX_SIZE), %rdi
-	call	ukarch_ectx_load
+	call	*ukarch_ectx_load(%rip)
 
 	/**
 	 * As stated previously, after function calls, %rsp preserved value of
