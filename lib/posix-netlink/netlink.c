@@ -318,7 +318,7 @@ static int nl_ioctl(const posix_sock *s __unused,
 	return -ENOTSUP;
 }
 
-static void nl_poll(const posix_sock *s __unused)
+static void nl_poll_setup(const posix_sock *s __unused)
 {
 	UK_WARN_STUBBED();
 }
@@ -333,7 +333,7 @@ static const struct posix_socket_ops netlink_vops = {
 	.recvfrom	= nl_recvfrom,
 	.setsockopt	= nl_sockopt,
 	.ioctl		= nl_ioctl,
-	.poll		= nl_poll,
+	.poll_setup	= nl_poll_setup,
 };
 
 POSIX_SOCKET_FAMILY_REGISTER(AF_NETLINK, &netlink_vops);
