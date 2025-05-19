@@ -31,6 +31,7 @@
 #include <uk/print.h>
 #include <uk/assert.h>
 #include <uk/arch/types.h>
+#include <uk/clock_event.h>
 #include <uk/plat/time.h>
 
 /************************************************************************
@@ -170,6 +171,28 @@ void time_block_until(__snsec until)
 	block_domain(until);
 }
 
+int vtimer_set_next_event(struct uk_clock_event *ce, __nsec at)
+{
+	uint64_t until_count = ns_to_ticks(until) + cntvct_at_init;
+
+	UK_ASSERT(irqs_disabled());
+	if (read_virtual_count() < until_count)
+		set_vtimer_compare(until_count);
+}
+
+int vtimer_disable_ce(struct uk_clock_event *ce __unused)
+{
+	unset_vtimer_compare();
+	return 0;
+}
+
+static struct uk_clock_event vtimer_clock_event = {
+	.name = "generic_timer",
+	.priority = 100,
+	.set_next_event = vtimer_set_next_event,
+	.disable = vtimer_disable_ce,
+};
+
 void ukplat_time_init(void)
 {
 	uk_pr_info("Initialising timer interface\n");
@@ -183,6 +206,10 @@ void ukplat_time_init(void)
 	cntvct_at_init = read_virtual_count();
 	uk_pr_debug("Virtual Count register is %llx, freq = %d Hz\n",
 		    cntvct_at_init, counter_freq);
+
+	/* Register timer as clock event device */
+	/* FIXME: Register an interrupt handler that calls the ce handler */
+	uk_clock_event_register(&vtimer_clock_event);
 }
 
 void ukplat_time_fini(void)

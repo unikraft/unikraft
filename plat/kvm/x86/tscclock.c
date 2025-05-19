@@ -54,11 +54,17 @@
 
 #include <uk/plat/lcpu.h>
 #include <uk/plat/time.h>
+#include <uk/clock_event.h>
+#include <uk/intctlr.h>
 #include <x86/cpu.h>
 #include <uk/timeconv.h>
 #include <uk/print.h>
 #include <uk/assert.h>
+#include <uk/event.h>
+#include <uk/migration.h>
 #include <uk/bitops.h>
+#include <uk/atomic.h>
+#include <uk/preempt.h>
 
 #define TIMER_CNTR           0x40
 #define TIMER_MODE           0x43
@@ -102,8 +108,16 @@ static __u64 rtc_epochoffset;
 static __u64 time_base;
 static __u64 tsc_base;
 
+/* Frequency of the TSC */
+static __u64 tsc_freq;
+
 /* Multiplier for converting TSC ticks to nsecs. (0.32) fixed point. */
 static __u32 tsc_mult;
+
+/* Shift for TSC tick to nanosecond conversions. This ensures that the tsc_mult
+ * multiplication won't overflow
+ */
+static __s8 tsc_shift;
 
 /*
  * Multiplier for converting nsecs to PIT ticks. (1.32) fixed point.
@@ -193,6 +207,111 @@ static __u64 rtc_gettimeofday(void)
 	return uktimeconv_bmkclock_to_nsec(&dt);
 }
 
+/**
+ * Convert a monotonic clock ticks (ns) to TSC cycles
+ */
+__u64 tscclock_ns_to_tsc_delta(__nsec ts)
+{
+	uint32_t gcd, factor, divisor;
+	uint64_t rem, sbintime;
+
+	/* Convert time delta into a (32.32) fixed-point number of seconds.
+	 * Calculation based on FreeBSD's nstosbt()
+	 */
+	gcd = 512; /* gcd(UKARCH_NSEC_PER_SEC, 1 << 32) */
+	factor = (1UL << 32) / gcd;
+	divisor = UKARCH_NSEC_PER_SEC / gcd;
+	rem = ts % divisor;
+	sbintime =
+	    ts / divisor * factor + (rem * factor + divisor - 1) / divisor;
+
+	/* sbintime (32.32) * tsc_freq (32.0)
+	 * = tsc (64.32) [(64.0) with mul64_32]
+	 */
+	return mul64_32(sbintime, tsc_freq);
+}
+
+/*
+ * Minimum delta to sleep using PIT. Programming seems to have an overhead of
+ * 3-4us, but play it safe here.
+ */
+#define PIT_MIN_DELTA	16
+
+static int tscclock_pit_set_next_event(struct uk_clock_event *ce, __nsec at)
+{
+	__u64 now, delta_ns;
+	__u64 delta_ticks;
+	unsigned int ticks;
+
+	now = ukplat_monotonic_clock();
+
+	if (at <= now)
+		goto immediate_expire;
+
+	/*
+	 * Compute delta in PIT ticks. Return if it is less than minimum safe
+	 * amount of ticks.  Essentially this will cause us to spin until
+	 * the timeout.
+	 */
+	delta_ns = at - now;
+	delta_ticks = mul64_32(delta_ns, pit_mult);
+	if (delta_ticks < PIT_MIN_DELTA)
+		goto immediate_expire;
+
+	/*
+	 * Program the timer to interrupt the CPU after the delay has expired.
+	 * Maximum timer delay is 65535 ticks.
+	 */
+	if (delta_ticks > 65535)
+		ticks = 65535;
+	else
+		ticks = delta_ticks;
+
+	/*
+	 * Note that according to the Intel 82C54 datasheet, p12 the
+	 * interrupt is actually delivered in N + 1 ticks.
+	 */
+	ticks -= 1;
+	outb(TIMER_MODE, TIMER_SEL0 | TIMER_ONESHOT | TIMER_16BIT);
+	outb(TIMER_CNTR, ticks & 0xff);
+	outb(TIMER_CNTR, ticks >> 8);
+
+	return 0;
+
+immediate_expire:
+	if (ce->event_handler)
+		ce->event_handler(ce);
+
+	return 0;
+}
+
+static int tscclock_pit_disable(struct uk_clock_event *ce __unused)
+{
+	outb(TIMER_MODE, TIMER_SEL0 | TIMER_ONESHOT | TIMER_16BIT);
+	outb(TIMER_CNTR, 0);
+	outb(TIMER_CNTR, 0);
+
+	return 0;
+}
+
+static int pit_timer_handler(void *arg)
+{
+	struct uk_clock_event *ce = arg;
+
+	tscclock_pit_disable(ce);
+	if (ce->event_handler)
+		ce->event_handler(ce);
+
+	return 1;
+}
+
+static struct uk_clock_event pit_clock_event = {
+	.name = "PIT",
+	.priority = 0,
+	.set_next_event = tscclock_pit_set_next_event,
+	.disable = tscclock_pit_disable,
+};
+
 /*
  * Return monotonic time using TSC clock.
  */
@@ -205,6 +324,11 @@ __u64 tscclock_monotonic(void)
 	 */
 	tsc_now = rdtsc();
 	tsc_delta = tsc_now - tsc_base;
+	if (tsc_shift >= 0)
+		tsc_delta <<= tsc_shift;
+	else
+		tsc_delta >>= -tsc_shift;
+
 	if (tsc_delta >= UINT64_MAX / 2)
 		tsc_delta = 1;
 	time_base += mul64_32(tsc_delta, tsc_mult);
@@ -213,18 +337,116 @@ __u64 tscclock_monotonic(void)
 	return time_base;
 }
 
-/*
- * Calibrate TSC and initialise TSC clock.
- */
-int tscclock_init(void)
-{
-	__u64 tsc_freq = 0, rtc_boot;
-	__u32 eax, ebx, ecx, edx;
+/* Ensure there is no accidental padding in the following structures */
+#pragma GCC diagnostic push
+#pragma GCC diagnostic error "-Wpadded"
+struct pvclock_vcpu_time_info {
+	__u32	version;
+	__u32	pad0;
+	__u64	tsc_timestamp;
+	__u64	system_time;
+	__u32	tsc_to_system_mul;
+	__s8	tsc_shift;
+	__u8	flags;
+	__u8	pad[2];
+};
 
-	/* Initialise i8254 timer channel 0 to mode 2 at CONFIG_HZ frequency */
-	outb(TIMER_MODE, TIMER_SEL0 | TIMER_RATEGEN | TIMER_16BIT);
-	outb(TIMER_CNTR, (TIMER_HZ / CONFIG_HZ) & 0xff);
-	outb(TIMER_CNTR, (TIMER_HZ / CONFIG_HZ) >> 8);
+struct pvclock_wall_clock {
+	__u32   version;
+	__u32   sec;
+	__u32   nsec;
+};
+#pragma GCC diagnostic pop
+
+static struct {
+	unsigned int system_clock_msr;
+	struct pvclock_vcpu_time_info system_clock;
+	unsigned int wall_clock_msr;
+	struct pvclock_wall_clock wall_clock;
+} pvclock_state;
+
+#define X86_KVM_CPUID_HYPERVISOR		0x40000000
+#define X86_KVM_CPUID_FEATURES			0x40000001
+
+#define X86_KVM_FEATURE_CLOCKSOURCE		(0 << 1)
+#define X86_KVM_FEATURE_CLOCKSOURCE2		(3 << 1)
+
+#define KVM_PVCLOCK_LEGACY_WALL_CLOCK_MSR	0x11
+#define KVM_PVCLOCK_LEGACY_SYS_CLOCK_MSR	0x12
+#define KVM_PVCLOCK_WALL_CLOCK_MSR		0x4b564d00
+#define KVM_PVCLOCK_SYS_CLOCK_MSR		0x4b564d01
+
+/**
+ * Initialize the TSC values from a set of pvclock MSRs.
+ * Documentation of these MSRs can ben found at:
+ *  https://www.kernel.org/doc/html/v5.9/virt/kvm/msr.html
+ */
+static void pvclock_init(unsigned int systemclock_msr,
+			 unsigned int wallclock_msr)
+{
+	__u32 version;
+
+	/* Give KVM the address of our pvclock structure and trigger an update.
+	 */
+	wrmsrl(systemclock_msr, (__u64)&pvclock_state.system_clock | 0x1);
+	wrmsrl(wallclock_msr, (__u64)&pvclock_state.wall_clock);
+
+	/* Attempt to fetch a consistent set of values (as in the version did
+	 * not change)
+	 */
+	do {
+		version = uk_load_n(&pvclock_state.system_clock.version);
+
+		time_base = pvclock_state.system_clock.system_time;
+		tsc_base = pvclock_state.system_clock.tsc_timestamp;
+		tsc_mult = pvclock_state.system_clock.tsc_to_system_mul;
+		tsc_shift = pvclock_state.system_clock.tsc_shift;
+	} while (version != uk_load_n(&pvclock_state.system_clock.version) ||
+		 (version & 1));
+
+	do {
+		version = uk_load_n(&pvclock_state.wall_clock.version);
+		rtc_epochoffset =
+		    ukarch_time_sec_to_nsec(pvclock_state.wall_clock.sec)
+		    + pvclock_state.wall_clock.nsec;
+	} while (version != uk_load_n(&pvclock_state.wall_clock.version) ||
+		 (version & 1));
+
+	tsc_freq = (UKARCH_NSEC_PER_SEC << 32) / tsc_mult;
+	if (tsc_shift < 0)
+		tsc_freq <<= -tsc_shift;
+	else
+		tsc_freq >>= tsc_shift;
+
+	pvclock_state.system_clock_msr = systemclock_msr;
+	pvclock_state.wall_clock_msr = wallclock_msr;
+}
+
+static int tscclock_resync(void *arg __unused)
+{
+	if (pvclock_state.system_clock_msr && pvclock_state.wall_clock_msr) {
+		pvclock_init(pvclock_state.system_clock_msr,
+			     pvclock_state.wall_clock_msr);
+	} else {
+		__u64 rtc_current;
+
+		// Update time_base and get a current RTC timestamp
+		uk_preempt_disable();
+		ukplat_monotonic_clock();
+		rtc_current = rtc_gettimeofday();
+		uk_preempt_enable();
+
+		rtc_epochoffset = rtc_current - time_base;
+	}
+	return UK_EVENT_HANDLED_CONT;
+}
+
+UK_EVENT_HANDLER(UK_MIGRATION_EVENT, tscclock_resync);
+
+void tscclock_pit_init(void)
+{
+	__u32 eax, ebx, ecx, edx;
+	__u64 rtc_boot;
 
 	/*
 	 * Read RTC "time at boot". This must be done just before tsc_base is
@@ -287,13 +509,52 @@ int tscclock_init(void)
 	 * time at boot.
 	 */
 	rtc_epochoffset = rtc_boot - time_base;
+}
 
-	/*
-	 * Initialise i8254 timer channel 0 to mode 4 (one shot).
-	 */
-	outb(TIMER_MODE, TIMER_SEL0 | TIMER_ONESHOT | TIMER_16BIT);
-	outb(TIMER_CNTR, 0);
-	outb(TIMER_CNTR, 0);
+/*
+ * Calibrate TSC and initialise TSC clock.
+ */
+int tscclock_init(void)
+{
+	__u32 eax, ebx, ecx, edx;
+	int rc;
+
+	/* Initialise i8254 timer channel 0 to mode 2 at CONFIG_HZ frequency */
+	outb(TIMER_MODE, TIMER_SEL0 | TIMER_RATEGEN | TIMER_16BIT);
+	outb(TIMER_CNTR, (TIMER_HZ / CONFIG_HZ) & 0xff);
+	outb(TIMER_CNTR, (TIMER_HZ / CONFIG_HZ) >> 8);
+
+	/* First try to fetch all timing information from the pvclock */
+	cpuid(X86_KVM_CPUID_HYPERVISOR, 0,
+	      &eax, &ebx, &ecx, &edx);
+	/* The values in the registers correspond to "KVMKVMKVM" */
+	if (ebx == 0x4b4d564b && ecx == 0x564b4d56 && edx == 0x4d) {
+		cpuid(X86_KVM_CPUID_FEATURES, 0,
+		      &eax, &ebx, &ecx, &edx);
+		if (eax & X86_KVM_FEATURE_CLOCKSOURCE2) {
+			uk_pr_debug("Using modern pvclock to init clock\n");
+			pvclock_init(KVM_PVCLOCK_SYS_CLOCK_MSR,
+				     KVM_PVCLOCK_WALL_CLOCK_MSR);
+		} else if (eax & X86_KVM_FEATURE_CLOCKSOURCE2) {
+			uk_pr_debug("Using legacy pvclock to init clock\n");
+			pvclock_init(KVM_PVCLOCK_LEGACY_SYS_CLOCK_MSR,
+				     KVM_PVCLOCK_LEGACY_WALL_CLOCK_MSR);
+		} else {
+			uk_pr_debug("KVM does not provide a pvclock\n");
+		}
+	}
+
+	/* If that fails, use legacy devices */
+	if (!tsc_mult)
+		tscclock_pit_init();
+
+	/* Register PIT clock event */
+	pit_clock_event.disable(&pit_clock_event);
+	rc = uk_intctlr_irq_register(ukplat_time_get_irq(), pit_timer_handler,
+				     &pit_clock_event);
+	if (rc < 0)
+		UK_CRASH("Failed to register timer interrupt handler\n");
+	uk_clock_event_register(&pit_clock_event);
 
 	return 0;
 }
@@ -305,12 +566,6 @@ __u64 tscclock_epochoffset(void)
 {
 	return rtc_epochoffset;
 }
-
-/*
- * Minimum delta to sleep using PIT. Programming seems to have an overhead of
- * 3-4us, but play it safe here.
- */
-#define PIT_MIN_DELTA	16
 
 /*
  * Returns early if any interrupts are serviced, or if the requested delay is
@@ -325,49 +580,12 @@ __u64 tscclock_epochoffset(void)
  */
 static void tscclock_cpu_block(__u64 until)
 {
-	__u64 now, delta_ns;
-	__u64 delta_ticks;
-	unsigned int ticks;
-
 	UK_ASSERT(ukplat_lcpu_irqs_disabled());
-
-	now = ukplat_monotonic_clock();
-
-	/*
-	 * Compute delta in PIT ticks. Return if it is less than minimum safe
-	 * amount of ticks.  Essentially this will cause us to spin until
-	 * the timeout.
+	/* If this function is used then we can't use the PIT for other purposes
 	 */
-	delta_ns = until - now;
-	delta_ticks = mul64_32(delta_ns, pit_mult);
-	if (delta_ticks < PIT_MIN_DELTA) {
-		/*
-		 * Since we are "spinning", quickly enable interrupts in
-		 * the hopes that we might get new work and can do something
-		 * else than spin.
-		 */
-		ukplat_lcpu_enable_irq();
-		nop(); /* ints are enabled 1 instr after sti */
-		ukplat_lcpu_disable_irq();
-		return;
-	}
+	UK_ASSERT(pit_clock_event.event_handler == NULL);
 
-	/*
-	 * Program the timer to interrupt the CPU after the delay has expired.
-	 * Maximum timer delay is 65535 ticks.
-	 */
-	if (delta_ticks > 65535)
-		ticks = 65535;
-	else
-		ticks = delta_ticks;
-
-	/*
-	 * Note that according to the Intel 82C54 datasheet, p12 the
-	 * interrupt is actually delivered in N + 1 ticks.
-	 */
-	ticks -= 1;
-	outb(TIMER_CNTR, ticks & 0xff);
-	outb(TIMER_CNTR, ticks >> 8);
+	pit_clock_event.set_next_event(&pit_clock_event, until);
 
 	/*
 	 * Wait for any interrupt. If we got an interrupt then just

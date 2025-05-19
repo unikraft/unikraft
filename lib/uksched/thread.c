@@ -228,6 +228,14 @@ void uk_thread_set_exited(struct uk_thread *t)
 	t->flags |= UK_THREADF_EXITED;
 }
 
+static enum uk_hr_timer_rearm uk_thread_timer_wakeup(struct uk_hr_timer *timer)
+{
+	struct uk_thread *thread = timer->priv;
+	uk_thread_wake(thread);
+
+	return UK_HR_TIMER_NO_REARM;
+}
+
 static void _uk_thread_struct_init(struct uk_thread *t,
 				   uintptr_t auxsp,
 				   uintptr_t tlsp,
@@ -256,6 +264,11 @@ static void _uk_thread_struct_init(struct uk_thread *t,
 		t->auxsp = auxsp;
 		ukarch_auxsp_init(auxsp);
 	}
+
+	uktimer_hr_init(&t->sleep_timer);
+	t->sleep_timer.priv = t;
+	t->sleep_timer.callback = uk_thread_timer_wakeup;
+
 	if (tlsp && is_uktls) {
 		t->flags |= UK_THREADF_UKTLS;
 		t->uktlsp = tlsp;
@@ -1043,7 +1056,10 @@ void uk_thread_block_until(struct uk_thread *thread, __snsec until)
 	UK_ASSERT(thread);
 
 	flags = ukplat_lcpu_save_irqf();
-	thread->wakeup_time = until;
+	if (until) {
+		thread->sleep_timer.expiry = until;
+		uktimer_hr_add(&thread->sleep_timer);
+	}
 	if (uk_thread_is_runnable(thread)) {
 		uk_thread_set_blocked(thread);
 		if (thread->sched)
@@ -1078,6 +1094,6 @@ void uk_thread_wake(struct uk_thread *thread)
 		if (thread->sched)
 			uk_sched_thread_woken(thread);
 	}
-	thread->wakeup_time = 0LL;
+	uktimer_hr_remove(&thread->sleep_timer);
 	ukplat_lcpu_restore_irqf(flags);
 }

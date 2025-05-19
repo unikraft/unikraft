@@ -36,5 +36,6 @@
 int tscclock_init(void);
 __u64 tscclock_monotonic(void);
 __u64 tscclock_epochoffset(void);
+__u64 tscclock_ns_to_tsc_delta(__nsec ts);
 
 #endif /* __KVM_TSCCLOCK_H__ */

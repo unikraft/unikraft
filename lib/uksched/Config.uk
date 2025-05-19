@@ -4,6 +4,7 @@ menuconfig LIBUKSCHED
 	select LIBNOLIBC if !HAVE_LIBC
 	select LIBUKDEBUG
 	select LIBUKALLOC
+	select LIBUKTIMER
 	select HAVE_SCHED
 
 if LIBUKSCHED

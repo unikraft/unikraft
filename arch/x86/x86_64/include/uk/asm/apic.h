@@ -39,6 +39,7 @@
 
 /* APIC MSR registers */
 #define APIC_MSR_BASE			0x01b
+#define APIC_MSR_TSC_DEADLINE		0x6e0
 
 /* The following MSRs are only accessible in x2APIC mode */
 #define APIC_MSR_ID			0x802
@@ -107,5 +108,15 @@
 #define APIC_ICR_DSTSH_SELF		(1 << 18)
 #define APIC_ICR_DSTSH_ALL_INCL_SELF	(2 << 18)
 #define APIC_ICR_DSTSH_ALL_EXCL_SELF	(3 << 18)
+
+/* LVT registers */
+#define APIC_LVT_MASK_MASK		(0x1 << 16)
+#define APIC_LVT_VECTOR_MASK		(0xff)
+
+/* APIC Timer modes */
+#define APIC_TIMER_MODE_MASK		(0x3 << 17)
+#define APIC_TIMER_MODE_ONE_SHOT	(0x0 << 17)
+#define APIC_TIMER_MODE_PERIODIC	(0x1 << 17)
+#define APIC_TIMER_MODE_TSC_DEADLINE	(0x2 << 17)
 
 #endif /* __UK_ARCH_APIC_H__ */

@@ -1,0 +1,6 @@
+menuconfig LIBUKCLOCKEVENT
+	bool "ukclockevent: Abstraction for clock interrupt sources"
+	default n
+
+if LIBUKCLOCKEVENT
+endif

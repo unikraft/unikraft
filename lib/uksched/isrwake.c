@@ -5,6 +5,7 @@
  */
 #include <uk/isr/sched.h>
 #include <uk/isr/thread.h>
+#include <uk/hrtimer.h>
 
 void uk_thread_wake_isr(struct uk_thread *thread)
 {
@@ -16,6 +17,6 @@ void uk_thread_wake_isr(struct uk_thread *thread)
 		if (thread->sched)
 			uk_sched_thread_woken_isr(thread);
 	}
-	thread->wakeup_time = 0LL;
+	uktimer_hr_remove(&thread->sleep_timer);
 	ukplat_lcpu_restore_irqf(flags);
 }

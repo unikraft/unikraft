@@ -40,6 +40,7 @@
 #include <uk/list.h>
 #include <uk/prio.h>
 #include <uk/essentials.h>
+#include <uk/hrtimer.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -63,7 +64,7 @@ struct uk_thread {
 
 	UK_TAILQ_ENTRY(struct uk_thread) queue;
 	uint32_t flags;
-	__snsec wakeup_time;
+	struct uk_hr_timer sleep_timer;
 	struct uk_sched *sched;
 
 	struct {

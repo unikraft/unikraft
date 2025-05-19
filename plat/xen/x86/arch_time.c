@@ -43,6 +43,7 @@
 #include <common/events.h>
 #include <xen-x86/irq.h>
 #include <uk/assert.h>
+#include <uk/clock_event.h>
 
 /************************************************************************
  * Time functions
@@ -203,12 +204,31 @@ void time_block_until(__snsec until)
 	}
 }
 
+int timer_set_next_event(struct uk_clock_event *ce __unused, __nsec at)
+{
+	HYPERVISOR_set_timer_op(at);
+	return 0;
+}
+
+int timer_disable_ce(struct uk_clock_event *ce __unused)
+{
+	HYPERVISOR_set_timer_op(0);
+	return 0;
+}
+
+static struct uk_clock_event timer_clock_event = {
+	.name = "xen timer",
+	.priority = 100,
+	.set_next_event = timer_set_next_event,
+	.disable = timer_disable_ce,
+};
+
 static void timer_handler(evtchn_port_t ev __unused,
 		struct __regs *regs __unused, void *ign __unused)
 {
-	__nsec until = ukplat_monotonic_clock() + UKPLAT_TIME_TICK_NSEC;
-
-	HYPERVISOR_set_timer_op(until);
+	timer_disable_ce(&timer_clock_event);
+	if (timer_clock_event.event_handler)
+		timer_clock_event.event_handler(&timer_clock_event);
 }
 
 
@@ -219,6 +239,9 @@ void ukplat_time_init(void)
 	uk_pr_debug("Initializing timer interface\n");
 	port = bind_virq(VIRQ_TIMER, &timer_handler, NULL);
 	unmask_evtchn(port);
+
+	/* Register timer as clock event device */
+	uk_clock_event_register(&timer_clock_event);
 }
 
 void ukplat_time_fini(void)

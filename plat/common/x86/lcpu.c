@@ -67,13 +67,13 @@ __lcpuid lcpu_arch_id(void)
 
 int lcpu_arch_init(struct lcpu *this_lcpu)
 {
-#ifdef CONFIG_HAVE_SMP
+#if CONFIG_LIBUKINTCTLR_APIC
 	int rc;
 
 	rc = apic_enable();
 	if (unlikely(rc))
 		return rc;
-#endif /* CONFIG_HAVE_SMP */
+#endif /* CONFIG_LIBUKINTCTLR_APIC */
 
 	traps_lcpu_init(this_lcpu);
 
