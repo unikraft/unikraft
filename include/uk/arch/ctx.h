@@ -56,6 +56,14 @@
 #define UKARCH_CTX_OFFSETOF_SP 8
 #endif
 
+#if (defined __PTR_IS_16)
+#define UKARCH_CTX_OFFSETOF_SSP 4
+#elif (defined __PTR_IS_32)
+#define UKARCH_CTX_OFFSETOF_SSP 8
+#elif (defined __PTR_IS_64)
+#define UKARCH_CTX_OFFSETOF_SSP 16
+#endif
+
 #ifndef __ASSEMBLY__
 struct ukarch_ctx {
 	__uptr ip;	/**< instruction pointer */
@@ -99,6 +107,19 @@ static inline void ukarch_ctx_init_bare(struct ukarch_ctx *ctx,
 	 */
 	(*ctx) = (struct ukarch_ctx){ .ip = ip, .sp = sp };
 }
+
+#if ((__CET__ & 1) && CONFIG_X86_64_CET_SS)
+static inline void ukarch_ctx_init_ssp(struct ukarch_ctx *ctx,
+					__uptr ssp)
+{
+	UK_ASSERT(ctx);
+
+	/* NOTE: We are not checking if SP is given or if SP is aligned because
+	 *       execution does not have to start with a function entry.
+	 */
+	ctx->ssp = ssp;
+}
+#endif
 
 /**
  * Initializes a context struct with stack pointer and
@@ -184,6 +205,16 @@ void ukarch_ctx_init_entry2(struct ukarch_ctx *ctx,
 	({								\
 		(ctx)->sp = ukarch_rstack_push_packed((ctx)->sp, (value)); \
 	})
+
+/**
+ * Push a value on the shadow stack of a remote context. The value must be 64-bits long
+*/
+#if ((__CET__ & 1) && CONFIG_X86_64_CET_SS)
+#define ukarch_rctx_shadowstackpush(ctx, value)				\
+	({								\
+		(ctx)->sp = ukarch_shadow_stack_push((ctx)->sp, (value));	\
+	})
+#endif
 
 /**
  * Switch the current logical CPU to context `load`. The current context

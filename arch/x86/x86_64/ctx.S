@@ -34,6 +34,7 @@
 
 ENTRY(_ctx_x86_clearregs)
 	X86_CET_ENDBR
+	endbr64
 
 	/* wipe argument and return registers */
 	xorq %rdi, %rdi
@@ -93,12 +94,28 @@ ENTRY(ukarch_ctx_switch)
 	pushq %r14
 	pushq %r15
 	movq %rsp, UKARCH_CTX_OFFSETOF_SP(%rdi)       /* save ESP */
+	
+	/* Save current shadow stack pointer */
+	pushq %rax
+	xor %rax, %rax
+	rdsspq %rax                                   /* read current SSP into RAX. This is a NOP if CET is not enabled */
+	testq %rax, %rax
+	jz skip_ssp_restore
+
+	sub $8, %rax
+	movq %rax, UKARCH_CTX_OFFSETOF_SSP(%rdi)      /* save SSP */
+	
+	/* Restore new thread's shadow stack pointer */
+	movq UKARCH_CTX_OFFSETOF_SSP(%rsi), %rax
+	rstorssp (%rax)                               /* restore SSP */
+	saveprevssp
+
+skip_ssp_restore:
+	pop %rax
 	movq UKARCH_CTX_OFFSETOF_SP(%rsi), %rsp       /* restore ESP */
 	lea .Lresume(%rip), %rbx
 	movq %rbx, UKARCH_CTX_OFFSETOF_IP(%rdi)       /* save EIP */
-	pushq UKARCH_CTX_OFFSETOF_IP(%rsi)            /* restore EIP
-						       * (to stack and return)
-						       */
+	pushq UKARCH_CTX_OFFSETOF_IP(%rsi)            /* jump to restored EIP */
 	ret
 
 .Lresume:

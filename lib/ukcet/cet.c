@@ -34,6 +34,11 @@ void* ukcet_create_shstk() {
 	if (mem == MAP_FAILED) {
 		return NULL;
 	}
+
+	for (unsigned int i = 0; i < SHSTK_SIZE; i += PAGE_SIZE) {
+		((char*)mem)[i] = 0;
+	}
+
 	// create a supervisor stack token
 	void *stack_start = ((char*)mem) + SHSTK_SIZE - PAGE_SIZE - 8;
 	*(unsigned long long*)stack_start = ((unsigned long long) stack_start);

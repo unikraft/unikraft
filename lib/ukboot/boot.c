@@ -389,6 +389,40 @@ void ukplat_entry(int argc, char *argv[])
 	uk_pr_info("Initialize platform time...\n");
 	ukplat_time_init();
 
+// this must be directly in the main function because putting it in a different
+// function will result in problems when we try to return from that function
+
+#if ((__CET__ & 1) && CONFIG_X86_64_CET_SS)
+	void *shstk = NULL;
+	void *isst = NULL;
+	int has_shadow_stack = 0;
+
+	has_shadow_stack = ukcet_cpu_supports_shadow_stack();
+	if (has_shadow_stack) {
+		shstk = ukcet_create_shstk();
+		uk_pr_err("create shstk top:%p base:0x%llx\n", shstk, SHSTK_BASE(shstk));
+		if (shstk == NULL) {
+			uk_pr_err("Shadow stack creation failed");
+			goto exit;
+		}
+		isst = ukcet_create_isst();
+		if (isst == NULL) {
+			uk_pr_err("Interrupt shadow stack table creation failed");
+			goto exit;
+		}
+		asm volatile ("cli" : : :);
+		#if CONFIG_X86_64_CET_IBT
+			wrmsrl(MSR_IA32_S_CET, X86_CET_SHSTK_EN | X86_CET_WRSS_EN | X86_CET_ENDBR_EN | X86_CET_NO_TRACK_EN);
+		#else
+			wrmsrl(MSR_IA32_S_CET, X86_CET_SHSTK_EN | X86_CET_WRSS_EN);
+		#endif
+		wrmsrl(MSR_IA32_INT_SSP_TAB, (unsigned long long) isst);
+		wrmsrl(MSR_IA32_PL0_SSP, SHSTK_BASE(shstk));
+		asm volatile ("setssbsy" : : :);
+		asm volatile("sti" : : :);
+	}
+#endif
+
 #if !CONFIG_LIBUKBOOT_NOSCHED
 	uk_pr_info("Initialize scheduling...\n");
 #if CONFIG_LIBUKBOOT_INITSCHEDCOOP
@@ -432,39 +466,6 @@ void ukplat_entry(int argc, char *argv[])
 
 	print_banner(stdout);
 	fflush(stdout);
-
-// this must be directly in the main function because putting it in a different
-// function will result in problems when we try to return from that function
-
-#if ((__CET__ & 1) && CONFIG_X86_64_CET_SS)
-	void *shstk = NULL;
-	void *isst = NULL;
-	int has_shadow_stack = 0;
-
-	has_shadow_stack = ukcet_cpu_supports_shadow_stack();
-	if (has_shadow_stack) {
-		shstk = ukcet_create_shstk();
-		if (shstk == NULL) {
-			uk_pr_err("Shadow stack creation failed");
-			goto exit;
-		}
-		isst = ukcet_create_isst();
-		if (isst == NULL) {
-			uk_pr_err("Interrupt shadow stack table creation failed");
-			goto exit;
-		}
-		asm volatile ("cli" : : :);
-		#if CONFIG_X86_64_CET_IBT
-			wrmsrl(MSR_IA32_S_CET, X86_CET_SHSTK_EN | X86_CET_WRSS_EN | X86_CET_ENDBR_EN | X86_CET_NO_TRACK_EN);
-		#else
-			wrmsrl(MSR_IA32_S_CET, X86_CET_SHSTK_EN | X86_CET_WRSS_EN);
-		#endif
-		wrmsrl(MSR_IA32_INT_SSP_TAB, (unsigned long long) isst);
-		wrmsrl(MSR_IA32_PL0_SSP, (unsigned long long)(((char*)shstk) + SHSTK_SIZE - PAGE_SIZE - 8));
-		asm volatile ("setssbsy" : : :);
-		asm volatile("sti" : : :);
-	}
-#endif
 
 #if !CONFIG_LIBUKBOOT_MAINTHREAD
 	do_main(ictx.cmdline.argc, ictx.cmdline.argv);

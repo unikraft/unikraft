@@ -48,4 +48,6 @@ ENTRY(uk_syscall_ctx_popall)
 
 	swapgs
 
+	# rdsspq %rax
+
 	iretq

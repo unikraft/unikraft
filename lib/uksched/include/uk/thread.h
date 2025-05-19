@@ -74,6 +74,9 @@ struct uk_thread {
 		struct uk_alloc *uktls_a;
 		void            *auxstack;
 		struct uk_alloc *auxstack_a;
+#if ((__CET__ & 1) && CONFIG_X86_64_CET_SS)
+		void *shadow_stack;
+#endif
 	} _mem;				/**< Associated allocs (internal!) */
 	uk_thread_gc_t _gc_fn;		/**< Extra gc function (internal!) */
 	void *_gc_argp;			/**< Argument for gc fn (internal!) */

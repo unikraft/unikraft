@@ -46,6 +46,11 @@
 #include <uk/arch/tls.h>
 #include <uk/plat/memory.h>
 
+#if CONFIG_LIBUKCET
+#include <uk/cet.h>
+#include <sys/mman.h>
+#endif
+
 #if CONFIG_LIBUKSCHED_TCB_INIT && !CONFIG_UKARCH_TLS_HAVE_TCB
 #error CONFIG_LIBUKSCHED_TCB_INIT requires that a TLS contains reserved space for a TCB
 #endif
@@ -249,6 +254,8 @@ static void _uk_thread_struct_init(struct uk_thread *t,
 	t->dtor = dtor;
 	t->exec_time = 0;
 
+	t->_mem.shadow_stack = ukcet_create_shstk();
+
 	if (auxsp) {
 		t->flags |= UK_THREADF_AUXSP;
 		t->auxsp = auxsp;
@@ -284,6 +291,10 @@ int uk_thread_init_bare(struct uk_thread *t,
 	_uk_thread_struct_init(t, auxsp, tlsp, is_uktls, ectx, name, priv,
 			       dtor);
 	ukarch_ctx_init_bare(&t->ctx, sp, ip);
+	__uptr _ssp = SHSTK_BASE(t->_mem.shadow_stack);
+	_ssp = ukarch_shadow_stack_push(_ssp, (long long) ip);
+	_ssp = ukarch_shadow_stack_push(_ssp, ((long long) _ssp) | 1);
+	ukarch_ctx_init_ssp(&t->ctx, _ssp);
 
 	if (ip)
 		uk_thread_set_runnable(t);
@@ -481,8 +492,23 @@ static int _uk_thread_struct_init_alloc(struct uk_thread *t,
 #endif /* CONFIG_LIBUKSCHED_TCB_INIT */
 	}
 
+#if ((__CET__ & 1) && CONFIG_X86_64_CET_SS)
+	t->_mem.shadow_stack = ukcet_create_shstk();
+	if (!t->_mem.shadow_stack) {
+		rc = -ENOMEM;
+		goto err_free_shstk;
+	} else {
+		__uptr _ssp = SHSTK_BASE(t->_mem.shadow_stack);
+		_ssp = ukarch_shadow_stack_push(_ssp, ((long long) _ssp) | 1);
+		ukarch_ctx_init_ssp(&t->ctx, _ssp);
+	}
+#endif
+
 	return 0;
 
+#if ((__CET__ & 1) && CONFIG_X86_64_CET_SS)
+err_free_shstk:
+#endif
 #if CONFIG_LIBUKSCHED_TCB_INIT
 err_free_tls:
 	uk_free(a_uktls, tls);
@@ -522,6 +548,9 @@ void _uk_thread_struct_free_alloc(struct uk_thread *t)
 		t->_mem.auxstack_a = NULL;
 		t->_mem.auxstack   = NULL;
 	}
+#if ((__CET__ & 1) && CONFIG_X86_64_CET_SS)
+	munmap(t->_mem.shadow_stack, SHSTK_SIZE);
+#endif
 }
 
 int uk_thread_init_fn0(struct uk_thread *t,

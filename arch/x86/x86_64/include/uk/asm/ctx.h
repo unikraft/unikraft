@@ -62,6 +62,20 @@
 		__sp__;					\
 	})
 
+#if ((__CET__ & 1) && CONFIG_X86_64_CET_SS)
+
+#define ukarch_shadow_stack_push(ssp, value) \
+	({						\
+		unsigned long long __ssp__ = (ssp);		\
+		unsigned long long v = (unsigned long long) value; \
+		__ssp__ -= 8;		\
+		uk_pr_err("SHADOW STACK PUSH: ssp:0x%llx val:0x%llx\n", __ssp__, v); \
+		asm volatile ("wrssq %0, %1" : : "r"(v), "m"(*(unsigned long long*)__ssp__) : "memory");	\
+		__ssp__;					\
+	})
+
+#endif
+
 #define ukarch_rstack_push_packed(sp, value)		\
 	ukarch_rstack_push(sp, value)
 

@@ -1058,7 +1058,7 @@ int vmem_pagefault(__vaddr_t vaddr, unsigned int type, struct __regs *regs)
 	 */
 	ctx.vma = vmem_vma_find(vas, vaddr, 0);
 	if (unlikely(!ctx.vma))
-		return -EFAULT;
+		return -vaddr;
 
 	UK_ASSERT(vaddr >= ctx.vma->start && vaddr < ctx.vma->end);
 
