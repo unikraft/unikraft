@@ -140,11 +140,7 @@ static inline int uk_vma_map_stack(struct uk_vas *vas, __vaddr_t *vaddr,
 
 	flags |= UK_VMA_MAP_SIZE(PAGE_SHIFT);
 
-	/* Just populate the whole stack */
-	if (premapped_len >= len) {
-		premapped_len = len;
-		flags |= UK_VMA_MAP_POPULATE;
-	}
+	premapped_len = MIN(premapped_len, len);
 
 	rc = uk_vma_map(vas, vaddr, len + UK_VMA_STACK_GUARDS_SIZE,
 			PAGE_ATTR_PROT_RW, flags, name,
