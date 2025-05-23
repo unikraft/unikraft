@@ -102,12 +102,12 @@ ENTRY(ukarch_ctx_switch)
 	testq %rax, %rax
 	jz skip_ssp_restore
 
-	sub $8, %rax
+	# sub $8, %rax
 	movq %rax, UKARCH_CTX_OFFSETOF_SSP(%rdi)      /* save SSP */
 	
 	/* Restore new thread's shadow stack pointer */
 	movq UKARCH_CTX_OFFSETOF_SSP(%rsi), %rax
-	rstorssp (%rax)                               /* restore SSP */
+	rstorssp -8(%rax)                               /* restore SSP */
 	saveprevssp
 
 skip_ssp_restore:
@@ -115,10 +115,11 @@ skip_ssp_restore:
 	movq UKARCH_CTX_OFFSETOF_SP(%rsi), %rsp       /* restore ESP */
 	lea .Lresume(%rip), %rbx
 	movq %rbx, UKARCH_CTX_OFFSETOF_IP(%rdi)       /* save EIP */
-	pushq UKARCH_CTX_OFFSETOF_IP(%rsi)            /* jump to restored EIP */
-	ret
+	jmp *UKARCH_CTX_OFFSETOF_IP(%rsi)            /* jump to restored EIP */
 
 .Lresume:
+	X86_CET_ENDBR
+	endbr64
 	popq %r15
 	popq %r14
 	popq %r13

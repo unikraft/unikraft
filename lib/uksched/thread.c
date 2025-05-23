@@ -294,7 +294,7 @@ int uk_thread_init_bare(struct uk_thread *t,
 	__uptr _ssp = SHSTK_BASE(t->_mem.shadow_stack);
 	_ssp = ukarch_shadow_stack_push(_ssp, (long long) ip);
 	_ssp = ukarch_shadow_stack_push(_ssp, ((long long) _ssp) | 1);
-	ukarch_ctx_init_ssp(&t->ctx, _ssp);
+	ukarch_ctx_init_ssp(&t->ctx, _ssp + 8);
 
 	if (ip)
 		uk_thread_set_runnable(t);
@@ -500,7 +500,7 @@ static int _uk_thread_struct_init_alloc(struct uk_thread *t,
 	} else {
 		__uptr _ssp = SHSTK_BASE(t->_mem.shadow_stack);
 		_ssp = ukarch_shadow_stack_push(_ssp, ((long long) _ssp) | 1);
-		ukarch_ctx_init_ssp(&t->ctx, _ssp);
+		ukarch_ctx_init_ssp(&t->ctx, _ssp + 8);
 	}
 #endif
 

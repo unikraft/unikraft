@@ -73,13 +73,13 @@ void ukarch_ctx_init(struct ukarch_ctx *ctx,
 #if ((__CET__ & 1) && CONFIG_X86_64_CET_SS)
 	_ssp = ukarch_shadow_stack_push(_ssp, (long long) ip);
 	if (keep_regs) {
-		_ssp = ukarch_shadow_stack_push(_ssp, (long long) _ctx_x86_call0);
+		//_ssp = ukarch_shadow_stack_push(_ssp, (long long) _ctx_x86_call0);
 	} else {
 		_ssp = ukarch_shadow_stack_push(_ssp, (long long) _ctx_x86_call0);
-		_ssp = ukarch_shadow_stack_push(_ssp, (long long) _ctx_x86_clearregs);
+		//_ssp = ukarch_shadow_stack_push(_ssp, (long long) _ctx_x86_clearregs);
 	}
 	_ssp = ukarch_shadow_stack_push(_ssp, ((long long) _ssp) | 1);
-	ukarch_ctx_init_ssp(ctx, _ssp);
+	ukarch_ctx_init_ssp(ctx, _ssp + 8);
 #endif
 
 	uk_pr_debug("ukarch_ctx %p: start:%p sp:%p\n",
@@ -128,13 +128,13 @@ void ukarch_ctx_init_entry0(struct ukarch_ctx *ctx,
 #if ((__CET__ & 1) && CONFIG_X86_64_CET_SS)
 	_ssp = ukarch_shadow_stack_push(_ssp, (long long) entry);
 	if (keep_regs) {
-		_ssp = ukarch_shadow_stack_push(_ssp, (long long) _ctx_x86_call0);
+		//_ssp = ukarch_shadow_stack_push(_ssp, (long long) _ctx_x86_call0);
 	} else {
 		_ssp = ukarch_shadow_stack_push(_ssp, (long long) _ctx_x86_call0);
-		_ssp = ukarch_shadow_stack_push(_ssp, (long long) _ctx_x86_clearregs);
+		//_ssp = ukarch_shadow_stack_push(_ssp, (long long) _ctx_x86_clearregs);
 	}
 	_ssp = ukarch_shadow_stack_push(_ssp, ((long long) _ssp) | 1);
-	ukarch_ctx_init_ssp(ctx, _ssp);
+	ukarch_ctx_init_ssp(ctx, _ssp + 8);
 #endif
 
 	uk_pr_debug("ukarch_ctx %p: entry:%p(), sp:%p\n",
@@ -170,13 +170,13 @@ void ukarch_ctx_init_entry1(struct ukarch_ctx *ctx,
 #if ((__CET__ & 1) && CONFIG_X86_64_CET_SS)
 	_ssp = ukarch_shadow_stack_push(_ssp, (long long) entry);
 	if (keep_regs) {
-		_ssp = ukarch_shadow_stack_push(_ssp, (long long) _ctx_x86_call1);
+		//_ssp = ukarch_shadow_stack_push(_ssp, (long long) _ctx_x86_call1);
 	} else {
 		_ssp = ukarch_shadow_stack_push(_ssp, (long long) _ctx_x86_call1);
-		_ssp = ukarch_shadow_stack_push(_ssp, (long long) _ctx_x86_clearregs);
+		//_ssp = ukarch_shadow_stack_push(_ssp, (long long) _ctx_x86_clearregs);
 	}
 	_ssp = ukarch_shadow_stack_push(_ssp, ((long long) _ssp) | 1);
-	ukarch_ctx_init_ssp(ctx, _ssp);
+	ukarch_ctx_init_ssp(ctx, _ssp + 8);
 #endif
 
 	uk_pr_debug("ukarch_ctx %p: entry:%p(%lx), sp:%p\n",
@@ -212,13 +212,13 @@ void ukarch_ctx_init_entry2(struct ukarch_ctx *ctx,
 #if ((__CET__ & 1) && CONFIG_X86_64_CET_SS)
 	_ssp = ukarch_shadow_stack_push(_ssp, (long long) entry);
 	if (keep_regs) {
-		_ssp = ukarch_shadow_stack_push(_ssp, (long long) _ctx_x86_call2);
+		//_ssp = ukarch_shadow_stack_push(_ssp, (long long) _ctx_x86_call2);
 	} else {
 		_ssp = ukarch_shadow_stack_push(_ssp, (long long) _ctx_x86_call2);
-		_ssp = ukarch_shadow_stack_push(_ssp, (long long) _ctx_x86_clearregs);
+		//_ssp = ukarch_shadow_stack_push(_ssp, (long long) _ctx_x86_clearregs);
 	}
 	_ssp = ukarch_shadow_stack_push(_ssp, ((long long) _ssp) | 1);
-	ukarch_ctx_init_ssp(ctx, _ssp);
+	ukarch_ctx_init_ssp(ctx, _ssp + 8);
 #endif
 
 	uk_pr_debug("ukarch_ctx %p: entry:%p(%lx, %lx), sp:%p\n",
