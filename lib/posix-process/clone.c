@@ -559,8 +559,13 @@ int uk_clone(struct clone_args *cl_args, size_t cl_args_len,
 
 	uk_thread_set_runnable(child);
 
-	/* We will return the child's pid to the parent */
-	ret = ukthread2pid(child);
+	/* Set the return value depending on whether
+	 * a thread or a process is created.
+	 */
+	if (cl_args->flags & CLONE_THREAD)
+		ret = ukthread2tid(child);
+	else
+		ret = ukthread2pid(child);
 
 	/* Assign the child to the scheduler */
 	uk_sched_thread_add(s, child);
