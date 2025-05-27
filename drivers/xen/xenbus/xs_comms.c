@@ -75,7 +75,7 @@ struct xs_handler {
 };
 
 static struct xs_handler xsh = {
-	.waitq = __WAIT_QUEUE_INITIALIZER(xsh.waitq),
+	.waitq = UK_WAIT_QUEUE_INITIALIZER(xsh.waitq),
 };
 
 /*
