@@ -46,6 +46,7 @@ extern "C" {
 #endif
 
 struct uk_sched;
+struct uk_thread;
 
 typedef void (*uk_thread_dtor_t)(struct uk_thread *);
 typedef void (*uk_thread_gc_t)(struct uk_thread *, void *);
@@ -65,6 +66,7 @@ struct uk_thread {
 	uint32_t flags;
 	__snsec wakeup_time;
 	struct uk_sched *sched;
+	struct uk_waitq_ticket wait_ticket;
 
 	struct {
 		struct uk_alloc *t_a;
@@ -100,6 +102,24 @@ static inline
 struct uk_thread *uk_thread_current(void)
 {
 	return ukplat_per_lcpu_current(__uk_sched_thread_current);
+}
+
+/**
+ * Return thread containing the waitqueue ticket `ticket`.
+ */
+static inline
+struct uk_thread *uk_thread_of_wait_ticket(struct uk_waitq_ticket *ticket)
+{
+	return __containerof(ticket, struct uk_thread, wait_ticket);
+}
+
+/**
+ * True if `thread` is linked in a wait queue.
+ */
+static inline
+bool uk_thread_in_waitq(struct uk_thread *thread)
+{
+	return !!thread->wait_ticket.wq;
 }
 
 /*
@@ -652,6 +672,19 @@ void uk_thread_block_until(struct uk_thread *thread, __snsec until);
 void uk_thread_block_timeout(struct uk_thread *thread, __nsec nsec);
 void uk_thread_block(struct uk_thread *thread);
 void uk_thread_wake(struct uk_thread *thread);
+
+/**
+ * Set the wakeup timer state for thread `t`.
+ *
+ * If `deadline`:
+ *  != 0: arm a wakeup timer for time `deadline`
+ *  == 0: disarm wakeup timer
+ */
+static inline
+void uk_thread_set_wakeup(struct uk_thread *t, __snsec deadline)
+{
+	t->wakeup_time = deadline;
+}
 
 /**
  * Macro to access a Unikraft thread-local (UKTLS) variable of a

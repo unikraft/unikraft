@@ -302,6 +302,10 @@ void uk_sched_thread_terminate(struct uk_thread *thread)
 	uk_pr_debug("%p: thread %p (%s) terminated\n",
 		    sched, thread, thread->name ? thread->name : "<unnamed>");
 
+	if (uk_thread_in_waitq(thread))
+		uk_pr_warn("%p: thread %p (%s) terminated while waiting\n",
+			   sched, thread,
+			   thread->name ? thread->name : "<unnamed>");
 	/* remove from scheduling queue */
 	uk_sched_thread_remove(thread);
 	/* causes calling termination table */
