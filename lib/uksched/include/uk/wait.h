@@ -189,6 +189,10 @@ void _uk_waitq_block_until(struct uk_thread *thread, __snsec deadline)
 #define uk_waitq_wait_locked(wq, lock_fn, unlock_fn, lock) \
 	_uk_waitq_wait((wq), 0, 0, lock_fn, unlock_fn, (lock))
 
+#define uk_waitq_wait_deadline_locked(wq, deadline, lock_fn, unlock_fn, lock) \
+	_uk_waitq_wait((wq), deadline, ukplat_monotonic_clock(),	\
+		       lock_fn, unlock_fn, (lock))
+
 static inline void _uk_waitq_noplock(int lock __unused) {}
 
 #define uk_waitq_wait_event(wq, condition)				\
