@@ -211,6 +211,18 @@ static inline void _uk_waitq_noplock(int lock __unused) {}
 			     lock_fn, unlock_fn, (lock))
 
 /**
+ * Set the wait cookie of the current thread to `cookie`.
+ *
+ * Waitq code does not interpret this field, it is up to consumers of waitq to
+ * use it as e.g., a condition in `uk_waitq_wake_up_if`.
+ */
+static inline
+void uk_waitq_set_cookie(__uptr cookie)
+{
+	uk_thread_current()->wait_ticket.cookie = cookie;
+}
+
+/**
  * Forcefully cancel the wait ticket of `thread` and remove it from the queue.
  *
  * `thread` must be waiting on a queue and will not be awoken; continuing its
@@ -270,6 +282,25 @@ void uk_waitq_wake_up_one(struct uk_waitq *wq)
 		_uk_waitq_wake(wq, t);
 	_uk_waitq_unlock(wq, flags);
 }
+
+#define _uk_waitq_wake_up_if_then(wq, ticket, condition, aftermath)	\
+do {									\
+	unsigned long _uk_waitq_flags;					\
+									\
+	_uk_waitq_lock((wq), _uk_waitq_flags);				\
+	uk_list_for_each_entry((ticket), &(wq)->waiters, link)		\
+		if ((condition)) {					\
+			_uk_waitq_wake((wq), (ticket));			\
+			aftermath;					\
+		}							\
+	_uk_waitq_unlock((wq), _uk_waitq_flags);			\
+} while (0)
+
+#define uk_waitq_wake_up_if(wq, ticket, condition) \
+	_uk_waitq_wake_up_if_then((wq), (ticket), (condition), (void)0)
+
+#define uk_waitq_wake_up_one_if(wq, ticket, condition) \
+	_uk_waitq_wake_up_if_then((wq), (ticket), (condition), break)
 
 #ifdef __cplusplus
 }

@@ -23,6 +23,8 @@ struct uk_waitq_ticket {
 	struct uk_list_head link;
 	/* Queue we're waiting on, if waiting; must be NULL if not waiting */
 	struct uk_waitq *wq;
+	/* Value & interpretation up to consumers of waitq */
+	__uptr cookie;
 };
 
 #define UK_WAITQ_TICKET_INITIALIZER { .wq = __NULL }
