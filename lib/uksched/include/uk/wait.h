@@ -211,6 +211,24 @@ static inline void _uk_waitq_noplock(int lock __unused) {}
 			     lock_fn, unlock_fn, (lock))
 
 /**
+ * Forcefully cancel the wait ticket of `thread` and remove it from the queue.
+ *
+ * `thread` must be waiting on a queue and will not be awoken; continuing its
+ * execution after forceful cancellation is undefined.
+ */
+static inline
+void uk_waitq_cancel(struct uk_thread *thread)
+{
+	struct uk_waitq *wq = thread->wait_ticket.wq;
+	unsigned long flags;
+
+	UK_ASSERT(wq);
+	_uk_waitq_lock(wq, flags);
+	_uk_waitq_remove(thread);
+	_uk_waitq_unlock(wq, flags);
+}
+
+/**
  * INTERNAL. Wake thread of ticket `t` from `wq`.
  */
 static inline

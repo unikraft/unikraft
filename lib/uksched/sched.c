@@ -42,6 +42,7 @@
 #include <uk/plat/lcpu.h>
 #include <uk/sched.h>
 #include <uk/syscall.h>
+#include <uk/wait.h>
 
 struct uk_sched *uk_sched_head;
 
@@ -303,9 +304,7 @@ void uk_sched_thread_terminate(struct uk_thread *thread)
 		    sched, thread, thread->name ? thread->name : "<unnamed>");
 
 	if (uk_thread_in_waitq(thread))
-		uk_pr_warn("%p: thread %p (%s) terminated while waiting\n",
-			   sched, thread,
-			   thread->name ? thread->name : "<unnamed>");
+		uk_waitq_cancel(thread);
 	/* remove from scheduling queue */
 	uk_sched_thread_remove(thread);
 	/* causes calling termination table */
