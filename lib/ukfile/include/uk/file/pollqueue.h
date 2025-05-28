@@ -171,23 +171,23 @@ struct uk_pollq {
 };
 
 /*
- * Pollqueues come in two varieties: edge- and level-notified.
- * Edge-notified queues require drivers to only notify rising edges of events,
- * while providing a callback for fetching instantaneous levels.
- * Level-notified queues require drivers to notify both rising and falling edges
+ * Pollqueues come in two varieties: managed and polled.
+ * Polled queues require drivers to only notify rising edges of events, while
+ * providing a callback for fetching instantaneous levels (.poll).
+ * Managed queues require drivers to notify both rising and falling edges
  * of events, with the queue itself maintaining event levels.
  * See description of `uk_poll_func` for more details.
  *
- * Edge-notified queues require setting LIBUKFILE_POLLED during configuration.
+ * Polled queues require setting LIBUKFILE_POLLED during configuration.
  */
 /*
- * We define initializers separate from an initial values.
+ * We define initializers separate from initial values.
  * The former can only be used in (static) variable initializations, while the
  * latter is meant for assigning to variables or as anonymous data structures.
  */
 #if CONFIG_LIBUKFILE_CHAINUPDATE
 #if CONFIG_LIBUKFILE_POLLED
-#define _POLLQ_INIT(q, pollfunc, ev) { \
+#define __UK_POLLQ_INIT(q, pollfunc, ev) { \
 	.wait = NULL, \
 	.waitend = &(q).wait, \
 	.prop = NULL, \
@@ -200,7 +200,7 @@ struct uk_pollq {
 	.waitlock = UK_RWLOCK_INITIALIZER((q).waitlock, 0), \
 }
 #else /* !CONFIG_LIBUKFILE_POLLED */
-#define _POLLQ_INIT(q, pollfunc, ev) { \
+#define __UK_POLLQ_INIT(q, pollfunc, ev) { \
 	.wait = NULL, \
 	.waitend = &(q).wait, \
 	.prop = NULL, \
@@ -214,7 +214,7 @@ struct uk_pollq {
 #endif /* !CONFIG_LIBUKFILE_POLLED */
 #else /* !CONFIG_LIBUKFILE_CHAINUPDATE */
 #if CONFIG_LIBUKFILE_POLLED
-#define _POLLQ_INIT(q, pollfunc, ev) { \
+#define __UK_POLLQ_INIT(q, pollfunc, ev) { \
 	.wait = NULL, \
 	.waitend = &(q).wait, \
 	.poll = (pollfunc), \
@@ -223,7 +223,7 @@ struct uk_pollq {
 	.waitlock = UK_RWLOCK_INITIALIZER((q).waitlock, 0), \
 }
 #else /* !CONFIG_LIBUKFILE_POLLED */
-#define _POLLQ_INIT(q, pollfunc, ev) { \
+#define __UK_POLLQ_INIT(q, pollfunc, ev) { \
 	.wait = NULL, \
 	.waitend = &(q).wait, \
 	.events = (ev), \
@@ -234,19 +234,20 @@ struct uk_pollq {
 #endif /* !CONFIG_LIBUKFILE_CHAINUPDATE */
 
 #if CONFIG_LIBUKFILE_POLLED
-#define UK_POLLQ_EDGE_INITIALIZER(q, pollfunc) _POLLQ_INIT(q, pollfunc, 0)
+#define UK_POLLQ_POLLED_INITIALIZER(q, pollfunc) __UK_POLLQ_INIT(q, pollfunc, 0)
 
-#define UK_POLLQ_EDGE_INIT_VALUE(q, pollfunc) \
-	((struct uk_pollq)UK_POLLQ_EDGE_INITIALIZER(q, pollfunc))
+#define UK_POLLQ_POLLED_INIT_VALUE(q, pollfunc) \
+	((struct uk_pollq)UK_POLLQ_POLLED_INITIALIZER(q, pollfunc))
 #endif /* CONFIG_LIBUKFILE_POLLED */
 
-#define UK_POLLQ_LEVEL_EVENTS_INITIALIZER(q, ev) _POLLQ_INIT(q, NULL, ev)
-#define UK_POLLQ_LEVEL_INITIALIZER(q) UK_POLLQ_LEVEL_EVENTS_INITIALIZER(q, 0)
+#define UK_POLLQ_MANAGED_EVENTS_INITIALIZER(q, ev) __UK_POLLQ_INIT(q, NULL, ev)
+#define UK_POLLQ_MANAGED_INITIALIZER(q) \
+	UK_POLLQ_MANAGED_EVENTS_INITIALIZER(q, 0)
 
-#define UK_POLLQ_LEVEL_EVENTS_INIT_VALUE(q, ev) \
-	((struct uk_pollq)UK_POLLQ_LEVEL_EVENTS_INITIALIZER(q, ev))
-#define UK_POLLQ_LEVEL_INIT_VALUE(q) \
-	((struct uk_pollq)UK_POLLQ_LEVEL_INITIALIZER(q))
+#define UK_POLLQ_MANAGED_EVENTS_INIT_VALUE(q, ev) \
+	((struct uk_pollq)UK_POLLQ_MANAGED_EVENTS_INITIALIZER(q, ev))
+#define UK_POLLQ_MANAGED_INIT_VALUE(q) \
+	((struct uk_pollq)UK_POLLQ_MANAGED_INITIALIZER(q))
 
 /* Polling cancellation */
 

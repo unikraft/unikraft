@@ -148,7 +148,7 @@ static inline void uk_file_state_wunlock(struct uk_file_state *st)
 #if CONFIG_LIBUKFILE_POLLED
 #define UK_FILE_POLLED_STATE_INITIALIZER(name, pollfunc) { \
 	.iolock = UK_RWLOCK_INITIALIZER((name).iolock, 0), \
-	.pollq = UK_POLLQ_EDGE_INITIALIZER((name).pollq, (pollfunc)) \
+	.pollq = UK_POLLQ_POLLED_INITIALIZER((name).pollq, (pollfunc)) \
 }
 #define UK_FILE_POLLED_STATE_INIT_VALUE(name, pollfunc) \
 	((struct uk_file_state)UK_FILE_POLLED_STATE_INITIALIZER( \
@@ -157,7 +157,7 @@ static inline void uk_file_state_wunlock(struct uk_file_state *st)
 
 #define UK_FILE_STATE_EVENTS_INITIALIZER(name, ev) { \
 	.iolock = UK_RWLOCK_INITIALIZER((name).iolock, 0), \
-	.pollq = UK_POLLQ_LEVEL_EVENTS_INITIALIZER((name).pollq, (ev)) \
+	.pollq = UK_POLLQ_MANAGED_EVENTS_INITIALIZER((name).pollq, (ev)) \
 }
 #define UK_FILE_STATE_EVENTS_INIT_VALUE(name, ev) \
 	((struct uk_file_state)UK_FILE_STATE_EVENTS_INITIALIZER((name), (ev)))
