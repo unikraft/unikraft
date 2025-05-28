@@ -9,6 +9,7 @@ config LIBUKFILE
 # Hidden, selected by core components when required
 config LIBUKFILE_CHAINUPDATE
 	bool
+	select LIBUKLOCK_MUTEX
 
 config LIBUKFILE_FINALIZERS
 	bool
