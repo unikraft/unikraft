@@ -98,7 +98,6 @@ typedef void (*uk_poll_chain_callback_fn)(uk_pollevent ev,
  * If newly modified events overlap with those in `mask`, perform a chain update
  * of these overlapping bits according to `type`:
  *   - UK_POLL_CHAINTYPE_UPDATE: propagate events to `queue`.
- *     If `set` != 0 set/clear events in `set`, instead of original
  *   - UK_POLL_CHAINTYPE_CALLBACK: call `callback`
  */
 struct uk_poll_chain {
@@ -108,7 +107,6 @@ struct uk_poll_chain {
 	union {
 		struct {
 			struct uk_pollq *queue; /* Where to propagate updates */
-			uk_pollevent set; /* Events to set */
 		};
 		struct {
 			uk_poll_chain_callback_fn callback;
@@ -120,15 +118,15 @@ struct uk_poll_chain {
 /* See comment for main queue below on initializers vs initial values */
 
 /* Initializer for a chain ticket that propagates events to another queue */
-#define UK_POLL_CHAIN_UPDATE_INITIALZER(msk, to, ev) { \
+#define UK_POLL_CHAIN_UPDATE_INITIALZER(msk, to) { \
 	.next = NULL, \
 	.mask = (msk), \
 	.type = UK_POLL_CHAINTYPE_UPDATE, \
 	.queue = (to), \
-	.set = (ev) \
 }
-#define UK_POLL_CHAIN_UPDATE(msk, to, ev) ((struct uk_poll_chain) \
-	UK_POLL_CHAIN_UPDATE_INITIALZER((msk), (to), (ev)))
+
+#define UK_POLL_CHAIN_UPDATE(msk, to) \
+	((struct uk_poll_chain)UK_POLL_CHAIN_UPDATE_INITIALZER((msk), (to)))
 
 /* Initializer for a chain ticket that calls a custom callback */
 #define UK_POLL_CHAIN_CALLBACK_INITIALIZER(msk, cb, dat) { \
@@ -138,6 +136,7 @@ struct uk_poll_chain {
 	.callback = (cb), \
 	.arg = (dat) \
 }
+
 #define UK_POLL_CHAIN_CALLBACK(msk, cb, dat) ((struct uk_poll_chain) \
 	UK_POLL_CHAIN_CALLBACK_INITIALIZER((msk), (cb), (dat)))
 

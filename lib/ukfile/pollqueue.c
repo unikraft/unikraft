@@ -61,18 +61,14 @@ static void pollq_propagate(struct uk_pollq *q,
 			if (req) {
 				switch (t->type) {
 				case UK_POLL_CHAINTYPE_UPDATE:
-				{
-					uk_pollevent ev = t->set ? t->set : req;
-
 					switch (op) {
 					case UK_POLL_CHAINOP_CLEAR:
-						uk_pollq_clear(t->queue, ev);
+						uk_pollq_clear(t->queue, req);
 						break;
 					case UK_POLL_CHAINOP_SET:
-						uk_pollq_set(t->queue, ev);
+						uk_pollq_set(t->queue, req);
 						break;
 					}
-				}
 					break;
 				case UK_POLL_CHAINTYPE_CALLBACK:
 					t->callback(req, op, t);
@@ -95,6 +91,11 @@ uk_pollevent uk_pollq_clear(struct uk_pollq *q, uk_pollevent clr)
 #if CONFIG_LIBUKFILE_POLLED
 	UK_ASSERT(!q->poll);
 #endif /* CONFIG_LIBUKFILE_POLLED */
+
+#if CONFIG_LIBUKFILE_CHAINUPDATE
+	if (q->_tag == uk_thread_current()) /* Chaining update loop, return */
+		return 0;
+#endif /* CONFIG_LIBUKFILE_CHAINUPDATE */
 
 	prev = uk_and(&q->events, ~clr);
 #if CONFIG_LIBUKFILE_CHAINUPDATE
@@ -133,18 +134,29 @@ uk_pollevent uk_pollq_assign_n(struct uk_pollq *q, uk_pollevent val, int one)
 {
 	uk_pollevent prev;
 	uk_pollevent set;
+#if CONFIG_LIBUKFILE_CHAINUPDATE
+	uk_pollevent clr;
+#endif /* CONFIG_LIBUKFILE_CHAINUPDATE */
 
 #if CONFIG_LIBUKFILE_POLLED
 	UK_ASSERT(!q->poll);
 #endif /* CONFIG_LIBUKFILE_POLLED */
 
+#if CONFIG_LIBUKFILE_CHAINUPDATE
+	if (q->_tag == uk_thread_current()) /* Chaining update loop, return */
+		return 0;
+#endif /* CONFIG_LIBUKFILE_CHAINUPDATE */
+
 	prev = uk_exchange_n(&q->events, val);
 	set = val & ~prev;
-	if (set) {
+	if (set)
 		pollq_notify_n(q, set, !!one);
 #if CONFIG_LIBUKFILE_CHAINUPDATE
+	clr = prev & ~val;
+	if (clr)
+		pollq_propagate(q, UK_POLL_CHAINOP_CLEAR, clr);
+	if (set)
 		pollq_propagate(q, UK_POLL_CHAINOP_SET, set);
 #endif /* CONFIG_LIBUKFILE_CHAINUPDATE */
-	}
 	return prev;
 }

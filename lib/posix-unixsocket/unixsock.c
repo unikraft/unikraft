@@ -237,7 +237,7 @@ void unix_socket_poll_setup(posix_sock *file)
 
 	if (data->rpipe) {
 		UK_ASSERT(!(data->flags & UNIXSOCK_RDEV));
-		data->rio = UK_POLL_CHAIN_UPDATE(UKFD_POLLIN, sockq, 0);
+		data->rio = UK_POLL_CHAIN_UPDATE(UKFD_POLLIN, sockq);
 		data->rerr = UK_POLL_CHAIN_CALLBACK(EPOLLHUP,
 			unix_sock_rdown, sockq);
 		posix_sock_event_set(
@@ -251,8 +251,7 @@ void unix_socket_poll_setup(posix_sock *file)
 	if (_SOCK_CONNECTION(data->type)) {
 		if (data->wpipe) {
 			UK_ASSERT(!(data->flags & UNIXSOCK_WREV));
-			data->wio = UK_POLL_CHAIN_UPDATE(UKFD_POLLOUT,
-				sockq, 0);
+			data->wio = UK_POLL_CHAIN_UPDATE(UKFD_POLLOUT, sockq);
 			data->werr = UK_POLL_CHAIN_CALLBACK(EPOLLERR,
 				unix_sock_wdown, sockq);
 			posix_sock_event_set(
