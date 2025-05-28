@@ -8,7 +8,7 @@
 
 #include <uk/assert.h>
 
-static void pollq_notify_n(struct uk_pollq *q, uk_pollevent set, int n)
+static void pollq_notify_n(struct uk_pollq *q, uk_pollevent set, int one)
 {
 	uk_rwlock_wlock(&q->waitlock);
 	if (q->waitmask & set) {
@@ -18,13 +18,11 @@ static void pollq_notify_n(struct uk_pollq *q, uk_pollevent set, int n)
 		for (struct uk_poll_ticket **p = &q->wait; *p; p = &(*p)->next) {
 			struct uk_poll_ticket *t = *p;
 
-			if (!n)
-				goto done;
 			if (t->mask & set) {
 				*p = t->next;
 				t->next = NULL;
 				uk_thread_wake(t->thread);
-				n--;
+				one--;
 			} else {
 				seen |= t->mask;
 			}
@@ -33,6 +31,8 @@ static void pollq_notify_n(struct uk_pollq *q, uk_pollevent set, int n)
 				q->waitend = p;
 				break;
 			}
+			if (!one)
+				goto done;
 		}
 		/* Reached end of list, can prune waitmask */
 		q->waitmask = seen;
@@ -103,7 +103,7 @@ uk_pollevent uk_pollq_clear(struct uk_pollq *q, uk_pollevent clr)
 	return prev;
 }
 
-uk_pollevent uk_pollq_set_n(struct uk_pollq *q, uk_pollevent set, int n)
+uk_pollevent uk_pollq_set_n(struct uk_pollq *q, uk_pollevent set, int one)
 {
 	uk_pollevent prev;
 
@@ -122,14 +122,14 @@ uk_pollevent uk_pollq_set_n(struct uk_pollq *q, uk_pollevent set, int n)
 #endif /* CONFIG_LIBUKFILE_POLLED */
 		prev = uk_or(&q->events, set);
 
-	pollq_notify_n(q, set, n);
+	pollq_notify_n(q, set, !!one);
 #if CONFIG_LIBUKFILE_CHAINUPDATE
 	pollq_propagate(q, UK_POLL_CHAINOP_SET, set);
 #endif /* CONFIG_LIBUKFILE_CHAINUPDATE */
 	return prev;
 }
 
-uk_pollevent uk_pollq_assign_n(struct uk_pollq *q, uk_pollevent val, int n)
+uk_pollevent uk_pollq_assign_n(struct uk_pollq *q, uk_pollevent val, int one)
 {
 	uk_pollevent prev;
 	uk_pollevent set;
@@ -141,7 +141,7 @@ uk_pollevent uk_pollq_assign_n(struct uk_pollq *q, uk_pollevent val, int n)
 	prev = uk_exchange_n(&q->events, val);
 	set = val & ~prev;
 	if (set) {
-		pollq_notify_n(q, set, n);
+		pollq_notify_n(q, set, !!one);
 #if CONFIG_LIBUKFILE_CHAINUPDATE
 		pollq_propagate(q, UK_POLL_CHAINOP_SET, set);
 #endif /* CONFIG_LIBUKFILE_CHAINUPDATE */

@@ -115,8 +115,7 @@ static void epoll_event_callback(uk_pollevent set,
 		struct uk_pollq *upq = (struct uk_pollq *)tick->arg;
 
 		(void)uk_or(&ent->revents, set);
-		uk_pollq_set_n(upq, UKFD_POLLIN,
-			       IS_EDGEPOLL(ent) ? 1 : UK_POLLQ_NOTIFY_ALL);
+		uk_pollq_set_n(upq, UKFD_POLLIN, IS_EDGEPOLL(ent));
 		if (IS_ONESHOT(ent))
 			tick->mask = 0;
 	}
@@ -259,8 +258,7 @@ static void epoll_register(const struct uk_file *epf, struct epoll_entry *ent,
 	if (ev) {
 		/* Need atomic OR since we're registered for updates */
 		(void)uk_or(&ent->revents, ev);
-		uk_pollq_set_n(&epf->state->pollq, UKFD_POLLIN,
-			       edge ? 1 : UK_POLLQ_NOTIFY_ALL);
+		uk_pollq_set_n(&epf->state->pollq, UKFD_POLLIN, edge);
 	}
 }
 

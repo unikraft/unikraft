@@ -569,14 +569,12 @@ out:
  *
  * @param q Target queue.
  * @param set Events to set.
- * @param n Maximum number of threads to wake up. If < 0 wake up all threads.
- *   Chained updates have their own defined notification semantics and may
- *   notify more threads than specified in `n`.
+ * @param one If zero, notify all waiting threads, if non-zero notify at most 1.
  *
  * @return
  *   The previous event set.
  */
-uk_pollevent uk_pollq_set_n(struct uk_pollq *q, uk_pollevent set, int n);
+uk_pollevent uk_pollq_set_n(struct uk_pollq *q, uk_pollevent set, int one);
 
 /**
  * Update events, clearing those in `clr`.
@@ -598,39 +596,15 @@ uk_pollevent uk_pollq_clear(struct uk_pollq *q, uk_pollevent clr);
  *
  * @param q Target queue.
  * @param val New event set.
- * @param n Maximum number of threads to wake up. If < 0 wake up all threads.
- *   Chained updates have their own defined notification semantics and may
- *   notify more threads than specified in `n`
+ * @param one If zero, notify all waiting threads, if non-zero notify at most 1.
  *
  * @return
  *   The previous event set.
  */
-uk_pollevent uk_pollq_assign_n(struct uk_pollq *q, uk_pollevent val, int n);
+uk_pollevent uk_pollq_assign_n(struct uk_pollq *q, uk_pollevent val, int one);
 
-#define UK_POLLQ_NOTIFY_ALL -1
+#define uk_pollq_set(q, s) uk_pollq_set_n(q, s, 0)
 
-/**
- * Update events, setting those in `set` and handling notifications.
- *
- * @param q Target queue.
- * @param set Events to set.
- *
- * @return
- *   The previous event set.
- */
-#define uk_pollq_set(q, s) uk_pollq_set_n(q, s, UK_POLLQ_NOTIFY_ALL)
-
-/**
- * Replace the events in `q` with `val` and handle notifications.
- *
- * Only available on level-triggered queues.
- *
- * @param q Target queue.
- * @param val New event set.
- *
- * @return
- *   The previous event set.
- */
-#define uk_pollq_assign(q, s) uk_pollq_assign_n(q, s, UK_POLLQ_NOTIFY_ALL)
+#define uk_pollq_assign(q, s) uk_pollq_assign_n(q, s, 0)
 
 #endif /* __UKFILE_POLLQUEUE_H__ */
