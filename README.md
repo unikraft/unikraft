@@ -281,7 +281,7 @@ The Unikraft name, logo and its mascot are trademark of [Unikraft GmbH](https://
   </picture>
 	&nbsp;&nbsp;&nbsp;
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://xenproject.org/wp-content/uploads/sites/79/2018/09/logo_xenproject.png">
+    <source media="(prefers-color-scheme: dark)" srcset="https://xenproject.org/img/logo-xen-reverse.svg">
     <img alt="XenProject logo" src="https://downloads.xenproject.org/Branding/Logos/Green+Black/xen_project_logo_dualcolor_767x319.png" width="18%">
   </picture>
 </div>
