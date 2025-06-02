@@ -205,6 +205,13 @@ struct uk_signal_tdesc {
 	struct uk_semaphore pending_semaphore;
 };
 
+/* System error descriptor passed to handler */
+struct sys_error_desc {
+	int signum;
+	__uptr auxsp;
+	__vaddr_t vaddr;
+};
+
 /* Allocate signal descriptor of a posix process */
 int pprocess_signal_pdesc_alloc(struct posix_process *proc);
 

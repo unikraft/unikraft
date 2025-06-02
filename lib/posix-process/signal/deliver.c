@@ -367,3 +367,62 @@ static void uk_signal_deliver(struct uk_syscall_exit_ctx *exit_ctx)
 }
 
 uk_syscall_exittab_prio(uk_signal_deliver, UK_PRIO_BEFORE(UK_PRIO_LATEST));
+
+/* We land here from the trap handler that executes in exception context.
+ * Once we return, the trampoline will pass control back to the application.
+ */
+void sys_error_handler(struct ukarch_execenv *ee __unused, long arg)
+{
+	struct ukarch_auxspcb *auxspcb;
+	struct sys_error_desc *error;
+	struct posix_thread *pthread;
+	struct posix_process *pproc;
+	struct uk_signal sig = {0};
+
+	/* Now we can enable IRQs */
+	ukplat_lcpu_enable_irq();
+
+	/* Get arg */
+	error = (struct sys_error_desc *)arg;
+	UK_ASSERT(error);
+
+	/* Switch to uk sysregs */
+	auxspcb = ukarch_auxsp_get_cb(error->auxsp);
+	ukarch_sysctx_load(&auxspcb->uksysctx);
+
+	/* Derive current process and thread */
+	pproc = uk_pprocess_current();
+	UK_ASSERT(pproc);
+
+	pthread = uk_pthread_current();
+	UK_ASSERT(pthread);
+
+	/* If there's a SIGKILL pending, kill the process right away */
+	if (IS_PENDING(pproc->signal->sigqueue, SIGKILL)) {
+		uk_sigact_term(SIGKILL);
+		UK_BUG(); /* noreturn */
+	}
+
+	/* If the application masks or ignores this signal, panic.
+	 * A general-purpose OS would terminate the application.
+	 * Being a unikernel, we treat this as a non-recoverable
+	 * error instead.
+	 */
+	if (!pprocess_signal_is_deliverable(pthread, error->signum))
+		goto err_panic;
+
+	if (KERN_SIGACTION(pproc, error->signum)->ks_handler == SIG_DFL)
+		goto err_panic;
+
+	/* Prepare siginfo */
+	set_siginfo_kill(error->signum, &sig.siginfo);
+
+	/* Execute standard delivery path */
+	do_deliver(pthread, &sig, ee);
+
+	return;
+
+err_panic:
+	/* FIXME: Cascading faulting */
+	UK_CRASH("Cannot deliver SIGSEGV for pf at 0x%lx\n", error->vaddr);
+}
