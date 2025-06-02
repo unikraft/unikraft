@@ -4,7 +4,9 @@
  * You may not use this file except in compliance with the License.
  */
 
+#include <uk/arch/ctx.h>
 #include <uk/essentials.h>
+#include <uk/plat/config.h>
 #include <uk/prio.h>
 #include <uk/process.h>
 #include <uk/syscall.h>
@@ -14,10 +16,30 @@
 #include "signal.h"
 #include "siginfo.h"
 
-/* asm */
-void pprocess_signal_call_handler_with_stack(int signum, siginfo_t *si,
-					     ucontext_t *ctx, void *handler,
-					     void *sp);
+struct pprocess_signal_handler_ctx {
+	void *handler_fn;
+	void *handler_sp;
+	siginfo_t *siginfo;
+	ucontext_t *ucontext;
+	int signo;
+} __packed;
+
+UK_CTASSERT(__offsetof(struct pprocess_signal_handler_ctx, handler_fn) ==
+	    PPROCESS_SIGHNDL_CTX_FN_OFFS);
+UK_CTASSERT(__offsetof(struct pprocess_signal_handler_ctx, handler_sp) ==
+	    PPROCESS_SIGHNDL_CTX_SP_OFFS);
+UK_CTASSERT(__offsetof(struct pprocess_signal_handler_ctx, signo) ==
+	    PPROCESS_SIGHNDL_CTX_SN_OFFS);
+UK_CTASSERT(__offsetof(struct pprocess_signal_handler_ctx, siginfo) ==
+	    PPROCESS_SIGHNDL_CTX_SI_OFFS);
+UK_CTASSERT(__offsetof(struct pprocess_signal_handler_ctx, ucontext) ==
+	    PPROCESS_SIGHNDL_CTX_UC_OFFS);
+
+/* Notice: We implement this in pure asm, as there is a number of issues
+ *         with correctly preserving context in inline asm.
+ */
+void pprocess_signal_jmp_handler(struct pprocess_signal_handler_ctx *h,
+				 struct ukarch_execenv *execenv);
 
 static void uk_sigact_term(int __unused sig)
 {
@@ -67,40 +89,21 @@ bool pprocess_signal_is_deliverable(struct posix_thread *pthread, int signum)
 	return (!IS_MASKED(pthread, signum) && !IS_IGNORED(proc, signum));
 }
 
-/* Switches to application context and jumps to handler.
- * Restores uk context on return.
- */
-static
-void jmp_handler(struct ukarch_execenv *execenv, int signum, siginfo_t *si,
-		 ucontext_t *ctx, void *handler, void *sp)
-{
-	struct ukarch_sysctx uk_sysctx;
-
-	ukarch_sysctx_store(&uk_sysctx);
-	ukarch_sysctx_load(&execenv->sysctx);
-
-	/* Notice: We implement this trampoline in asm as there is a ton of
-	 *         challenges involved with correctly preserving context
-	 *         with inline asm.
-	 */
-	pprocess_signal_call_handler_with_stack(signum, si, ctx, handler, sp);
-
-	ukarch_sysctx_load(&uk_sysctx);
-}
-
 static void handle_self(struct uk_signal *sig, const struct kern_sigaction *ks,
 			struct ukarch_execenv *execenv)
 {
-	ucontext_t ucontext __maybe_unused;
+	struct pprocess_signal_handler_ctx handler_ctx;
+	ucontext_t ucontext;
 	struct posix_process *this_process;
-	struct ukarch_auxspcb *auxspcb;
-	__uptr fp, saved_fp;
 	stack_t *altstack;
 	__uptr ulsp;
 
 	UK_ASSERT(sig);
 	UK_ASSERT(ks);
 	UK_ASSERT(execenv);
+
+	/* We expect to be operating on the aux stack */
+	UK_ASSERT(SP_IN_AUXSP(ukarch_read_sp(), ukplat_lcpu_get_auxsp()));
 
 	this_process = uk_pprocess_current();
 	UK_ASSERT(this_process);
@@ -116,7 +119,6 @@ static void handle_self(struct uk_signal *sig, const struct kern_sigaction *ks,
 	 * while we are executing on it, neither sigaction() modifies
 	 * sa_flags->SA_ONSTACK.
 	 */
-
 	if ((ks->ks_flags & SA_ONSTACK) && !(altstack->ss_flags & SS_DISABLE)) {
 		UK_ASSERT(altstack->ss_sp);
 		UK_ASSERT(!(altstack->ss_flags & SS_ONSTACK));
@@ -133,43 +135,23 @@ static void handle_self(struct uk_signal *sig, const struct kern_sigaction *ks,
 		uk_pr_debug("Using the application stack @ 0x%lx\n", ulsp);
 	}
 
-	/* Signal handlers can make syscalls, that can invoke signal handlers,
-	 * that can make syscalls, and so on. We need to support nesting.
-	 * Since on syscall entry we switch to the auxsp, nested syscalls will
-	 * corrupt the previous syscall's stack. To avoid that from happening,
-	 * save the base auxsp of this syscall. Once the handler returns we will
-	 * restore the original value. Moreover, prepare a new base auxsp for
-	 * the nested syscall based on the current (aligned) value of the auxsp.
-	 */
-
-	/* Assuming that we are operating on the auxsp and that
-	 * the sp has moved down since entry, align down to
-	 * UKARCH_AUXSP_ALIGN so that a nested syscall finds the
-	 * auxsp aligned. Make sure we reserve enough space for
-	 * pprocess_signal_arch_jmp_handler() to save our general
-	 * purpose registers before we jump to the application
-	 * handler.
-	 */
-	auxspcb = ukarch_auxsp_get_cb(uk_thread_current()->auxsp);
-	saved_fp = ukarch_auxspcb_get_curr_fp(auxspcb);
-
-	fp = ALIGN_DOWN(ukarch_read_sp(), UKARCH_AUXSP_ALIGN);
-	ukarch_auxspcb_set_curr_fp(auxspcb, fp);
+	handler_ctx.handler_fn = ks->ks_handler;
+	handler_ctx.handler_sp = (void *)ulsp;
+	handler_ctx.signo = sig->siginfo.si_signo;
 
 	if (ks->ks_flags & SA_SIGINFO) {
+		handler_ctx.siginfo = &sig->siginfo;
+		handler_ctx.ucontext = &ucontext;
+
 		pprocess_signal_arch_set_ucontext(execenv, &ucontext);
-		jmp_handler(execenv, sig->siginfo.si_signo,
-			    &sig->siginfo, &ucontext,
-			    ks->ks_handler, (void *)ulsp);
+		pprocess_signal_jmp_handler(&handler_ctx, execenv);
 		pprocess_signal_arch_get_ucontext(&ucontext, execenv);
 	} else {
-		jmp_handler(execenv, sig->siginfo.si_signo,
-			    NULL, NULL, ks->ks_handler,
-			    (void *)ulsp);
-	}
+		handler_ctx.siginfo = __NULL;
+		handler_ctx.ucontext = __NULL;
 
-	/* Restore the aux stack's fp */
-	ukarch_auxspcb_set_curr_fp(auxspcb, saved_fp);
+		pprocess_signal_jmp_handler(&handler_ctx, execenv);
+	}
 
 	if (ks->ks_flags & SA_ONSTACK) {
 		UK_ASSERT(altstack->ss_flags & SS_ONSTACK);
@@ -284,7 +266,7 @@ static int deliver_pending_proc(struct posix_process *proc,
 			if (IS_MASKED(thread, signum))
 				continue;
 
-			while ((sig = pprocess_signal_dequeue(proc, NULL,
+			while ((sig = pprocess_signal_dequeue(proc, __NULL,
 							      signum))) {
 				do_deliver(thread, sig, execenv);
 				uk_signal_free(proc->_a, sig);
@@ -299,7 +281,7 @@ static int deliver_pending_proc(struct posix_process *proc,
 			if (IS_MASKED(this_thread, signum))
 				continue;
 
-			while ((sig = pprocess_signal_dequeue(proc, NULL,
+			while ((sig = pprocess_signal_dequeue(proc, __NULL,
 							      signum))) {
 				do_deliver(this_thread, sig, execenv);
 				uk_signal_free(proc->_a, sig);

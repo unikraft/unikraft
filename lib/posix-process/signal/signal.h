@@ -7,6 +7,7 @@
 #ifndef __UK_PROCESS_SIGNAL_H__
 #define __UK_PROCESS_SIGNAL_H__
 
+#if !__ASSEMBLY__
 #include <limits.h>
 #include <signal.h>
 #include <stdbool.h>
@@ -24,9 +25,18 @@
 #if CONFIG_LIBPOSIX_PROCESS_SIGNALFD
 #include "signal_file.h"
 #endif /* CONFIG_LIBPOSIX_PROCESS_SIGNALFD */
+#endif /* __ASSEMBLY__ */
 
 #define SIG_ARRAY_COUNT		_NSIG /* SIGRTMAX + 1 */
 
+/* struct pprocess_signal_handler_ctx */
+#define	PPROCESS_SIGHNDL_CTX_FN_OFFS	 0/* handler_fn */
+#define	PPROCESS_SIGHNDL_CTX_SP_OFFS	 8/* handler_sp */
+#define	PPROCESS_SIGHNDL_CTX_SI_OFFS	16/* siginfo_t */
+#define	PPROCESS_SIGHNDL_CTX_UC_OFFS	24/* ucontext_t */
+#define	PPROCESS_SIGHNDL_CTX_SN_OFFS	32/* signum */
+
+#if !__ASSEMBLY__
 /* Check if signal number is valid */
 #define IS_VALID(_signum)						\
 	((_signum) > 0 && (_signum) <= SIGRTMAX)
@@ -91,7 +101,7 @@
  * passed to the sigaction() glibc wrapper.
  */
 struct kern_sigaction {
-	void (*ks_handler)(int signo);
+	void *ks_handler;
 	unsigned long ks_flags;
 	void (*ks_restorer)(void);
 	uk_sigset_t ks_mask;
@@ -366,4 +376,5 @@ bool pprocess_signal_should_drop(struct posix_process *pproc, int signum)
 
 #endif /* CONFIG_LIBPOSIX_PROCESS_MULTITHREADING */
 
+#endif /* !__ASSEMBLY__ */
 #endif /* __UK_PROCESS_SIGNAL_H__ */
