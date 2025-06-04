@@ -283,12 +283,12 @@ static inline unsigned long num_pages_to_order(unsigned long num_pages)
 	if (num_pages == 1)
 		return 0;
 
-	/* uk_flsl(num_pages - 1) returns log of the previous power of two
-	 * of num_pages. uk_flsl is called with `num_pages - 1` and not
+	/* uk_mssbl(num_pages - 1) returns log of the previous power of two
+	 * of num_pages. uk_mssbl is called with `num_pages - 1` and not
 	 * `num_pages` to handle the case where num_pages is already a power
 	 * of two.
 	 */
-	return uk_flsl(num_pages - 1) + 1;
+	return uk_mssbl(num_pages - 1) + 1;
 }
 
 /*********************

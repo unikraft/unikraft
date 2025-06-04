@@ -31,12 +31,12 @@
 #define __UK_BITOPS_H__
 
 #define __UKARCH_BITOPS_H__
-#include <uk/asm/bitops.h>
 
 #include <sys/param.h>
 #include <errno.h>
 #include <uk/essentials.h>
 #include <uk/bitcount.h>
+#include <uk/bitops/bitscan.h>
 #include <uk/arch/lcpu.h>
 #include <uk/atomic.h>
 
@@ -73,14 +73,6 @@ extern "C" {
 #define	uk_hweight64(x)	uk_bitcount64(x)
 #define	uk_hweight_long(x)	uk_bitcountl(x)
 
-#if 0 /* TODO revisit when needed */
-static inline int
-fls64(__u64 mask)
-{
-	return flsll(mask);
-}
-#endif
-
 static inline __u32
 uk_ror32(__u32 word, unsigned int shift)
 {
@@ -91,7 +83,7 @@ static inline int uk_get_count_order(unsigned int count)
 {
 	int order;
 
-	order = uk_fls(count);
+	order = uk_mssb(count);
 	if (count & (count - 1))
 		order++;
 	return order;
@@ -107,12 +99,12 @@ uk_find_first_bit(const unsigned long *addr, unsigned long size)
 		size -= UK_BITS_PER_LONG, bit += UK_BITS_PER_LONG, addr++) {
 		if (*addr == 0)
 			continue;
-		return (bit + uk_ffsl(*addr));
+		return (bit + uk_lssbl(*addr));
 	}
 	if (size) {
 		mask = (*addr) & UK_BITMAP_LAST_WORD_MASK(size);
 		if (mask)
-			bit += uk_ffsl(mask);
+			bit += uk_lssbl(mask);
 		else
 			bit += size;
 	}
@@ -129,12 +121,12 @@ uk_find_first_zero_bit(const unsigned long *addr, unsigned long size)
 		size -= UK_BITS_PER_LONG, bit += UK_BITS_PER_LONG, addr++) {
 		if (~(*addr) == 0)
 			continue;
-		return (bit + uk_ffsl(~(*addr)));
+		return (bit + uk_lssbl(~(*addr)));
 	}
 	if (size) {
 		mask = ~(*addr) & UK_BITMAP_LAST_WORD_MASK(size);
 		if (mask)
-			bit += uk_ffsl(mask);
+			bit += uk_lssbl(mask);
 		else
 			bit += size;
 	}
@@ -156,13 +148,13 @@ uk_find_last_bit(const unsigned long *addr, unsigned long size)
 	if (offs) {
 		mask = (*addr) & UK_BITMAP_LAST_WORD_MASK(offs);
 		if (mask)
-			return (bit + uk_flsl(mask));
+			return (bit + uk_mssbl(mask));
 	}
 	while (pos--) {
 		addr--;
 		bit -= UK_BITS_PER_LONG;
 		if (*addr)
-			return (bit + uk_flsl(*addr));
+			return (bit + uk_mssbl(*addr));
 	}
 	return (size);
 }
@@ -185,7 +177,7 @@ uk_find_next_bit(const unsigned long *addr, unsigned long size,
 	if (offs) {
 		mask = (*addr) & ~UK_BITMAP_LAST_WORD_MASK(offs);
 		if (mask)
-			return (bit + uk_ffsl(mask));
+			return (bit + uk_lssbl(mask));
 		if (size - bit <= UK_BITS_PER_LONG)
 			return (size);
 		bit += UK_BITS_PER_LONG;
@@ -195,12 +187,12 @@ uk_find_next_bit(const unsigned long *addr, unsigned long size,
 		size -= UK_BITS_PER_LONG, bit += UK_BITS_PER_LONG, addr++) {
 		if (*addr == 0)
 			continue;
-		return (bit + uk_ffsl(*addr));
+		return (bit + uk_lssbl(*addr));
 	}
 	if (size) {
 		mask = (*addr) & UK_BITMAP_LAST_WORD_MASK(size);
 		if (mask)
-			bit += uk_ffsl(mask);
+			bit += uk_lssbl(mask);
 		else
 			bit += size;
 	}
@@ -225,7 +217,7 @@ uk_find_next_zero_bit(const unsigned long *addr, unsigned long size,
 	if (offs) {
 		mask = ~(*addr) & ~UK_BITMAP_LAST_WORD_MASK(offs);
 		if (mask)
-			return (bit + uk_ffsl(mask));
+			return (bit + uk_lssbl(mask));
 		if (size - bit <= UK_BITS_PER_LONG)
 			return (size);
 		bit += UK_BITS_PER_LONG;
@@ -235,12 +227,12 @@ uk_find_next_zero_bit(const unsigned long *addr, unsigned long size,
 		size -= UK_BITS_PER_LONG, bit += UK_BITS_PER_LONG, addr++) {
 		if (~(*addr) == 0)
 			continue;
-		return (bit + uk_ffsl(~(*addr)));
+		return (bit + uk_lssbl(~(*addr)));
 	}
 	if (size) {
 		mask = ~(*addr) & UK_BITMAP_LAST_WORD_MASK(size);
 		if (mask)
-			bit += uk_ffsl(mask);
+			bit += uk_lssbl(mask);
 		else
 			bit += size;
 	}

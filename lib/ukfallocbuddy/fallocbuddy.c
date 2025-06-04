@@ -692,7 +692,7 @@ static inline struct bfa_memblock *bfa_fl_pop_mb(struct buddy_framealloc *bfa,
 
 	// TODO: This should call a generic
 	/* Find smallest free list that is not empty */
-	lvl = uk_ffs(map);
+	lvl = uk_lssb(map);
 	UK_ASSERT(lvl < BFA_LEVELS);
 
 	mb = uk_list_first_entry(&bfa->free_list[lvl],
@@ -731,7 +731,7 @@ bfa_fl_find_mb_in_zone(struct buddy_framealloc *bfa, struct bfa_zone *zone,
 
 	while (map) {
 		/* Find largest free list that is not empty */
-		lvl = uk_fls(map);
+		lvl = uk_mssb(map);
 		UK_ASSERT(lvl < BFA_LEVELS);
 
 		size = BFA_Lx_SIZE(lvl);
@@ -827,7 +827,7 @@ bfa_fl_find_mb_in_range(struct buddy_framealloc *bfa, unsigned int *level,
 
 	while (map) {
 		/* Find smallest free list that is not empty */
-		lvl = uk_ffs(map);
+		lvl = uk_lssb(map);
 		UK_ASSERT(lvl < BFA_LEVELS);
 
 		size = BFA_Lx_SIZE(lvl);
@@ -886,7 +886,7 @@ static inline int bfa_largest_level(__paddr_t paddr, __sz len)
 	paddr |= BFA_Lx_SIZE(BFA_LEVELS - 1);
 
 	/* We compute the maximum level according to the alignment */
-	lvl = bfa_order_to_lvl(uk_ffsl(paddr));
+	lvl = bfa_order_to_lvl(uk_lssbl(paddr));
 
 	/* Now reduce the level until the length fits */
 	while (BFA_Lx_SIZE(lvl) > len) {
@@ -911,7 +911,7 @@ static inline int bfa_largest_level_strong(__paddr_t paddr, __sz len)
 	/* Limit bit scan to BFA_LEVELS - 1 at most */
 	value |= BFA_Lx_SIZE(BFA_LEVELS - 1);
 
-	return bfa_order_to_lvl(uk_ffsl(value));
+	return bfa_order_to_lvl(uk_lssbl(value));
 }
 
 static void bfa_fl_addmem(struct buddy_framealloc *bfa, struct bfa_zone *zone,
@@ -1126,7 +1126,7 @@ static int bfa_do_alloc_any(struct buddy_framealloc *bfa, __paddr_t *paddr,
 	 * where len is already a power of two. If lvl is greater than
 	 * BFA_LEVELS - 1 the request exceeds the maximum allocation size.
 	 */
-	to_lvl = bfa_order_to_lvl(uk_flsl(len - 1) + 1);
+	to_lvl = bfa_order_to_lvl(uk_mssbl(len - 1) + 1);
 	if (unlikely(to_lvl >= BFA_LEVELS))
 		return -ENOMEM;
 
@@ -1241,7 +1241,7 @@ static int bfa_do_alloc_any_in_range(struct buddy_framealloc *bfa,
 	 * where len is already a power of two. If lvl is greater than
 	 * BFA_LEVELS - 1 the request exceeds the maximum allocation size.
 	 */
-	to_lvl = bfa_order_to_lvl(uk_flsl(len - 1) + 1);
+	to_lvl = bfa_order_to_lvl(uk_mssbl(len - 1) + 1);
 	if (unlikely(to_lvl >= BFA_LEVELS))
 		return -ENOMEM;
 
