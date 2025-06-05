@@ -54,4 +54,71 @@ size_t uk_fs_path_sep(const char *path, size_t len)
 	return (size_t)(p - path);
 }
 
+/* Return tuple type combining a string length and position */
+struct uk_fs_poslen {
+	size_t pos;
+	size_t len;
+};
+
+/**
+ * Find path length and position of first separator (if any) in a single pass.
+ *
+ * If `ignore_lead` is non-zero, ignore any number of leading separators.
+ *
+ * @return
+ *  .len = length of string `path`; same as reported by `strlen()`
+ *  .pos = posision of first matching separator, or == .len if none found
+ */
+static inline
+struct uk_fs_poslen uk_fs_path_len_lead(const char *path, int ignore_lead)
+{
+	size_t pos = 0;
+	size_t len = 0;
+
+	if (ignore_lead)
+		while (path[len] == '/')
+			len++;
+	while (path[len]) {
+		if (path[len] == '/')
+			pos = len + 1;
+		len++;
+	}
+	return (struct uk_fs_poslen){
+		.pos = pos ? pos - 1 : len,
+		.len = len
+	};
+}
+
+/**
+ * Find path length and position of last separator (if any) in a single pass.
+ *
+ * If `ignore_trail` is non-zero, ignore any number of trailing separators up to
+ * a bare "/" path.
+ *
+ * @return
+ *  .len = length of string `path`; same as reported by `strlen()`
+ *  .pos = posision of last matching separator, or == .len if none found
+ */
+static inline
+struct uk_fs_poslen uk_fs_path_len_trail(const char *path, int ignore_trail)
+{
+	size_t pos = 0;
+	size_t len;
+
+	for (len = 0; path[len]; len++)
+		if (path[len] == '/')
+			pos = len + 1;
+	if (ignore_trail && len > 1 && pos == len) {
+		size_t tmp = len - 1;
+
+		while (tmp && path[tmp] == '/')
+			tmp--;
+		len = tmp + 1;
+		pos = tmp;
+		while (pos && path[pos - 1] != '/')
+			pos--;
+	}
+	return (struct uk_fs_poslen){pos, len};
+}
+
 #endif /* __UKFS_FS_PATHUTIL_H__ */
