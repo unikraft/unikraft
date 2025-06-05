@@ -5,7 +5,7 @@ config LIBUKCPIO
 	# additional options todo with automatically mounting the desired
 	# filesystem and also initializing it (in the case of ramfs) with
 	# ukcpio.
-	depends on LIBVFSCORE
+	depends on HAVE_VFS
 	select LIBNOLIBC if !HAVE_LIBC
 	select LIBSYSCALL_SHIM
 	default n
