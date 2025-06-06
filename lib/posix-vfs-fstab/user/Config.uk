@@ -1,0 +1,460 @@
+### User-provided fstab detailed config
+
+if LIBPOSIX_VFS_FSTAB
+
+if LIBPOSIX_VFS_FSTAB_USER
+
+config LIBPOSIX_VFS_FSTAB_USER_SIZE
+	int "Maximum number of entries"
+	default 8
+	range 1 255
+	help
+	  Maximum number of volumes read from the vfs.fstab argument.
+
+config LIBPOSIX_VFS_FSTAB_FALLBACK
+	bool "Fall-back entries (built-in, if user-provided is empty)"
+
+if LIBPOSIX_VFS_FSTAB_FALLBACK
+
+choice LIBPOSIX_VFS_FSTAB_FALLBACK_CONF
+	prompt "Configuration"
+	default LIBPOSIX_VFS_FSTAB_FALLBACK_CUSTOM
+
+config LIBPOSIX_VFS_FSTAB_FALLBACK_RAMFS
+	bool "RAMfs"
+	select LIBUKFS_RAMFS
+	help
+	  Mount empty RAMfs.
+
+config LIBPOSIX_VFS_FSTAB_FALLBACK_INITRD
+	bool "RAMfs + CPIO initrd"
+	select LIBUKFS_RAMFS
+	select LIBUKCPIO
+	help
+	  Extract a user-supplied initrd into an empty RAMfs.
+
+config LIBPOSIX_VFS_FSTAB_FALLBACK_EINITRD
+	bool "RAMfs + compiled-in CPIO initrd"
+	select LIBPOSIX_VFS_FSTAB_EINITRD
+	select LIBUKFS_RAMFS
+	select LIBUKCPIO
+	help
+	  Extract a compiled-in initrd into an empty RAMFS.
+
+config LIBPOSIX_VFS_FSTAB_FALLBACK_INITRD_EXTRACT
+	bool "CPIO initrd, extract only"
+	select LIBUKCPIO
+	help
+	  Extract a user-supplied initrd into an existing directory.
+
+config LIBPOSIX_VFS_FSTAB_FALLBACK_EINITRD_EXTRACT
+	bool "CPIO compiled-in initrd, extract only"
+	select LIBPOSIX_VFS_FSTAB_EINITRD
+	select LIBUKCPIO
+	help
+	  Extract a compiled-in initrd into an existing directory.
+
+config LIBPOSIX_VFS_FSTAB_FALLBACK_CUSTOM
+	bool "Custom"
+	help
+	  Custom fstab entries to be mounted in lieu of user-supplied.
+
+endchoice
+
+# Provide options for customization of the standard fallback fstab configs.
+if LIBPOSIX_VFS_FSTAB_BUILTIN && !LIBPOSIX_VFS_FSTAB_FALLBACK_CUSTOM
+
+config LIBPOSIX_VFS_FSTAB_FB_MP
+	string "Fallback mount point"
+	default "/"
+	help
+	  Path to mount the fallback fstab on.
+
+menu "Fallback mount options"
+
+config LIBPOSIX_VFS_FSTAB_FB_UKOPTS_MKMP
+	bool "mkmp - Create mountpoint"
+	default y if LIBPOSIX_VFS_FSTAB_FB_MP != "/"
+
+config LIBPOSIX_VFS_FSTAB_FB_UKOPTS_IFINITRD0
+	bool "ifinitrd0 - If 'initrd0' is present"
+
+config LIBPOSIX_VFS_FSTAB_FB_UKOPTS_IFNOINITRD0
+	bool "ifnoinitrd0 - If 'initrd0' is absent"
+
+endmenu
+
+endif # LIBPOSIX_VFS_FSTAB_BUILTIN && !LIBPOSIX_VFS_FSTAB_FALLBACK_CUSTOM
+
+if LIBPOSIX_VFS_FSTAB_FALLBACK_CUSTOM
+
+# *** Entry 0: ***
+comment "Entry 0:"
+
+config LIBPOSIX_VFS_FSTAB_FB0_DEV
+	string "Device"
+	help
+	  Device to mount the filesystem from. Depending on the selected
+	  filesystem, this option may not be required.
+
+config LIBPOSIX_VFS_FSTAB_FB0_MP
+	string "Mount point"
+	help
+	  The path to mount the filesystem on.
+
+config LIBPOSIX_VFS_FSTAB_FB0_DRIVER
+	string "Filesystem"
+	help
+	  The type of filesystem to mount.
+
+config LIBPOSIX_VFS_FSTAB_FB0_FLAGS
+	hex "Flags"
+	default 0x0
+	help
+	  Mount flags.
+
+config LIBPOSIX_VFS_FSTAB_FB0_OPTS
+	string "Options"
+	help
+	  Usually a comma-separated list of additional mount options that are
+	  directly interpreted by the target filesystem.
+
+menu "Entry options"
+
+config LIBPOSIX_VFS_FSTAB_FB0_UKOPTS_MKMP
+	bool "mkmp - Create mountpoint"
+
+config LIBPOSIX_VFS_FSTAB_FB0_UKOPTS_IFINITRD0
+	bool "ifinitrd0 - If 'initrd0' is present"
+
+config LIBPOSIX_VFS_FSTAB_FB0_UKOPTS_IFNOINITRD0
+	bool "ifnoinitrd0 - If 'initrd0' is absent"
+
+endmenu
+
+# *** Entry 1: ***
+if LIBPOSIX_VFS_FSTAB_FB0
+
+comment "Entry 1:"
+
+config LIBPOSIX_VFS_FSTAB_FB1_DEV
+	string "Device"
+	help
+	  Device to mount the filesystem from. Depending on the selected
+	  filesystem, this option may not be required.
+
+config LIBPOSIX_VFS_FSTAB_FB1_MP
+	string "Mount point"
+	help
+	  The path to mount the filesystem on.
+
+config LIBPOSIX_VFS_FSTAB_FB1_DRIVER
+	string "Filesystem"
+	help
+	  The type of filesystem to mount.
+
+config LIBPOSIX_VFS_FSTAB_FB1_FLAGS
+	hex "Flags"
+	default 0x0
+	help
+	  Mount flags.
+
+config LIBPOSIX_VFS_FSTAB_FB1_OPTS
+	string "Options"
+	help
+	  Usually a comma-separated list of additional mount options that are
+	  directly interpreted by the target filesystem.
+
+menu "Entry options"
+
+config LIBPOSIX_VFS_FSTAB_FB1_UKOPTS_MKMP
+	bool "mkmp - Create mountpoint"
+
+config LIBPOSIX_VFS_FSTAB_FB1_UKOPTS_IFINITRD0
+	bool "ifinitrd0 - If 'initrd0' is present"
+
+config LIBPOSIX_VFS_FSTAB_FB1_UKOPTS_IFNOINITRD0
+	bool "ifnoinitrd0 - If 'initrd0' is absent"
+
+endmenu
+
+endif # LIBPOSIX_VFS_FSTAB_FB0
+
+# *** Entry 2: ***
+if LIBPOSIX_VFS_FSTAB_FB1
+
+comment "Entry 2:"
+
+config LIBPOSIX_VFS_FSTAB_FB2_DEV
+	string "Device"
+	help
+	  Device to mount the filesystem from. Depending on the selected
+	  filesystem, this option may not be required.
+
+config LIBPOSIX_VFS_FSTAB_FB2_MP
+	string "Mount point"
+	help
+	  The path to mount the filesystem on.
+
+config LIBPOSIX_VFS_FSTAB_FB2_DRIVER
+	string "Filesystem"
+	help
+	  The type of filesystem to mount.
+
+config LIBPOSIX_VFS_FSTAB_FB2_FLAGS
+	hex "Flags"
+	default 0x0
+	help
+	  Mount flags.
+
+config LIBPOSIX_VFS_FSTAB_FB2_OPTS
+	string "Options"
+	help
+	  Usually a comma-separated list of additional mount options that are
+	  directly interpreted by the target filesystem.
+
+menu "Entry options"
+
+config LIBPOSIX_VFS_FSTAB_FB2_UKOPTS_MKMP
+	bool "mkmp - Create mountpoint"
+
+config LIBPOSIX_VFS_FSTAB_FB2_UKOPTS_IFINITRD0
+	bool "ifinitrd0 - If 'initrd0' is present"
+
+config LIBPOSIX_VFS_FSTAB_FB2_UKOPTS_IFNOINITRD0
+	bool "ifnoinitrd0 - If 'initrd0' is absent"
+
+endmenu
+
+endif # LIBPOSIX_VFS_FSTAB_FB1
+
+# *** Entry 3: ***
+if LIBPOSIX_VFS_FSTAB_FB2
+
+comment "Entry 3:"
+
+config LIBPOSIX_VFS_FSTAB_FB3_DEV
+	string "Device"
+	help
+	  Device to mount the filesystem from. Depending on the selected
+	  filesystem, this option may not be required.
+
+config LIBPOSIX_VFS_FSTAB_FB3_MP
+	string "Mount point"
+	help
+	  The path to mount the filesystem on.
+
+config LIBPOSIX_VFS_FSTAB_FB3_DRIVER
+	string "Filesystem"
+	help
+	  The type of filesystem to mount.
+
+config LIBPOSIX_VFS_FSTAB_FB3_FLAGS
+	hex "Flags"
+	default 0x0
+	help
+	  Mount flags.
+
+config LIBPOSIX_VFS_FSTAB_FB3_OPTS
+	string "Options"
+	help
+	  Usually a comma-separated list of additional mount options that are
+	  directly interpreted by the target filesystem.
+
+menu "Entry options"
+
+config LIBPOSIX_VFS_FSTAB_FB3_UKOPTS_MKMP
+	bool "mkmp - Create mountpoint"
+
+config LIBPOSIX_VFS_FSTAB_FB3_UKOPTS_IFINITRD0
+	bool "ifinitrd0 - If 'initrd0' is present"
+
+config LIBPOSIX_VFS_FSTAB_FB3_UKOPTS_IFNOINITRD0
+	bool "ifnoinitrd0 - If 'initrd0' is absent"
+
+endmenu
+
+endif # LIBPOSIX_VFS_FSTAB_FB2
+
+endif # LIBPOSIX_VFS_FSTAB_FALLBACK_CUSTOM
+
+# Invisible options that indicate if an entry was set
+config LIBPOSIX_VFS_FSTAB_FB0
+	bool
+	default y if LIBPOSIX_VFS_FSTAB_FB0_MP_ARG != ""
+
+config LIBPOSIX_VFS_FSTAB_FB1
+	bool
+	default y if LIBPOSIX_VFS_FSTAB_FB1_MP_ARG != ""
+
+config LIBPOSIX_VFS_FSTAB_FB2
+	bool
+	default y if LIBPOSIX_VFS_FSTAB_FB2_MP_ARG != ""
+
+config LIBPOSIX_VFS_FSTAB_FB3
+	bool
+	default y if LIBPOSIX_VFS_FSTAB_FB3_MP_ARG != ""
+
+# NOTE: We use invisible *_ARG values similar to builtin fstab
+
+# *** Entry 0: ***
+config LIBPOSIX_VFS_FSTAB_FB0_DEV_ARG
+	string
+	default LIBPOSIX_VFS_FSTAB_FB0_DEV if LIBPOSIX_VFS_FSTAB_FALLBACK_CUSTOM
+	default "initrd0" if LIBPOSIX_VFS_FSTAB_FALLBACK_INITRD_EXTRACT
+	default "embedded" if LIBPOSIX_VFS_FSTAB_FALLBACK_EINITRD_EXTRACT
+
+config LIBPOSIX_VFS_FSTAB_FB0_MP_ARG
+	string
+	default LIBPOSIX_VFS_FSTAB_FB0_MP if LIBPOSIX_VFS_FSTAB_FALLBACK_CUSTOM
+	default LIBPOSIX_VFS_FSTAB_FB_MP if LIBPOSIX_VFS_FSTAB_BUILTIN && !LIBPOSIX_VFS_FSTAB_FALLBACK_CUSTOM
+	default "/" if !LIBPOSIX_VFS_FSTAB_BUILTIN && LIBPOSIX_VFS_FSTAB_FALLBACK_RAMFS
+	default "/" if !LIBPOSIX_VFS_FSTAB_BUILTIN && LIBPOSIX_VFS_FSTAB_FALLBACK_INITRD
+	default "/" if !LIBPOSIX_VFS_FSTAB_BUILTIN && LIBPOSIX_VFS_FSTAB_FALLBACK_EINITRD
+
+config LIBPOSIX_VFS_FSTAB_FB0_DRIVER_ARG
+	string
+	default LIBPOSIX_VFS_FSTAB_FB0_DRIVER if LIBPOSIX_VFS_FSTAB_FALLBACK_CUSTOM
+	default "ramfs" if LIBPOSIX_VFS_FSTAB_FALLBACK_RAMFS
+	default "ramfs" if LIBPOSIX_VFS_FSTAB_FALLBACK_INITRD
+	default "ramfs" if LIBPOSIX_VFS_FSTAB_FALLBACK_EINITRD
+	default "extract" if LIBPOSIX_VFS_FSTAB_FALLBACK_INITRD_EXTRACT
+	default "extract" if LIBPOSIX_VFS_FSTAB_FALLBACK_EINITRD_EXTRACT
+
+config LIBPOSIX_VFS_FSTAB_FB0_FLAGS_ARG
+	hex
+	default 0x0
+	default LIBPOSIX_VFS_FSTAB_FB0_FLAGS if LIBPOSIX_VFS_FSTAB_FALLBACK_CUSTOM
+
+config LIBPOSIX_VFS_FSTAB_FB0_OPTS_ARG
+	string
+	default LIBPOSIX_VFS_FSTAB_FB0_OPTS if LIBPOSIX_VFS_FSTAB_FALLBACK_CUSTOM
+
+config LIBPOSIX_VFS_FSTAB_FB0_UKOPTS_MKMP_ARG
+	bool
+	default LIBPOSIX_VFS_FSTAB_FB0_UKOPTS_MKMP if LIBPOSIX_VFS_FSTAB_FALLBACK_CUSTOM
+	default LIBPOSIX_VFS_FSTAB_FB_UKOPTS_MKMP if LIBPOSIX_VFS_FSTAB_BUILTIN && !LIBPOSIX_VFS_FSTAB_FALLBACK_CUSTOM
+
+config LIBPOSIX_VFS_FSTAB_FB0_UKOPTS_IFINITRD0_ARG
+	bool
+	default LIBPOSIX_VFS_FSTAB_FB0_UKOPTS_IFINITRD0 if LIBPOSIX_VFS_FSTAB_FALLBACK_CUSTOM
+	default LIBPOSIX_VFS_FSTAB_FB_UKOPTS_IFINITRD0 if LIBPOSIX_VFS_FSTAB_BUILTIN && !LIBPOSIX_VFS_FSTAB_FALLBACK_CUSTOM
+
+config LIBPOSIX_VFS_FSTAB_FB0_UKOPTS_IFNOINITRD0_ARG
+	bool
+	default LIBPOSIX_VFS_FSTAB_FB0_UKOPTS_IFNOINITRD0 if LIBPOSIX_VFS_FSTAB_FALLBACK_CUSTOM
+	default LIBPOSIX_VFS_FSTAB_FB_UKOPTS_IFNOINITRD0 if LIBPOSIX_VFS_FSTAB_BUILTIN && !LIBPOSIX_VFS_FSTAB_FALLBACK_CUSTOM
+
+# *** Entry 1: ***
+config LIBPOSIX_VFS_FSTAB_FB1_DEV_ARG
+	string
+	default LIBPOSIX_VFS_FSTAB_FB1_DEV if LIBPOSIX_VFS_FSTAB_FALLBACK_CUSTOM
+	default "initrd0" if LIBPOSIX_VFS_FSTAB_FALLBACK_INITRD
+	default "embedded" if LIBPOSIX_VFS_FSTAB_FALLBACK_EINITRD
+
+config LIBPOSIX_VFS_FSTAB_FB1_MP_ARG
+	string
+	default LIBPOSIX_VFS_FSTAB_FB1_MP if LIBPOSIX_VFS_FSTAB_FALLBACK_CUSTOM
+	default LIBPOSIX_VFS_FSTAB_FB_MP if LIBPOSIX_VFS_FSTAB_FALLBACK_INITRD
+	default LIBPOSIX_VFS_FSTAB_FB_MP if LIBPOSIX_VFS_FSTAB_FALLBACK_EINITRD
+
+config LIBPOSIX_VFS_FSTAB_FB1_DRIVER_ARG
+	string
+	default LIBPOSIX_VFS_FSTAB_FB1_DRIVER if LIBPOSIX_VFS_FSTAB_FALLBACK_CUSTOM
+	default "extract" if LIBPOSIX_VFS_FSTAB_FALLBACK_INITRD
+	default "extract" if LIBPOSIX_VFS_FSTAB_FALLBACK_EINITRD
+
+config LIBPOSIX_VFS_FSTAB_FB1_FLAGS_ARG
+	hex
+	default 0x0
+	default LIBPOSIX_VFS_FSTAB_FB1_FLAGS if LIBPOSIX_VFS_FSTAB_FALLBACK_CUSTOM
+
+config LIBPOSIX_VFS_FSTAB_FB1_OPTS_ARG
+	string
+	default LIBPOSIX_VFS_FSTAB_FB1_OPTS if LIBPOSIX_VFS_FSTAB_FALLBACK_CUSTOM
+
+config LIBPOSIX_VFS_FSTAB_FB1_UKOPTS_MKMP_ARG
+	bool
+	default LIBPOSIX_VFS_FSTAB_FB1_UKOPTS_MKMP if LIBPOSIX_VFS_FSTAB_FALLBACK_CUSTOM
+
+config LIBPOSIX_VFS_FSTAB_FB1_UKOPTS_IFINITRD0_ARG
+	bool
+	default LIBPOSIX_VFS_FSTAB_FB1_UKOPTS_IFINITRD0 if LIBPOSIX_VFS_FSTAB_FALLBACK_CUSTOM
+
+config LIBPOSIX_VFS_FSTAB_FB1_UKOPTS_IFNOINITRD0_ARG
+	bool
+	default LIBPOSIX_VFS_FSTAB_FB1_UKOPTS_IFNOINITRD0 if LIBPOSIX_VFS_FSTAB_FALLBACK_CUSTOM
+
+# *** Entry 2: ***
+config LIBPOSIX_VFS_FSTAB_FB2_DEV_ARG
+	string
+	default LIBPOSIX_VFS_FSTAB_FB2_DEV if LIBPOSIX_VFS_FSTAB_FALLBACK_CUSTOM
+
+config LIBPOSIX_VFS_FSTAB_FB2_MP_ARG
+	string
+	default LIBPOSIX_VFS_FSTAB_FB2_MP if LIBPOSIX_VFS_FSTAB_FALLBACK_CUSTOM
+
+config LIBPOSIX_VFS_FSTAB_FB2_DRIVER_ARG
+	string
+	default LIBPOSIX_VFS_FSTAB_FB2_DRIVER if LIBPOSIX_VFS_FSTAB_FALLBACK_CUSTOM
+
+config LIBPOSIX_VFS_FSTAB_FB2_FLAGS_ARG
+	hex
+	default 0x0
+	default LIBPOSIX_VFS_FSTAB_FB2_FLAGS if LIBPOSIX_VFS_FSTAB_FALLBACK_CUSTOM
+
+config LIBPOSIX_VFS_FSTAB_FB2_OPTS_ARG
+	string
+	default LIBPOSIX_VFS_FSTAB_FB2_OPTS if LIBPOSIX_VFS_FSTAB_FALLBACK_CUSTOM
+
+config LIBPOSIX_VFS_FSTAB_FB2_UKOPTS_MKMP_ARG
+	bool
+	default LIBPOSIX_VFS_FSTAB_FB2_UKOPTS_MKMP if LIBPOSIX_VFS_FSTAB_FALLBACK_CUSTOM
+
+config LIBPOSIX_VFS_FSTAB_FB2_UKOPTS_IFINITRD0_ARG
+	bool
+	default LIBPOSIX_VFS_FSTAB_FB2_UKOPTS_IFINITRD0 if LIBPOSIX_VFS_FSTAB_FALLBACK_CUSTOM
+
+config LIBPOSIX_VFS_FSTAB_FB2_UKOPTS_IFNOINITRD0_ARG
+	bool
+	default LIBPOSIX_VFS_FSTAB_FB2_UKOPTS_IFNOINITRD0 if LIBPOSIX_VFS_FSTAB_FALLBACK_CUSTOM
+
+# *** Entry 3: ***
+config LIBPOSIX_VFS_FSTAB_FB3_DEV_ARG
+	string
+	default LIBPOSIX_VFS_FSTAB_FB3_DEV if LIBPOSIX_VFS_FSTAB_FALLBACK_CUSTOM
+
+config LIBPOSIX_VFS_FSTAB_FB3_MP_ARG
+	string
+	default LIBPOSIX_VFS_FSTAB_FB3_MP if LIBPOSIX_VFS_FSTAB_FALLBACK_CUSTOM
+
+config LIBPOSIX_VFS_FSTAB_FB3_DRIVER_ARG
+	string
+	default LIBPOSIX_VFS_FSTAB_FB3_DRIVER if LIBPOSIX_VFS_FSTAB_FALLBACK_CUSTOM
+
+config LIBPOSIX_VFS_FSTAB_FB3_FLAGS_ARG
+	hex
+	default 0x0
+	default LIBPOSIX_VFS_FSTAB_FB3_FLAGS if LIBPOSIX_VFS_FSTAB_FALLBACK_CUSTOM
+
+config LIBPOSIX_VFS_FSTAB_FB3_OPTS_ARG
+	string
+	default LIBPOSIX_VFS_FSTAB_FB3_OPTS if LIBPOSIX_VFS_FSTAB_FALLBACK_CUSTOM
+
+config LIBPOSIX_VFS_FSTAB_FB3_UKOPTS_MKMP_ARG
+	bool
+	default LIBPOSIX_VFS_FSTAB_FB3_UKOPTS_MKMP if LIBPOSIX_VFS_FSTAB_FALLBACK_CUSTOM
+
+config LIBPOSIX_VFS_FSTAB_FB3_UKOPTS_IFINITRD0_ARG
+	bool
+	default LIBPOSIX_VFS_FSTAB_FB3_UKOPTS_IFINITRD0 if LIBPOSIX_VFS_FSTAB_FALLBACK_CUSTOM
+
+config LIBPOSIX_VFS_FSTAB_FB3_UKOPTS_IFNOINITRD0_ARG
+	bool
+	default LIBPOSIX_VFS_FSTAB_FB3_UKOPTS_IFNOINITRD0 if LIBPOSIX_VFS_FSTAB_FALLBACK_CUSTOM
+
+endif # LIBPOSIX_VFS_FSTAB_FALLBACK
+
+endif # LIBPOSIX_VFS_FSTAB_USER
+
+endif # LIBPOSIX_VFS_FSTAB

@@ -1,0 +1,49 @@
+menuconfig LIBPOSIX_VFS_FSTAB
+	bool "posix-vfs-fstab: Mount filesystems at boot"
+	select LIBPOSIX_VFS
+
+if LIBPOSIX_VFS_FSTAB
+
+# Invisible option to enable fstab parsing at boot
+config LIBPOSIX_VFS_FSTAB_INIT
+	bool
+	select LIBPOSIX_VFS_MOUNT_CLEANUP
+
+config LIBPOSIX_VFS_FSTAB_BUILTIN
+	bool "Built-in filesystem table (up to 4 entries, earliest priority)"
+	select LIBPOSIX_VFS_FSTAB_INIT
+	help
+		Mount volumes early in boot.
+
+source "$(shell,$(UK_BASE)/support/build/config-submenu.sh -q -o '$(KCONFIG_DIR)/posix-vfs-fstab-builtin.uk' -l '$(KCONFIG_LIB_BASE)/posix-vfs-fstab/builtin')"
+
+config LIBPOSIX_VFS_FSTAB_USER
+	bool "User-provided filesystem table (kernel parameter)"
+	select LIBPOSIX_VFS_FSTAB_INIT
+	select LIBUKLIBPARAM
+	select LIBUKARGPARSE
+	help
+	  These volumes are parsed from a command-line argument:
+	  vfs.fstab=[
+	    "<dev>:<mntpoint>:<fsdriver>[:<flags>[:<opts>[:<ukopt>]]]"
+	    "<dev>:<mntpoint>:<fsdriver>[:<flags>[:<opts>[:<ukopt>]]]"
+	    ...
+	  ]
+	  The list elements are to be separated by whitespace.
+
+source "$(shell,$(UK_BASE)/support/build/config-submenu.sh -q -o '$(KCONFIG_DIR)/posix-vfs-fstab-user.uk' -l '$(KCONFIG_LIB_BASE)/posix-vfs-fstab/user')"
+
+config LIBPOSIX_VFS_FSTAB_EINITRD
+	bool "Embed initrd in unikernel"
+
+if LIBPOSIX_VFS_FSTAB_EINITRD
+
+config LIBPOSIX_VFS_FSTAB_EINITRD_PATH
+	string "Path to embedded initrd (fully qualified)"
+	default "$(UK_APP)/initrd.cpio"
+	help
+	  Path of a CPIO file to be embedded in the unikernel image as initrd.
+
+endif
+
+endif # LIBPOSIX_VFS_FSTAB

@@ -1,0 +1,405 @@
+### Built-in fstab detailed config
+
+if LIBPOSIX_VFS_FSTAB
+
+if LIBPOSIX_VFS_FSTAB_BUILTIN
+
+choice LIBPOSIX_VFS_FSTAB_BUILTIN_CONF
+	prompt "Configuration"
+	default LIBPOSIX_VFS_FSTAB_BUILTIN_CUSTOM
+
+config LIBPOSIX_VFS_FSTAB_BUILTIN_RAMFS
+	bool "RAMfs"
+	select LIBUKFS_RAMFS
+	help
+	  Mount empty RAMfs at /.
+
+config LIBPOSIX_VFS_FSTAB_BUILTIN_INITRD
+	bool "RAMfs + CPIO initrd"
+	select LIBUKFS_RAMFS
+	select LIBUKCPIO
+	help
+	  Extract a user-supplied initrd into an empty RAMfs mounted at /.
+
+config LIBPOSIX_VFS_FSTAB_BUILTIN_EINITRD
+	bool "RAMfs + compiled-in CPIO initrd"
+	select LIBPOSIX_VFS_FSTAB_EINITRD
+	select LIBUKFS_RAMFS
+	select LIBUKCPIO
+	help
+	  Extract a compiled-in initrd into an empty RAMFS mounted at /.
+
+config LIBPOSIX_VFS_FSTAB_BUILTIN_CUSTOM
+	bool "Custom"
+	help
+	  Custom fstab entries to be mounted early in boot.
+
+endchoice
+
+if LIBPOSIX_VFS_FSTAB_BUILTIN_CUSTOM
+
+# *** Entry 0: ***
+comment "Entry 0:"
+
+config LIBPOSIX_VFS_FSTAB_BI0_DEV
+	string "Device"
+	help
+	  Device to mount the filesystem from. Depending on the selected
+	  filesystem, this option may not be required.
+
+config LIBPOSIX_VFS_FSTAB_BI0_MP
+	string "Mount point"
+	help
+	  The path to mount the filesystem on.
+
+config LIBPOSIX_VFS_FSTAB_BI0_DRIVER
+	string "Filesystem"
+	help
+	  The type of filesystem to mount.
+
+config LIBPOSIX_VFS_FSTAB_BI0_FLAGS
+	hex "Flags"
+	default 0x0
+	help
+	  Mount flags.
+
+config LIBPOSIX_VFS_FSTAB_BI0_OPTS
+	string "Options"
+	help
+	  Usually a comma-separated list of additional mount options that are
+	  directly interpreted by the target filesystem.
+
+menu "Entry options"
+
+config LIBPOSIX_VFS_FSTAB_BI0_UKOPTS_MKMP
+	bool "mkmp - Create mountpoint"
+
+config LIBPOSIX_VFS_FSTAB_BI0_UKOPTS_IFINITRD0
+	bool "ifinitrd0 - If 'initrd0' is present"
+
+config LIBPOSIX_VFS_FSTAB_BI0_UKOPTS_IFNOINITRD0
+	bool "ifnoinitrd0 - If 'initrd0' is absent"
+
+endmenu
+
+# *** Entry 1: ***
+if LIBPOSIX_VFS_FSTAB_BI0
+
+comment "Entry 1:"
+
+config LIBPOSIX_VFS_FSTAB_BI1_DEV
+	string "Device"
+	help
+	  Device to mount the filesystem from. Depending on the selected
+	  filesystem, this option may not be required.
+
+config LIBPOSIX_VFS_FSTAB_BI1_MP
+	string "Mount point"
+	help
+	  The path to mount the filesystem on.
+
+config LIBPOSIX_VFS_FSTAB_BI1_DRIVER
+	string "Filesystem"
+	help
+	  The type of filesystem to mount.
+
+config LIBPOSIX_VFS_FSTAB_BI1_FLAGS
+	hex "Flags"
+	default 0x0
+	help
+	  Mount flags.
+
+config LIBPOSIX_VFS_FSTAB_BI1_OPTS
+	string "Options"
+	help
+	  Usually a comma-separated list of additional mount options that are
+	  directly interpreted by the target filesystem.
+
+menu "Entry options"
+
+config LIBPOSIX_VFS_FSTAB_BI1_UKOPTS_MKMP
+	bool "mkmp - Create mountpoint"
+
+config LIBPOSIX_VFS_FSTAB_BI1_UKOPTS_IFINITRD0
+	bool "ifinitrd0 - If 'initrd0' is present"
+
+config LIBPOSIX_VFS_FSTAB_BI1_UKOPTS_IFNOINITRD0
+	bool "ifnoinitrd0 - If 'initrd0' is absent"
+
+endmenu
+
+endif # LIBPOSIX_VFS_FSTAB_BI0
+
+# *** Entry 2: ***
+if LIBPOSIX_VFS_FSTAB_BI1
+
+comment "Entry 2:"
+
+config LIBPOSIX_VFS_FSTAB_BI2_DEV
+	string "Device"
+	help
+	  Device to mount the filesystem from. Depending on the selected
+	  filesystem, this option may not be required.
+
+config LIBPOSIX_VFS_FSTAB_BI2_MP
+	string "Mount point"
+	help
+	  The path to mount the filesystem on.
+
+config LIBPOSIX_VFS_FSTAB_BI2_DRIVER
+	string "Filesystem"
+	help
+	  The type of filesystem to mount.
+
+config LIBPOSIX_VFS_FSTAB_BI2_FLAGS
+	hex "Flags"
+	default 0x0
+	help
+	  Mount flags.
+
+config LIBPOSIX_VFS_FSTAB_BI2_OPTS
+	string "Options"
+	help
+	  Usually a comma-separated list of additional mount options that are
+	  directly interpreted by the target filesystem.
+
+menu "Entry options"
+
+config LIBPOSIX_VFS_FSTAB_BI2_UKOPTS_MKMP
+	bool "mkmp - Create mountpoint"
+
+config LIBPOSIX_VFS_FSTAB_BI2_UKOPTS_IFINITRD0
+	bool "ifinitrd0 - If 'initrd0' is present"
+
+config LIBPOSIX_VFS_FSTAB_BI2_UKOPTS_IFNOINITRD0
+	bool "ifnoinitrd0 - If 'initrd0' is absent"
+
+endmenu
+
+endif # LIBPOSIX_VFS_FSTAB_BI1
+
+# *** Entry 3: ***
+if LIBPOSIX_VFS_FSTAB_BI2
+
+comment "Entry 3:"
+
+config LIBPOSIX_VFS_FSTAB_BI3_DEV
+	string "Device"
+	help
+	  Device to mount the filesystem from. Depending on the selected
+	  filesystem, this option may not be required.
+
+config LIBPOSIX_VFS_FSTAB_BI3_MP
+	string "Mount point"
+	help
+	  The path to mount the filesystem on.
+
+config LIBPOSIX_VFS_FSTAB_BI3_DRIVER
+	string "Filesystem"
+	help
+	  The type of filesystem to mount.
+
+config LIBPOSIX_VFS_FSTAB_BI3_FLAGS
+	hex "Flags"
+	default 0x0
+	help
+	  Mount flags.
+
+config LIBPOSIX_VFS_FSTAB_BI3_OPTS
+	string "Options"
+	help
+	  Usually a comma-separated list of additional mount options that are
+	  directly interpreted by the target filesystem.
+
+menu "Entry options"
+
+config LIBPOSIX_VFS_FSTAB_BI3_UKOPTS_MKMP
+	bool "mkmp - Create mountpoint"
+
+config LIBPOSIX_VFS_FSTAB_BI3_UKOPTS_IFINITRD0
+	bool "ifinitrd0 - If 'initrd0' is present"
+
+config LIBPOSIX_VFS_FSTAB_BI3_UKOPTS_IFNOINITRD0
+	bool "ifnoinitrd0 - If 'initrd0' is absent"
+
+endmenu
+
+endif # LIBPOSIX_VFS_FSTAB_BI2
+
+endif # LIBPOSIX_VFS_FSTAB_BUILTIN_CUSTOM
+
+# Invisible options that indicate if an entry was set
+config LIBPOSIX_VFS_FSTAB_BI0
+	bool
+	default y if LIBPOSIX_VFS_FSTAB_BI0_MP_ARG != ""
+
+config LIBPOSIX_VFS_FSTAB_BI1
+	bool
+	default y if LIBPOSIX_VFS_FSTAB_BI1_MP_ARG != ""
+
+config LIBPOSIX_VFS_FSTAB_BI2
+	bool
+	default y if LIBPOSIX_VFS_FSTAB_BI2_MP_ARG != ""
+
+config LIBPOSIX_VFS_FSTAB_BI3
+	bool
+	default y if LIBPOSIX_VFS_FSTAB_BI3_MP_ARG != ""
+
+# NOTE:
+# In the following, we take over setting into invisible *_ARG depending on
+# configuration. This is done to avoid conflicts of values set differently
+# between configuration changes.
+# We are making use here of invisible configurations that are not loaded from
+# `.config`. We can use them to pick the actual values we want to have.
+
+# *** Entry 0: ***
+config LIBPOSIX_VFS_FSTAB_BI0_DEV_ARG
+	string
+	default LIBPOSIX_VFS_FSTAB_BI0_DEV if LIBPOSIX_VFS_FSTAB_BUILTIN_CUSTOM
+
+config LIBPOSIX_VFS_FSTAB_BI0_MP_ARG
+	string
+	default LIBPOSIX_VFS_FSTAB_BI0_MP if LIBPOSIX_VFS_FSTAB_BUILTIN_CUSTOM
+	default "/" if LIBPOSIX_VFS_FSTAB_BUILTIN_RAMFS
+	default "/" if LIBPOSIX_VFS_FSTAB_BUILTIN_INITRD
+	default "/" if LIBPOSIX_VFS_FSTAB_BUILTIN_EINITRD
+
+config LIBPOSIX_VFS_FSTAB_BI0_DRIVER_ARG
+	string
+	default LIBPOSIX_VFS_FSTAB_BI0_DRIVER if LIBPOSIX_VFS_FSTAB_BUILTIN_CUSTOM
+	default "ramfs" if LIBPOSIX_VFS_FSTAB_BUILTIN_RAMFS
+	default "ramfs" if LIBPOSIX_VFS_FSTAB_BUILTIN_INITRD
+	default "ramfs" if LIBPOSIX_VFS_FSTAB_BUILTIN_EINITRD
+
+config LIBPOSIX_VFS_FSTAB_BI0_FLAGS_ARG
+	hex
+	default 0x0
+	default LIBPOSIX_VFS_FSTAB_BI0_FLAGS if LIBPOSIX_VFS_FSTAB_BUILTIN_CUSTOM
+
+config LIBPOSIX_VFS_FSTAB_BI0_OPTS_ARG
+	string
+	default LIBPOSIX_VFS_FSTAB_BI0_OPTS if LIBPOSIX_VFS_FSTAB_BUILTIN_CUSTOM
+
+config LIBPOSIX_VFS_FSTAB_BI0_UKOPTS_MKMP_ARG
+	bool
+	default LIBPOSIX_VFS_FSTAB_BI0_UKOPTS_MKMP if LIBPOSIX_VFS_FSTAB_BUILTIN_CUSTOM
+
+config LIBPOSIX_VFS_FSTAB_BI0_UKOPTS_IFINITRD0_ARG
+	bool
+	default LIBPOSIX_VFS_FSTAB_BI0_UKOPTS_IFINITRD0 if LIBPOSIX_VFS_FSTAB_BUILTIN_CUSTOM
+
+config LIBPOSIX_VFS_FSTAB_BI0_UKOPTS_IFNOINITRD0_ARG
+	bool
+	default LIBPOSIX_VFS_FSTAB_BI0_UKOPTS_IFNOINITRD0 if LIBPOSIX_VFS_FSTAB_BUILTIN_CUSTOM
+
+# *** Entry 1: ***
+config LIBPOSIX_VFS_FSTAB_BI1_DEV_ARG
+	string
+	default LIBPOSIX_VFS_FSTAB_BI1_DEV if LIBPOSIX_VFS_FSTAB_BUILTIN_CUSTOM
+	default "initrd0" if LIBPOSIX_VFS_FSTAB_BUILTIN_INITRD
+	default "embedded" if LIBPOSIX_VFS_FSTAB_BUILTIN_EINITRD
+
+config LIBPOSIX_VFS_FSTAB_BI1_MP_ARG
+	string
+	default LIBPOSIX_VFS_FSTAB_BI1_MP if LIBPOSIX_VFS_FSTAB_BUILTIN_CUSTOM
+	default "/" if LIBPOSIX_VFS_FSTAB_BUILTIN_INITRD
+	default "/" if LIBPOSIX_VFS_FSTAB_BUILTIN_EINITRD
+
+config LIBPOSIX_VFS_FSTAB_BI1_DRIVER_ARG
+	string
+	default LIBPOSIX_VFS_FSTAB_BI1_DRIVER if LIBPOSIX_VFS_FSTAB_BUILTIN_CUSTOM
+	default "extract" if LIBPOSIX_VFS_FSTAB_BUILTIN_INITRD
+	default "extract" if LIBPOSIX_VFS_FSTAB_BUILTIN_EINITRD
+
+config LIBPOSIX_VFS_FSTAB_BI1_FLAGS_ARG
+	hex
+	default 0x0
+	default LIBPOSIX_VFS_FSTAB_BI1_FLAGS if LIBPOSIX_VFS_FSTAB_BUILTIN_CUSTOM
+
+config LIBPOSIX_VFS_FSTAB_BI1_OPTS_ARG
+	string
+	default LIBPOSIX_VFS_FSTAB_BI1_OPTS if LIBPOSIX_VFS_FSTAB_BUILTIN_CUSTOM
+
+config LIBPOSIX_VFS_FSTAB_BI1_UKOPTS_MKMP_ARG
+	bool
+	default LIBPOSIX_VFS_FSTAB_BI1_UKOPTS_MKMP if LIBPOSIX_VFS_FSTAB_BUILTIN_CUSTOM
+
+config LIBPOSIX_VFS_FSTAB_BI1_UKOPTS_IFINITRD0_ARG
+	bool
+	default LIBPOSIX_VFS_FSTAB_BI1_UKOPTS_IFINITRD0 if LIBPOSIX_VFS_FSTAB_BUILTIN_CUSTOM
+
+config LIBPOSIX_VFS_FSTAB_BI1_UKOPTS_IFNOINITRD0_ARG
+	bool
+	default LIBPOSIX_VFS_FSTAB_BI1_UKOPTS_IFNOINITRD0 if LIBPOSIX_VFS_FSTAB_BUILTIN_CUSTOM
+
+# *** Entry 2: ***
+config LIBPOSIX_VFS_FSTAB_BI2_DEV_ARG
+	string
+	default LIBPOSIX_VFS_FSTAB_BI2_DEV if LIBPOSIX_VFS_FSTAB_BUILTIN_CUSTOM
+
+config LIBPOSIX_VFS_FSTAB_BI2_MP_ARG
+	string
+	default LIBPOSIX_VFS_FSTAB_BI2_MP if LIBPOSIX_VFS_FSTAB_BUILTIN_CUSTOM
+
+config LIBPOSIX_VFS_FSTAB_BI2_DRIVER_ARG
+	string
+	default LIBPOSIX_VFS_FSTAB_BI2_DRIVER if LIBPOSIX_VFS_FSTAB_BUILTIN_CUSTOM
+
+config LIBPOSIX_VFS_FSTAB_BI2_FLAGS_ARG
+	hex
+	default 0x0
+	default LIBPOSIX_VFS_FSTAB_BI2_FLAGS if LIBPOSIX_VFS_FSTAB_BUILTIN_CUSTOM
+
+config LIBPOSIX_VFS_FSTAB_BI2_OPTS_ARG
+	string
+	default LIBPOSIX_VFS_FSTAB_BI2_OPTS if LIBPOSIX_VFS_FSTAB_BUILTIN_CUSTOM
+
+config LIBPOSIX_VFS_FSTAB_BI2_UKOPTS_MKMP_ARG
+	bool
+	default LIBPOSIX_VFS_FSTAB_BI2_UKOPTS_MKMP if LIBPOSIX_VFS_FSTAB_BUILTIN_CUSTOM
+
+config LIBPOSIX_VFS_FSTAB_BI2_UKOPTS_IFINITRD0_ARG
+	bool
+	default LIBPOSIX_VFS_FSTAB_BI2_UKOPTS_IFINITRD0 if LIBPOSIX_VFS_FSTAB_BUILTIN_CUSTOM
+
+config LIBPOSIX_VFS_FSTAB_BI2_UKOPTS_IFNOINITRD0_ARG
+	bool
+	default LIBPOSIX_VFS_FSTAB_BI2_UKOPTS_IFNOINITRD0 if LIBPOSIX_VFS_FSTAB_BUILTIN_CUSTOM
+
+# *** Entry 3: ***
+config LIBPOSIX_VFS_FSTAB_BI3_DEV_ARG
+	string
+	default LIBPOSIX_VFS_FSTAB_BI3_DEV if LIBPOSIX_VFS_FSTAB_BUILTIN_CUSTOM
+
+config LIBPOSIX_VFS_FSTAB_BI3_MP_ARG
+	string
+	default LIBPOSIX_VFS_FSTAB_BI3_MP if LIBPOSIX_VFS_FSTAB_BUILTIN_CUSTOM
+
+config LIBPOSIX_VFS_FSTAB_BI3_DRIVER_ARG
+	string
+	default LIBPOSIX_VFS_FSTAB_BI3_DRIVER if LIBPOSIX_VFS_FSTAB_BUILTIN_CUSTOM
+
+config LIBPOSIX_VFS_FSTAB_BI3_FLAGS_ARG
+	hex
+	default 0x0
+	default LIBPOSIX_VFS_FSTAB_BI3_FLAGS if LIBPOSIX_VFS_FSTAB_BUILTIN_CUSTOM
+
+config LIBPOSIX_VFS_FSTAB_BI3_OPTS_ARG
+	string
+	default LIBPOSIX_VFS_FSTAB_BI3_OPTS if LIBPOSIX_VFS_FSTAB_BUILTIN_CUSTOM
+
+config LIBPOSIX_VFS_FSTAB_BI3_UKOPTS_MKMP_ARG
+	bool
+	default LIBPOSIX_VFS_FSTAB_BI3_UKOPTS_MKMP if LIBPOSIX_VFS_FSTAB_BUILTIN_CUSTOM
+
+config LIBPOSIX_VFS_FSTAB_BI3_UKOPTS_IFINITRD0_ARG
+	bool
+	default LIBPOSIX_VFS_FSTAB_BI3_UKOPTS_IFINITRD0 if LIBPOSIX_VFS_FSTAB_BUILTIN_CUSTOM
+
+config LIBPOSIX_VFS_FSTAB_BI3_UKOPTS_IFNOINITRD0_ARG
+	bool
+	default LIBPOSIX_VFS_FSTAB_BI3_UKOPTS_IFNOINITRD0 if LIBPOSIX_VFS_FSTAB_BUILTIN_CUSTOM
+
+endif # LIBPOSIX_VFS_FSTAB_BUILTIN
+
+endif # LIBPOSIX_VFS_FSTAB
