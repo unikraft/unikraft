@@ -204,7 +204,7 @@ int do_init(int argc, char *argv[])
 		bytes = read(sigfd, &info, sizeof(info));
 		if (bytes != sizeof(info)) {
 			uk_pr_err("Read from signalfd failed\n");
-			goto err_close_signalfd;
+			goto out;
 		}
 
 		if (info.ssi_signo == SIGCHLD) {
@@ -219,7 +219,7 @@ int do_init(int argc, char *argv[])
 
 			if (ret == -1 && errno == ECHILD) {
 				uk_pr_info("All children terminated. Initiating shutdown...\n");
-				break;
+				goto out;
 			}
 		} else if (info.ssi_signo == SIGTERM) {
 			uk_pr_info("Received SIGTERM. Initiating shutdown...\n");
@@ -231,7 +231,7 @@ int do_init(int argc, char *argv[])
 	graceful_shutdown(sigfd);
 #endif /* CONFIG_LIBUKBOOT_GRACEFUL_SHUTDOWN */
 
-err_close_signalfd:
+out:
 	/* If the application is still running, set the error code to SIGKILL
 	 * to signify it was (actually, will be) force-killed. Return back to
 	 * Unikraft to terminate all remaining processes and shut down the
