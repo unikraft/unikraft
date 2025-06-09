@@ -95,6 +95,7 @@
 #define APIC_ICR_DMODE_NMI		(4 << 8)
 #define APIC_ICR_DMODE_INIT		(5 << 8)
 #define APIC_ICR_DMODE_SUP		(6 << 8)
+#define APIC_ICR_DMODE_EXTINT		(7 << 8)
 
 #define APIC_ICR_DESTMODE_PHYSICAL	0
 #define APIC_ICR_DESTMODE_LOGICAL	(1 << 11)

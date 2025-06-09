@@ -50,6 +50,8 @@ int uk_intctlr_probe(void)
 
 #if CONFIG_LIBUKINTCTLR_APIC
 	apic_enable();
+	/* Enable routing PIC interrupts. */
+	apic_enable_extint();
 	intctlr.name = "APIC";
 #else /* ! CONFIG_LIBUKINTCTLR_APIC */
 	intctlr.name = "PIC";

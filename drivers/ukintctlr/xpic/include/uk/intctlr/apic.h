@@ -78,6 +78,11 @@ static inline int x2apic_enable(void)
 	return 0;
 }
 
+static inline void x2apic_enable_extint(void)
+{
+	wrmsr(APIC_MSR_LVT_LINT0, APIC_ICR_DMODE_EXTINT, 0);
+}
+
 static inline void x2apic_send_ipi(int irqno, int dest)
 {
 	__u32 eax;
@@ -150,6 +155,7 @@ static inline void x2apic_ack_interrupt(void)
 
 /* We only support x2APIC at the moment */
 #define apic_enable		x2apic_enable
+#define apic_enable_extint	x2apic_enable_extint
 #define apic_send_ipi		x2apic_send_ipi
 #define apic_send_nmi		x2apic_send_nmi
 #define apic_send_sipi		x2apic_send_sipi
