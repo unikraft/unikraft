@@ -1,0 +1,14 @@
+$(eval $(call addlib_s,libprocfs,$(CONFIG_LIBPROCFS)))
+
+CINCLUDES-y += -I$(LIBPROCFS_BASE)/include/
+
+#LIBPROCFS_SRCS-y += $(LIBPROCFS_BASE)/device.c
+LIBPROCFS_SRCS-y += $(LIBPROCFS_BASE)/procfs_vnops.c
+LIBPROCFS_SRCS-y += $(LIBPROCFS_BASE)/proc.c
+LIBPROCFS_SRCS-y += $(LIBPROCFS_BASE)/version.c
+LIBPROCFS_SRCS-y += $(LIBPROCFS_BASE)/cmdline.c
+LIBPROCFS_SRCS-y += $(LIBPROCFS_BASE)/mounts.c
+LIBPROCFS_SRCS-y += $(LIBPROCFS_BASE)/filesystems.c
+LIBPROCFS_SRCS-y += $(LIBPROCFS_BASE)/proc_folder.c
+LIBPROCFS_SRCS-y += $(LIBPROCFS_BASE)/self.c
+LIBPROCFS_SRCS-y += $(LIBPROCFS_BASE)/sys_folder.c

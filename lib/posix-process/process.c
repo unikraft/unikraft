@@ -113,6 +113,34 @@ static void release_tid(pid_t tid)
 	uk_clear_bit(tid, tid_map);
 }
 
+#include <procfs/proc.h>
+#ifdef CONFIG_LIBPROCFS_CMDLINE
+#include <uk/store.h>
+#include <stdlib.h>
+#include <uk/boot/store.h>
+#include <stdio.h>
+static int get_cur_proc(void *cookie __unused, char **out)
+{
+	*out = malloc(10);
+	if (*out == NULL)
+		return -ENOMEM;
+	struct posix_thread *pthread = pthread_self;
+	struct posix_process *pprocess = pthread->process;
+	int u = snprintf(*out, 10, "%d", (int)pprocess->pid);
+	if (u < 0 || u >= 10) {
+		free(*out);
+		return -ENOMEM;
+	}
+	(*out)[u] = '\0';
+	uk_pr_debug("Current process PID: %s\n", *out);
+
+	return 0;
+}
+
+UK_STORE_STATIC_ENTRY(0x1, uk_cur_proc_global, charp, get_cur_proc, NULL);
+#endif /* CONFIG_LIBPROCFS_CMDLINE */
+
+
 /* Allocate a thread for a process */
 static struct posix_thread *pprocess_create_pthread(
 			struct posix_process *pprocess, struct uk_thread *th)
@@ -262,6 +290,9 @@ int uk_posix_process_create(struct uk_alloc *a,
 	uk_pr_debug("Process PID %d created (parent PID: %d)\n",
 		    (int) pprocess->pid,
 		    (int) ((pprocess->parent) ? pprocess->parent->pid : 0));
+#ifdef CONFIG_LIBPROCFS_PROC_FOLDER
+	procfs_register_proc_folder(pprocess->pid);
+#endif /* CONFIG_LIBPROCFS_PROC_FOLDER */
 	return 0;
 
 err_free_pprocess:
@@ -449,6 +480,7 @@ static int posix_thread_init(struct uk_thread *child, struct uk_thread *parent)
 	uk_pr_debug("thread %p (%s): New thread with TID: %d (PID: %d)\n",
 		    child, child->name, (int) pthread->tid,
 		    (int) pthread->process->pid);
+		
 	return 0;
 }
 

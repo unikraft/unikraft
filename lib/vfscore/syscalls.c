@@ -1275,11 +1275,6 @@ sys_readlink(char *path, char *buf, size_t bufsize, ssize_t *size)
 		return (error);
 	}
 
-	if (dp->d_vnode->v_type != VLNK) {
-		drele(dp);
-		drele(ddp);
-		return (EINVAL);
-	}
 	vec.iov_base	= buf;
 	vec.iov_len	= bufsize;
 
@@ -1291,7 +1286,10 @@ sys_readlink(char *path, char *buf, size_t bufsize, ssize_t *size)
 
 	vp = dp->d_vnode;
 	vn_lock(vp);
-	error = VOP_READLINK(vp, &uio);
+	if(vp->v_type == VLNK)
+		error = VOP_READLINK(vp, &uio);
+	else
+		error = VOP_READ(vp, NULL, &uio, 0);
 	vn_unlock(vp);
 
 	drele(dp);

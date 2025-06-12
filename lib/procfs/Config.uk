@@ -1,0 +1,42 @@
+menuconfig LIBPROCFS
+	bool "procfs: Proc filesystem"
+	default n
+	select LIBVFSCORE
+	select UKSTORE
+
+if LIBPROCFS
+	config LIBPROCFS_AUTOMOUNT
+	bool "Mount /proc during boot"
+	default n
+
+	config LIBPROCFS_VERSION
+		bool "Add /proc/version file"
+		default n
+
+	config LIBPROCFS_CMDLINE
+		bool "Add /proc/cmdline file"
+		default n
+
+	config LIBPROCFS_FILESYSTEMS
+		bool "Add /proc/filesystem file"
+		default n
+
+	config LIBPROCFS_MOUNTS
+		bool "Add /proc/mounts file"
+		default n
+
+	config LIBPROCFS_PROC_FOLDER
+		bool "Add /proc/PID folder"
+		default n
+
+if LIBPROCFS_PROC_FOLDER
+	config LIBPROCFS_SELF_LINK
+		bool "Add /proc/self symbolic link"
+		default n
+endif
+
+	config LIBPROCFS_SYS_FOLDER
+		bool "Add /proc/sys folder"
+		default n
+
+endif

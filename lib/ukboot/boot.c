@@ -110,6 +110,33 @@
 extern char **boot_argv;
 extern int boot_argc;
 
+#ifdef CONFIG_LIBPROCFS_CMDLINE
+#include <uk/store.h>
+#include <stdlib.h>
+#include <uk/boot/store.h>
+
+static int get_cmdline(void *cookie __unused, char **out)
+{
+	size_t len = 13;
+	for (int i = 0; i < boot_argc; i++){
+		len += strlen(boot_argv[i]); /* +1 for space or null terminator */
+		if (i < boot_argc - 1)
+			len++; /* +1 for space */}
+	*out = malloc(len);
+	if (*out == NULL)
+		return -ENOMEM;
+	strcpy(*out, "BOOT_IMAGE=/");
+	for (int i = 0; i < boot_argc; i++) {
+		strcat(*out, boot_argv[i]);
+		if (i < boot_argc - 1)
+			strcat(*out, " ");
+	}
+	return 0;
+}
+
+UK_STORE_STATIC_ENTRY(UK_BOOT_CMDLINE, uk_cmdline_global, charp, get_cmdline, NULL);
+#endif /* CONFIG_LIBPROCFS_CMDLINE */
+
 int main(int argc, char *argv[]) __weak;
 static inline int do_main(int argc, char *argv[]);
 
