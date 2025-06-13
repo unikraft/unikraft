@@ -33,6 +33,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <stdbool.h>
 #include <uk/arch/ctx.h>
 #include <uk/arch/lcpu.h>
 #include <uk/arch/types.h>
@@ -50,6 +51,46 @@ enum x86_save_method {
 	X86_SAVE_XSAVE,
 	X86_SAVE_XSAVEOPT
 };
+
+struct x86_fsave_ctx {
+	__u8 state[108];
+} __packed;
+
+struct x86_fxsave_ctx {
+	__u8 state[416];
+	__u8 avail[96];
+} __packed __align(16);
+
+struct x86_xsave_hdr {
+#define X86_XSAVE_HDR_XSTATE_BV_X87F			(1UL <<  0)
+#define X86_XSAVE_HDR_XSTATE_BV_SSEF			(1UL <<  1)
+#define X86_XSAVE_HDR_XSTATE_BV_AVXF			(1UL <<  2)
+	__u64 xstate_bv;
+#define X86_XSAVE_HDR_XCOMP_BV_COMPF			(1UL << 63)
+	__u64 xcomp_bv;
+	/* Bytes 63:16 of the XSAVE header are reserved */
+	__u8 rsvd[48];
+} __packed;
+
+struct x86_xsave_ctx {
+	/* x87 state comprises bytes 23:0 and bytes 159:32 */
+	__u8 x87_state1[24];
+	__u32 mxcsr;
+	__u32 mxcsr_mask;
+	__u8 x87_state2[128];
+	/* SSE state comprises bytes 31:24 and bytes 415:160 */
+	__u8 sse_state[256];
+	__u8 avail[96];
+	struct x86_xsave_hdr xsave_hdr;
+	/*
+	 * AVX state comprises bytes 831:576, after the XSAVE header,
+	 * at the beginning of the extended xsave area.
+	 *
+	 * AVX state has 256 bytes: 127:0 for YMM0_H–YMM7_H and 255:128
+	 * for YMM8_H–YMM15_H.
+	 */
+	__u8 avx_state[256];
+} __packed __align(64);
 
 static enum x86_save_method ectx_method;
 static __sz ectx_size;
@@ -77,16 +118,20 @@ static void _init_ectx_store(void)
 		}
 		ukarch_x86_cpuid(0xd, 0, &eax, &ebx, &ecx, &edx);
 		ectx_size = ebx;
-		ectx_align = 64;
+		ectx_align = __alignof(struct x86_xsave_ctx);
+
+		UK_ASSERT(ectx_size == sizeof(struct x86_xsave_ctx) ||
+			  ectx_size == __offsetof(struct x86_xsave_ctx,
+						  avx_state));
 	} else if (edx & X86_CPUID1_EDX_FXSR) {
 		ectx_method = X86_SAVE_FXSAVE;
-		ectx_size = 512;
-		ectx_align = 16;
+		ectx_size = sizeof(struct x86_fxsave_ctx);
+		ectx_align = __alignof(struct x86_fxsave_ctx);
 		uk_pr_debug("Load/store of extended CPU state: FXSAVE\n");
 	} else {
 		ectx_method = X86_SAVE_FSAVE;
-		ectx_size = 108;
-		ectx_align = 1;
+		ectx_size = sizeof(struct x86_fsave_ctx);
+		ectx_align = __alignof(struct x86_fsave_ctx);
 		uk_pr_debug("Load/store of extended CPU state: FSAVE\n");
 	}
 
@@ -202,7 +247,117 @@ void ukarch_ectx_load(struct ukarch_ectx *state)
 	}
 }
 
-#ifdef CONFIG_ARCH_X86_64
+static inline int x86_xsave_substate_memcmp(const struct x86_xsave_ctx *ctx1,
+					    const struct x86_xsave_ctx *ctx2,
+					    __u64 substate)
+{
+	int rc;
+
+	switch (substate) {
+	case X86_XSAVE_HDR_XSTATE_BV_X87F:
+		if ((rc = memcmp_isr(ctx1->x87_state1, ctx2->x87_state1,
+				     sizeof(ctx1->x87_state1))) ||
+		    (rc = memcmp_isr(ctx1->x87_state2, ctx2->x87_state2,
+				     sizeof(ctx1->x87_state2)))) {
+			uk_pr_debug("x87 state differs!\n");
+			return rc;
+		}
+		break;
+	case X86_XSAVE_HDR_XSTATE_BV_SSEF:
+		if ((rc = memcmp_isr(ctx1->sse_state, ctx2->sse_state,
+				     sizeof(ctx1->sse_state)))) {
+			uk_pr_debug("SSE state differs!\n");
+			return rc;
+		}
+		break;
+	case X86_XSAVE_HDR_XSTATE_BV_AVXF:
+		if ((rc = memcmp_isr(ctx1->avx_state, ctx2->avx_state,
+				     sizeof(ctx1->avx_state)))) {
+			uk_pr_debug("AVX state differs!\n");
+			return rc;
+		}
+		break;
+	default:
+		UK_CRASH("Unknown XSAVE substate: %lu\n", substate);
+	}
+
+	return 0;
+}
+
+static inline bool mem_iszero(const void *mem, __sz len)
+{
+	for (__sz i = 0; i < len; i++)
+		if (((const __u8 *)mem)[i] != 0)
+			return false;
+
+	return true;
+}
+
+/*
+ * Check if a state component has the initial values defined by the
+ * architecture (all zeroes).
+ */
+static inline bool x86_xsave_substate_isinit(const struct x86_xsave_ctx *ctx,
+					     __u64 substate)
+{
+	switch (substate) {
+	case X86_XSAVE_HDR_XSTATE_BV_X87F:
+		return mem_iszero(ctx->x87_state1, sizeof(ctx->x87_state1)) &&
+		       mem_iszero(ctx->x87_state2, sizeof(ctx->x87_state2));
+	case X86_XSAVE_HDR_XSTATE_BV_SSEF:
+		return mem_iszero(ctx->sse_state, sizeof(ctx->sse_state));
+	case X86_XSAVE_HDR_XSTATE_BV_AVXF:
+		return mem_iszero(ctx->avx_state, sizeof(ctx->avx_state));
+	default:
+		UK_CRASH("Unknown XSAVE substate: %lu\n", substate);
+	}
+}
+
+static inline bool x86_xsave_mxcsr_iseq(const struct x86_xsave_ctx *ctx1,
+					const struct x86_xsave_ctx *ctx2)
+{
+	/*
+	 * Bytes 27:24 of XSAVE area are for the MXCSR register which is
+	 * loaded regardless of XSTATE_BV bitmap, so check unconditionally.
+	 */
+	return ctx1->mxcsr == ctx2->mxcsr;
+}
+
+static bool x86_xsave_substate_iseq(const struct x86_xsave_ctx *ctx1,
+				    const struct x86_xsave_ctx *ctx2,
+				    __u64 substate)
+{
+	__u64 ctx1_bitf, ctx2_bitf;
+
+	ctx1_bitf = ctx1->xsave_hdr.xstate_bv & substate;
+	ctx2_bitf = ctx2->xsave_hdr.xstate_bv & substate;
+
+	if (!ctx1_bitf && !ctx2_bitf)
+		return true;
+
+	if (ctx1_bitf != ctx2_bitf)
+		return x86_xsave_substate_isinit(ctx1_bitf ? ctx1 : ctx2,
+						 substate);
+
+	return x86_xsave_substate_memcmp(ctx1, ctx2, substate) == 0;
+}
+
+static inline bool x86_xsave_hdr_isvalid(const struct x86_xsave_ctx *ctx)
+{
+	const __u64 xhdr_supp_mask = X86_XSAVE_HDR_XSTATE_BV_X87F |
+				     X86_XSAVE_HDR_XSTATE_BV_SSEF |
+				     X86_XSAVE_HDR_XSTATE_BV_AVXF;
+	const struct x86_xsave_hdr *xhdr = &ctx->xsave_hdr;
+
+	/*
+	 * It is impossible for XCOMP_BV[63] to be set since we do not
+	 * use XSAVEC.
+	 */
+	return xhdr->xcomp_bv == 0 &&
+	       (xhdr->xstate_bv & ~xhdr_supp_mask) == 0 &&
+	       mem_iszero(xhdr->rsvd, sizeof(xhdr->rsvd));
+}
+
 void ukarch_ectx_assert_equal(struct ukarch_ectx *state)
 {
 	__u8 ectxbuf[ectx_size + ectx_align];
@@ -212,19 +367,76 @@ void ukarch_ectx_assert_equal(struct ukarch_ectx *state)
 	current = (struct ukarch_ectx *)ALIGN_UP((__uptr)ectxbuf, ectx_align);
 	ukarch_ectx_init(current);
 
-	if (memcmp_isr(current, state, ectx_size) != 0) {
-		uk_pr_crit("Modified ECTX detected!\n");
-		uk_pr_crit("Current:\n");
-		uk_hexdumpk(KLVL_CRIT, current, ectx_size,
-			    UK_HXDF_ADDR | UK_HXDF_GRPQWORD | UK_HXDF_COMPRESS,
-			    2);
+	/*
+	 * When using XSAVE(OPT) two ectx memory areas may differ
+	 * but be equivalent on XRSTOR, thus we cannot simply do memcmp.
+	 *
+	 * According to the Intel SDM, XSTATE_BV is a bitmap that, depending
+	 * on which extended register context subcomponent is used, it may
+	 * have its corresponding bit marked as dirty through the CPU-internal
+	 * state tracking structure XINUSE. If a subcomponent is enabled
+	 * (RFBM[i] = 1) then it is stated that: if the state component is in
+	 * its initial configuration, XINUSE[i] may be either 0 or 1, and
+	 * XSTATE_BV[i] may be written with either 0 or 1. In other words,
+	 * if the component happens to be zeroed out entirely, its
+	 * XSTATE_BV[i] can be either 0 or 1, both being valid.
+	 * Therefore, in some cases, following XSAVE(OPT), you can have two
+	 * ectx that differ in memory but are equivalent when loaded in.
+	 * Our comparison must take into account the state of the bitmaps
+	 * for proper checking.
+	 */
+	switch (ectx_method) {
+	case X86_SAVE_FSAVE:
+		if (unlikely(memcmp_isr(current, state,
+					sizeof(struct x86_fsave_ctx))))
+			goto ectx_corrupted;
+		break;
+	case X86_SAVE_FXSAVE:
+		/* According to Intel SDM, XSAVE does not use bytes 511:416 */
+		struct x86_fxsave_ctx *fxsave1 = (struct x86_fxsave_ctx *)state;
+		struct x86_fxsave_ctx *fxsave2 =
+			(struct x86_fxsave_ctx *)current;
 
-		uk_pr_crit("Expected:\n");
-		uk_hexdumpk(KLVL_CRIT, state, ectx_size,
-			    UK_HXDF_ADDR | UK_HXDF_GRPQWORD | UK_HXDF_COMPRESS,
-			    2);
+		if (unlikely(memcmp_isr(fxsave1->state, fxsave2->state,
+					sizeof(fxsave1->state))))
+			goto ectx_corrupted;
+		break;
+	case X86_SAVE_XSAVE:
+	case X86_SAVE_XSAVEOPT:
+		struct x86_xsave_ctx *xsave1 = (struct x86_xsave_ctx *)state;
+		struct x86_xsave_ctx *xsave2 = (struct x86_xsave_ctx *)current;
 
-		UK_CRASH("Modified ECTX\n");
+		if (unlikely(!x86_xsave_hdr_isvalid(xsave2)))
+			UK_CRASH("Error in saving current ectx\n");
+
+		if (unlikely(!x86_xsave_hdr_isvalid(xsave1) ||
+			     !x86_xsave_mxcsr_iseq(xsave1, xsave2) ||
+			     !x86_xsave_substate_iseq(xsave1, xsave2,
+					     X86_XSAVE_HDR_XSTATE_BV_X87F) ||
+			     !x86_xsave_substate_iseq(xsave1, xsave2,
+					     X86_XSAVE_HDR_XSTATE_BV_SSEF) ||
+			     !x86_xsave_substate_iseq(xsave1, xsave2,
+					     X86_XSAVE_HDR_XSTATE_BV_AVXF)))
+			goto ectx_corrupted;
+		break;
+	default:
+		UK_CRASH("Unknown ectx method: %d\n", ectx_method);
+		return;
 	}
+
+	return;
+
+ectx_corrupted:
+	uk_pr_crit("Modified ECTX detected!\n");
+	uk_pr_crit("Current:\n");
+	uk_hexdumpk(KLVL_CRIT, current, ectx_size,
+		    UK_HXDF_ADDR | UK_HXDF_GRPQWORD | UK_HXDF_COMPRESS,
+		    2);
+
+	uk_pr_crit("Expected:\n");
+	uk_hexdumpk(KLVL_CRIT, state, ectx_size,
+		    UK_HXDF_ADDR | UK_HXDF_GRPQWORD | UK_HXDF_COMPRESS,
+		    2);
+
+	UK_CRASH("Modified ECTX\n");
 }
-#endif
