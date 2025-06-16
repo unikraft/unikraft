@@ -70,19 +70,7 @@ extern "C" {
 #endif
 
 #if CONFIG_LIBSYSCALL_SHIM
-static inline
-void _uk_syscall_wrapper_do_entertab(struct ukarch_execenv *execenv)
-{
-	struct uk_syscall_enter_ctx enter_ctx;
-
-	uk_syscall_nested_depth++;
-
-	uk_syscall_enter_ctx_init(&enter_ctx,
-				  execenv,
-				  uk_syscall_nested_depth,
-				  0);
-	uk_syscall_entertab_run(&enter_ctx);
-}
+void _uk_syscall_wrapper_do_entertab(struct ukarch_execenv *execenv);
 #else /* !CONFIG_LIBSYSCALL_SHIM */
 static inline
 void _uk_syscall_wrapper_do_entertab(struct ukarch_execenv *execenv __unused)
@@ -90,19 +78,7 @@ void _uk_syscall_wrapper_do_entertab(struct ukarch_execenv *execenv __unused)
 #endif /* !CONFIG_LIBSYSCALL_SHIM */
 
 #if CONFIG_LIBSYSCALL_SHIM
-static inline
-void _uk_syscall_wrapper_do_exittab(struct ukarch_execenv *execenv)
-{
-	struct uk_syscall_exit_ctx exit_ctx;
-
-	uk_syscall_exit_ctx_init(&exit_ctx,
-				 execenv,
-				 uk_syscall_nested_depth,
-				 0);
-	uk_syscall_exittab_run(&exit_ctx);
-
-	uk_syscall_nested_depth--;
-}
+void _uk_syscall_wrapper_do_exittab(struct ukarch_execenv *execenv);
 #else /* !CONFIG_LIBSYSCALL_SHIM */
 static inline
 void _uk_syscall_wrapper_do_exittab(struct ukarch_execenv *execenv __unused)
