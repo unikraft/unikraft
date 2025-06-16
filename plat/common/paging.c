@@ -316,6 +316,7 @@ int ukplat_pt_init(struct uk_pagetable *pt, __paddr_t start, __sz len)
 	if (unlikely(rc))
 		return rc;
 
+	uk_spin_init(&pt->lock);
 #ifdef CONFIG_PAGING_STATS
 	/* If we have stats active, we need to discover all mappings etc. We
 	 * simplify this by just cloning the page table hierarchy.
@@ -433,11 +434,17 @@ static inline int pg_falloc(struct uk_pagetable *pt, __paddr_t *paddr,
 			    unsigned int level)
 {
 	unsigned long pages = PG_Lx_L0_PAGES(level);
+	int returned_value;
 
 	UK_ASSERT(level < PT_LEVELS);
 	UK_ASSERT(pt->fa->falloc);
 
-	return pt->fa->falloc(pt->fa, paddr, pages, FALLOC_FLAG_ALIGNED);
+	uk_spin_lock(&pt->lock);
+	returned_value = pt->fa->falloc(pt->fa,
+		paddr, pages, FALLOC_FLAG_ALIGNED);
+	uk_spin_unlock(&pt->lock);
+
+	return returned_value;
 }
 
 static inline void pg_ffree(struct uk_pagetable *pt, __paddr_t paddr,
@@ -583,6 +590,7 @@ static int pg_page_mapx(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 	pte_idx = PT_Lx_IDX(vaddr, lvl);
 	page_size = PAGE_Lx_SIZE(lvl);
 
+	uk_spin_lock(&pt->level_locks[lvl]);
 	do {
 		/* This loop is responsible for walking the page table down
 		 * until we reach the desired level. If there is a page table
@@ -591,8 +599,12 @@ static int pg_page_mapx(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 		while (lvl > to_lvl) {
 			/* We are too high and need to walk further down */
 			rc = ukarch_pte_read(pt_vaddr, lvl, pte_idx, &pte);
-			if (unlikely(rc))
+
+			if (unlikely(rc)) {
+				uk_spin_unlock(&pt->level_locks[lvl]);
 				return rc;
+			}
+
 			if (PT_Lx_PTE_PRESENT(pte, lvl)) {
 				/* If there is already a larger page mapped
 				 * at this address and we have a mapx, we
@@ -601,13 +613,19 @@ static int pg_page_mapx(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 				 * Otherwise, we bail out.
 				 */
 				if (PAGE_Lx_IS(pte, lvl)) {
-					if (!mapx)
+					if (!mapx) {
+						uk_spin_unlock(
+							&pt->level_locks[lvl]);
 						return -EEXIST;
-
+					}
 					rc = pg_page_split(pt, pt_vaddr, vaddr,
 							   lvl);
-					if (unlikely(rc))
+					if (unlikely(rc)) {
+						uk_spin_unlock(
+							&pt->level_locks[lvl]);
+
 						return rc;
+					}
 
 					continue;
 				}
@@ -619,8 +637,10 @@ static int pg_page_mapx(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 				 */
 				rc = pg_pt_alloc(pt, &pt_vaddr, &pt_paddr,
 						 lvl - 1);
-				if (unlikely(rc))
+				if (unlikely(rc)) {
+					uk_spin_unlock(&pt->level_locks[lvl]);
 					return rc;
+				}
 
 				if (!(flags & PAGE_FLAG_KEEP_PTES))
 					pte = template;
@@ -633,17 +653,22 @@ static int pg_page_mapx(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 						      pte_idx, pte);
 				if (unlikely(rc)) {
 					pg_pt_free(pt, pt_vaddr, lvl - 1);
+					uk_spin_unlock(&pt->level_locks[lvl]);
 					return rc;
 				}
 			}
 
 			UK_ASSERT(lvl > PAGE_LEVEL);
+
+			uk_spin_unlock(&pt->level_locks[lvl]);
+
 			lvl--;
 
 			pt_vaddr_cache[lvl] = pt_vaddr;
 
 			pte_idx = PT_Lx_IDX(vaddr, lvl);
 			page_size = PAGE_Lx_SIZE(lvl);
+			uk_spin_lock(&pt->level_locks[lvl]);
 		}
 
 		UK_ASSERT(lvl == to_lvl);
@@ -652,6 +677,7 @@ static int pg_page_mapx(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 		/* At this point, we are at the target level and know that
 		 * pages can be mapped at this level.
 		 */
+		uk_spin_unlock(&pt->level_locks[lvl]);
 		rc = ukarch_pte_read(pt_vaddr, lvl, pte_idx, &pte);
 		if (unlikely(rc))
 			return rc;
@@ -844,6 +870,9 @@ NEXT_PTE:
 
 	} while (1);
 
+	/* Make sure we won't live with any lock. */
+	uk_spin_unlock(&pt->level_locks[lvl]);
+
 	return 0;
 }
 
@@ -852,6 +881,7 @@ int ukplat_page_mapx(struct uk_pagetable *pt, __vaddr_t vaddr,
 		     unsigned long attr, unsigned long flags,
 		     struct ukplat_page_mapx *mapx)
 {
+	int rc;
 	unsigned int level = PAGE_FLAG_SIZE_TO_LEVEL(flags);
 	__sz len;
 
@@ -996,10 +1026,13 @@ static int pg_page_unmap(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 	first_pte_idx[lvl] = pte_idx;
 	skip_pt_free = (flags & PAGE_FLAG_KEEP_PTES);
 
+	uk_spin_lock(&pt->level_locks[lvl]);
 	do {
 		rc = ukarch_pte_read(pt_vaddr, lvl, pte_idx, &pte);
-		if (unlikely(rc))
+		if (unlikely(rc)) {
+			uk_spin_unlock(&pt->level_locks[lvl]);
 			return rc;
+		}
 
 		if (PT_Lx_PTE_PRESENT(pte, lvl)) {
 
@@ -1008,15 +1041,19 @@ static int pg_page_unmap(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 			 */
 			if (!PAGE_Lx_IS(pte, lvl)) {
 				if ((flags & PAGE_FLAG_FORCE_SIZE) &&
-				    (lvl == to_lvl))
+				    (lvl == to_lvl)) {
+					uk_spin_unlock(&pt->level_locks[lvl]);
 					return -EFAULT;
+				}
 
 				pt_vaddr = pgarch_pt_pte_to_vaddr(pt, pte, lvl);
 
 				pte_idx_cache[lvl] = pte_idx;
 
 				UK_ASSERT(lvl > PAGE_LEVEL);
+				uk_spin_unlock(&pt->level_locks[lvl]);
 				lvl--;
+				uk_spin_lock(&pt->level_locks[lvl]);
 
 				pt_vaddr_cache[lvl] = pt_vaddr;
 
@@ -1030,7 +1067,6 @@ static int pg_page_unmap(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 
 				first_pte_idx[lvl] = pte_idx;
 				skip_pt_free = (flags & PAGE_FLAG_KEEP_PTES);
-
 				continue;
 			}
 
@@ -1042,8 +1078,10 @@ static int pg_page_unmap(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 			 * than the remaining len to unmap, or it is not
 			 * aligned to the current vaddr).
 			 */
-			if ((flags & PAGE_FLAG_FORCE_SIZE) && (lvl != to_lvl))
+			if ((flags & PAGE_FLAG_FORCE_SIZE) && (lvl != to_lvl)) {
+				uk_spin_unlock(&pt->level_locks[lvl]);
 				return -EFAULT;
+			}
 
 			if ((page_size > len) ||
 			    (!PAGE_Lx_ALIGNED(vaddr, lvl))) {
@@ -1051,9 +1089,10 @@ static int pg_page_unmap(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 
 				rc = pg_page_split(pt, pt_vaddr,
 					PAGE_Lx_ALIGN_DOWN(vaddr, lvl), lvl);
-				if (unlikely(rc))
+				if (unlikely(rc)) {
+					uk_spin_unlock(&pt->level_locks[lvl]);
 					return rc;
-
+				}
 				continue;
 			}
 
@@ -1070,8 +1109,10 @@ static int pg_page_unmap(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 					PT_Lx_PTE_INVALID(lvl);
 
 			rc = ukarch_pte_write(pt_vaddr, lvl, pte_idx, new_pte);
-			if (unlikely(rc))
+			if (unlikely(rc)) {
+				uk_spin_unlock(&pt->level_locks[lvl]);
 				return rc;
+			}
 
 			if (vaddr != __VADDR_ANY && pt == pg_active_pt)
 				ukarch_tlb_flush_entry(vaddr);
@@ -1125,7 +1166,9 @@ static int pg_page_unmap(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 			plvl = lvl;
 
 			/* Go up one level */
+			uk_spin_unlock(&pt->level_locks[lvl]);
 			pte_idx = pte_idx_cache[++lvl];
+			uk_spin_lock(&pt->level_locks[lvl]);
 			UK_ASSERT(pte_idx < PT_Lx_PTES(lvl));
 
 			if (skip_pt_free)
@@ -1147,8 +1190,10 @@ static int pg_page_unmap(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 			 */
 			while (i++ < PT_Lx_PTES(plvl) - 1) {
 				rc = ukarch_pte_read(pt_vaddr, plvl, i, &pte);
-				if (unlikely(rc))
+				if (unlikely(rc)) {
+					uk_spin_unlock(&pt->level_locks[lvl]);
 					return rc;
+				}
 
 				if (pte != PT_Lx_PTE_INVALID(plvl)) {
 					skip_pt_free = 1;
@@ -1162,8 +1207,10 @@ static int pg_page_unmap(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 			i = first_pte_idx[plvl];
 			do {
 				rc = ukarch_pte_read(pt_vaddr, plvl, i, &pte);
-				if (unlikely(rc))
+				if (unlikely(rc)) {
+					uk_spin_unlock(&pt->level_locks[lvl]);
 					return rc;
+				}
 
 				if (pte != PT_Lx_PTE_INVALID(plvl)) {
 					skip_pt_free = 1;
@@ -1180,8 +1227,10 @@ static int pg_page_unmap(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 			 */
 			rc = ukarch_pte_write(pt_vaddr, lvl, pte_idx,
 					      PT_Lx_PTE_INVALID(lvl));
-			if (unlikely(rc))
+			if (unlikely(rc)) {
+				uk_spin_unlock(&pt->level_locks[lvl]);
 				return rc;
+			}
 
 			if (vaddr != __VADDR_ANY && pt == pg_active_pt)
 				ukarch_tlb_flush_entry(vaddr);
@@ -1206,6 +1255,8 @@ static int pg_page_unmap(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 			break;
 
 	} while (1);
+
+	uk_spin_unlock(&pt->level_locks[lvl]);
 
 	if (vaddr == __VADDR_ANY && pt == pg_active_pt)
 		ukarch_tlb_flush();

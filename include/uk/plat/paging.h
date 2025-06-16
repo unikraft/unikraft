@@ -40,6 +40,7 @@
 #include <uk/config.h>
 #include <uk/arch/types.h>
 #include <uk/arch/paging.h>
+#include <uk/spinlock.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -59,6 +60,9 @@ struct uk_pagetable {
 
 	/* Architecture-dependent part */
 	struct ukarch_pagetable arch;
+
+	struct uk_spinlock lock;
+	struct uk_spinlock level_locks[5];
 
 #ifdef CONFIG_PAGING_STATS
 	unsigned long nr_lx_pages[PT_LEVELS];
