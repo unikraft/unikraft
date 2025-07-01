@@ -168,11 +168,11 @@ void ukarch_ectx_store(struct ukarch_ectx *state)
 		asm volatile("fxsave (%0)" :: "r"(state) : "memory");
 		break;
 	case X86_SAVE_XSAVE:
-		asm volatile("xsave (%0)" :: "r"(state),
+		asm volatile("xsave64 (%0)" :: "r"(state),
 			     "a"(0xffffffff), "d"(0xffffffff) : "memory");
 		break;
 	case X86_SAVE_XSAVEOPT:
-		asm volatile("xsaveopt (%0)" :: "r"(state),
+		asm volatile("xsaveopt64 (%0)" :: "r"(state),
 			     "a"(0xffffffff), "d"(0xffffffff) : "memory");
 		break;
 	}
