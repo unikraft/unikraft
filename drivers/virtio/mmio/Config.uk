@@ -6,6 +6,7 @@ menuconfig LIBVIRTIO_MMIO
 	depends on HAVE_MMIO
 	depends on VIRTIO_DEVICE
 	select LIBUKBUS_PLATFORM
+	select LIBUKBITOPS
 	help
 		Virtio MMIO transport.
 

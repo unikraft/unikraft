@@ -3,6 +3,7 @@ menuconfig LIBPL011
 	depends on ARCH_ARM_64
 	depends on LIBUKCONSOLE
 	select LIBUKOFW
+	select LIBUKBITOPS
 
 if LIBPL011
 

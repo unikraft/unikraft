@@ -6,6 +6,7 @@ config LIBXENBUS
 	depends on HAVE_XENBUS
 	select LIBXENHEADERS
 	select LIBUKALLOC
+	select LIBUKBITOPS
 	select LIBUKSCHED
 	select LIBUKBUS
 	help

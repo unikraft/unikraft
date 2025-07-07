@@ -3,5 +3,6 @@ config LIBVIRTIO_NET
 	depends on LIBUKNETDEV
 	select LIBVIRTIO_BUS
 	select LIBUKSGLIST
+	select LIBUKBITOPS
 	help
 		Virtual network driver.

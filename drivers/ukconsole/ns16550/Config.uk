@@ -8,6 +8,7 @@ menuconfig LIBNS16550
 	depends on (HAVE_FDT || HAVE_IBMPC_NS16550)
 	depends on LIBUKCONSOLE
 	select LIBUKOFW if ARCH_ARM_64
+	select LIBUKBITOPS
 
 if LIBNS16550
 
