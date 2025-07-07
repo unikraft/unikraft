@@ -117,7 +117,7 @@ static void vm_set_features(struct virtio_dev *vdev)
 
 	/* Make sure there are no mixed devices */
 	if (vm_dev->version == 2 &&
-	    !uk_test_bit(VIRTIO_F_VERSION_1, &vdev->features)) {
+	    !(vdev->features & UK_BIT(VIRTIO_F_VERSION_1))) {
 		uk_pr_err("Modern virtio devices must set VIRTIO_F_VERSION_1\n");
 		return;
 	}
