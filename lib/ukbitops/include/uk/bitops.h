@@ -33,7 +33,6 @@
 #define __UKARCH_BITOPS_H__
 
 #include <uk/essentials.h>
-#include <uk/bitcount.h>
 #include <uk/bitops/bitscan.h>
 
 #ifdef __cplusplus
@@ -52,12 +51,6 @@ extern "C" {
 #define	UK_BITS_PER_LONG_LONG	64
 
 #define BITS_PER_BYTE  8
-
-#define	uk_hweight8(x)	uk_bitcount((uint8_t)(x))
-#define	uk_hweight16(x)	uk_bitcount16(x)
-#define	uk_hweight32(x)	uk_bitcount32(x)
-#define	uk_hweight64(x)	uk_bitcount64(x)
-#define	uk_hweight_long(x)	uk_bitcountl(x)
 
 static inline __u32
 uk_ror32(__u32 word, unsigned int shift)

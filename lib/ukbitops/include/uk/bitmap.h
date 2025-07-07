@@ -34,6 +34,7 @@
 #include <string.h>
 #include <sys/param.h>
 #include <uk/bitops.h>
+#include <uk/bitcount.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -564,12 +565,12 @@ uk_bitmap_weight(unsigned long *addr, const unsigned int size)
 	unsigned int i;
 
 	for (i = 0; i != end; i++)
-		retval += uk_hweight_long(addr[i]);
+		retval += uk_bitcountl(addr[i]);
 
 	if (tail) {
 		const unsigned long mask = UK_BITMAP_LAST_WORD_MASK(tail);
 
-		retval += uk_hweight_long(addr[end] & mask);
+		retval += uk_bitcountl(addr[end] & mask);
 	}
 	return (retval);
 }
