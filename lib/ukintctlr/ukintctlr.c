@@ -28,7 +28,7 @@
 #include <stdlib.h>
 #include <uk/alloc.h>
 #include <uk/atomic.h>
-#include <uk/bitmap.h>
+#include <uk/bitops/bitmap.h>
 #include <uk/plat/lcpu.h>
 #include <uk/plat/time.h>
 #include <uk/intctlr.h>

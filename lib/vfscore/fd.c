@@ -34,7 +34,7 @@
 #include <uk/config.h>
 #include <string.h>
 #include <uk/essentials.h>
-#include <uk/bitmap.h>
+#include <uk/bitops/bitmap.h>
 #include <uk/assert.h>
 #include <vfscore/file.h>
 #include <uk/plat/lcpu.h>

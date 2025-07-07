@@ -37,7 +37,7 @@
 #include <inttypes.h>
 #include <uk/config.h>
 #include <uk/arch/spinlock.h>
-#include <uk/bitmap.h>
+#include <uk/bitops/bitmap.h>
 #include <uk/list.h>
 #include <uk/9p_core.h>
 #if CONFIG_LIBUKSCHED

@@ -41,7 +41,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <uk/errptr.h>
-#include <uk/bitmap.h>
+#include <uk/bitops/bitmap.h>
 #include <uk/wait.h>
 #include <uk/arch/spinlock.h>
 #include <common/events.h>

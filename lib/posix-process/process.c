@@ -20,7 +20,7 @@ struct uk_thread *pprocess_thread_main;
 #if CONFIG_LIBPOSIX_PROCESS_MULTITHREADING
 #include <signal.h> /* SIGCHLD */
 
-#include <uk/bitmap.h>
+#include <uk/bitops/bitmap.h>
 #include <uk/list.h>
 #include <uk/alloc.h>
 #include <uk/sched.h>

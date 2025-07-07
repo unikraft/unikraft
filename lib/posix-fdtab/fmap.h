@@ -14,7 +14,7 @@
 #include <uk/atomic.h>
 #include <uk/assert.h>
 #include <uk/bitops.h>
-#include <uk/bitmap.h>
+#include <uk/bitops/bitmap.h>
 #include <uk/essentials.h>
 #include <uk/thread.h>
 

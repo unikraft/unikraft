@@ -37,7 +37,7 @@
 #include <uk/alloc.h>
 #include <uk/essentials.h>
 #include <uk/errptr.h>
-#include <uk/bitmap.h>
+#include <uk/bitops/bitmap.h>
 #include <uk/refcount.h>
 #include <uk/9p.h>
 #include <uk/9pdev.h>
