@@ -46,7 +46,7 @@
 #include <uk/alloc_impl.h>
 #include <uk/arch/limits.h>
 #include <uk/atomic.h>
-#include <uk/bitops.h>
+#include <uk/bitops/bitscan.h>
 #include <uk/print.h>
 #include <uk/assert.h>
 #include <uk/page.h>

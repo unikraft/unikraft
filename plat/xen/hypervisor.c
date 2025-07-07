@@ -41,7 +41,7 @@
 #include <xen/hvm/hvm_op.h>
 #include <uk/arch/lcpu.h>
 #include <uk/atomic.h>
-#include <uk/bitops.h>
+#include <uk/bitops/bitscan.h>
 
 #define active_evtchns(sh, idx)				\
 	((sh)->evtchn_pending[idx] & ~(sh)->evtchn_mask[idx])

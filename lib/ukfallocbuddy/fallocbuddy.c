@@ -39,6 +39,7 @@
 #include <uk/arch/paging.h>
 #include <uk/assert.h>
 #include <uk/bitops.h>
+#include <uk/bitops/bitscan.h>
 #include <uk/atomic.h>
 #include <uk/list.h>
 #include <uk/print.h>

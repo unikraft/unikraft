@@ -33,7 +33,6 @@
 #define __UKARCH_BITOPS_H__
 
 #include <uk/essentials.h>
-#include <uk/bitops/bitscan.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -57,17 +56,6 @@ uk_ror32(__u32 word, unsigned int shift)
 {
 	return ((word >> shift) | (word << (32 - shift)));
 }
-
-static inline int uk_get_count_order(unsigned int count)
-{
-	int order;
-
-	order = uk_mssb(count);
-	if (count & (count - 1))
-		order++;
-	return order;
-}
-
 
 static inline __u64
 uk_sign_extend64(__u64 value, int index)
