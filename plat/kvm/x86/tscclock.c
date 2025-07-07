@@ -58,7 +58,7 @@
 #include <uk/timeconv.h>
 #include <uk/print.h>
 #include <uk/assert.h>
-#include <uk/bitops.h>
+#include <uk/atomic.h>
 
 #define TIMER_CNTR           0x40
 #define TIMER_MODE           0x43
@@ -389,7 +389,7 @@ void time_block_until(__snsec until)
 	while ((__snsec) ukplat_monotonic_clock() < until) {
 		tscclock_cpu_block(until);
 
-		if (__uk_test_and_clear_bit(0, &sched_have_pending_events))
+		if (uk_and_relax(&sched_have_pending_events, 0))
 			break;
 	}
 }
