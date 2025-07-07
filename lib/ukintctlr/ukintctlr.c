@@ -27,6 +27,7 @@
 
 #include <stdlib.h>
 #include <uk/alloc.h>
+#include <uk/atomic.h>
 #include <uk/bitmap.h>
 #include <uk/plat/lcpu.h>
 #include <uk/plat/time.h>
@@ -197,7 +198,7 @@ void uk_intctlr_irq_handle(struct __regs *regs, unsigned int irq)
 			 * the halting loop, and let it take care of
 			 * that work.
 			 */
-			__uk_test_and_set_bit(0, &sched_have_pending_events);
+			uk_or_relax(&sched_have_pending_events, 1);
 
 		if (h->func(h->arg) == 1)
 			goto exit;

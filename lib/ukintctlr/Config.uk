@@ -4,6 +4,8 @@ config HAVE_INTCTLR
 config LIBUKINTCTLR
 	bool "ukintctlr: Interrupt Controller API"
 	depends on HAVE_INTCTLR
+	select LIBUKATOMIC
+	select LIBUKBITOPS
 
 if LIBUKINTCTLR
 
