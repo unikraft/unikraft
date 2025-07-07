@@ -40,7 +40,7 @@
 #include <uk/print.h>
 #include <uk/event.h>
 #include <uk/assert.h>
-#include <uk/bitops.h>
+#include <uk/bitmap.h>
 
 #define NR_EVS 1024
 
