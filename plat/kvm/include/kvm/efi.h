@@ -4,7 +4,7 @@
 #include <stdbool.h>
 #include <uk/arch/limits.h>
 #include <uk/arch/types.h>
-#include <uk/bitcount.h>
+#include <uk/bitops/bitcount.h>
 #include <uk/essentials.h>
 
 #if defined(__X86_64__)

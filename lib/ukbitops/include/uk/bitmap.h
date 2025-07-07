@@ -34,7 +34,7 @@
 #include <string.h>
 #include <sys/param.h>
 #include <uk/bitops.h>
-#include <uk/bitcount.h>
+#include <uk/bitops/bitcount.h>
 #include <uk/bitops/bitscan.h>
 
 #ifdef __cplusplus
