@@ -35,7 +35,7 @@
 #include <uk/assert.h>
 #include <uk/plat/time.h>
 #include <uk/plat/lcpu.h>
-#include <uk/bitops.h>
+#include <uk/atomic.h>
 #include <uk/plat/common/cpu.h>
 #include <uk/plat/common/sections.h>
 #include <uk/plat/common/bootinfo.h>
@@ -94,7 +94,7 @@ void time_block_until(__nsec until)
 {
 	while (ukplat_monotonic_clock() < until) {
 		generic_timer_cpu_block_until(until);
-		if (__uk_test_and_clear_bit(0, &sched_have_pending_events))
+		if (uk_and_relax(&sched_have_pending_events, 0))
 			break;
 	}
 }
