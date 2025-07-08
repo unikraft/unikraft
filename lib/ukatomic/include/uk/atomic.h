@@ -43,10 +43,22 @@ extern "C" {
 	__atomic_load_n(src, __ATOMIC_SEQ_CST)
 
 /**
+ * Perform an atomic load operation with relaxed ordering.
+ */
+#define uk_load_n_relax(src) \
+	__atomic_load_n(src, __ATOMIC_RELAXED)
+
+/**
  * Perform an atomic store operation.
  */
 #define uk_store_n(src, value) \
 	__atomic_store_n(src, value, __ATOMIC_SEQ_CST)
+
+/**
+ * Perform an atomic store operation with relaxed ordering.
+ */
+#define uk_store_n_relax(src, value) \
+	__atomic_store_n(src, value, __ATOMIC_RELAXED)
 
 /**
  * Perform an atomic fetch and add/sub operation.
@@ -57,12 +69,28 @@ extern "C" {
 	__atomic_fetch_sub(src, value, __ATOMIC_SEQ_CST)
 
 /**
+ * Perform an atomic fetch and add/sub operation with relaxed ordering.
+ */
+#define uk_fetch_add_relax(src, value) \
+	__atomic_fetch_add(src, value, __ATOMIC_RELAXED)
+#define uk_fetch_sub_relax(src, value) \
+	__atomic_fetch_sub(src, value, __ATOMIC_RELAXED)
+
+/**
  * Perform an atomic add/sub and fetch operation.
  */
 #define uk_add_fetch(src, value) \
 	__atomic_add_fetch(src, value, __ATOMIC_SEQ_CST)
 #define uk_sub_fetch(src, value) \
 	__atomic_sub_fetch(src, value, __ATOMIC_SEQ_CST)
+
+/**
+ * Perform an atomic add/sub and fetch operation with relaxed ordering.
+ */
+#define uk_add_fetch_relax(src, value) \
+	__atomic_add_fetch(src, value, __ATOMIC_RELAXED)
+#define uk_sub_fetch_relax(src, value) \
+	__atomic_sub_fetch(src, value, __ATOMIC_RELAXED)
 
 /**
  * Perform an atomic increment/decrement operation and return the
@@ -74,16 +102,28 @@ extern "C" {
 	uk_fetch_sub(src, 1)
 
 /**
- * Perform an atomic OR operation and return the previous value.
+ * Perform an atomic fetch and OR operation.
  */
 #define uk_or(src, val) \
 	__atomic_fetch_or(src, val, __ATOMIC_SEQ_CST)
 
 /**
- * Perform an atomic AND operation and return the previous value.
+ * Perform an atomic fetch and OR operation with relaxed ordering.
+ */
+#define uk_or_relax(src, val) \
+	__atomic_fetch_or(src, val, __ATOMIC_RELAXED)
+
+/**
+ * Perform an atomic fetch and AND operation.
  */
 #define uk_and(src, val) \
 	__atomic_fetch_and(src, val, __ATOMIC_SEQ_CST)
+
+/**
+ * Perform an atomic fetch and AND operation with relaxed ordering.
+ */
+#define uk_and_relax(src, val) \
+	__atomic_fetch_and(src, val, __ATOMIC_RELAXED)
 
 /**
  * Writes *src into *dst, and returns the previous contents of *dst.
@@ -92,10 +132,24 @@ extern "C" {
 	__atomic_exchange(dst, src, __ATOMIC_SEQ_CST)
 
 /**
+ * Writes *src into *dst, and returns the previous contents of *dst, with
+ * relaxed ordering.
+ */
+#define uk_exchange_relax(dst, src) \
+	__atomic_exchange(dst, src, __ATOMIC_RELAXED)
+
+/**
  * Writes v into *dst, and returns the previous contents of *dst.
  */
 #define uk_exchange_n(dst, v) \
 	__atomic_exchange_n(dst, v, __ATOMIC_SEQ_CST)
+
+/**
+ * Writes v into *dst, and returns the previous contents of *dst with relaxed
+ * ordering.
+ */
+#define uk_exchange_n_relax(dst, v) \
+	__atomic_exchange_n(dst, v, __ATOMIC_RELAXED)
 
 #define uk_compare_exchange_n(dst, exp, des)  \
 	__atomic_compare_exchange_n(dst, exp, des, 0, \
