@@ -313,8 +313,6 @@ ssize_t vfscore_preadv(struct vfscore_file *fp, const struct iovec *iov,
 	error = do_preadv(fp, iov, iovcnt, offset, &bytes);
 
 out_error_fdrop:
-	fdrop(fp);
-
 	if (error < 0)
 		goto out_error;
 
@@ -389,8 +387,6 @@ ssize_t vfscore_readv(struct vfscore_file *fp,
 	error = do_preadv(fp, iov, iovcnt, -1, &bytes);
 
 out_error_fdrop:
-	fdrop(fp);
-
 	if (error < 0)
 		goto out_error;
 
@@ -481,8 +477,6 @@ ssize_t vfscore_pwritev(struct vfscore_file *fp, const struct iovec *iov,
 	error = do_pwritev(fp, iov, iovcnt, offset, &bytes);
 
 out_error_fdrop:
-	fdrop(fp);
-
 	if (error < 0)
 		goto out_error;
 
@@ -557,8 +551,6 @@ ssize_t vfscore_writev(struct vfscore_file *fp,
 	error = do_pwritev(fp, vec, vlen, -1, &bytes);
 
 out_error_fdrop:
-	fdrop(fp);
-
 	if (error < 0)
 		goto out_error;
 

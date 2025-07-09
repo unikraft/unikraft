@@ -36,6 +36,7 @@ UK_SYSCALL_R_DEFINE(ssize_t, preadv2, int, fd, const struct iovec *, iov,
 			r = -EINVAL;
 		else
 			r = vfscore_preadv(sf.vfile, iov, iovcnt, offset);
+		fdrop(sf.vfile);
 		break;
 #endif /* CONFIG_LIBVFSCORE */
 	default:
@@ -58,6 +59,7 @@ UK_SYSCALL_R_DEFINE(ssize_t, preadv, int, fd, const struct iovec *, iov,
 #if CONFIG_LIBVFSCORE
 	case UK_SHIM_LEGACY:
 		r = vfscore_preadv(sf.vfile, iov, iovcnt, offset);
+		fdrop(sf.vfile);
 		break;
 #endif /* CONFIG_LIBVFSCORE */
 	default:
@@ -90,6 +92,7 @@ UK_SYSCALL_R_DEFINE(ssize_t, pread64, int, fd,
 #if CONFIG_LIBVFSCORE
 	case UK_SHIM_LEGACY:
 		r = vfscore_pread64(sf.vfile, buf, count, offset);
+		fdrop(sf.vfile);
 		break;
 #endif /* CONFIG_LIBVFSCORE */
 	default:
@@ -116,6 +119,7 @@ UK_SYSCALL_R_DEFINE(ssize_t, readv, int, fd,
 #if CONFIG_LIBVFSCORE
 	case UK_SHIM_LEGACY:
 		r = vfscore_readv(sf.vfile, iov, iovcnt);
+		fdrop(sf.vfile);
 		break;
 #endif /* CONFIG_LIBVFSCORE */
 	default:
@@ -138,6 +142,7 @@ UK_SYSCALL_R_DEFINE(ssize_t, read, int, fd,
 #if CONFIG_LIBVFSCORE
 	case UK_SHIM_LEGACY:
 		r = vfscore_read(sf.vfile, buf, count);
+		fdrop(sf.vfile);
 		break;
 #endif /* CONFIG_LIBVFSCORE */
 	default:
@@ -163,6 +168,7 @@ UK_SYSCALL_R_DEFINE(ssize_t, pwritev2, int, fd, const struct iovec*, iov,
 			r = -EINVAL;
 		else
 			r = vfscore_pwritev(sf.vfile, iov, iovcnt, offset);
+		fdrop(sf.vfile);
 		break;
 #endif /* CONFIG_LIBVFSCORE */
 	default:
@@ -185,6 +191,7 @@ UK_SYSCALL_R_DEFINE(ssize_t, pwritev, int, fd, const struct iovec*, iov,
 #if CONFIG_LIBVFSCORE
 	case UK_SHIM_LEGACY:
 		r = vfscore_pwritev(sf.vfile, iov, iovcnt, offset);
+		fdrop(sf.vfile);
 		break;
 #endif /* CONFIG_LIBVFSCORE */
 	default:
@@ -212,6 +219,7 @@ UK_SYSCALL_R_DEFINE(ssize_t, pwrite64, int, fd,
 #if CONFIG_LIBVFSCORE
 	case UK_SHIM_LEGACY:
 		r = vfscore_pwrite64(sf.vfile, buf, count, offset);
+		fdrop(sf.vfile);
 		break;
 #endif /* CONFIG_LIBVFSCORE */
 	default:
@@ -238,6 +246,7 @@ UK_SYSCALL_R_DEFINE(ssize_t, writev, int, fd, const struct iovec *, iov,
 #if CONFIG_LIBVFSCORE
 	case UK_SHIM_LEGACY:
 		r = vfscore_writev(sf.vfile, iov, iovcnt);
+		fdrop(sf.vfile);
 		break;
 #endif /* CONFIG_LIBVFSCORE */
 	default:
@@ -259,6 +268,7 @@ UK_SYSCALL_R_DEFINE(ssize_t, write, int, fd, const void *, buf, size_t, count)
 #if CONFIG_LIBVFSCORE
 	case UK_SHIM_LEGACY:
 		r = vfscore_write(sf.vfile, buf, count);
+		fdrop(sf.vfile);
 		break;
 #endif /* CONFIG_LIBVFSCORE */
 	default:
