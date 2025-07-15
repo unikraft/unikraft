@@ -70,6 +70,12 @@ extern "C" {
 #endif
 
 #if CONFIG_LIBSYSCALL_SHIM
+long uk_syscall_do_stat(long pathname, long st);
+long uk_syscall_do_lstat(long pathname, long st);
+long uk_syscall_do_fstat(long dirfd, long st);
+#endif /* !CONFIG_LIBSYSCALL_SHIM */
+
+#if CONFIG_LIBSYSCALL_SHIM
 static inline
 void _uk_syscall_wrapper_do_entertab(struct ukarch_execenv *execenv)
 {
