@@ -160,8 +160,13 @@ struct f_owner_ex {
 };
 #endif
 
+#if CONFIG_LIBUKFILE
+#include <linux/falloc.h>
+#else /* !CONFIG_LIBUKFILE */
 #define FALLOC_FL_KEEP_SIZE 1
 #define FALLOC_FL_PUNCH_HOLE 2
+#endif /* !CONFIG_LIBUKFILE */
+
 #define SYNC_FILE_RANGE_WAIT_BEFORE 1
 #define SYNC_FILE_RANGE_WRITE 2
 #define SYNC_FILE_RANGE_WAIT_AFTER 4
