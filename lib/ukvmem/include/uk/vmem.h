@@ -679,6 +679,6 @@ int uk_vma_advise(struct uk_vas *vas, __vaddr_t vaddr, __sz len,
 }
 #endif
 
-#include <uk/vma_types.h>
+#include <uk/vmem/vma_types.h>
 
 #endif /* __UK_VMEM_H__ */

@@ -7,7 +7,6 @@
 #include <stdio.h>
 #include <errno.h>
 
-#include <uk/vma_types.h>
 #include <uk/vmem.h>
 #include <uk/test.h>
 #include <uk/list.h>
