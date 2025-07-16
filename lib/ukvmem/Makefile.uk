@@ -20,5 +20,8 @@ LIBUKVMEM_SRCS-$(CONFIG_ARCH_ARM_64) += \
 endif
 
 ifneq ($(filter y,$(CONFIG_LIBUKVMEM_TEST) $(CONFIG_LIBUKTEST_ALL)),)
+CINCLUDES-y   += -I$(LIBUKVMEM_BASE)/tests/include
+CXXINCLUDES-y += -I$(LIBUKVMEM_BASE)/tests/include
+
 LIBUKVMEM_SRCS-y += $(LIBUKVMEM_BASE)/tests/test_vmem.c
 endif

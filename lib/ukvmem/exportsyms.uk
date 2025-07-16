@@ -19,3 +19,7 @@ uk_vma_op_deny
 uk_vma_op_unmap
 uk_vma_op_set_attr
 uk_vma_op_advise
+
+uk_vmem_test_vas_init
+uk_vmem_test_vas_clean
+uk_vmem_test_check_vas

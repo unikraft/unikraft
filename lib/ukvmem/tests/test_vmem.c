@@ -8,6 +8,7 @@
 #include <errno.h>
 
 #include <uk/vmem.h>
+#include <uk/vmem/vma_test.h>
 #include <uk/test.h>
 #include <uk/list.h>
 #include <uk/print.h>
@@ -30,45 +31,30 @@
 #undef PROT_RWX
 #define PROT_RWX PAGE_ATTR_PROT_RWX
 
-#define pr_info(fmt, ...)						\
-	_uk_printk(KLVL_INFO, __NULL, __NULL, 0x0, fmt, ##__VA_ARGS__)
-
-#define vmem_bug_on(cond)						\
-	do {								\
-		if (unlikely(cond))					\
-			UK_CRASH("'%s' during test execution.\n",	\
-				 STRINGIFY(cond));			\
-	} while (0)
-
-struct vma_entry {
-	__vaddr_t start;
-	__vaddr_t end;
-	unsigned long attr;
-};
-
 static void vmem_print(struct uk_vas *vas)
 {
 	struct uk_vma *vma;
-	int i = 0;
+	__sz i = 0;
 
-	pr_info("   VAS layout:\n");
+	uk_pr_info("   VAS layout:\n");
 	uk_list_for_each_entry(vma, &vas->vma_list, vma_list) {
 		if (vma->name && strcmp("heap", vma->name) == 0)
 			continue;
 
-		pr_info("     [%d] 0x%lx-0x%lx %c%c%c %s\n", i++,
-			vma->start, vma->end,
-			(vma->attr & PAGE_ATTR_PROT_READ) ? 'r' : '-',
-			(vma->attr & PAGE_ATTR_PROT_WRITE) ? 'w' : '-',
-			(vma->attr & PAGE_ATTR_PROT_EXEC) ? 'x' : '-',
-			(vma->name) ? vma->name : "");
+		uk_pr_info("     [%zu] 0x%lx-0x%lx %c%c%c %s\n", i++,
+			   vma->start, vma->end,
+			   (vma->attr & PAGE_ATTR_PROT_READ) ? 'r' : '-',
+			   (vma->attr & PAGE_ATTR_PROT_WRITE) ? 'w' : '-',
+			   (vma->attr & PAGE_ATTR_PROT_EXEC) ? 'x' : '-',
+			   (vma->name) ? vma->name : "");
 	}
 }
 
-static int chk_vas(struct uk_vas *vas, struct vma_entry *vmas, int num)
+int uk_vmem_test_check_vas(struct uk_vas *vas,
+			   struct uk_vmem_test_vma *vmas, __sz num)
 {
 	struct uk_vma *vma;
-	int i = 0;
+	__sz i = 0;
 
 	vmem_print(vas);
 
@@ -91,15 +77,15 @@ static int chk_vas(struct uk_vas *vas, struct vma_entry *vmas, int num)
 	return (i == num) ? 0 : -1;
 }
 
-static struct uk_vas *vas_init(void)
+struct uk_vas *uk_vmem_test_vas_init(void)
 {
 	struct uk_vas *vas = uk_vas_get_active();
 
-	vmem_bug_on(vas == __NULL);
+	uk_vmem_test_bug_on(vas == __NULL);
 	return vas;
 }
 
-static void vas_clean(struct uk_vas *vas)
+void uk_vmem_test_vas_clean(struct uk_vas *vas)
 {
 	struct uk_vma *vma;
 	int restart, rc;
@@ -112,7 +98,7 @@ static void vas_clean(struct uk_vas *vas)
 
 			rc = uk_vma_unmap(vas, vma->start,
 					  vma->end - vma->start, 0);
-			vmem_bug_on(rc != 0);
+			uk_vmem_test_bug_on(rc != 0);
 
 			restart = 1;
 			break;
@@ -129,7 +115,7 @@ static void vas_clean(struct uk_vas *vas)
  */
 UK_TESTCASE(ukvmem, test_basic_vas_layout)
 {
-	struct uk_vas *vas = vas_init();
+	struct uk_vas *vas = uk_vmem_test_vas_init();
 	__vaddr_t va;
 	int rc;
 
@@ -143,10 +129,11 @@ UK_TESTCASE(ukvmem, test_basic_vas_layout)
 	rc = uk_vma_reserve(vas, &va, 0x1000);
 	UK_TEST_EXPECT_ZERO(rc);
 
-	UK_TEST_EXPECT_ZERO(chk_vas(vas, (struct vma_entry[]){
-		{MAPPING_BASE + 0x000000, MAPPING_BASE + 0x010000, 0x0},
-		{MAPPING_BASE + 0x020000, MAPPING_BASE + 0x021000, 0x0},
-	}, 2));
+	UK_TEST_EXPECT_ZERO(uk_vmem_test_check_vas(vas,
+		(struct uk_vmem_test_vma[]){
+			{MAPPING_BASE + 0x000000, MAPPING_BASE + 0x010000, 0x0},
+			{MAPPING_BASE + 0x020000, MAPPING_BASE + 0x021000, 0x0},
+		}, 2));
 
 	/* Create VMA after first one, should merge */
 	va = __VADDR_ANY;
@@ -179,29 +166,32 @@ UK_TESTCASE(ukvmem, test_basic_vas_layout)
 	rc = uk_vma_reserve(vas, &va, 0x1000);
 	UK_TEST_EXPECT_ZERO(rc);
 
-	UK_TEST_EXPECT_ZERO(chk_vas(vas, (struct vma_entry[]){
-		{MAPPING_BASE + 0x000000, MAPPING_BASE + 0x011000, 0x0},
-		{MAPPING_BASE + 0x01f000, MAPPING_BASE + 0x021000, 0x0},
-	}, 2));
+	UK_TEST_EXPECT_ZERO(uk_vmem_test_check_vas(vas,
+		(struct uk_vmem_test_vma[]){
+			{MAPPING_BASE + 0x000000, MAPPING_BASE + 0x011000, 0x0},
+			{MAPPING_BASE + 0x01f000, MAPPING_BASE + 0x021000, 0x0},
+		}, 2));
 
 	/* Create VMA that is too large for the hole, should merge with last */
 	va = __VADDR_ANY;
 	rc = uk_vma_reserve(vas, &va, 0x100000);
 	UK_TEST_EXPECT_ZERO(rc);
 
-	UK_TEST_EXPECT_ZERO(chk_vas(vas, (struct vma_entry[]){
-		{MAPPING_BASE + 0x000000, MAPPING_BASE + 0x011000, 0x0},
-		{MAPPING_BASE + 0x01f000, MAPPING_BASE + 0x121000, 0x0},
-	}, 2));
+	UK_TEST_EXPECT_ZERO(uk_vmem_test_check_vas(vas,
+		(struct uk_vmem_test_vma[]){
+			{MAPPING_BASE + 0x000000, MAPPING_BASE + 0x011000, 0x0},
+			{MAPPING_BASE + 0x01f000, MAPPING_BASE + 0x121000, 0x0},
+		}, 2));
 
 	/* Create VMA that fits the hole, should merge everything */
 	va = __VADDR_ANY;
 	rc = uk_vma_reserve(vas, &va, 0xe000);
 	UK_TEST_EXPECT_ZERO(rc);
 
-	UK_TEST_EXPECT_ZERO(chk_vas(vas, (struct vma_entry[]){
-		{MAPPING_BASE + 0x000000, MAPPING_BASE + 0x121000, 0x0},
-	}, 1));
+	UK_TEST_EXPECT_ZERO(uk_vmem_test_check_vas(vas,
+		(struct uk_vmem_test_vma[]){
+			{MAPPING_BASE + 0x000000, MAPPING_BASE + 0x121000, 0x0},
+		}, 1));
 
 	/* Punch a few holes into the VMA */
 	rc = uk_vma_unmap(vas, MAPPING_BASE + 0x4000, 0x1000, 0);
@@ -216,11 +206,12 @@ UK_TESTCASE(ukvmem, test_basic_vas_layout)
 	rc = uk_vma_unmap(vas, MAPPING_BASE - 0x1000, 0x2000, 0);
 	UK_TEST_EXPECT_ZERO(rc);
 
-	UK_TEST_EXPECT_ZERO(chk_vas(vas, (struct vma_entry[]){
-		{MAPPING_BASE + 0x001000, MAPPING_BASE + 0x004000, 0x0},
-		{MAPPING_BASE + 0x005000, MAPPING_BASE + 0x006000, 0x0},
-		{MAPPING_BASE + 0x00e000, MAPPING_BASE + 0x100000, 0x0},
-	}, 3));
+	UK_TEST_EXPECT_ZERO(uk_vmem_test_check_vas(vas,
+		(struct uk_vmem_test_vma[]){
+			{MAPPING_BASE + 0x001000, MAPPING_BASE + 0x004000, 0x0},
+			{MAPPING_BASE + 0x005000, MAPPING_BASE + 0x006000, 0x0},
+			{MAPPING_BASE + 0x00e000, MAPPING_BASE + 0x100000, 0x0},
+		}, 3));
 
 	/* Unmap a region where nothing is - ok without strict checking */
 	rc = uk_vma_unmap(vas, MAPPING_BASE + 0x200000, 0x1000, 0);
@@ -239,10 +230,11 @@ UK_TESTCASE(ukvmem, test_basic_vas_layout)
 	rc = uk_vma_unmap(vas, MAPPING_BASE + 0x2000, 0xd000, 0);
 	UK_TEST_EXPECT_ZERO(rc);
 
-	UK_TEST_EXPECT_ZERO(chk_vas(vas, (struct vma_entry[]){
-		{MAPPING_BASE + 0x001000, MAPPING_BASE + 0x002000, 0x0},
-		{MAPPING_BASE + 0x00f000, MAPPING_BASE + 0x100000, 0x0},
-	}, 2));
+	UK_TEST_EXPECT_ZERO(uk_vmem_test_check_vas(vas,
+		(struct uk_vmem_test_vma[]){
+			{MAPPING_BASE + 0x001000, MAPPING_BASE + 0x002000, 0x0},
+			{MAPPING_BASE + 0x00f000, MAPPING_BASE + 0x100000, 0x0},
+		}, 2));
 
 	/* Check that length is page aligned */
 	rc = uk_vma_unmap(vas, MAPPING_BASE + 0xf000, 0x0100, 0);
@@ -252,7 +244,7 @@ UK_TESTCASE(ukvmem, test_basic_vas_layout)
 	rc = uk_vma_unmap(vas, MAPPING_BASE, 0x200000, 0);
 	UK_TEST_EXPECT_ZERO(rc);
 
-	UK_TEST_EXPECT_ZERO(chk_vas(vas, NULL, 0));
+	UK_TEST_EXPECT_ZERO(uk_vmem_test_check_vas(vas, NULL, 0));
 
 	/* Create a couple of more complex VMAs, some of which should merge,
 	 * and some should not
@@ -277,24 +269,26 @@ UK_TESTCASE(ukvmem, test_basic_vas_layout)
 	rc = uk_vma_reserve_ex(vas, &va, 0x2000, PROT_RW, 0, "tst");
 	UK_TEST_EXPECT_ZERO(rc);
 
-	UK_TEST_EXPECT_ZERO(chk_vas(vas, (struct vma_entry[]){
-		{MAPPING_BASE + 0x000000, MAPPING_BASE + 0x002000, PROT_RW},
-		{MAPPING_BASE + 0x002000, MAPPING_BASE + 0x004000, PROT_RWX},
-		{MAPPING_BASE + 0x004000, MAPPING_BASE + 0x008000, PROT_RWX},
-		{MAPPING_BASE + 0x008000, MAPPING_BASE + 0x00a000, PROT_RW}
-	}, 4));
+	UK_TEST_EXPECT_ZERO(uk_vmem_test_check_vas(vas,
+		(struct uk_vmem_test_vma[]){
+			{MAPPING_BASE + 0x000000, MAPPING_BASE + 0x002000, PROT_RW},
+			{MAPPING_BASE + 0x002000, MAPPING_BASE + 0x004000, PROT_RWX},
+			{MAPPING_BASE + 0x004000, MAPPING_BASE + 0x008000, PROT_RWX},
+			{MAPPING_BASE + 0x008000, MAPPING_BASE + 0x00a000, PROT_RW}
+		}, 4));
 
 	/* Set attributes so that some areas are merged */
 	va = MAPPING_BASE + 0x1000;
 	rc = uk_vma_set_attr(vas, va, 0x7000, PAGE_ATTR_PROT_RW, 0);
 	UK_TEST_EXPECT_ZERO(rc);
 
-	UK_TEST_EXPECT_ZERO(chk_vas(vas, (struct vma_entry[]){
-		{MAPPING_BASE + 0x000000, MAPPING_BASE + 0x004000, PROT_RW},
-		{MAPPING_BASE + 0x004000, MAPPING_BASE + 0x00a000, PROT_RW},
-	}, 2));
+	UK_TEST_EXPECT_ZERO(uk_vmem_test_check_vas(vas,
+		(struct uk_vmem_test_vma[]){
+			{MAPPING_BASE + 0x000000, MAPPING_BASE + 0x004000, PROT_RW},
+			{MAPPING_BASE + 0x004000, MAPPING_BASE + 0x00a000, PROT_RW},
+		}, 2));
 
-	vas_clean(vas);
+	uk_vmem_test_vas_clean(vas);
 }
 
 static inline int is_zero(__vaddr_t va, __sz len)
@@ -313,30 +307,6 @@ static inline int is_zero(__vaddr_t va, __sz len)
 	return 1;
 }
 
-static inline __sz probe_r(__vaddr_t vaddr, __sz len)
-{
-	return uk_nofault_probe_r(vaddr, len, UK_NOFAULTF_CONTINUE);
-}
-
-static inline __sz probe_rw(__vaddr_t vaddr, __sz len)
-{
-	return uk_nofault_probe_rw(vaddr, len, UK_NOFAULTF_CONTINUE);
-}
-
-static inline __sz probe_r_nopage(__vaddr_t vaddr, __sz len)
-{
-	unsigned long flags = UK_NOFAULTF_CONTINUE | UK_NOFAULTF_NOPAGING;
-
-	return uk_nofault_probe_r(vaddr, len, flags);
-}
-
-static inline __sz probe_rw_nopage(__vaddr_t vaddr, __sz len)
-{
-	unsigned long flags = UK_NOFAULTF_CONTINUE | UK_NOFAULTF_NOPAGING;
-
-	return uk_nofault_probe_rw(vaddr, len, flags);
-}
-
 /**
  * Tests if reserved memory regions behave as expected. Since we test all
  * things related to the VAS layout in a different test using reserved regions,
@@ -345,7 +315,7 @@ static inline __sz probe_rw_nopage(__vaddr_t vaddr, __sz len)
  */
 UK_TESTCASE(ukvmem, test_vma_rsvd)
 {
-	struct uk_vas *vas = vas_init();
+	struct uk_vas *vas = uk_vmem_test_vas_init();
 	__vaddr_t vaddr;
 	int rc;
 	__sz len;
@@ -354,10 +324,10 @@ UK_TESTCASE(ukvmem, test_vma_rsvd)
 	rc = uk_vma_reserve(vas, &vaddr, PAGE_SIZE);
 	UK_TEST_EXPECT_ZERO(rc);
 
-	len = probe_r(vaddr, PAGE_SIZE);
+	len = uk_vmem_test_probe_r(vaddr, PAGE_SIZE);
 	UK_TEST_EXPECT_SNUM_EQ(len, 0);
 
-	vas_clean(vas);
+	uk_vmem_test_vas_clean(vas);
 }
 
 /**
@@ -367,7 +337,7 @@ UK_TESTCASE(ukvmem, test_vma_rsvd)
  */
 UK_TESTCASE(ukvmem, test_vma_anon)
 {
-	struct uk_vas *vas = vas_init();
+	struct uk_vas *vas = uk_vmem_test_vas_init();
 	__vaddr_t va1, va2;
 	int rc;
 	__sz len;
@@ -381,12 +351,12 @@ UK_TESTCASE(ukvmem, test_vma_anon)
 			     UK_VMA_MAP_POPULATE, NULL);
 	UK_TEST_EXPECT_ZERO(rc);
 
-	len = probe_r_nopage(va1, 0x10000);
+	len = uk_vmem_test_probe_r_nopage(va1, 0x10000);
 	UK_TEST_EXPECT_SNUM_EQ(len, 0x10000);
 	UK_TEST_EXPECT(is_zero(va1, 0x10000));
 
 	/* Check protections are set correctly */
-	len = probe_rw_nopage(va1, 0x10000);
+	len = uk_vmem_test_probe_rw_nopage(va1, 0x10000);
 	UK_TEST_EXPECT_ZERO(len);
 
 	/* Perform another mapping with demand-paging. We test if we can
@@ -397,54 +367,57 @@ UK_TESTCASE(ukvmem, test_vma_anon)
 	rc = uk_vma_map_anon(vas, &va2, 0x2000, PROT_R, 0, NULL);
 	UK_TEST_EXPECT_ZERO(rc);
 
-	UK_TEST_EXPECT_ZERO(chk_vas(vas, (struct vma_entry[]){
-		{va1, va1 + 0x10000 + 0x2000, PROT_R},
-	}, 1));
+	UK_TEST_EXPECT_ZERO(uk_vmem_test_check_vas(vas,
+		(struct uk_vmem_test_vma[]){
+			{va1, va1 + 0x10000 + 0x2000, PROT_R},
+		}, 1));
 
-	len = probe_r_nopage(va2, 0x2000);
+	len = uk_vmem_test_probe_r_nopage(va2, 0x2000);
 	UK_TEST_EXPECT_ZERO(len);
 
-	len = probe_r(va2 + 0x1000, 0x1000);
+	len = uk_vmem_test_probe_r(va2 + 0x1000, 0x1000);
 	UK_TEST_EXPECT_SNUM_EQ(len, 0x1000);
 	UK_TEST_EXPECT(is_zero(va2 + 0x1000, 0x1000));
 
 	/* Check protections are set correctly */
-	len = probe_rw(va2 + 0x1000, 0x1000);
+	len = uk_vmem_test_probe_rw(va2 + 0x1000, 0x1000);
 	UK_TEST_EXPECT_ZERO(len);
 
 	/* First page should still be inaccessible */
-	len = probe_r_nopage(va2, 0x1000);
+	len = uk_vmem_test_probe_r_nopage(va2, 0x1000);
 	UK_TEST_EXPECT_ZERO(len);
 
 	/* We change protections for the second VMA range */
 	rc = uk_vma_set_attr(vas, va2, 0x2000, PROT_RW, 0);
 	UK_TEST_EXPECT_ZERO(rc);
 
-	UK_TEST_EXPECT_ZERO(chk_vas(vas, (struct vma_entry[]){
-		{va1, va1 + 0x10000, PROT_R},
-		{va2, va2 + 0x2000, PROT_RW},
-	}, 2));
+	UK_TEST_EXPECT_ZERO(uk_vmem_test_check_vas(vas,
+		(struct uk_vmem_test_vma[]){
+			{va1, va1 + 0x10000, PROT_R},
+			{va2, va2 + 0x2000, PROT_RW},
+		}, 2));
 
 	/* This should create a new mapping based on the updated attr for the
 	 * first page and use the updated mapping for the second page
 	 */
-	len = probe_rw(va2, 0x2000);
+	len = uk_vmem_test_probe_rw(va2, 0x2000);
 	UK_TEST_EXPECT_SNUM_EQ(len, 0x2000);
 
 	/* Unmap some part of the area */
 	rc = uk_vma_unmap(vas, va1 + 0x2000, 0x3000, 0);
 	UK_TEST_EXPECT_ZERO(rc);
 
-	UK_TEST_EXPECT_ZERO(chk_vas(vas, (struct vma_entry[]){
-		{va1 + 0x0000, va1 + 0x2000, PROT_R},
-		{va1 + 0x5000, va1 + 0x10000, PROT_R},
-		{va2 + 0x0000, va2 + 0x2000, PROT_RW},
-	}, 3));
+	UK_TEST_EXPECT_ZERO(uk_vmem_test_check_vas(vas,
+		(struct uk_vmem_test_vma[]){
+			{va1 + 0x0000, va1 + 0x2000, PROT_R},
+			{va1 + 0x5000, va1 + 0x10000, PROT_R},
+			{va2 + 0x0000, va2 + 0x2000, PROT_RW},
+		}, 3));
 
-	len = probe_r(va1 + 0x2000, 0x3000);
+	len = uk_vmem_test_probe_r(va1 + 0x2000, 0x3000);
 	UK_TEST_EXPECT_ZERO(len);
 
-	vas_clean(vas);
+	uk_vmem_test_vas_clean(vas);
 }
 
 #ifdef PAGE_LARGE_SHIFT
@@ -453,7 +426,7 @@ UK_TESTCASE(ukvmem, test_vma_anon)
  */
 UK_TESTCASE(ukvmem, test_vma_anon_large)
 {
-	struct uk_vas *vas = vas_init();
+	struct uk_vas *vas = uk_vmem_test_vas_init();
 	__vaddr_t va;
 	unsigned int lvl;
 	int rc;
@@ -475,13 +448,13 @@ UK_TESTCASE(ukvmem, test_vma_anon_large)
 			     UK_VMA_MAP_SIZE(PAGE_LARGE_SHIFT), NULL);
 	UK_TEST_EXPECT_ZERO(rc);
 
-	len = probe_rw(va, PAGE_LARGE_SIZE * 2);
+	len = uk_vmem_test_probe_rw(va, PAGE_LARGE_SIZE * 2);
 	UK_TEST_EXPECT_SNUM_EQ(len, PAGE_LARGE_SIZE * 2);
 
 	/* Check if this is really a large page */
 	lvl = PAGE_LEVEL;
 	rc = ukplat_pt_walk(vas->pt, va, &lvl, NULL, NULL);
-	vmem_bug_on(rc != 0);
+	uk_vmem_test_bug_on(rc != 0);
 
 	UK_TEST_EXPECT_SNUM_EQ(lvl, PAGE_LARGE_LEVEL);
 
@@ -498,12 +471,13 @@ UK_TESTCASE(ukvmem, test_vma_anon_large)
 			     PROT_R, 0);
 	UK_TEST_EXPECT_ZERO(0);
 
-	UK_TEST_EXPECT_ZERO(chk_vas(vas, (struct vma_entry[]){
-		{va, va + PAGE_LARGE_SIZE, PROT_RW},
-		{va + PAGE_LARGE_SIZE, va + 2 * PAGE_LARGE_SIZE, PROT_R},
-	}, 2));
+	UK_TEST_EXPECT_ZERO(uk_vmem_test_check_vas(vas,
+		(struct uk_vmem_test_vma[]){
+			{va, va + PAGE_LARGE_SIZE, PROT_RW},
+			{va + PAGE_LARGE_SIZE, va + 2 * PAGE_LARGE_SIZE, PROT_R},
+		}, 2));
 
-	vas_clean(vas);
+	uk_vmem_test_vas_clean(vas);
 }
 #endif /* PAGE_LARGE_SHIFT */
 
@@ -514,7 +488,7 @@ UK_TESTCASE(ukvmem, test_vma_anon_large)
  */
 UK_TESTCASE(ukvmem, test_vma_dma)
 {
-	struct uk_vas *vas = vas_init();
+	struct uk_vas *vas = uk_vmem_test_vas_init();
 	__vaddr_t kvaddr;
 	__vaddr_t vaddr = __VADDR_ANY;
 	__paddr_t paddr = __PADDR_ANY;
@@ -527,10 +501,10 @@ UK_TESTCASE(ukvmem, test_vma_dma)
 	 * the contents matches
 	 */
 	rc = vas->pt->fa->falloc(vas->pt->fa, &paddr, 4, 0);
-	vmem_bug_on(rc != 0);
+	uk_vmem_test_bug_on(rc != 0);
 
 	kvaddr = ukplat_page_kmap(vas->pt, paddr, 4, 0);
-	vmem_bug_on(kvaddr == __VADDR_INV);
+	uk_vmem_test_bug_on(kvaddr == __VADDR_INV);
 
 	for (i = 0, va = kvaddr; i < 4; i++, va += PAGE_SIZE)
 		*((unsigned long *)va) = 0xDEADB0B0 + i;
@@ -561,10 +535,11 @@ UK_TESTCASE(ukvmem, test_vma_dma)
 	rc = uk_vma_set_attr(vas, vaddr, 2 * PAGE_SIZE, PROT_R, 0);
 	UK_TEST_EXPECT_ZERO(rc);
 
-	UK_TEST_EXPECT_ZERO(chk_vas(vas, (struct vma_entry[]){
-		{vaddr + 0 * PAGE_SIZE, vaddr + 2 * PAGE_SIZE, PROT_R},
-		{vaddr + 2 * PAGE_SIZE, vaddr + 4 * PAGE_SIZE, PROT_RW},
-	}, 2));
+	UK_TEST_EXPECT_ZERO(uk_vmem_test_check_vas(vas,
+		(struct uk_vmem_test_vma[]){
+			{vaddr + 0 * PAGE_SIZE, vaddr + 2 * PAGE_SIZE, PROT_R},
+			{vaddr + 2 * PAGE_SIZE, vaddr + 4 * PAGE_SIZE, PROT_RW},
+		}, 2));
 
 	/* Two pages should be read-only now and one of the rw-pages (the 4th)
 	 * should not be mapped at this point. We then perform a write, which
@@ -573,10 +548,10 @@ UK_TESTCASE(ukvmem, test_vma_dma)
 	 * new physical base address computed during the split and used during
 	 * the fault is correct.
 	 */
-	len = probe_r_nopage(vaddr, 4 * PAGE_SIZE);
+	len = uk_vmem_test_probe_r_nopage(vaddr, 4 * PAGE_SIZE);
 	UK_TEST_EXPECT_SNUM_EQ(len, 3 * PAGE_SIZE);
 
-	len = probe_rw_nopage(vaddr, 4 * PAGE_SIZE);
+	len = uk_vmem_test_probe_rw_nopage(vaddr, 4 * PAGE_SIZE);
 	UK_TEST_EXPECT_SNUM_EQ(len, PAGE_SIZE);
 
 	*((unsigned long *)(vaddr + 3 * PAGE_SIZE)) = 0xB0B0CAFE + 3;
@@ -590,17 +565,18 @@ UK_TESTCASE(ukvmem, test_vma_dma)
 	rc = uk_vma_set_attr(vas, vaddr, 2 * PAGE_SIZE, PROT_RW, 0);
 	UK_TEST_EXPECT_ZERO(rc);
 
-	UK_TEST_EXPECT_ZERO(chk_vas(vas, (struct vma_entry[]){
-		{vaddr, vaddr + 4 * PAGE_SIZE, PROT_RW},
-	}, 1));
+	UK_TEST_EXPECT_ZERO(uk_vmem_test_check_vas(vas,
+		(struct uk_vmem_test_vma[]){
+			{vaddr, vaddr + 4 * PAGE_SIZE, PROT_RW},
+		}, 1));
 
 	/* Clean up */
 	ukplat_page_kunmap(vas->pt, kvaddr, 4, 0);
 
 	rc = vas->pt->fa->ffree(vas->pt->fa, paddr, 4);
-	vmem_bug_on(rc != 0);
+	uk_vmem_test_bug_on(rc != 0);
 
-	vas_clean(vas);
+	uk_vmem_test_vas_clean(vas);
 }
 
 /**
@@ -611,7 +587,7 @@ UK_TESTCASE(ukvmem, test_vma_dma)
 #define VMEM_STACKSIZE (16 * PAGE_SIZE)
 UK_TESTCASE(ukvmem, test_vma_stack)
 {
-	struct uk_vas *vas = vas_init();
+	struct uk_vas *vas = uk_vmem_test_vas_init();
 	__vaddr_t va1 = __VADDR_ANY;
 	__vaddr_t va2 = __VADDR_ANY;
 	__sz len;
@@ -624,44 +600,45 @@ UK_TESTCASE(ukvmem, test_vma_stack)
 	/* Verify that only the initial length has been allocated and the
 	 * memory is readable/writable
 	 */
-	len = probe_rw_nopage(va1, VMEM_STACKSIZE);
+	len = uk_vmem_test_probe_rw_nopage(va1, VMEM_STACKSIZE);
 	UK_TEST_EXPECT_SNUM_EQ(len, 2 * PAGE_SIZE);
 
 	/* Probe the top guard pages */
-	len = probe_r(va1 + VMEM_STACKSIZE, UK_VMA_STACK_TOP_GUARD_SIZE);
+	len = uk_vmem_test_probe_r(va1 + VMEM_STACKSIZE, UK_VMA_STACK_TOP_GUARD_SIZE);
 	UK_TEST_EXPECT_ZERO(len);
 
 	/* Probe the bottom guard pages */
-	len = probe_r(va1 - UK_VMA_STACK_BOTTOM_GUARD_SIZE,
-		      UK_VMA_STACK_BOTTOM_GUARD_SIZE);
+	len = uk_vmem_test_probe_r(va1 - UK_VMA_STACK_BOTTOM_GUARD_SIZE,
+				   UK_VMA_STACK_BOTTOM_GUARD_SIZE);
 	UK_TEST_EXPECT_ZERO(len);
 
 	/* Probe the entire stack */
-	len = probe_r(va1 - UK_VMA_STACK_BOTTOM_GUARD_SIZE,
-		      VMEM_STACKSIZE + UK_VMA_STACK_GUARDS_SIZE);
+	len = uk_vmem_test_probe_r(va1 - UK_VMA_STACK_BOTTOM_GUARD_SIZE,
+				   VMEM_STACKSIZE + UK_VMA_STACK_GUARDS_SIZE);
 	UK_TEST_EXPECT_SNUM_EQ(len, VMEM_STACKSIZE);
 
 	rc = uk_vma_map_stack(vas, &va2, VMEM_STACKSIZE, 0,
 			      NULL, VMEM_STACKSIZE);
 	UK_TEST_EXPECT_ZERO(rc);
 
-	UK_TEST_EXPECT_ZERO(chk_vas(vas, (struct vma_entry[]){
-		{va1, va1 + VMEM_STACKSIZE, PROT_RW},
-		{va2, va2 + VMEM_STACKSIZE, PROT_RW},
-	}, 2));
+	UK_TEST_EXPECT_ZERO(uk_vmem_test_check_vas(vas,
+		(struct uk_vmem_test_vma[]){
+			{va1, va1 + VMEM_STACKSIZE, PROT_RW},
+			{va2, va2 + VMEM_STACKSIZE, PROT_RW},
+		}, 2));
 
 	/* Probe the top guard pages */
-	len = probe_r(va2 + VMEM_STACKSIZE, UK_VMA_STACK_TOP_GUARD_SIZE);
+	len = uk_vmem_test_probe_r(va2 + VMEM_STACKSIZE, UK_VMA_STACK_TOP_GUARD_SIZE);
 	UK_TEST_EXPECT_ZERO(len);
 
 	/* Probe the bottom guard pages */
-	len = probe_r(va2 - UK_VMA_STACK_BOTTOM_GUARD_SIZE,
-		      UK_VMA_STACK_BOTTOM_GUARD_SIZE);
+	len = uk_vmem_test_probe_r(va2 - UK_VMA_STACK_BOTTOM_GUARD_SIZE,
+				   UK_VMA_STACK_BOTTOM_GUARD_SIZE);
 	UK_TEST_EXPECT_ZERO(len);
 
 	/* Probe the entire stack */
-	len = probe_r(va2 - UK_VMA_STACK_BOTTOM_GUARD_SIZE,
-		      VMEM_STACKSIZE + UK_VMA_STACK_GUARDS_SIZE);
+	len = uk_vmem_test_probe_r(va2 - UK_VMA_STACK_BOTTOM_GUARD_SIZE,
+				   VMEM_STACKSIZE + UK_VMA_STACK_GUARDS_SIZE);
 	UK_TEST_EXPECT_SNUM_EQ(len, VMEM_STACKSIZE);
 
 	/* Try to unmap only some part of the stack */
@@ -678,7 +655,7 @@ UK_TESTCASE(ukvmem, test_vma_stack)
 			     PROT_R, 0);
 	UK_TEST_EXPECT_ZERO(rc);
 
-	vas_clean(vas);
+	uk_vmem_test_vas_clean(vas);
 }
 
 #ifdef CONFIG_LIBVFSCORE
@@ -694,7 +671,7 @@ UK_TESTCASE(ukvmem, test_vma_stack)
 #define VMEM_TEST_FILENAME "/test_vma_file"
 UK_TESTCASE(ukvmem, test_vma_file)
 {
-	struct uk_vas *vas = vas_init();
+	struct uk_vas *vas = uk_vmem_test_vas_init();
 	unsigned char *buf;
 	int fd, i, rc;
 	__vaddr_t va1, va2;
@@ -707,10 +684,10 @@ UK_TESTCASE(ukvmem, test_vma_file)
 	 * memory for the remainder of the page.
 	 */
 	fd = creat(VMEM_TEST_FILENAME, 0700);
-	vmem_bug_on(fd < 0);
+	uk_vmem_test_bug_on(fd < 0);
 
 	buf = malloc(PAGE_SIZE);
-	vmem_bug_on(!buf);
+	uk_vmem_test_bug_on(!buf);
 
 	memset(buf, 0xdd, PAGE_SIZE);
 
@@ -718,12 +695,12 @@ UK_TESTCASE(ukvmem, test_vma_file)
 		buf[0] = (char)i;
 
 		len = write(fd, buf, PAGE_SIZE);
-		vmem_bug_on(len != PAGE_SIZE);
+		uk_vmem_test_bug_on(len != PAGE_SIZE);
 	}
 
 	buf[0] = (char)i;
 	len = write(fd, buf, PAGE_SIZE / 2);
-	vmem_bug_on(len != PAGE_SIZE / 2);
+	uk_vmem_test_bug_on(len != PAGE_SIZE / 2);
 
 	free(buf);
 
@@ -733,8 +710,8 @@ UK_TESTCASE(ukvmem, test_vma_file)
 	rc = uk_vma_map_file(vas, &va1, 3 * PAGE_SIZE, PROT_R, 0, fd, 0);
 	UK_TEST_EXPECT_ZERO(rc);
 
-	len = probe_r(va1, 3 * PAGE_SIZE);
-	vmem_bug_on(len != 3 * PAGE_SIZE);
+	len = uk_vmem_test_probe_r(va1, 3 * PAGE_SIZE);
+	uk_vmem_test_bug_on(len != 3 * PAGE_SIZE);
 
 	UK_TEST_EXPECT_SNUM_EQ(*((unsigned char *)(va1)), 0);
 	UK_TEST_EXPECT_SNUM_EQ(*((unsigned char *)(va1 + 1)), 0xdd);
@@ -744,10 +721,11 @@ UK_TESTCASE(ukvmem, test_vma_file)
 	rc = uk_vma_set_attr(vas, va1 + 2 * PAGE_SIZE, PAGE_SIZE, PROT_RW, 0);
 	UK_TEST_EXPECT_ZERO(rc);
 
-	UK_TEST_EXPECT_ZERO(chk_vas(vas, (struct vma_entry[]){
-		{va1, va1 + 2 * PAGE_SIZE, PROT_R},
-		{va1 + 2 * PAGE_SIZE, va1 + 3 * PAGE_SIZE, PROT_RW},
-	}, 2));
+	UK_TEST_EXPECT_ZERO(uk_vmem_test_check_vas(vas,
+		(struct uk_vmem_test_vma[]){
+			{va1, va1 + 2 * PAGE_SIZE, PROT_R},
+			{va1 + 2 * PAGE_SIZE, va1 + 3 * PAGE_SIZE, PROT_RW},
+		}, 2));
 
 	/* Unmap the first two pages of the file. Then map the last half page
 	 * of the file directly after the last VMA. They should merge.
@@ -760,9 +738,10 @@ UK_TESTCASE(ukvmem, test_vma_file)
 			     3 * PAGE_SIZE);
 	UK_TEST_EXPECT_ZERO(rc);
 
-	UK_TEST_EXPECT_ZERO(chk_vas(vas, (struct vma_entry[]){
-		{va1 + 2 * PAGE_SIZE, va1 + 4 * PAGE_SIZE, PROT_RW},
-	}, 1));
+	UK_TEST_EXPECT_ZERO(uk_vmem_test_check_vas(vas,
+		(struct uk_vmem_test_vma[]){
+			{va1 + 2 * PAGE_SIZE, va1 + 4 * PAGE_SIZE, PROT_RW},
+		}, 1));
 
 	/* Check if we correctly read the last bits and if the remainder of the
 	 * page is zeroed (we just check two bytes here).
@@ -777,7 +756,7 @@ UK_TESTCASE(ukvmem, test_vma_file)
 	close(fd);
 	unlink(VMEM_TEST_FILENAME);
 
-	vas_clean(vas);
+	uk_vmem_test_vas_clean(vas);
 }
 #endif /* CONFIG_LIBVFSCORE */
 
@@ -788,20 +767,21 @@ UK_TESTCASE(ukvmem, test_vma_file)
 #define VMEM_TEST_HEAPSIZE 0x40000000
 UK_TESTCASE(ukvmem, test_vma_replace)
 {
-	struct uk_vas *vas = vas_init();
+	struct uk_vas *vas = uk_vmem_test_vas_init();
 	__vaddr_t va1 = __VADDR_ANY, va2;
 	__sz len;
 	int rc;
 
 	/* Reserve a large area */
 	rc = uk_vma_reserve(uk_vas_get_active(), &va1, VMEM_TEST_HEAPSIZE);
-	vmem_bug_on(rc != 0);
+	uk_vmem_test_bug_on(rc != 0);
 
-	UK_TEST_EXPECT_ZERO(chk_vas(vas, (struct vma_entry[]){
-		{va1, va1 + VMEM_TEST_HEAPSIZE, 0},
-	}, 1));
+	UK_TEST_EXPECT_ZERO(uk_vmem_test_check_vas(vas,
+		(struct uk_vmem_test_vma[]){
+			{va1, va1 + VMEM_TEST_HEAPSIZE, 0},
+		}, 1));
 
-	len = probe_r(va1, 1);
+	len = uk_vmem_test_probe_r(va1, 1);
 	UK_TEST_EXPECT_ZERO(len);
 
 	/* Initial 1MB mapping */
@@ -810,12 +790,13 @@ UK_TESTCASE(ukvmem, test_vma_replace)
 			     UK_VMA_MAP_REPLACE, "HEAP");
 
 	va2 = va1 + 0x100000;
-	UK_TEST_EXPECT_ZERO(chk_vas(vas, (struct vma_entry[]){
-		{va1, va2, PROT_RW},
-		{va2, va1 + VMEM_TEST_HEAPSIZE, 0},
-	}, 2));
+	UK_TEST_EXPECT_ZERO(uk_vmem_test_check_vas(vas,
+		(struct uk_vmem_test_vma[]){
+			{va1, va2, PROT_RW},
+			{va2, va1 + VMEM_TEST_HEAPSIZE, 0},
+		}, 2));
 
-	len = probe_r(va1, va2 - va1);
+	len = uk_vmem_test_probe_r(va1, va2 - va1);
 	UK_TEST_EXPECT_SNUM_EQ(len, va2 - va1);
 
 	// Grow mapping by 2MB
@@ -824,12 +805,13 @@ UK_TESTCASE(ukvmem, test_vma_replace)
 			     UK_VMA_MAP_REPLACE, "HEAP");
 
 	va2 += 0x200000;
-	UK_TEST_EXPECT_ZERO(chk_vas(vas, (struct vma_entry[]){
-		{va1, va2, PROT_RW},
-		{va2, va1 + VMEM_TEST_HEAPSIZE, 0},
-	}, 2));
+	UK_TEST_EXPECT_ZERO(uk_vmem_test_check_vas(vas,
+		(struct uk_vmem_test_vma[]){
+			{va1, va2, PROT_RW},
+			{va2, va1 + VMEM_TEST_HEAPSIZE, 0},
+		}, 2));
 
-	len = probe_r(va1, va2 - va1);
+	len = uk_vmem_test_probe_r(va1, va2 - va1);
 	UK_TEST_EXPECT_SNUM_EQ(len, va2 - va1);
 
 	// Shrink mapping by 1MB
@@ -838,18 +820,19 @@ UK_TESTCASE(ukvmem, test_vma_replace)
 			       &va2, 0x100000, 0,
 			       UK_VMA_MAP_REPLACE, NULL);
 
-	UK_TEST_EXPECT_ZERO(chk_vas(vas, (struct vma_entry[]){
-		{va1, va2, PROT_RW},
-		{va2, va1 + VMEM_TEST_HEAPSIZE, 0},
-	}, 2));
+	UK_TEST_EXPECT_ZERO(uk_vmem_test_check_vas(vas,
+		(struct uk_vmem_test_vma[]){
+			{va1, va2, PROT_RW},
+			{va2, va1 + VMEM_TEST_HEAPSIZE, 0},
+		}, 2));
 
-	len = probe_r(va1, va2 - va1);
+	len = uk_vmem_test_probe_r(va1, va2 - va1);
 	UK_TEST_EXPECT_SNUM_EQ(len, va2 - va1);
 
-	len = probe_r(va2, 0x100000);
+	len = uk_vmem_test_probe_r(va2, 0x100000);
 	UK_TEST_EXPECT_SNUM_EQ(len, 0);
 
-	vas_clean(vas);
+	uk_vmem_test_vas_clean(vas);
 }
 
 uk_testsuite_register(ukvmem, NULL);
