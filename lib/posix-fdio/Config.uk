@@ -1,4 +1,4 @@
-config LIBPOSIX_FDIO
+menuconfig LIBPOSIX_FDIO
 	bool "posix-fdio: File I/O and control"
 	select LIBUKATOMIC
 	select LIBUKFILE
@@ -7,3 +7,21 @@ config LIBPOSIX_FDIO
 	select LIBUKTIMECONV
 	imply LIBPOSIX_FDTAB
 	select LIBPOSIX_FDTAB_LEGACY_SHIM if LIBPOSIX_FDTAB
+
+if LIBPOSIX_FDIO
+
+choice LIBPOSIX_FDIO_VMA
+	prompt "File memory mappings"
+	depends on LIBUKVMEM
+	default LIBPOSIX_FDIO_VMA_COPY
+
+config LIBPOSIX_FDIO_VMA_COPY
+	bool "Private copies"
+	help
+	  File mappings are created as private copies on allocation.
+	  This mimics the behavior of legacy vfscore file mappings.
+	  Shared mappings and writeback are not supported.
+
+endchoice
+
+endif
