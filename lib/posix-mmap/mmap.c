@@ -16,9 +16,19 @@
 #include <uk/arch/lcpu.h>
 #include <uk/vmem.h>
 
+#if CONFIG_LIBPOSIX_FDTAB
+#include <uk/posix-fdtab.h>
+
 #if CONFIG_LIBVFSCORE
 #include <vfscore/vma.h>
+#include <vfscore/file.h>
 #endif /* CONFIG_LIBVFSCORE */
+
+#if CONFIG_LIBPOSIX_FDIO
+#include <uk/posix-file-vma.h>
+#endif /* CONFIG_LIBPOSIX_FDIO */
+
+#endif /* CONFIG_LIBPOSIX_FDTAB */
 
 #ifndef MAP_UNINITIALIZED
 #define MAP_UNINITIALIZED 0x4000000
@@ -51,9 +61,14 @@ static int do_mmap(void **addr, size_t len, int prot, int flags, int fd,
 	unsigned long vattr = prot_to_attr(prot);
 	unsigned long vflags = 0;
 	__vaddr_t vaddr;
-#ifdef CONFIG_LIBVFSCORE
-	struct uk_vma_file_args file_args;
+#if CONFIG_LIBPOSIX_FDTAB
+#if CONFIG_LIBVFSCORE
+	struct uk_vma_file_args vfscore_vma_args;
 #endif /* CONFIG_LIBVFSCORE */
+#if CONFIG_LIBPOSIX_FDIO
+	struct uk_fdio_vma_args fdio_vma_args;
+#endif /* CONFIG_LIBPOSIX_FDIO */
+#endif /* CONFIG_LIBPOSIX_FDTAB */
 	void *vargs;
 	const struct uk_vma_ops *vops;
 	unsigned int order, lvl = PAGE_LEVEL;
@@ -126,7 +141,9 @@ static int do_mmap(void **addr, size_t len, int prot, int flags, int fd,
 		vargs = NULL;
 		vops  = &uk_vma_anon_ops;
 	} else {
-#ifdef CONFIG_LIBVFSCORE
+#if CONFIG_LIBPOSIX_FDTAB
+		union uk_shim_file sf;
+
 		if ((flags & MAP_SHARED) ||
 		    (flags & MAP_SHARED_VALIDATE) == MAP_SHARED_VALIDATE)
 			vflags |= UK_VMA_FILE_SHARED;
@@ -146,19 +163,37 @@ static int do_mmap(void **addr, size_t len, int prot, int flags, int fd,
 		if (unlikely(!PAGE_ALIGNED(offset)))
 			return -EINVAL;
 
-		if (unlikely(fd < 0))
+		switch (uk_fdtab_shim_get(fd, &sf)) {
+		case UK_SHIM_LEGACY:
+#if CONFIG_LIBVFSCORE
+			vfscore_vma_args.fd = fd;
+			vfscore_vma_args.offset = offset;
+			vargs = &vfscore_vma_args;
+			vops = &uk_vma_file_ops;
+			fdrop(sf.vfile);
+			break;
+#else /* !CONFIG_LIBVFSCORE */
+			UK_CRASH("Impossible\n");
+#endif /* !CONFIG_LIBVFSCORE */
+		case UK_SHIM_OFILE:
+#if CONFIG_LIBPOSIX_FDIO
+			fdio_vma_args.of = sf.ofile;
+			fdio_vma_args.offset = offset;
+			vargs = &fdio_vma_args;
+			vops = &uk_fdio_vma_ops;
+			/* We release the ofile after VMA creation */
+			break;
+#else /* !CONFIG_LIBPOSIX_FDIO */
+			return -ENOTSUP;
+#endif /* CONFIG_LIBPOSIX_FDTAB */
+		default:
 			return -EBADF;
-
-		file_args.fd     = fd;
-		file_args.offset = offset;
-
-		vargs = &file_args;
-		vops  = &uk_vma_file_ops;
+		}
 #else
 		(void)fd; /* silence warning */
 
 		return -ENOTSUP;
-#endif /* CONFIG_LIBVFSCORE */
+#endif /* CONFIG_LIBPOSIX_FDTAB */
 	}
 
 	/* Linux will always align len to the selected page size */
@@ -171,20 +206,21 @@ static int do_mmap(void **addr, size_t len, int prot, int flags, int fd,
 	/* MAP_NONBLOCKED: Ignored for now */
 	/* MAP_NORESERVE : Ignored for now */
 
-	do {
-		rc = uk_vma_map(vas, &vaddr, len, vattr, vflags, NULL, vops,
-				vargs);
-		if (likely(rc == 0))
-			break;
-
-		if (vaddr == __VADDR_ANY)
-			return rc;
-
+	rc = uk_vma_map(vas, &vaddr, len, vattr, vflags, NULL, vops, vargs);
+	if (unlikely(rc && vaddr != __VADDR_ANY && !(flags & MAP_FIXED))) {
 		/* If addr was meant as a hint and we fail to map, we retry
 		 * without specifying an address.
 		 */
 		vaddr = __VADDR_ANY;
-	} while (1);
+		rc = uk_vma_map(vas, &vaddr, len, vattr, vflags, NULL, vops,
+				vargs);
+	}
+
+#if CONFIG_LIBPOSIX_FDTAB && CONFIG_LIBPOSIX_FDIO
+	/* Return open file description after creation of VMAs */
+	if (vargs == &fdio_vma_args)
+		uk_ofile_release(fdio_vma_args.of);
+#endif /* CONFIG_LIBPOSIX_FDTAB && CONFIG_LIBPOSIX_FDIO */
 
 	*addr = (void *)vaddr;
 	return rc;
