@@ -288,23 +288,3 @@ jobs:
           exit 1;
         env:
           GITHUB_TOKEN: ${{ secrets.GH_CATALOG_PAT }}
-
-
-  merge-stable:
-    needs: [catalog-tests]
-    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/staging' && github.repository_owner == 'unikraft' }}
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          ref: staging
-
-      - name: Merge stable
-        run: |
-          set -e;
-
-          git pull origin stable;
-          git checkout --track origin/stable;
-          git rebase staging;
-          git push origin stable;
