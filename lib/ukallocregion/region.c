@@ -73,23 +73,22 @@ static void *uk_allocregion_malloc(struct uk_alloc *a, size_t size)
 	/* return aligned pointers: this is a requirement for some
 	 * embedded systems archs, and more generally good for performance
 	 */
-	intptr = ALIGN_UP(((uintptr_t) b->heap_base),
-			     (uintptr_t) sizeof(void *));
+	intptr = ALIGN_UP(((uintptr_t)b->heap_base), (uintptr_t)sizeof(void *));
 
 	newbase  = intptr + size;
-	if (newbase > (uintptr_t) b->heap_top)
+	if (newbase > (uintptr_t)b->heap_top)
 		goto enomem; /* OOM */
 
 	/* Check for overflow, handle malloc(0) */
-	if (newbase <= (uintptr_t) b->heap_base)
+	if (newbase <= (uintptr_t)b->heap_base)
 		goto enomem;
 
-	uk_alloc_stats_count_alloc(a, (void *) intptr,
-				   newbase - (uintptr_t) b->heap_base);
+	uk_alloc_stats_count_alloc(a, (void *)intptr,
+				   newbase - (uintptr_t)b->heap_base);
 
-	b->heap_base = (void *)(newbase);
+	b->heap_base = (void *)newbase;
 
-	return (void *) intptr;
+	return (void *)intptr;
 
 enomem:
 	uk_alloc_stats_count_enomem(a, size);
@@ -119,22 +118,22 @@ static int uk_allocregion_posix_memalign(struct uk_alloc *a, void **memptr,
 		return EINVAL;
 	}
 
-	intptr = ALIGN_UP((uintptr_t) b->heap_base, (uintptr_t) align);
+	intptr = ALIGN_UP((uintptr_t)b->heap_base, (uintptr_t)align);
 
 	newbase  = intptr + size;
-	if (newbase > (uintptr_t) b->heap_top)
+	if (newbase > (uintptr_t)b->heap_top)
 		goto enomem; /* out-of-memory */
 
 	/* Check for overflow */
-	if (newbase <= (uintptr_t) b->heap_base)
+	if (newbase <= (uintptr_t)b->heap_base)
 		goto enomem;
 
 	*memptr = (void *)intptr;
 
-	uk_alloc_stats_count_alloc(a, (void *) intptr,
+	uk_alloc_stats_count_alloc(a, (void *)intptr,
 				   newbase - (uintptr_t)b->heap_base);
 
-	b->heap_base = (void *)(newbase);
+	b->heap_base = (void *)newbase;
 
 	return 0;
 
@@ -147,8 +146,8 @@ enomem:
 static void uk_allocregion_free(struct uk_alloc *a __maybe_unused,
 				void *ptr __maybe_unused)
 {
-	uk_pr_debug("%p: Releasing of memory is not supported by "
-			"ukallocregion\n", a);
+	uk_pr_debug("%p: Releasing of memory is not supported by ukallocregion\n",
+		    a);
 
 	/* Count a free operation but do not release memory from stats */
 	uk_alloc_stats_count_free(a, ptr, 0);
@@ -163,19 +162,19 @@ static ssize_t uk_allocregion_leftspace(struct uk_alloc *a)
 
 	UK_ASSERT(a != NULL);
 
-	b = (struct uk_allocregion *) &a->priv;
+	b = (struct uk_allocregion *)&a->priv;
 
 	UK_ASSERT(b != NULL);
 
-	return (uintptr_t) b->heap_top - (uintptr_t) b->heap_base;
+	return (uintptr_t)b->heap_top - (uintptr_t)b->heap_base;
 }
 
 static int uk_allocregion_addmem(struct uk_alloc *a __unused,
 				 void *base __unused, size_t size __unused)
 {
 	/* TODO: support multiple regions */
-	uk_pr_debug("%p: ukallocregion does not support multiple memory "
-			"regions\n", a);
+	uk_pr_debug("%p: ukallocregion does not support multiple memory regions\n",
+		    a);
 	return 0;
 }
 
@@ -194,8 +193,7 @@ struct uk_alloc *uk_allocregion_init(void *base, size_t len)
 
 	/* enough space for allocator available? */
 	if (metalen > len) {
-		uk_pr_err("Not enough space for allocator: %"__PRIsz
-			  " B required but only %"__PRIuptr" B usable\n",
+		uk_pr_err("Not enough space for allocator: %"__PRIsz" B required but only %"__PRIuptr" B usable\n",
 			  metalen, len);
 		return NULL;
 	}
@@ -204,21 +202,21 @@ struct uk_alloc *uk_allocregion_init(void *base, size_t len)
 	a = (struct uk_alloc *)base;
 	b = (struct uk_allocregion *)&a->priv;
 
-	uk_pr_info("Initialize allocregion allocator @ 0x%"
-		   __PRIuptr ", len %"__PRIsz"\n", (uintptr_t)a, len);
+	uk_pr_info("Initialize allocregion allocator @ 0x%"__PRIuptr ", len %"__PRIsz"\n",
+		   (uintptr_t)a, len);
 
-	b->heap_top  = (void *)((uintptr_t) base + len);
-	b->heap_base = (void *)((uintptr_t) base + metalen);
+	b->heap_top  = (void *)((uintptr_t)base + len);
+	b->heap_base = (void *)((uintptr_t)base + metalen);
 
 	/* use exclusively "compat" wrappers for calloc, realloc, memalign,
 	 * palloc and pfree as those do not add additional metadata.
 	 */
 	uk_alloc_init_malloc(a, uk_allocregion_malloc, uk_calloc_compat,
-				uk_realloc_compat, uk_allocregion_free,
-				uk_allocregion_posix_memalign,
-				uk_memalign_compat, uk_allocregion_leftspace,
-				uk_allocregion_leftspace,
-				uk_allocregion_addmem);
+			     uk_realloc_compat, uk_allocregion_free,
+			     uk_allocregion_posix_memalign,
+			     uk_memalign_compat, uk_allocregion_leftspace,
+			     uk_allocregion_leftspace,
+			     uk_allocregion_addmem);
 
 	return a;
 }
