@@ -76,11 +76,11 @@ static void *uk_allocregion_malloc(struct uk_alloc *a, size_t size)
 	intptr = ALIGN_UP(((uintptr_t)b->heap_base), (uintptr_t)sizeof(void *));
 
 	newbase  = intptr + size;
-	if (newbase > (uintptr_t)b->heap_top)
+	if (unlikely(newbase > (uintptr_t)b->heap_top))
 		goto enomem; /* OOM */
 
 	/* Check for overflow, handle malloc(0) */
-	if (newbase <= (uintptr_t)b->heap_base)
+	if (unlikely(newbase <= (uintptr_t)b->heap_base))
 		goto enomem;
 
 	uk_alloc_stats_count_alloc(a, (void *)intptr,
@@ -113,7 +113,7 @@ static int uk_allocregion_posix_memalign(struct uk_alloc *a, void **memptr,
 	/* align must be larger than pointer size */
 	UK_ASSERT((align % sizeof(void *)) == 0);
 
-	if (!size) {
+	if (unlikely(!size)) {
 		*memptr = NULL;
 		return EINVAL;
 	}
@@ -121,11 +121,11 @@ static int uk_allocregion_posix_memalign(struct uk_alloc *a, void **memptr,
 	intptr = ALIGN_UP((uintptr_t)b->heap_base, (uintptr_t)align);
 
 	newbase  = intptr + size;
-	if (newbase > (uintptr_t)b->heap_top)
+	if (unlikely(newbase > (uintptr_t)b->heap_top))
 		goto enomem; /* out-of-memory */
 
 	/* Check for overflow */
-	if (newbase <= (uintptr_t)b->heap_base)
+	if (unlikely(newbase <= (uintptr_t)b->heap_base))
 		goto enomem;
 
 	*memptr = (void *)intptr;
@@ -188,11 +188,11 @@ struct uk_alloc *uk_allocregion_init(void *base, size_t len)
 	 * Because of the multiboot layout, the first region might be a single
 	 * page, so we simply ignore it.
 	 */
-	if (len <= __PAGE_SIZE)
+	if (unlikely(len <= __PAGE_SIZE))
 		return NULL;
 
 	/* enough space for allocator available? */
-	if (metalen > len) {
+	if (unlikely(metalen > len)) {
 		uk_pr_err("Not enough space for allocator: %"__PRIsz" B required but only %"__PRIuptr" B usable\n",
 			  metalen, len);
 		return NULL;
