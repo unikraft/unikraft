@@ -161,13 +161,6 @@ struct uk_alloc *uk_allocregion_init(void *base, size_t len)
 	struct uk_allocregion *b;
 	const size_t metalen = sizeof(*a) + sizeof(*b);
 
-	/* TODO: ukallocregion does not support multiple memory regions yet.
-	 * Because of the multiboot layout, the first region might be a single
-	 * page, so we simply ignore it.
-	 */
-	if (unlikely(len <= __PAGE_SIZE))
-		return NULL;
-
 	/* enough space for allocator available? */
 	if (unlikely(metalen > len)) {
 		uk_pr_err("Not enough space for allocator: %"__PRIsz" B required but only %"__PRIuptr" B usable\n",
