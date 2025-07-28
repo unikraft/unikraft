@@ -55,51 +55,40 @@
 #include <uk/page.h>	/* round_pgup() */
 
 struct uk_allocregion {
-	void *heap_top;
+	void *heap_pos;
 	void *heap_base;
 };
 
 static void *uk_allocregion_malloc(struct uk_alloc *a, size_t size)
 {
 	struct uk_allocregion *b;
-	uintptr_t intptr, newbase;
 
 	UK_ASSERT(a != NULL);
 
 	b = (struct uk_allocregion *)&a->priv;
 
-	UK_ASSERT(b != NULL);
+	if (unlikely(!size))
+		return NULL;
+
+	if (unlikely((uintptr_t)b->heap_pos - (uintptr_t)b->heap_base < size)) {
+		uk_alloc_stats_count_enomem(a, size);
+		return NULL;
+	}
 
 	/* return aligned pointers: this is a requirement for some
 	 * embedded systems archs, and more generally good for performance
 	 */
-	intptr = ALIGN_UP(((uintptr_t)b->heap_base), (uintptr_t)sizeof(void *));
+	b->heap_pos = (void *)ALIGN_DOWN((uintptr_t)b->heap_pos - size,
+					 (uintptr_t)sizeof(void *));
 
-	newbase  = intptr + size;
-	if (unlikely(newbase > (uintptr_t)b->heap_top))
-		goto enomem; /* OOM */
-
-	/* Check for overflow, handle malloc(0) */
-	if (unlikely(newbase <= (uintptr_t)b->heap_base))
-		goto enomem;
-
-	uk_alloc_stats_count_alloc(a, (void *)intptr,
-				   newbase - (uintptr_t)b->heap_base);
-
-	b->heap_base = (void *)newbase;
-
-	return (void *)intptr;
-
-enomem:
-	uk_alloc_stats_count_enomem(a, size);
-	return NULL;
+	uk_alloc_stats_count_alloc(a, b->heap_pos, size);
+	return b->heap_pos;
 }
 
 static int uk_allocregion_posix_memalign(struct uk_alloc *a, void **memptr,
 					 size_t align, size_t size)
 {
 	struct uk_allocregion *b;
-	uintptr_t intptr, newbase;
 
 	UK_ASSERT(a != NULL);
 
@@ -118,29 +107,17 @@ static int uk_allocregion_posix_memalign(struct uk_alloc *a, void **memptr,
 		return EINVAL;
 	}
 
-	intptr = ALIGN_UP((uintptr_t)b->heap_base, (uintptr_t)align);
+	if (unlikely((uintptr_t)b->heap_pos - (uintptr_t)b->heap_base < size)) {
+		uk_alloc_stats_count_enomem(a, size);
+		*memptr = NULL;
+		return ENOMEM;
+	}
 
-	newbase  = intptr + size;
-	if (unlikely(newbase > (uintptr_t)b->heap_top))
-		goto enomem; /* out-of-memory */
+	b->heap_pos = (void *)ALIGN_DOWN((uintptr_t)b->heap_pos - size, align);
+	*memptr = b->heap_pos;
 
-	/* Check for overflow */
-	if (unlikely(newbase <= (uintptr_t)b->heap_base))
-		goto enomem;
-
-	*memptr = (void *)intptr;
-
-	uk_alloc_stats_count_alloc(a, (void *)intptr,
-				   newbase - (uintptr_t)b->heap_base);
-
-	b->heap_base = (void *)newbase;
-
+	uk_alloc_stats_count_alloc(a, b->heap_pos, size);
 	return 0;
-
-enomem:
-	uk_alloc_stats_count_enomem(a, size);
-	return ENOMEM;
-
 }
 
 static void uk_allocregion_free(struct uk_alloc *a __maybe_unused,
@@ -166,7 +143,7 @@ static ssize_t uk_allocregion_leftspace(struct uk_alloc *a)
 
 	UK_ASSERT(b != NULL);
 
-	return (uintptr_t)b->heap_top - (uintptr_t)b->heap_base;
+	return (uintptr_t)b->heap_pos - (uintptr_t)b->heap_base;
 }
 
 static int uk_allocregion_addmem(struct uk_alloc *a __unused,
@@ -182,7 +159,7 @@ struct uk_alloc *uk_allocregion_init(void *base, size_t len)
 {
 	struct uk_alloc *a;
 	struct uk_allocregion *b;
-	size_t metalen = sizeof(*a) + sizeof(*b);
+	const size_t metalen = sizeof(*a) + sizeof(*b);
 
 	/* TODO: ukallocregion does not support multiple memory regions yet.
 	 * Because of the multiboot layout, the first region might be a single
@@ -205,7 +182,7 @@ struct uk_alloc *uk_allocregion_init(void *base, size_t len)
 	uk_pr_info("Initialize allocregion allocator @ 0x%"__PRIuptr ", len %"__PRIsz"\n",
 		   (uintptr_t)a, len);
 
-	b->heap_top  = (void *)((uintptr_t)base + len);
+	b->heap_pos  = (void *)((uintptr_t)base + len);
 	b->heap_base = (void *)((uintptr_t)base + metalen);
 
 	/* use exclusively "compat" wrappers for calloc, realloc, memalign,
