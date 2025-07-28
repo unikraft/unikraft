@@ -1,8 +1,11 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /*
  * Authors: Hugo Lefeuvre <hugo.lefeuvre@neclab.eu>
+ *          Sergiu Moga <sergiu@unikraft.io>
  *
  * Copyright (c) 2020, NEC Laboratories Europe GmbH, NEC Corporation,
+ *                     All rights reserved.
+ * Copyright (c) 2025, Unikraft GmbH and The Unikraft Authors.
  *                     All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -55,46 +58,56 @@
 #include <uk/page.h>	/* round_pgup() */
 
 struct uk_allocregion {
+	struct uk_alloc a;
 	void *heap_pos;
 	void *heap_base;
 };
 
-static void *uk_allocregion_malloc(struct uk_alloc *a, size_t size)
+static inline
+struct uk_allocregion *ukalloc2allocregion(struct uk_alloc *a)
 {
-	struct uk_allocregion *b;
+	return __containerof(a, struct uk_allocregion, a);
+}
 
-	UK_ASSERT(a != NULL);
+static inline
+void allocregion_do_bump(struct uk_allocregion *ar, size_t size, size_t align)
+{
+	/* return aligned pointers: this is a requirement for some
+	 * embedded systems archs, and more generally good for performance
+	 */
+	ar->heap_pos = (void *)ALIGN_DOWN((uintptr_t)ar->heap_pos - size,
+					  (uintptr_t)align);
+}
 
-	b = (struct uk_allocregion *)&a->priv;
+void *uk_allocregion_bump(struct uk_allocregion *ar, size_t size)
+{
+	UK_ASSERT(ar);
 
 	if (unlikely(!size))
 		return NULL;
 
-	if (unlikely((uintptr_t)b->heap_pos - (uintptr_t)b->heap_base < size)) {
-		uk_alloc_stats_count_enomem(a, size);
+	if (unlikely(uk_allocregion_availmem(ar) < size)) {
+		uk_alloc_stats_count_enomem(&ar->a, size);
 		return NULL;
 	}
 
-	/* return aligned pointers: this is a requirement for some
-	 * embedded systems archs, and more generally good for performance
-	 */
-	b->heap_pos = (void *)ALIGN_DOWN((uintptr_t)b->heap_pos - size,
-					 (uintptr_t)sizeof(void *));
-
-	uk_alloc_stats_count_alloc(a, b->heap_pos, size);
-	return b->heap_pos;
+	allocregion_do_bump(ar, size, sizeof(void *));
+	uk_alloc_stats_count_alloc(&ar->a, ar->heap_pos, size);
+	return ar->heap_pos;
 }
 
-static int uk_allocregion_posix_memalign(struct uk_alloc *a, void **memptr,
-					 size_t align, size_t size)
+static void *allocregion_malloc(struct uk_alloc *a, size_t size)
 {
-	struct uk_allocregion *b;
+	UK_ASSERT(a);
+	return uk_allocregion_bump((struct uk_allocregion *)&a->priv, size);
+}
 
-	UK_ASSERT(a != NULL);
+static int allocregion_posix_memalign(struct uk_alloc *a, void **memptr,
+				      size_t align, size_t size)
+{
+	struct uk_allocregion *ar = ukalloc2allocregion(a);
 
-	b = (struct uk_allocregion *)&a->priv;
-
-	UK_ASSERT(b != NULL);
+	UK_ASSERT(a);
 
 	/* align must be a power of two */
 	UK_ASSERT(((align - 1) & align) == 0);
@@ -107,21 +120,21 @@ static int uk_allocregion_posix_memalign(struct uk_alloc *a, void **memptr,
 		return EINVAL;
 	}
 
-	if (unlikely((uintptr_t)b->heap_pos - (uintptr_t)b->heap_base < size)) {
-		uk_alloc_stats_count_enomem(a, size);
+	if (unlikely(uk_allocregion_availmem(ar) < size)) {
+		uk_alloc_stats_count_enomem(&ar->a, size);
 		*memptr = NULL;
 		return ENOMEM;
 	}
 
-	b->heap_pos = (void *)ALIGN_DOWN((uintptr_t)b->heap_pos - size, align);
-	*memptr = b->heap_pos;
+	allocregion_do_bump(ar, size, align);
+	*memptr = ar->heap_pos;
 
-	uk_alloc_stats_count_alloc(a, b->heap_pos, size);
+	uk_alloc_stats_count_alloc(&ar->a, b->heap_pos, size);
 	return 0;
 }
 
-static void uk_allocregion_free(struct uk_alloc *a __maybe_unused,
-				void *ptr __maybe_unused)
+static void allocregion_free(struct uk_alloc *a __maybe_unused,
+			     void *ptr __maybe_unused)
 {
 	uk_pr_debug("%p: Releasing of memory is not supported by ukallocregion\n",
 		    a);
@@ -130,24 +143,23 @@ static void uk_allocregion_free(struct uk_alloc *a __maybe_unused,
 	uk_alloc_stats_count_free(a, ptr, 0);
 }
 
-/* NOTE: We use `uk_allocregion_leftspace()` for `maxalloc` and `availmem`
+/* NOTE: We use `uk_allocregion_availmem()` for `maxalloc` and `availmem`
  *       because it is the same for this region allocator
  */
-static ssize_t uk_allocregion_leftspace(struct uk_alloc *a)
+size_t uk_allocregion_availmem(const struct uk_allocregion *ar)
 {
-	struct uk_allocregion *b;
-
-	UK_ASSERT(a != NULL);
-
-	b = (struct uk_allocregion *)&a->priv;
-
-	UK_ASSERT(b != NULL);
-
-	return (uintptr_t)b->heap_pos - (uintptr_t)b->heap_base;
+	UK_ASSERT(ar);
+	return (uintptr_t)ar->heap_pos - (uintptr_t)ar->heap_base;
 }
 
-static int uk_allocregion_addmem(struct uk_alloc *a __unused,
-				 void *base __unused, size_t size __unused)
+static ssize_t allocregion_availmem(struct uk_alloc *a)
+{
+	UK_ASSERT(a);
+	return (ssize_t)uk_allocregion_availmem(ukalloc2allocregion(a));
+}
+
+static int allocregion_addmem(struct uk_alloc *a __unused,
+			      void *base __unused, size_t size __unused)
 {
 	/* TODO: support multiple regions */
 	uk_pr_debug("%p: ukallocregion does not support multiple memory regions\n",
@@ -155,38 +167,37 @@ static int uk_allocregion_addmem(struct uk_alloc *a __unused,
 	return 0;
 }
 
-struct uk_alloc *uk_allocregion_init(void *base, size_t len)
+struct uk_allocregion *uk_allocregion_init(void *base, size_t len)
 {
-	struct uk_alloc *a;
-	struct uk_allocregion *b;
-	const size_t metalen = sizeof(*a) + sizeof(*b);
+	struct uk_allocregion *ar;
 
 	/* enough space for allocator available? */
-	if (unlikely(metalen > len)) {
-		uk_pr_err("Not enough space for allocator: %"__PRIsz" B required but only %"__PRIuptr" B usable\n",
-			  metalen, len);
+	if (unlikely(sizeof(*ar) > len)) {
+		uk_pr_err("Not enough space for allocator\n");
 		return NULL;
 	}
 
-	/* store allocator metadata on the heap, just before the memory pool */
-	a = (struct uk_alloc *)base;
-	b = (struct uk_allocregion *)&a->priv;
+	if (unlikely(!IS_ALIGNED((uintptr_t)base, __alignof(*ar)))) {
+		uk_pr_err("Heap base requires alignment %lu\n", __alignof(*ar));
+		return NULL;
+	}
 
-	uk_pr_info("Initialize allocregion allocator @ 0x%"__PRIuptr ", len %"__PRIsz"\n",
-		   (uintptr_t)a, len);
+	ar = (struct uk_allocregion *)base;
 
-	b->heap_pos  = (void *)((uintptr_t)base + len);
-	b->heap_base = (void *)((uintptr_t)base + metalen);
+	uk_pr_info("Initialize allocregion allocator @ %p, len %lu\n", ar, len);
+
+	ar->heap_pos  = (void *)((uintptr_t)base + len);
+	ar->heap_base = (void *)((uintptr_t)base + sizeof(*ar));
 
 	/* use exclusively "compat" wrappers for calloc, realloc, memalign,
 	 * palloc and pfree as those do not add additional metadata.
 	 */
-	uk_alloc_init_malloc(a, uk_allocregion_malloc, uk_calloc_compat,
-			     uk_realloc_compat, uk_allocregion_free,
-			     uk_allocregion_posix_memalign,
-			     uk_memalign_compat, uk_allocregion_leftspace,
-			     uk_allocregion_leftspace,
-			     uk_allocregion_addmem);
+	uk_alloc_init_malloc(&ar->a, allocregion_malloc, uk_calloc_compat,
+			     uk_realloc_compat, allocregion_free,
+			     allocregion_posix_memalign,
+			     uk_memalign_compat, allocregion_availmem,
+			     allocregion_availmem,
+			     allocregion_addmem);
 
-	return a;
+	return ar;
 }
