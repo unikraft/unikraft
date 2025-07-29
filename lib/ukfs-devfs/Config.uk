@@ -1,0 +1,5 @@
+config LIBUKFS_DEVFS
+	bool "ukfs-devfs: Filesystem for /dev"
+	select LIBUKFILE
+	select LIBUKFS
+	select LIBUKFS_RAMFS
