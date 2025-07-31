@@ -41,6 +41,7 @@
 #include <uk/essentials.h>
 #include <uk/assert.h>
 #include <uk/print.h>
+#include <uk/hexdump.h>
 #include <uk/isr/string.h> /* memset_isr */
 #include <arm/cpu.h>
 
@@ -92,4 +93,30 @@ void ukarch_ectx_load(struct ukarch_ectx *state)
 	UK_ASSERT(IS_ALIGNED((__uptr) state, ECTX_ALIGN));
 
 	restore_extregs(state);
+}
+
+void ukarch_ectx_assert_equal(struct ukarch_ectx *state)
+{
+	const __sz ectx_size = sizeof(struct fpsimd_state);
+	__u8 ectxbuf[ectx_size + ECTX_ALIGN];
+	struct ukarch_ectx *current;
+
+	/* Store the current state */
+	current = (struct ukarch_ectx *)ALIGN_UP((__uptr)ectxbuf, ECTX_ALIGN);
+	ukarch_ectx_init(current);
+
+	if (memcmp_isr(current, state, ectx_size) != 0) {
+		uk_pr_crit("Modified ECTX detected!\n");
+		uk_pr_crit("Current:\n");
+		uk_hexdumpk(KLVL_CRIT, current, ectx_size,
+			    UK_HXDF_ADDR | UK_HXDF_GRPQWORD | UK_HXDF_COMPRESS,
+			    2);
+
+		uk_pr_crit("Expected:\n");
+		uk_hexdumpk(KLVL_CRIT, state, ectx_size,
+			    UK_HXDF_ADDR | UK_HXDF_GRPQWORD | UK_HXDF_COMPRESS,
+			    2);
+
+		UK_CRASH("Modified ECTX\n");
+	}
 }

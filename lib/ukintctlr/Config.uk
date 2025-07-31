@@ -15,6 +15,5 @@ config LIBUKINTCTLR_MAX_HANDLERS_PER_IRQ
 
 config LIBUKINTCTLR_ISR_ECTX_ASSERTIONS
 	bool "Check for unmodified ECTX in interrupt handlers"
-	depends on ARCH_X86_64
 
 endif
