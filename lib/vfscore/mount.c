@@ -53,6 +53,9 @@
 #include <vfscore/dentry.h>
 #include <vfscore/vnode.h>
 #include <uk/syscall.h>
+#if defined(CONFIG_LIBPROCFS_FIELSYSTEMS) || defined(CONFIG_LIBPROCFS_MOUNTS)
+#include <uk/store.h>
+#endif
 
 /*
  * List for VFS mount points.
@@ -72,6 +75,64 @@ extern const struct vfscore_fs_type *uk_fslist_end;
 	for (iter = &uk_fslist_start;	\
 	     iter < &uk_fslist_end;		\
 	     iter++)
+
+#ifdef CONFIG_LIBPROCFS_FIELSYSTEMS
+static int get_uk_filesystems(void *cookie __unused, char **out)
+{
+	const struct vfscore_fs_type *fs = NULL, **__fs;
+
+	*out = malloc(sizeof(char) * 100);
+	if (*out == NULL)
+		return -ENOMEM;
+
+	for_each_fs(__fs) {
+		fs = *__fs;
+		if (!fs || !fs->vs_name)
+			continue;
+
+		strcat(*out, fs->vs_name);
+		strcat(*out, "\n");
+	}
+	return 0;
+
+}
+UK_STORE_STATIC_ENTRY(uk_filesystems, charp, get_uk_filesystems, NULL, NULL);
+#endif /* CONFIG_LIBPROCFS_FIELSYSTEMS */
+
+#ifdef CONFIG_LIBPROCFS_MOUNTS
+static int get_uk_mounts(void *cookie __unused, char **out)
+{
+	const struct vfscore_fs_type *fs = NULL, **__fs;
+
+	*out = malloc(sizeof(char) * 100);
+	if (*out == NULL)
+		return -ENOMEM;
+
+	for_each_fs(__fs) {
+		fs = *__fs;
+		if (!fs || !fs->vs_name)
+			continue;
+
+		if (strcmp(fs->vs_name, "9pfs") == 0) 
+			continue;
+
+		strcat(*out, fs->vs_name);
+		strcat(*out, "\t");
+		if (strcmp(fs->vs_name, "ramfs") == 0) {
+			strcat(*out, "/");
+		} else {
+			char dir[15];
+			strcpy(dir, fs->vs_name);
+			dir[strlen(fs->vs_name) - 2] = '\0';
+			strcat(*out, "/");
+			strcat(*out, dir);
+		}
+		strcat(*out, "\n");
+	}
+	return 0;
+}
+UK_STORE_STATIC_ENTRY(uk_mounts, charp, get_uk_mounts, NULL, NULL);
+#endif /* CONFIG_LIBPROCFS_MOUNTS */
 
 /*
  * Lookup file system.

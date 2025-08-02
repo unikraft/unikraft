@@ -98,6 +98,12 @@
 #endif /* CONFIG_LIBUKBOOT_MAINTHREAD */
 #include <uk/errptr.h>
 #include "banner.h"
+#ifdef CONFIG_LIBPROCFS_CMDLINE
+#include <string.h>
+#include <stdlib.h>
+#include <uk/store.h>
+#endif /* CONFIG_LIBPROCFS_CMDLINE */
+
 
 #if !CONFIG_LIBUKBOOT_INITSCHED
 #include <uk/plat/common/lcpu.h>
