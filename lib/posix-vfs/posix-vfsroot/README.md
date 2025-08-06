@@ -1,7 +1,7 @@
-# `posix-vfs-fsroot`: Static filesystem root file
+# `posix-vfs-fsroot`: POSIX VFS Static Root File
 
-This library implements a static singleton file intended to serve as the root of the virtual filesystem.
+This sub-library implements a static singleton file intended to serve as the root of the POSIX virtual filesystem.
 It is responsible for exactly three things:
-- behave as a read-only empty dir when nothing is mounted
+- behave as a read-only empty root dir when nothing is mounted
 - be a mount point for any real root
-- ensure, via lookup, that '/' is always its own parent
+- ensure, via lookup, that `/` is always its own parent
