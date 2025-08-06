@@ -274,7 +274,7 @@ uk_pollevent _uk_pollq_poll_locked(struct uk_pollq *q, uk_pollevent req,
  *
  * @param q Target queue.
  * @param req Events to poll for.
- * @param exp Events expected to be already set.
+ * @param f File whose events to poll.
  *
  * @return
  *   non-zero evmask with lock released if events appeared

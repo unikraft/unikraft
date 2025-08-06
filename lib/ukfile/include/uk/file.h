@@ -344,10 +344,17 @@ typedef struct uk_swrefcount uk_file_refcnt;
 struct uk_fs_ops;
 #endif /* CONFIG_LIBUKFS */
 
+/* Main file struct.
+ *
+ * Drivers should always use designated initializers or zero the memory when
+ * populating the struct. Optional fields may be added in the future, but always
+ * with the guarantee that a NULL / all-zero value remains backwards-compatible.
+ */
+
 struct uk_file {
 	/* Identity */
-	const void *vol; /* Driver-specific volume state */
-	void *node; /* Driver-specific inode data */
+	const void *vol; /* Driver-private volume state */
+	void *node; /* Driver-private file data */
 	/* Ops table */
 	const struct uk_file_ops *ops;
 #if CONFIG_LIBUKFS
