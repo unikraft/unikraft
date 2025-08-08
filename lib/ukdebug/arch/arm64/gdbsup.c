@@ -79,14 +79,16 @@ static int gdb_arch_check_brk(unsigned long pc)
 	return ((opcode & BRK_OPCODE_MASK) != BRK_OPCODE);
 }
 
-static int gdb_arch_debug_handler(void *data)
+static enum uk_event_status gdb_arch_debug_handler(void *data, int *error)
 {
 	int have_brk, r;
 	struct ukarch_trap_ctx *ctx = (struct ukarch_trap_ctx *)data;
 
 	r = gdb_arch_dbg_trap(5 /* SIGTRAP */, ctx->regs);
-	if (unlikely(r < 0))
-		return r;
+	if (unlikely(r < 0)) {
+		*error = r;
+		return UK_EVENT_ERROR;
+	}
 
 	/* If we return from an brk trap, we have to explicitly skip the
 	 * corresponding brk instruction. Otherwise, we will not make
@@ -98,8 +100,10 @@ static int gdb_arch_debug_handler(void *data)
 	 * must be skipped. Otherwise, just continue at the current PC.
 	 */
 	have_brk = gdb_arch_check_brk(ctx->regs->elr_el1);
-	if (unlikely(have_brk < 0))
-		return have_brk;
+	if (unlikely(have_brk < 0)) {
+		*error = have_brk;
+		return UK_EVENT_ERROR;
+	}
 
 	if ((ESR_EC_FROM(ctx->esr) == ESR_EL1_EC_BRK64) && (have_brk == 0)) {
 		ctx->regs->elr_el1 += 4; /* instructions are all 4 bytes wide */
