@@ -6,6 +6,7 @@
 #include <uk/atomic.h>
 #if !__INTERRUPTSAFE__
 #include <uk/boot.h>
+#include <uk/compiler.h>
 #else /* __INTERRUPTSAFE__ */
 #include <uk/isr/boot.h>
 #include <uk/isr/semaphore.h>
@@ -57,7 +58,8 @@ int uk_boot_shutdown_req_isr(enum ukplat_gstate target)
 }
 
 #if __INTERRUPTSAFE__ && CONFIG_LIBUKBOOT_SHUTDOWNREQ_HANDLER
-static int shutdown_req_handler(void *data)
+static
+enum uk_event_status shutdown_req_handler(void *data, int *error __unused)
 {
 	enum ukplat_gstate request = (enum ukplat_gstate)data;
 	int rc;
