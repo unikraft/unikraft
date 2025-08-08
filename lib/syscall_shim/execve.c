@@ -4,13 +4,15 @@
  * You may not use this file except in compliance with the License.
  */
 
+#include <uk/compiler.h>
 #include <uk/event.h>
 #include <uk/prio.h>
 #include <uk/process.h>
 #include <uk/syscall.h>
 #include <uk/thread.h>
 
-static int syscall_nested_depth_reset(void *data)
+static
+enum uk_event_status syscall_nested_depth_reset(void *data, int *error __unused)
 {
 	struct posix_process_execve_event_data *event_data;
 
