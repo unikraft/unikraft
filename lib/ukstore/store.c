@@ -301,6 +301,8 @@ uk_store_obj_alloc(struct uk_alloc *a, __u64 id, const char *name,
 int _uk_store_obj_add(__u16 library_id, struct uk_store_object *object)
 {
 	struct uk_store_event_data event_data;
+	enum uk_event_status event_status;
+	int event_error;
 
 	UK_ASSERT(object);
 
@@ -316,7 +318,12 @@ int _uk_store_obj_add(__u16 library_id, struct uk_store_object *object)
 		.object_id = object->id
 	};
 
-	uk_raise_event(UKSTORE_EVENT_CREATE_OBJECT, &event_data);
+	event_status = uk_raise_event(UKSTORE_EVENT_CREATE_OBJECT, &event_data,
+				      &event_error);
+	if (unlikely(event_status == UK_EVENT_ERROR)) {
+		uk_pr_err("Handler returned error (%d)\n", event_error);
+		return event_error;
+	}
 
 	return 0;
 }
