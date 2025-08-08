@@ -21,15 +21,16 @@
  * CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#include <uk/arch/lcpu.h>
-#include <uk/arch/types.h>
-#include <uk/arch/ctx.h>
 #include <arm/cpu.h>
 #include <arm/traps.h>
-#include <uk/print.h>
+#include <uk/arch/ctx.h>
+#include <uk/arch/lcpu.h>
+#include <uk/arch/types.h>
 #include <uk/assert.h>
+#include <uk/compiler.h>
 #include <uk/intctlr/gic.h>
 #include <uk/plat/syscall.h>
+#include <uk/print.h>
 
 #ifdef CONFIG_ARM64_FEAT_MTE
 #include <arm/arm64/mte.h>
@@ -195,15 +196,18 @@ void invalid_trap_handler(struct __regs *regs, __u32 el, __u32 reason,
 
 void trap_el1_sync(struct __regs *regs, __u64 far)
 {
-	int rc;
 	struct ukarch_trap_ctx ctx = {regs, regs->esr_el1, 1, 0, far};
 	enum aarch64_trap trap = esr_to_trap(regs->esr_el1);
+	enum uk_event_status event_status;
+	int event_error;
 
 	if (trap < AARCH64_TRAP_MAX) {
-		rc = uk_raise_event_ptr(_trap_table[trap].event, &ctx);
-		if (unlikely(rc < 0))
-			uk_pr_crit("event handler returned error: %d\n", rc);
-		else if (rc)
+		event_status = uk_raise_event_ptr(_trap_table[trap].event, &ctx,
+						  &event_error);
+		if (unlikely(event_status == UK_EVENT_ERROR))
+			uk_pr_crit("event handler returned error: %d\n",
+				   event_error);
+		else if (event_status != UK_EVENT_NOT_HANDLED)
 			return;
 	}
 
@@ -228,7 +232,8 @@ void trap_el1_irq(struct __regs *regs)
 
 extern void ukplat_syscall_handler(struct uk_syscall_ctx *usc);
 
-static int arm64_syscall_adapter(void *data)
+static
+enum uk_event_status arm64_syscall_adapter(void *data, int *error __unused)
 {
 	struct ukarch_trap_ctx *ctx = (struct ukarch_trap_ctx *)data;
 	struct ukarch_execenv *execenv = (struct ukarch_execenv *)ctx->regs;
@@ -248,7 +253,7 @@ static int arm64_syscall_adapter(void *data)
 	/* Restore extended register state */
 	ukarch_ectx_load((struct ukarch_ectx *)&execenv->ectx);
 
-	return 1; /* Success */
+	return UK_EVENT_HANDLED;
 }
 
 UK_EVENT_HANDLER(UKARCH_TRAP_SYSCALL, arm64_syscall_adapter);

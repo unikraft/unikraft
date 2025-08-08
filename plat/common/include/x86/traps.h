@@ -96,10 +96,13 @@ void do_unhandled_trap(int trapnr, char *str, struct __regs *regs,
 
 #define DECLARE_TRAP_EVENT(event)					\
 UK_EVENT(event);							\
-static inline int _raise_event_##event(int trapnr, struct __regs *regs,	\
-		unsigned long error_code) {				\
+static inline								\
+int _raise_event_##event(int trapnr, struct __regs *regs,		\
+		unsigned long error_code, int *event_error)		\
+{									\
 	struct ukarch_trap_ctx ctx = {regs, trapnr, error_code, 0};	\
-	return uk_raise_event(event, &ctx);				\
+									\
+	return uk_raise_event(event, &ctx, event_error);		\
 }
 
 #define _raise_event_NULL(...) (0)
@@ -107,24 +110,32 @@ static inline int _raise_event_##event(int trapnr, struct __regs *regs,	\
 #define DECLARE_TRAP(name, str, event)					\
 void do_##name(struct __regs *regs)					\
 {									\
-	int rc;								\
-	rc = _raise_event_##event(TRAP_##name, regs, 0);		\
-	if (unlikely(rc < 0))						\
-		uk_pr_crit("trap handler returned error: %d\n", rc);	\
+	enum uk_event_status event_status;				\
+	int event_error;						\
 									\
-	if (!rc)							\
+	event_status = _raise_event_##event(TRAP_##name, regs, 0,	\
+					    &event_error);		\
+	if (unlikely(event_status == UK_EVENT_ERROR))			\
+		uk_pr_crit("trap handler returned error: %d\n",		\
+			   event_error);				\
+									\
+	if (event_status == UK_EVENT_NOT_HANDLED)			\
 		do_unhandled_trap(TRAP_##name, str, regs, 0);		\
 }
 
 #define DECLARE_TRAP_EC(name, str, event)				\
 void do_##name(struct __regs *regs, unsigned long error_code)		\
 {									\
-	int rc;								\
-	rc = _raise_event_##event(TRAP_##name, regs, error_code);	\
-	if (unlikely(rc < 0))						\
-		uk_pr_crit("trap handler returned error: %d\n", rc);	\
+	enum uk_event_status event_status;				\
+	int event_error;						\
 									\
-	if (!rc)							\
+	event_status = _raise_event_##event(TRAP_##name, regs,		\
+					    error_code, &event_error);	\
+	if (unlikely(event_status == UK_EVENT_ERROR))			\
+		uk_pr_crit("trap handler returned error: %d\n",		\
+			   event_error);				\
+									\
+	if (event_status == UK_EVENT_NOT_HANDLED)			\
 		do_unhandled_trap(TRAP_##name, str, regs, error_code);	\
 }
 
