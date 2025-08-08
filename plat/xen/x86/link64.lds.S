@@ -31,6 +31,7 @@ OUTPUT_ARCH(i386:x86-64)
 
 PHDRS
 {
+	phdrs PT_LOAD FILEHDR PHDRS FLAGS(PHDRS_PF_R);
 	text PT_LOAD FLAGS(PHDRS_PF_RX);
 	rodata PT_LOAD FLAGS(PHDRS_PF_R);
 	data PT_LOAD;
@@ -45,6 +46,10 @@ SECTIONS
 	. = 0x0;
 
 	_base_addr = .;		/* Symbol to represent the load base address */
+
+	PROVIDE(__executable_start = _base_addr);
+	. = _base_addr + SIZEOF_HEADERS;
+	PROVIDE(__phdr = .);
 
 	_text = .;			/* Text and read-only data */
 	.text : {
