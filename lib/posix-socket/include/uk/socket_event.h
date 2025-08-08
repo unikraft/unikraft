@@ -6,9 +6,11 @@
 #ifndef __UK_POSIX_SOCKET_EVENT_H__
 #define __UK_POSIX_SOCKET_EVENT_H__
 
-#include <uk/config.h>
 #include <stdint.h>
 #include <sys/socket.h>
+
+#include <uk/config.h>
+#include <uk/compiler.h>
 #include <uk/event.h>
 
 /*
@@ -65,20 +67,21 @@ struct uk_socket_event {
  *   Event receiver function, must have the following singature:
  *   `void recvfn(const struct uk_socket_event *)`
  */
-#define __UK_SOCKET_EVENT_RECEIVER(afamily, event, arecvfn)		\
-	static int __uk_event ## event ## arecvfn(void *data)		\
-	{								\
-		const struct uk_socket_event *e =			\
-			(const struct uk_socket_event *) data;		\
-									\
-		if (afamily && (afamily != e->family))			\
-			return UK_EVENT_HANDLED_CONT;			\
-									\
-		arecvfn(e);						\
-		return UK_EVENT_HANDLED_CONT;				\
-	}								\
-									\
-	UK_EVENT_HANDLER(UK_POSIX_SOCKET_EVENT_ ## event,		\
+#define __UK_SOCKET_EVENT_RECEIVER(afamily, event, arecvfn)		       \
+	static enum uk_event_status					       \
+	__uk_event ## event ## arecvfn(void *data, int *error __unused)	       \
+	{								       \
+		const struct uk_socket_event *e =			       \
+			(const struct uk_socket_event *)data;		       \
+									       \
+		if (afamily && (afamily != e->family))			       \
+			return UK_EVENT_HANDLED_CONT;			       \
+									       \
+		arecvfn(e);						       \
+		return UK_EVENT_HANDLED_CONT;				       \
+	}								       \
+									       \
+	UK_EVENT_HANDLER(UK_POSIX_SOCKET_EVENT_ ## event,		       \
 			 __uk_event ## event ## arecvfn)
 
 #define _UK_SOCKET_EVENT_RECEIVER(family, event, recvfn) \
