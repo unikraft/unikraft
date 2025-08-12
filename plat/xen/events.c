@@ -92,9 +92,10 @@ void unbind_all_ports(void)
  */
 int do_event(evtchn_port_t port, struct __regs *regs)
 {
-	ev_action_t *action;
-	int rc;
+	enum uk_event_status event_status;
 	struct uk_event_irq_data ctx;
+	int event_error;
+	ev_action_t *action;
 
 	clear_evtchn(port);
 
@@ -105,10 +106,10 @@ int do_event(evtchn_port_t port, struct __regs *regs)
 
 	ctx.regs = regs;
 	ctx.irq = port;
-	rc = uk_raise_event(UKPLAT_EVENT_IRQ, &ctx);
-	if (unlikely(rc < 0))
-		UK_CRASH("IRQ event handler returned error: %d\n", rc);
-	if (rc == UK_EVENT_HANDLED)
+	event_status = uk_raise_event(UKPLAT_EVENT_IRQ, &ctx, &event_error);
+	if (unlikely(event_status == UK_EVENT_ERROR))
+		UK_CRASH("IRQ event handler returned error: %d\n", event_error);
+	if (event_status == UK_EVENT_HANDLED)
 		return 1;
 
 	action = &ev_actions[port];
