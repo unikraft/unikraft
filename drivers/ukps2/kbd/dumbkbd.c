@@ -40,6 +40,7 @@ UK_EVENT(UKPLAT_SHUTDOWN_EVENT);
 
 static int kbd_ps2_irq_handler(void *arg __unused)
 {
+	int event_error __unused;
 	/* Read received scan code (ACPI scan code set) */
 	__u16 sc;
 
@@ -63,7 +64,8 @@ static int kbd_ps2_irq_handler(void *arg __unused)
 		if (!(lctrl_pressed && lalt_pressed))
 			break;
 
-		uk_raise_event(UKPLAT_SHUTDOWN_EVENT, (void *)UKPLAT_HALT);
+		uk_raise_event(UKPLAT_SHUTDOWN_EVENT, (void *)UKPLAT_HALT,
+			       &event_error);
 
 		break;
 	}
