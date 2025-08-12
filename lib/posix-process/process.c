@@ -352,10 +352,12 @@ pid_t uk_posix_process_run(uk_posix_process_mainlike_func fn,
 {
 	struct posix_process_execve_event_data event_data;
 	struct uk_sched *s = uk_sched_current();
+	enum uk_event_status event_status;
 	struct clone_args cl_args;
 	struct uk_thread *thread;
 	struct uk_thread *parent;
 	pid_t parent_tid;
+	int event_error;
 	pid_t tid;
 	int ret;
 
@@ -403,9 +405,10 @@ pid_t uk_posix_process_run(uk_posix_process_mainlike_func fn,
 
 	/* Raise the execve event */
 	event_data.thread = thread;
-	ret = pprocess_raise_execve_event(&event_data);
-	if (unlikely(ret < 0)) {
-		uk_pr_err("exeve event error (%d)\n", ret);
+	event_status = pprocess_raise_execve_event(&event_data, &event_error);
+	if (unlikely(event_status == UK_EVENT_ERROR)) {
+		uk_pr_err("exeve event error (%d)\n", event_error);
+		ret = event_error;
 		goto err_term_clonetab;
 	}
 

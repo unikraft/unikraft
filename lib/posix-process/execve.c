@@ -83,9 +83,12 @@ static int pprocess_cleanup(struct posix_process *pprocess)
 	return 0;
 }
 
-int pprocess_raise_execve_event(struct posix_process_execve_event_data *data)
+enum uk_event_status
+pprocess_raise_execve_event(struct posix_process_execve_event_data *event_data,
+			    int event_error)
 {
-	return uk_raise_event(POSIX_PROCESS_EXECVE_EVENT, data);
+	return uk_raise_event(POSIX_PROCESS_EXECVE_EVENT, event_data,
+			      event_error);
 }
 
 UK_SYSCALL_R_E_DEFINE(int, execve, const char *, pathname,
@@ -95,10 +98,12 @@ UK_SYSCALL_R_E_DEFINE(int, execve, const char *, pathname,
 	struct posix_process_execve_event_data event_data;
 	struct uk_binfmt_loader_args loader_args;
 	struct ukarch_execenv *execenv_new;
+	enum uk_event_status event_status;
 	struct uk_thread *this_thread;
 	struct ukarch_ctx ctx_old;
 	void *stack_old;
 	void *stack_new;
+	int event_error;
 	int rc = 0;
 
 	/* Linux deviates from POSIX by treating NULL pointers to
@@ -175,9 +180,10 @@ UK_SYSCALL_R_E_DEFINE(int, execve, const char *, pathname,
 	 * internal cleanup.
 	 */
 	event_data.thread = this_thread;
-	rc = pprocess_raise_execve_event(&event_data);
-	if (unlikely(rc < 0)) {
-		uk_pr_err("execve event error (%d)\n", rc);
+	event_status = pprocess_raise_execve_event(&event_data, &event_error);
+	if (unlikely(event_status == UK_EVENT_ERR)) {
+		uk_pr_err("execve event error (%d)\n", event_error);
+		rc = event_error;
 		goto err_free_stack_new;
 	}
 	pprocess_cleanup(uk_pprocess_current());
