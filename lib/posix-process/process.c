@@ -492,13 +492,19 @@ static void posix_thread_fini(struct uk_thread *thread)
 
 	pthread = uk_thread_uktls_var(thread, pthread_self);
 
+	/* No pthread was ever assigned to this uk_thread,
+	 * or the pthread was already terminated as a result
+	 * to an exit syscall or a signal.
+	 *
+	 * If the pthread exists, this is its return path.
+	 */
 	if (!pthread)
-		return; /* no posix thread was assigned */
+		return;
 
 	pprocess = pthread->process;
 	UK_ASSERT(pprocess);
 
-	/* Perform thread termination and relase the thread */
+	/* Terminate and release thread */
 	pprocess_exit_pthread(pthread_self, POSIX_THREAD_EXITED, 0);
 
 	/* If last thread, also release the process */

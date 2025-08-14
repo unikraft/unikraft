@@ -43,12 +43,30 @@ static void pprocess_system_shutdown(struct uk_term_ctx *ctx __unused)
 {
 	struct posix_process *pproc_init;
 	struct posix_process *pproc;
+	int rc;
 
 	pproc_init = pid2pprocess(UK_PID_INIT);
 
-	if (pproc_init && pproc_init->state == POSIX_PROCESS_RUNNING) {
-		pprocess_signal_send(pproc_init, SIGTERM, NULL);
-		uk_semaphore_down(&pproc_init->exit_semaphore);
+	/* If the init process does not exist, it must have returned.
+	 * We can't know its return status, but hopefully the caller
+	 * (libukboot) saved it to term_ctx already.
+	 *
+	 * If the init process exists and it's stil running, terminate
+	 * now with signal, and propagate its status.
+	 *
+	 * If the init process exists but is not running, it has been
+	 * terminated by an exit syscall or a signal. Propagate its exit
+	 * status.
+	 */
+	if (pproc_init) {
+		if (pproc_init->state == POSIX_PROCESS_RUNNING) {
+			rc = pprocess_signal_send(pproc_init, SIGTERM, NULL);
+			if (unlikely(rc))
+				UK_CRASH("Could not signal init process (%d)\n",
+					 rc);
+			uk_semaphore_down(&pproc_init->exit_semaphore);
+		}
+		ctx->exit_code = pproc_init->exit_status;
 	}
 
 	uk_pprocess_foreach(pproc)
@@ -67,11 +85,23 @@ static void pprocess_system_shutdown(struct uk_term_ctx *ctx)
 
 	pproc_init = pid2pprocess(UK_PID_INIT);
 
-	/* If terminated, we come from a return,
-	 * hence the exit_code is already set.
+	/* If the init process does not exist, it must have returned.
+	 * We can't know its return status, but hopefully the caller
+	 * (libukboot) saved it to term_ctx already.
+	 *
+	 * If the init process exists and it's stil running, terminate
+	 * now with an appropriate exit code and propagate its status.
+	 *
+	 * If the init process exists but is not running, it has been
+	 * terminated by an exit syscall or by signal. Propagate its
+	 * exit status.
 	 */
-	if (pproc_init && pproc_init->state == POSIX_PROCESS_RUNNING)
-		ctx->exit_code = 0x80 | SIGKILL;
+	if (pproc_init) {
+		if (pproc_init->state == POSIX_PROCESS_RUNNING)
+			ctx->exit_code = 0x80 | SIGKILL;
+		else
+			ctx->exit_code = pproc_init->exit_status;
+	}
 
 	uk_pprocess_foreach(pproc)
 		force_kill(pproc);
@@ -83,7 +113,13 @@ static void pprocess_system_shutdown(struct uk_term_ctx *ctx)
  */
 static void pprocess_system_shutdown(struct uk_term_ctx *ctx)
 {
-	ctx->exit_code = pprocess_exit_status;
+	/* If we the application called one of the emulated
+	 * exit syscalls, propagate the status. Otherwise,
+	 * main() returned already and its return status
+	 * was already set, so do not overwrite.
+	 */
+	if (pprocess_exit_status != PPROCESS_EXIT_STATUS_UNSET)
+		ctx->exit_code = pprocess_exit_status;
 }
 #endif /* !CONFIG_LIBPOSIX_PROCESS_MULTITHREADING */
 

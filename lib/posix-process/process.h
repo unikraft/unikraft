@@ -23,6 +23,11 @@ extern struct uk_thread *pprocess_thread_main;
 
 extern int pprocess_exit_status;
 
+/* Defined as a value larger than the max error code
+ * to distinguish between set to zero and unset.
+ */
+#define PPROCESS_EXIT_STATUS_UNSET  (1 << 8)
+
 #if CONFIG_LIBPOSIX_PROCESS_MULTITHREADING
 
 #define UK_PID_INIT		1

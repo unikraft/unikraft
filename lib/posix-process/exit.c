@@ -34,7 +34,7 @@
 
 UK_EVENT(POSIX_PROCESS_EXIT_EVENT);
 
-int pprocess_exit_status;
+int pprocess_exit_status = PPROCESS_EXIT_STATUS_UNSET;
 
 #if CONFIG_LIBPOSIX_PROCESS_MULTITHREADING
 
