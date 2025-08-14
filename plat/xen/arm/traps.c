@@ -132,4 +132,10 @@ void trap_init(void)
 void trap_fini(void)
 {
 }
+
+__uptr traps_lcpu_get_except_stack_base(void)
+{
+	UK_WARN_STUBBED();
+	return 0;
+}
 #endif /* __aarch64__ */

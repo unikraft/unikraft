@@ -75,4 +75,9 @@ void traps_lcpu_init(struct lcpu *current __unused)
 				 (unsigned long) asm_failsafe_callback, 0);
 }
 
+__uptr traps_lcpu_get_except_stack_base(void)
+{
+	UK_WARN_STUBBED();
+	return 0;
+}
 #endif

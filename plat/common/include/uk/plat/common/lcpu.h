@@ -278,6 +278,16 @@ static inline int lcpu_current_is_bsp(void)
 }
 
 /**
+ * Assuming we are in an exception handler on an exception stack, fetch the
+ * current LCPU pointer in such a manner that we do not assume any register
+ * state.
+ *
+ * WARNING: Again, only use in exception context (e.g. trap (non-syscall),
+ *          IRQ)!
+ */
+__isr struct lcpu *lcpu_get_current_in_except(void);
+
+/**
  * Initialize a logical CPU. The function must be executed on the CPU
  * represented by the LCPU as early as possible after startup.
  *

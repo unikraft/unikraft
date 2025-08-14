@@ -123,6 +123,14 @@ struct lcpu *lcpu_get_current(void)
 	return lcpu_get(ukplat_lcpu_idx());
 }
 
+__isr __uptr traps_lcpu_get_except_stack_base(void);
+__isr struct lcpu *lcpu_get_current_in_except(void)
+{
+	return lcpu_get((ukarch_read_sp() -
+			 traps_lcpu_get_except_stack_base()) /
+			(CPU_EXCEPT_STACK_SIZE * 3));
+}
+
 int lcpu_init(struct lcpu *this_lcpu)
 {
 	int rc;

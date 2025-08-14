@@ -75,6 +75,11 @@ static __align(UKARCH_SP_ALIGN)
 UKPLAT_PER_LCPU_ARRAY_DEFINE(__u8, lcpu_except_stack,
 			     CPU_EXCEPT_STACK_SIZE * 3);
 
+__isr __uptr traps_lcpu_get_except_stack_base(void)
+{
+	return (__uptr)&lcpu_except_stack;
+}
+
 __lcpuid lcpu_arch_id(void)
 {
 	__u64 mpidr_reg;
