@@ -112,6 +112,7 @@ typedef __u64 __lcpuid;		/* Physical ID of logical CPU */
  * Returns the auxiliary stack pointer of the current logical CPU
  */
 __uptr ukplat_lcpu_get_auxsp(void);
+__isr __uptr ukplat_lcpu_get_auxsp_in_except(void);
 
 /**
  * Sets the auxiliary stack pointer of the current logical cpu

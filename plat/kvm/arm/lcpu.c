@@ -89,3 +89,8 @@ __uptr ukplat_lcpu_get_auxsp(void)
 {
 	return lcpu_get_current()->auxsp;
 }
+
+__isr __uptr ukplat_lcpu_get_auxsp_in_except(void)
+{
+	return lcpu_get_current_in_except()->auxsp;
+}
