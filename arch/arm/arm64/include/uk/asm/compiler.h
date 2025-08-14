@@ -58,3 +58,7 @@
 #define __no_branch_protection
 #endif /* CONFIG_ARM64_FEAT_PAUTH || CONFIG_ARM64_FEAT_BTI */
 
+#define __isr						\
+	__attribute__((__target__(			\
+		"general-regs-only"			\
+	)))

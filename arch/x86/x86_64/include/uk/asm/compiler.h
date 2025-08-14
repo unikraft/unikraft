@@ -32,4 +32,10 @@
 #endif
 
 /* Architecture-specific compiler definitions */
-
+#define __isr						\
+	__attribute__((__target__(			\
+		"no-mmx,"				\
+		"no-sse,"				\
+		"no-avx,"				\
+		"general-regs-only"			\
+	)))
