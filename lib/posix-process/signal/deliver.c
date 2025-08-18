@@ -164,8 +164,8 @@ static void handle_self(struct uk_signal *sig, const struct kern_sigaction *ks,
  * is not masked by the handling thread or ignored by the process or its
  * default disposition.
  */
-static int do_deliver(struct posix_thread *pthread, struct uk_signal *sig,
-		      struct ukarch_execenv *execenv)
+static void do_deliver(struct posix_thread *pthread, struct uk_signal *sig,
+		       struct ukarch_execenv *execenv)
 {
 	struct posix_process *pproc;
 	uk_sigset_t saved_mask;
@@ -199,7 +199,7 @@ static int do_deliver(struct posix_thread *pthread, struct uk_signal *sig,
 			/* Real-time signals: SIG_TERM by default */
 			uk_sigact_term(signum);
 		}
-		return 0;
+		return;
 	}
 
 	/* Save original mask and apply mask from sigaction */
@@ -220,8 +220,6 @@ static int do_deliver(struct posix_thread *pthread, struct uk_signal *sig,
 	/* If SA_RESETHAND flag is set, restore the default handler */
 	if (KERN_SIGACTION(pproc, signum)->ks_flags & SA_RESETHAND)
 		pprocess_signal_sigaction_clear(KERN_SIGACTION(pproc, signum));
-
-	return 0;
 }
 
 /* Deliver pending signals of a given process. We deliver each
