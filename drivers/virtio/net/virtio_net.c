@@ -1340,16 +1340,28 @@ static void virtio_net_info_get(struct uk_netdev *dev,
 		dev_info->nb_encap_rx = VTNET_HDR_SIZE_PADDED(vndev);
 	dev_info->ioalign = VIRTIO_PKT_BUFFER_ALIGN;
 
-	dev_info->features = UK_NETDEV_F_RXQ_INTR
-		| (VIRTIO_FEATURE_HAS(host_features, VIRTIO_NET_F_CSUM)
-		   ? UK_NETDEV_F_PARTIAL_CSUM : 0)
-		| ((VIRTIO_FEATURE_HAS(host_features, VIRTIO_NET_F_HOST_TSO4)
-		    || VIRTIO_FEATURE_HAS(host_features, VIRTIO_NET_F_GSO))
-		   ? UK_NETDEV_F_TSO4 : 0)
-		| ((VIRTIO_FEATURE_HAS(host_features, VIRTIO_NET_F_GUEST_TSO4)
-		    || VIRTIO_FEATURE_HAS(host_features,
-					  VIRTIO_NET_F_GUEST_TSO6)
-		   ? UK_NETDEV_F_LRO : 0));
+	dev_info->features = UK_NETDEV_F_RXQ_INTR;
+	if (VIRTIO_FEATURE_HAS(host_features, VIRTIO_NET_F_CSUM))
+		dev_info->features |= UK_NETDEV_F_PARTIAL_CSUM;
+
+	if (VIRTIO_FEATURE_HAS(host_features, VIRTIO_NET_F_HOST_TSO4) ||
+	    VIRTIO_FEATURE_HAS(host_features, VIRTIO_NET_F_GSO))
+		dev_info->features |= UK_NETDEV_F_TSO4;
+
+	/**
+	 * Large Receive Offload
+	 * NOTE: This allows the host to send packets larger than MTU. The
+	 *       network stack needs to be able to handle such packets.
+	 *       We only enable this if we have also support for mergeable RX
+	 *       buffers, otherwise we would have to either allocate huge
+	 *       buffers (wasting space for smaller buffers) or use many small
+	 *       descriptors (needing indirect descriptors and putting a large
+	 *       burden on the allocator).
+	 */
+	if (VIRTIO_FEATURE_HAS(host_features, VIRTIO_NET_F_MRG_RXBUF) &&
+	    (VIRTIO_FEATURE_HAS(host_features, VIRTIO_NET_F_GUEST_TSO4) ||
+	     VIRTIO_FEATURE_HAS(host_features, VIRTIO_NET_F_GUEST_TSO6)))
+		dev_info->features |= UK_NETDEV_F_LRO;
 }
 
 static int virtio_net_start(struct uk_netdev *n)
