@@ -307,6 +307,27 @@ int fstab_process_internal(const struct vfs_fstab_entry fstab[],
 }
 #endif /* CONFIG_LIBPOSIX_VFS_FSTAB_BUILTIN || CONFIG_LIBPOSIX_VFS_FSTAB_FALLBACK */
 
+/* Assumes path is directly under `/` or an existing dir */
+static
+int fstab_mount_special(const char *path, const char *fstype,
+			const char *source, unsigned long flags, void *data)
+{
+	int r;
+
+	r = fstab_mkdir(path);
+	if (unlikely(r)) {
+		uk_pr_err("Failed to create %s: %d\n", path, r);
+		return r;
+	}
+	r = uk_sys_mount(source, path, fstype, flags, data);
+	if (unlikely(r)) {
+		uk_pr_err("Failed to mount special filesystem %s on %s: %d\n",
+			  fstype, path, r);
+		return r;
+	}
+	return 0;
+}
+
 static
 int init_vfs_fstab(struct uk_init_ctx *ictx __unused)
 {
@@ -346,6 +367,12 @@ int init_vfs_fstab(struct uk_init_ctx *ictx __unused)
 	}
 #endif /* CONFIG_LIBPOSIX_VFS_FSTAB_FALLBACK */
 #endif /* CONFIG_LIBPOSIX_VFS_FSTAB_USER */
+
+#if CONFIG_LIBPOSIX_VFS_FSTAB_MOUNT_DEV
+	r = fstab_mount_special("/dev", "devfs", "", 0, NULL);
+	if (unlikely(r))
+		return r;
+#endif /* CONFIG_LIBPOSIX_VFS_FSTAB_MOUNT_DEV */
 
 	uk_pr_debug("Mounted %d entries total\n", count);
 	return 0;

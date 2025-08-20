@@ -46,4 +46,14 @@ config LIBPOSIX_VFS_FSTAB_EINITRD_PATH
 
 endif
 
+if LIBPOSIX_VFS_FSTAB_BUILTIN || LIBPOSIX_VFS_FSTAB_USER
+
+comment "Mount special filesystems after processing table(s):"
+
+config LIBPOSIX_VFS_FSTAB_MOUNT_DEV
+	bool "/dev: devfs"
+	select LIBUKFS_DEVFS
+
+endif # LIBPOSIX_VFS_FSTAB_BUILTIN || LIBPOSIX_VFS_FSTAB_USER
+
 endif # LIBPOSIX_VFS_FSTAB
