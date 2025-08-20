@@ -6,3 +6,15 @@ config LIBUKFILE_PSEUDO
 	  - null: behaves as always on EOF
 	  - zero: reads all-zeros
 	  - void: behaves as always waiting on data
+
+if LIBUKFILE_PSEUDO
+
+# Hidden, will autoselect if devfs is present
+config LIBUKFILE_PSEUDO_DEVFS
+	bool
+	default y if LIBUKFS_DEVFS
+	help
+	  Provide the "null" and "zero" special files under devfs, made
+	  available when mounted e.g., under /dev.
+
+endif
