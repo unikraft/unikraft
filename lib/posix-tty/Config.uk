@@ -4,6 +4,14 @@ menuconfig LIBPOSIX_TTY
 
 if LIBPOSIX_TTY
 
+# Hidden, will autoselect if devfs is present
+config LIBPOSIX_TTY_DEVFS
+	bool
+	default y if LIBUKFS_DEVFS
+	help
+	  Provide the "stdin", "stdout", and "stderr" special files under devfs,
+	  made available when mounted e.g., under /dev.
+
 config LIBPOSIX_TTY_SERIAL
 	bool "Provide file driver for the serial console"
 	select LIBUKCONSOLE
