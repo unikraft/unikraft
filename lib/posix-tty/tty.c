@@ -8,8 +8,11 @@
 #include <uk/init.h>
 #include <uk/posix-fd.h>
 #include <uk/posix-fdtab.h>
-#include <uk/posix-pseudofile.h>
 #include <uk/posix-serialfile.h>
+
+#if CONFIG_LIBPOSIX_TTY_PSEUDO
+#include <uk/file-pseudo.h>
+#endif /* CONFIG_LIBPOSIX_TTY_PSEUDO */
 
 #define STDIN_FNAME_NULL "stdin:null"
 #define STDIN_FNAME_LEN_NULL (sizeof(STDIN_FNAME_NULL) - 1)
@@ -37,11 +40,11 @@ static int init_posix_tty(struct uk_init_ctx *ictx __unused)
 	int r;
 
 #if CONFIG_LIBPOSIX_TTY_STDIN_NULL
-	in = uk_nullfile_create();
+	in = &uk_file_null;
 	in_fname = STDIN_FNAME_NULL;
 	in_fnamelen = STDIN_FNAME_LEN_NULL;
 #elif CONFIG_LIBPOSIX_TTY_STDIN_VOID
-	in = uk_voidfile_create();
+	in = &uk_file_void;
 	in_fname = STDIN_FNAME_VOID;
 	in_fnamelen = STDIN_FNAME_LEN_VOID;
 #elif CONFIG_LIBPOSIX_TTY_STDIN_SERIAL
@@ -53,7 +56,7 @@ static int init_posix_tty(struct uk_init_ctx *ictx __unused)
 #endif /* !CONFIG_LIBPOSIX_TTY_STDIN_* */
 
 #if CONFIG_LIBPOSIX_TTY_STDOUT_NULL
-	out = uk_nullfile_create();
+	out = &uk_file_null;
 	out_fname = STDOUT_FNAME_NULL;
 	out_fnamelen = STDOUT_FNAME_LEN_NULL;
 #elif CONFIG_LIBPOSIX_TTY_STDOUT_SERIAL

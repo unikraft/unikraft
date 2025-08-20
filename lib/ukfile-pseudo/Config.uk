@@ -1,0 +1,8 @@
+config LIBUKFILE_PSEUDO
+	bool "ukfile-pseudo: Pseudofiles with trivial behavior"
+	select LIBUKFILE
+	help
+	  Provide null, zero, and void pseudofiles that ignore all writes and
+	  - null: behaves as always on EOF
+	  - zero: reads all-zeros
+	  - void: behaves as always waiting on data
