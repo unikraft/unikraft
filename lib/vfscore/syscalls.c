@@ -1237,11 +1237,17 @@ sys_fchdir(struct vfscore_file *fp, char *cwd)
 }
 
 #if CONFIG_LIBPOSIX_PROCESS_MULTITHREADING
-static int uk_posix_clone_fs(const struct clone_args *cl_args,
-			     size_t cl_args_len __unused,
-			     struct uk_thread *child __unused,
-			     struct uk_thread *parent __unused)
+static int uk_posix_clone_fs(void *arg)
 {
+	struct posix_process_clone_event_data *event_data;
+	const struct clone_args *cl_args;
+
+	event_data = (struct posix_process_clone_event_data *)arg;
+	UK_ASSERT(event_data);
+
+	cl_args = event_data->cl_args;
+	UK_ASSERT(cl_args);
+
 	if (unlikely(!(cl_args->flags & CLONE_FS) &&
 		     !(cl_args->flags & CLONE_VM))) {
 		uk_pr_warn("Separate filesystem information for children are not supported (CLONE_FS absent)\n");
@@ -1252,9 +1258,10 @@ static int uk_posix_clone_fs(const struct clone_args *cl_args,
 	 * is shared with the child, this is what we have implemented only
 	 * at the moment
 	 */
-	return 0;
+	return UK_EVENT_HANDLED_CONT;
 }
-UK_POSIX_CLONE_HANDLER(CLONE_FS, false, uk_posix_clone_fs, 0x0);
+
+POSIX_PROCESS_CLONE_HANDLER(CLONE_FS, uk_posix_clone_fs);
 #endif /* CONFIG_LIBPOSIX_PROCESS_MULTITHREADING */
 
 int
