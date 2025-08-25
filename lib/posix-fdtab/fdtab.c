@@ -383,8 +383,7 @@ static int fdtab_handle_execve(void *data)
 }
 #endif /* !CONFIG_LIBPOSIX_FDTAB_MULTITAB */
 
-UK_EVENT_HANDLER_PRIO(POSIX_PROCESS_EXECVE_EVENT, fdtab_handle_execve,
-		      UK_PRIO_EARLIEST);
+POSIX_PROCESS_EXECVE_HANDLER_PRIO(fdtab_handle_execve, UK_PRIO_EARLIEST);
 #endif /* CONFIG_LIBPOSIX_PROCESS_EXECVE */
 
 /* Cleanup all leftover open fds in the initial fdtab */
@@ -476,15 +475,27 @@ static void fdtab_thread_term(struct uk_thread *child)
 UK_THREAD_INIT(fdtab_thread_init, fdtab_thread_term);
 
 #if CONFIG_LIBPOSIX_PROCESS_MULTITHREADING
-static int fdtab_clone(const struct clone_args *cl_args,
-		       size_t cl_args_len __unused,
-		       struct uk_thread *child,
-		       struct uk_thread *parent)
+static int fdtab_clone(void *arg)
 {
-	struct uk_fdtab *tab = uk_thread_uktls_var(parent, active_fdtab);
+	struct posix_process_clone_event_data *event_data;
+	struct uk_fdtab *tab;
 	struct uk_fdtab *newtab;
+	const struct clone_args *cl_args;
+	struct uk_thread *child;
+	struct uk_thread *parent;
 
+	event_data = (struct posix_process_clone_event_data *)arg;
+	UK_ASSERT(event_data);
+
+	cl_args = event_data->cl_args;
+	UK_ASSERT(cl_args);
+
+	child = event_data->child;
+	parent = event_data->parent;
+
+	tab = uk_thread_uktls_var(parent, active_fdtab);
 	UK_ASSERT(tab); /* Do not call clone from raw threads */
+
 	if (cl_args->flags & CLONE_FILES) {
 		/* Inherit parent's fdtab */
 		/* As a compat stop-gap, the raw thread already inherited the
@@ -493,7 +504,7 @@ static int fdtab_clone(const struct clone_args *cl_args,
 		 * TODO: move inheritance here once stopgap is removed.
 		 */
 		UK_ASSERT(uk_thread_uktls_var(child, active_fdtab) == tab);
-		return 0;
+		return UK_EVENT_HANDLED_CONT;
 	} else {
 		/* Duplicate parent's fdtab */
 		int r __maybe_unused;
@@ -507,10 +518,10 @@ static int fdtab_clone(const struct clone_args *cl_args,
 		UK_ASSERT(!r); /* Cannot have been the last ref */
 	}
 	uk_thread_uktls_var(child, active_fdtab) = newtab;
-	return 0;
+	return UK_EVENT_HANDLED_CONT;
 }
 
-UK_POSIX_CLONE_HANDLER(CLONE_FILES, 0, fdtab_clone, 0);
+POSIX_PROCESS_CLONE_HANDLER(CLONE_FILES, fdtab_clone);
 
 #endif /* CONFIG_LIBPOSIX_PROCESS_MULTITHREADING */
 #endif /* CONFIG_LIBPOSIX_FDTAB_MULTITAB */
