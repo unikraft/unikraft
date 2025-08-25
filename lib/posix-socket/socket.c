@@ -685,7 +685,7 @@ UK_SYSCALL_R_DEFINE(int, connect, int, sock, const struct sockaddr *, addr,
 	if (ret == -EINPROGRESS && _SHOULD_BLOCK(mode)) {
 		socklen_t _opsz = sizeof(ret);
 
-		(void)uk_file_poll(of->file, UKFD_POLLOUT);
+		(void)uk_file_poll(of->file, UKFD_POLLOUT | UKFD_POLL_ALWAYS);
 		/* Get err status from getsockopt */
 		uk_file_rlock(of->file);
 		posix_socket_getsockopt(of->file, SOL_SOCKET, SO_ERROR,
