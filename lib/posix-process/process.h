@@ -201,15 +201,46 @@ int pprocess_create(struct uk_alloc *a, struct uk_thread *thread,
 int uk_clone(struct clone_args *cl_args, size_t cl_args_len,
 	     struct ukarch_execenv *execenv);
 
-int pprocess_clonetab_init(const struct clone_args *cl_args, size_t cl_args_len,
-			   __u64 cl_flags_optional, struct uk_thread *child,
-			   struct uk_thread *parent);
+/**
+ * INTERNAL. POSIX process events kernel API
+ *
+ * Handler parameters are defined in the public API
+ * (libposix-process/include/uk/process/event.h)
+ */
 
-void pprocess_clonetab_term(struct uk_thread *child);
+/**
+ * INTERNAL. Raises clone event
+ *
+ * @param data Pointer to event data.
+ * @return UK_EVENT_HANDLED_CONT, UK_EVENT_NOT_HANDLED,
+ *         or negative value on error.
+ */
+int pprocess_raise_clone_event(struct posix_process_clone_event_data *data);
 
 #if CONFIG_LIBPOSIX_PROCESS_EXECVE
+/**
+ * INTERNAL. Raises exceve event
+ *
+ * @param data Pointer to event data.
+ * @return UK_EVENT_HANDLED_CONT, UK_EVENT_NOT_HANDLED,
+ *         or negative value on error.
+ */
 int pprocess_raise_execve_event(struct posix_process_execve_event_data *data);
 #endif /* CONFIG_LIBPOSIX_PROCESS_EXECVE */
+
+/**
+ * INTERNAL. Raises pthread exit event
+ *
+ * @param data Pointer to event data.
+ */
+void pprocess_raise_ptexit_event(struct posix_process_ptexit_event_data *data);
+
+/**
+ * INTERNAL. Raises process exit event
+ *
+ * @param data Pointer to event data.
+ */
+void pprocess_raise_ppexit_event(struct posix_process_ppexit_event_data *data);
 
 #endif /* CONFIG_LIBPOSIX_PROCESS_MULTITHREADING */
 

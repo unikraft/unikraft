@@ -350,13 +350,14 @@ err_out:
 pid_t uk_posix_process_run(uk_posix_process_mainlike_func fn,
 			   int argc, const char *argv[])
 {
-	struct posix_process_execve_event_data event_data;
+	struct posix_process_execve_event_data execve_data;
+	struct posix_process_clone_event_data clone_data;
 	struct uk_sched *s = uk_sched_current();
 	struct clone_args cl_args;
-	struct uk_thread *thread;
 	struct uk_thread *parent;
+	struct uk_thread *child;
 	pid_t parent_tid;
-	pid_t tid;
+	pid_t child_tid;
 	int ret;
 
 	UK_ASSERT(s);
@@ -366,66 +367,79 @@ pid_t uk_posix_process_run(uk_posix_process_mainlike_func fn,
 	UK_ASSERT(parent_tid > 0);
 
 	/* Create container thread */
-	thread = uk_thread_create_container(uk_alloc_get_default(),
-					    s->a_stack,
-					    STACK_SIZE,
-					    s->a_auxstack, 0, s->a_uktls,
-					    false, "application", NULL, NULL);
-	if (unlikely(!thread)) {
+	child = uk_thread_create_container(uk_alloc_get_default(),
+					   s->a_stack,
+					   STACK_SIZE,
+					   s->a_auxstack, 0, s->a_uktls,
+					   false, "application", NULL, NULL);
+	if (unlikely(!child)) {
 		uk_pr_err("Could not create thread\n");
 		return -ENOMEM;
 	}
 
 	/* Create new process */
-	ret = pprocess_create(uk_alloc_get_default(), thread, parent);
+	ret = pprocess_create(uk_alloc_get_default(), child, parent);
 	if (unlikely(ret)) {
 		uk_pr_err("Could not create process (%d)\n", ret);
 		goto err_free_thread;
 	}
+	child_tid = ukthread2tid(child);
 
-	tid = ukthread2tid(thread);
-
-	/* Iterate clonetab. We pass the flags used when creating
+	/* Raise the clone event. We pass the flags used when creating
 	 * a new process, i.e. CLONE_VM | CLONE_VFORK | SIGCHLD.
 	 */
 	cl_args = (struct clone_args) {
 		.flags       = CLONE_VM | CLONE_VFORK,
-		.child_tid   = tid,
+		.child_tid   = child_tid,
 		.parent_tid  = parent_tid,
 		.exit_signal = SIGCHLD,
 	};
-	ret = pprocess_clonetab_init(&cl_args, sizeof(cl_args), 0,
-				     thread, parent);
-	if (unlikely(ret)) {
-		uk_pr_err("clonetab execution error (%d)\n", ret);
-		goto err_free_process;
+
+	clone_data = (struct posix_process_clone_event_data) {
+		.cl_args = &cl_args,
+		.cl_args_len = sizeof(cl_args),
+		.child = child,
+		.parent = parent,
+		.ppid = ukthread2pid(parent),
+		.pid = ukthread2pid(child),
+		.tid = child_tid,
+	};
+
+	ret = pprocess_raise_clone_event(&clone_data);
+	if (unlikely(ret < 0)) {
+		uk_pr_err("clone event error (%d)\n", ret);
+		goto err_free_thread;
 	}
 
 	/* Raise the execve event */
-	event_data.thread = thread;
-	ret = pprocess_raise_execve_event(&event_data);
+	execve_data = (struct posix_process_execve_event_data) {
+		.thread = child,
+		.tid = ukthread2tid(child),
+		.pid = ukthread2pid(child),
+	};
+	ret = pprocess_raise_execve_event(&execve_data);
 	if (unlikely(ret < 0)) {
 		uk_pr_err("exeve event error (%d)\n", ret);
-		goto err_term_clonetab;
+		goto err_free_thread;
 	}
 
 	/* Schedule the process */
-	uk_thread_container_init_fn2(thread,
+	uk_thread_container_init_fn2(child,
 				     (uk_thread_fn2_t)fn,
 				     (void *)(unsigned long)argc,
 				     (void *)argv);
-	uk_sched_thread_add(s, thread);
+	ret = uk_sched_thread_add(s, child);
+	if (unlikely(ret < 0)) {
+		uk_pr_err("Unable to add tid %d to scheduler (%d)\n",
+			  ukthread2tid(child), ret);
+		goto err_free_thread;
+	}
 
-	return ukthread2pid(thread);
-
-err_term_clonetab:
-	pprocess_clonetab_term(thread);
-
-err_free_process:
-	pprocess_release(tid2pprocess(tid));
+	return ukthread2pid(child);
 
 err_free_thread:
-	uk_thread_release(thread);
+	/* also issues exit events */
+	uk_thread_release(child);
 
 	return ret;
 }
@@ -614,53 +628,6 @@ pid_t uk_sys_getppid(void)
 
 	return pthread_self->process->parent->pid;
 }
-
-/* Store child PID at given location for parent */
-static int pprocess_parent_settid(const struct clone_args *cl_args,
-				  size_t cl_args_len __unused,
-				  struct uk_thread *child,
-				  struct uk_thread *parent __unused)
-{
-	pid_t child_tid = ukthread2tid(child);
-
-	UK_ASSERT(child_tid > 0);
-
-	if (!cl_args->parent_tid)
-		return -EINVAL;
-
-	*((pid_t *) cl_args->parent_tid) = child_tid;
-	return 0;
-}
-UK_POSIX_CLONE_HANDLER(CLONE_PARENT_SETTID, true, pprocess_parent_settid, 0x0);
-
-/* Store child PID at given location in child */
-static int pprocess_child_settid(const struct clone_args *cl_args,
-				 size_t cl_args_len __unused,
-				 struct uk_thread *child,
-				 struct uk_thread *parent __unused)
-{
-	pid_t child_tid = ukthread2tid(child);
-
-	UK_ASSERT(child_tid > 0);
-
-	if (!cl_args->child_tid)
-		return -EINVAL;
-
-	*((pid_t *) cl_args->child_tid) = child_tid;
-	return 0;
-}
-UK_POSIX_CLONE_HANDLER(CLONE_CHILD_SETTID, true, pprocess_child_settid, 0x0);
-
-static int pprocess_clone_thread(const struct clone_args *cl_args __unused,
-				 size_t cl_args_len __unused,
-				 struct uk_thread *child __unused,
-				 struct uk_thread *parent __unused)
-{
-	UK_WARN_STUBBED();
-
-	return 0;
-}
-UK_POSIX_CLONE_HANDLER(CLONE_THREAD, false, pprocess_clone_thread, 0x0);
 #else  /* !CONFIG_LIBPOSIX_PROCESS_MULTITHREADING */
 
 #define UNIKRAFT_PID      1

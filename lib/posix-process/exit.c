@@ -9,7 +9,6 @@
 #include <stddef.h>
 
 #include <uk/config.h>
-#include <uk/event.h>
 #include <uk/process.h>
 #include <uk/sched.h>
 #include <uk/syscall.h>
@@ -31,8 +30,6 @@
 #else /* !CONFIG_LIBPOSIX_PROCESS_SIGNAL */
 #define PTHREAD_BLOCKING_ON_SIGNAL(_pt)		    0
 #endif /* !CONFIG_LIBPOSIX_PROCESS_SIGNAL */
-
-UK_EVENT(POSIX_PROCESS_EXIT_EVENT);
 
 int pprocess_exit_status = PPROCESS_EXIT_STATUS_UNSET;
 
@@ -91,11 +88,10 @@ void pprocess_exit_pthread(struct posix_thread *pthread,
 			   enum posix_thread_state state,
 			   int exit_status __unused)
 {
-	struct posix_process_exit_event_data event_data;
+	struct posix_process_ptexit_event_data event_data;
 	struct posix_process *pprocess;
 	struct posix_thread *parent_pthread;
 	struct uk_thread *thread;
-	int ret;
 
 	UK_ASSERT(state == POSIX_THREAD_EXITED ||
 		  state == POSIX_THREAD_KILLED);
@@ -119,10 +115,7 @@ void pprocess_exit_pthread(struct posix_thread *pthread,
 	/* Raise event */
 	event_data.thread = pthread->thread;
 	event_data.tid = pthread->tid;
-	event_data.pid = pprocess->pid;
-	ret = uk_raise_event(POSIX_PROCESS_EXIT_EVENT, &event_data);
-	if (unlikely(ret < 0))
-		UK_CRASH("POSIX_PROCESS_EXIT_EVENT failed with %d\n", ret);
+	pprocess_raise_ptexit_event(&event_data);
 
 	/* Wake up parent if it was blocking on vfork */
 	if (parent_pthread &&
@@ -148,7 +141,7 @@ void pprocess_exit(struct posix_process *pprocess,
 		   enum posix_process_state state,
 		   int exit_status)
 {
-	struct posix_process_exit_event_data event_data;
+	struct posix_process_ppexit_event_data event_data;
 	struct posix_process *parent_process;
 	struct posix_thread *pt, *ptn;
 	__bool nowait = false;
@@ -210,11 +203,8 @@ void pprocess_exit(struct posix_process *pprocess,
 	pprocess_reparent_children(pprocess);
 
 	/* Notify handlers */
-	event_data.thread = NULL;
 	event_data.pid = pprocess->pid;
-	ret = uk_raise_event(POSIX_PROCESS_EXIT_EVENT, &event_data);
-	if (unlikely(ret < 0))
-		UK_CRASH("POSIX_PROCESS_EXIT_EVENT handler returned error\n");
+	pprocess_raise_ppexit_event(&event_data);
 
 	uk_semaphore_up(&pprocess->exit_semaphore);
 

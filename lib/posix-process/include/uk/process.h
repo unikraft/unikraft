@@ -43,99 +43,13 @@
 #include <uk/essentials.h>
 
 #if CONFIG_LIBPOSIX_PROCESS_MULTITHREADING
-#ifndef _GNU_SOURCE
-#define _GNU_SOURCE
-#endif
-#include <sched.h>       /* CLONE_* constants */
-#include <linux/sched.h> /* struct clone_args */
-
 #include <arch/clone.h>
 #include <uk/event.h>
 #include <uk/prio.h>
 #include <uk/thread.h>
 
-/* In case a libC is defining only a subset of our currently supported clone
- * flags, we provide here a completion of the list
- */
-#ifndef CLONE_NEWTIME
-#define CLONE_NEWTIME		0x00000080
-#endif /* !CLONE_NEWTIME */
-#ifndef CLONE_VM
-#define CLONE_VM		0x00000100
-#endif /* !CLONE_VM */
-#ifndef CLONE_FS
-#define CLONE_FS		0x00000200
-#endif /* !CLONE_FS */
-#ifndef CLONE_FILES
-#define CLONE_FILES		0x00000400
-#endif /* !CLONE_FILES */
-#ifndef CLONE_SIGHAND
-#define CLONE_SIGHAND		0x00000800
-#endif /* !CLONE_SIGHAND */
-#ifndef CLONE_PIDFD
-#define CLONE_PIDFD		0x00001000
-#endif /* !CLONE_PIDFD */
-#ifndef CLONE_PTRACE
-#define CLONE_PTRACE		0x00002000
-#endif /* !CLONE_PTRACE */
-#ifndef CLONE_VFORK
-#define CLONE_VFORK		0x00004000
-#endif /* !CLONE_VFORK */
-#ifndef CLONE_PARENT
-#define CLONE_PARENT		0x00008000
-#endif /* !CLONE_PARENT */
-#ifndef CLONE_THREAD
-#define CLONE_THREAD		0x00010000
-#endif /* !CLONE_THREAD */
-#ifndef CLONE_NEWNS
-#define CLONE_NEWNS		0x00020000
-#endif /* !CLONE_NEWNS */
-#ifndef CLONE_SYSVSEM
-#define CLONE_SYSVSEM		0x00040000
-#endif /* !CLONE_SYSVSEM */
-#ifndef CLONE_SETTLS
-#define CLONE_SETTLS		0x00080000
-#endif /* !CLONE_SETTLS */
-#ifndef CLONE_PARENT_SETTID
-#define CLONE_PARENT_SETTID	0x00100000
-#endif /* !CLONE_PARENT_SETTID */
-#ifndef CLONE_CHILD_CLEARTID
-#define CLONE_CHILD_CLEARTID	0x00200000
-#endif /* !CLONE_CHILD_CLEARTID */
-#ifndef CLONE_DETACHED
-#define CLONE_DETACHED		0x00400000
-#endif /* !CLONE_DETACHED */
-#ifndef CLONE_UNTRACED
-#define CLONE_UNTRACED		0x00800000
-#endif /* !CLONE_UNTRACED */
-#ifndef CLONE_CHILD_SETTID
-#define CLONE_CHILD_SETTID	0x01000000
-#endif /* !CLONE_CHILD_SETTID */
-#ifndef CLONE_NEWCGROUP
-#define CLONE_NEWCGROUP		0x02000000
-#endif /* !CLONE_NEWCGROUP */
-#ifndef CLONE_NEWUTS
-#define CLONE_NEWUTS		0x04000000
-#endif /* !CLONE_NEWUTS */
-#ifndef CLONE_NEWIPC
-#define CLONE_NEWIPC		0x08000000
-#endif /* !CLONE_NEWIPC */
-#ifndef CLONE_NEWUSER
-#define CLONE_NEWUSER		0x10000000
-#endif /* !CLONE_NEWUSER */
-#ifndef CLONE_NEWPID
-#define CLONE_NEWPID		0x20000000
-#endif /* !CLONE_NEWPID */
-#ifndef CLONE_NEWNET
-#define CLONE_NEWNET		0x40000000
-#endif /* !CLONE_NEWNET */
-#ifndef CLONE_IO
-#define CLONE_IO		0x80000000
-#endif /* !CLONE_IO */
-#ifndef CLONE_CLEAR_SIGHAND
-#define CLONE_CLEAR_SIGHAND	0x100000000ULL
-#endif
-#endif /* CONFIG_LIBPOSIX_PROCESS_MULTITHREADING */
+#include <uk/process/events.h>
+#endif /* CONFIG_LIBPOSIX_PROCESS_MULTITHREADING  */
 
 int uk_sys_prlimit64(int pid, unsigned int resource,
 		     struct rlimit *new_limit, struct rlimit *old_limit);
@@ -156,64 +70,6 @@ pid_t uk_sys_getppid(void);
 pid_t uk_sys_getpid(void);
 
 #if CONFIG_LIBPOSIX_PROCESS_MULTITHREADING
-typedef int  (*uk_posix_clone_init_func_t)(const struct clone_args *cl_args,
-					   size_t cl_args_len,
-					   struct uk_thread *child,
-					   struct uk_thread *parent);
-typedef void (*uk_posix_clone_term_func_t)(__u64 cl_flags,
-					   struct uk_thread *child);
-
-/* helper to test if a cl_args field is given */
-#define UK_POSIX_CLONE_ARGS_HAS(field, cl_args_len)		\
-	__contains(struct clone_args, field, cl_args_len)
-
-
-struct uk_posix_clonetab_entry {
-	__u64 flags_mask;
-	bool presence_only; /* call handler only if at least one flag is set */
-	uk_posix_clone_init_func_t init;
-	uk_posix_clone_term_func_t term;
-};
-
-#define __UK_POSIX_CLONETAB_ENTRY(arg_flags_mask, arg_presence_only,	\
-				  init_fn, term_fn, prio)		\
-	static const struct uk_posix_clonetab_entry			\
-	__used __section(".uk_posix_clonetab" # prio) __align(8)	\
-		__uk_posix_clonetab ## prio ## _ ## init_fn ## _ ## term_fn = {\
-		.flags_mask = (arg_flags_mask),				\
-		.presence_only = !(!(arg_presence_only)),		\
-		.init = (init_fn),					\
-		.term = (term_fn)					\
-	}
-
-#define _UK_POSIX_CLONETAB_ENTRY(flags_mask, presence_only,		\
-				 init_fn, term_fn, prio)		\
-	__UK_POSIX_CLONETAB_ENTRY(flags_mask, presence_only,		\
-				  init_fn, term_fn, prio)
-
-/**
- * Registers a clone handler that is called during thread cloning
- *
- * @param flags_mask
- *   Mask of flags that are handled by this handler
- * @param presence_only
- *   Call handler only if at least one flag is set from flags_mask:
- *   (clone_args->flags & flags_mask) != 0
- * @param init_fn
- *   Handler that is called once from parent during clone
- * @param term_fn
- *   Handler that is called when the child terminates
- * @parm prio
- *   Call order priority for this handler
- */
-#define UK_POSIX_CLONE_HANDLER_PRIO(flags_mask, presence_only,		\
-				    init_fn, term_fn, prio)		\
-	_UK_POSIX_CLONETAB_ENTRY(flags_mask, presence_only,		\
-				 init_fn, term_fn, prio)
-
-#define UK_POSIX_CLONE_HANDLER(flags_mask, presence_only, init_fn, term_fn)    \
-	_UK_POSIX_CLONETAB_ENTRY(flags_mask, presence_only, init_fn, term_fn,  \
-				 UK_PRIO_LATEST)
 
 /* Creates a pthread and attaches it to the current process
  *
@@ -244,25 +100,5 @@ typedef int (*uk_posix_process_mainlike_func)(int argc, char *argv[]);
 pid_t uk_posix_process_run(uk_posix_process_mainlike_func fn,
 			   int argc, const char **argv);
 #endif /* CONFIG_LIBPOSIX_PROCESS_MULTIPROCESS */
-
-#if CONFIG_LIBPOSIX_PROCESS_EXECVE
-/* Data delivered to the handlers of the POSIX_PROCESS_EXECVE_EVENT */
-struct posix_process_execve_event_data {
-	struct uk_thread *thread;
-};
-
-#endif /* CONFIG_LIBPOSIX_PROCESS_EXECVE */
-
-/* Data delivered to the handlers of POSIX_PROCESS_EXIT_EVENT.
- * This event is triggered upon both pthread and pprocess exit.
- * - pthread exit: all fields are populated.
- * - process exit: thread is set to NULL and the value of
- *   tid is undefined.
- */
-struct posix_process_exit_event_data {
-	struct uk_thread *thread;
-	pid_t pid;
-	pid_t tid;
-};
 
 #endif /* __UK_PROCESS_H__ */

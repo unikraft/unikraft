@@ -18,11 +18,12 @@
 
 #include "signal.h"
 
-static int uk_posix_clone_sighand(const struct clone_args *cl_args,
-				  size_t cl_args_len __unused,
-				  struct uk_thread *child,
-				  struct uk_thread *parent)
+static
+int uk_posix_clone_sighand(void *arg)
 {
+	struct posix_process_clone_event_data *event_data;
+
+	const struct clone_args *cl_args;
 	struct posix_process *pp; /* parent process */
 	struct posix_process *cp; /* child process */
 	struct posix_thread *ct; /* child thread */
@@ -31,13 +32,21 @@ static int uk_posix_clone_sighand(const struct clone_args *cl_args,
 	int signum;
 	int rc;
 
-	ppid = ukthread2pid(parent);
-	cpid = ukthread2pid(child);
+	event_data = (struct posix_process_clone_event_data *)arg;
+	UK_ASSERT(event_data);
+	UK_ASSERT(event_data->cl_args);
+	UK_ASSERT(event_data->child);
+	UK_ASSERT(event_data->parent);
+
+	cl_args = event_data->cl_args;
+
+	ppid = ukthread2pid(event_data->parent);
+	cpid = ukthread2pid(event_data->child);
 
 	pp = pid2pprocess(ppid);
 	cp = pid2pprocess(cpid);
 
-	ct = tid2pthread(ukthread2tid(child));
+	ct = tid2pthread(ukthread2tid(event_data->child));
 
 	/* CLONE_SIGHAND and CLONE_CLEAR_SIGHAND should not be together */
 	if (unlikely((cl_args->flags & (CLONE_SIGHAND | CLONE_CLEAR_SIGHAND))
@@ -153,11 +162,15 @@ fail_tdesc_alloc:
 	return rc;
 }
 #else /* !CONFIG_LIBPOSIX_PROCESS_SIGNAL */
-static int uk_posix_clone_sighand(const struct clone_args *cl_args,
-				  size_t cl_args_len __unused,
-				  struct uk_thread *child __unused,
-				  struct uk_thread *parent __unused)
+static int uk_posix_clone_sighand(void *arg)
 {
+	struct posix_process_clone_event_data *event_data;
+	const struct clone_args *cl_args;
+
+	event_data = (struct posix_process_clone_event_data *)arg;
+	UK_ASSERT(event_data);
+	UK_ASSERT(event_data->cl_args);
+
 	/* CLONE_SIGHAND and CLONE_CLEAR_SIGHAND should not be together */
 	if (unlikely((cl_args->flags & (CLONE_SIGHAND | CLONE_CLEAR_SIGHAND)) ==
 		     (CLONE_SIGHAND | CLONE_CLEAR_SIGHAND)))
@@ -176,5 +189,5 @@ static int uk_posix_clone_sighand(const struct clone_args *cl_args,
 }
 #endif /* !CONFIG_LIBPOSIX_PROCESS_SIGNAL */
 
-UK_POSIX_CLONE_HANDLER(CLONE_SIGHAND | CLONE_CLEAR_SIGHAND, false,
-		       uk_posix_clone_sighand, 0x0);
+POSIX_PROCESS_CLONE_HANDLER(CLONE_SIGHAND | CLONE_CLEAR_SIGHAND,
+			    uk_posix_clone_sighand);

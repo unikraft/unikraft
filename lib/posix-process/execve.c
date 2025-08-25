@@ -19,8 +19,6 @@ void execve_arch_execenv_init(struct ukarch_execenv *execenv_new,
 			      struct ukarch_execenv *execenv,
 			      __uptr ip, __uptr sp);
 
-UK_EVENT(POSIX_PROCESS_EXECVE_EVENT);
-
 /* arg0: execenv_new, arg1: stack_old */
 static void __noreturn execve_ctx_switch(long arg0, long arg1)
 {
@@ -81,11 +79,6 @@ static int pprocess_cleanup(struct posix_process *pprocess)
 	}
 
 	return 0;
-}
-
-int pprocess_raise_execve_event(struct posix_process_execve_event_data *data)
-{
-	return uk_raise_event(POSIX_PROCESS_EXECVE_EVENT, data);
 }
 
 UK_SYSCALL_R_E_DEFINE(int, execve, const char *, pathname,
@@ -174,7 +167,11 @@ UK_SYSCALL_R_E_DEFINE(int, execve, const char *, pathname,
 	 * libraries that may have registered for the event, then do the
 	 * internal cleanup.
 	 */
-	event_data.thread = this_thread;
+	event_data = (struct posix_process_execve_event_data) {
+		.thread = this_thread,
+		.tid = ukthread2tid(this_thread),
+		.pid = ukthread2pid(this_thread),
+	};
 	rc = pprocess_raise_execve_event(&event_data);
 	if (unlikely(rc < 0)) {
 		uk_pr_err("execve event error (%d)\n", rc);
