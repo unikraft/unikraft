@@ -38,6 +38,4 @@ static int syscall_nested_depth_reset(void *data)
 	return UK_EVENT_HANDLED_CONT;
 }
 
-UK_EVENT_HANDLER_PRIO(POSIX_PROCESS_EXECVE_EVENT,
-		      syscall_nested_depth_reset,
-		      UK_PRIO_EARLIEST);
+POSIX_PROCESS_EXECVE_HANDLER_PRIO(syscall_nested_depth_reset, UK_PRIO_EARLIEST);
