@@ -281,12 +281,25 @@ struct vfs_proc_state *vfs_ctx_duplicate(struct vfs_proc_state *ctx)
 }
 
 static
-int vfs_clone(const struct clone_args *cl_args, size_t cl_args_len __unused,
-	      struct uk_thread *child, struct uk_thread *parent __unused)
+int vfs_clone(void *arg)
 {
-	struct vfs_proc_state *ctx = uk_thread_uktls_var(parent, vfs_ctx);
+	struct posix_process_clone_event_data *event_data;
+	const struct clone_args *cl_args;
 	struct vfs_proc_state *newctx;
+	struct vfs_proc_state *ctx;
+	struct uk_thread *parent;
+	struct uk_thread *child;
 
+	event_data = (struct posix_process_clone_event_data *)arg;
+	UK_ASSERT(event_data);
+
+	cl_args = event_data->cl_args;
+	UK_ASSERT(cl_args);
+
+	child = event_data->child;
+	parent = event_data->parent;
+
+	ctx = uk_thread_uktls_var(parent, vfs_ctx);
 	UK_ASSERT(ctx); /* Do not call clone from raw threads */
 	if ((cl_args->flags & CLONE_FS)) {
 		/* Inherit parent's vfs ctx */
@@ -296,7 +309,7 @@ int vfs_clone(const struct clone_args *cl_args, size_t cl_args_len __unused,
 		 * TODO: move inheritance here once stopgap is removed.
 		 */
 		UK_ASSERT(uk_thread_uktls_var(child, vfs_ctx) == ctx);
-		return 0;
+		return UK_EVENT_HANDLED_CONT;
 	} else {
 		/* Duplicate parent's vfs ctx */
 		newctx = vfs_ctx_duplicate(ctx);
@@ -307,10 +320,10 @@ int vfs_clone(const struct clone_args *cl_args, size_t cl_args_len __unused,
 		vfs_ctx_release(ctx);
 	}
 	uk_thread_uktls_var(child, vfs_ctx) = newctx;
-	return 0;
+	return UK_EVENT_HANDLED_CONT;
 }
 
-UK_POSIX_CLONE_HANDLER(CLONE_FS, 0, vfs_clone, 0);
+POSIX_PROCESS_CLONE_HANDLER(CLONE_FS, vfs_clone);
 
 #endif /* CONFIG_LIBPOSIX_PROCESS_MULTITHREADING */
 
