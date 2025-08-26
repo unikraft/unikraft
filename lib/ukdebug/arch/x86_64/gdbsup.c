@@ -37,15 +37,17 @@ static int gdb_arch_dbg_trap(int errnr, struct __regs *regs)
 	return 0;
 }
 
-static int gdb_arch_debug_handler(void *data)
+static enum uk_event_status gdb_arch_debug_handler(void *data, int *error)
 {
 	int r;
 	struct ukarch_trap_ctx *ctx = (struct ukarch_trap_ctx *)data;
 
-	if ((r = gdb_arch_dbg_trap(5 /* SIGTRAP */, ctx->regs)) < 0)
-		return r;
-	else
-		return UK_EVENT_HANDLED;
+	r = gdb_arch_dbg_trap(5 /* SIGTRAP */, ctx->regs);
+	if (unlikely(r < 0)) {
+		*error = r;
+		return UK_EVENT_ERROR;
+	}
+	return UK_EVENT_HANDLED;
 }
 
 UK_EVENT_HANDLER(UKARCH_TRAP_DEBUG, gdb_arch_debug_handler);

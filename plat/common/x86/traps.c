@@ -92,14 +92,17 @@ void do_unhandled_trap(int trapnr, char *str, struct __regs *regs,
 
 void do_page_fault(struct __regs *regs, unsigned long error_code)
 {
-	int rc;
 	unsigned long vaddr = read_cr2();
 	struct ukarch_trap_ctx ctx = {regs, TRAP_page_fault, error_code, vaddr};
+	enum uk_event_status event_status;
+	int event_error;
 
-	rc = uk_raise_event(UKARCH_TRAP_PAGE_FAULT, &ctx);
-	if (unlikely(rc < 0))
-		uk_pr_crit("page fault handler returned error: %d\n", rc);
-	else if (rc)
+	event_status = uk_raise_event(UKARCH_TRAP_PAGE_FAULT, &ctx,
+				      &event_error);
+	if (unlikely(event_status == UK_EVENT_ERROR))
+		uk_pr_crit("page fault handler returned error: %d\n",
+			   event_error);
+	else if (event_status != UK_EVENT_NOT_HANDLED)
 		return;
 
 	dump_regs(regs);

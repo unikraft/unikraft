@@ -92,10 +92,11 @@ void pprocess_exit_pthread(struct posix_thread *pthread,
 			   int exit_status __unused)
 {
 	struct posix_process_exit_event_data event_data;
-	struct posix_process *pprocess;
 	struct posix_thread *parent_pthread;
+	enum uk_event_status event_status;
+	struct posix_process *pprocess;
 	struct uk_thread *thread;
-	int ret;
+	int event_error;
 
 	UK_ASSERT(state == POSIX_THREAD_EXITED ||
 		  state == POSIX_THREAD_KILLED);
@@ -120,9 +121,11 @@ void pprocess_exit_pthread(struct posix_thread *pthread,
 	event_data.thread = pthread->thread;
 	event_data.tid = pthread->tid;
 	event_data.pid = pprocess->pid;
-	ret = uk_raise_event(POSIX_PROCESS_EXIT_EVENT, &event_data);
-	if (unlikely(ret < 0))
-		UK_CRASH("POSIX_PROCESS_EXIT_EVENT failed with %d\n", ret);
+	event_status = uk_raise_event(POSIX_PROCESS_EXIT_EVENT, &event_data,
+				      &event_error);
+	if (unlikely(event_status == UK_EVENT_ERROR))
+		UK_CRASH("POSIX_PROCESS_EXIT_EVENT failed with %d\n",
+			 event_error);
 
 	/* Wake up parent if it was blocking on vfork */
 	if (parent_pthread &&
@@ -150,9 +153,10 @@ void pprocess_exit(struct posix_process *pprocess,
 {
 	struct posix_process_exit_event_data event_data;
 	struct posix_process *parent_process;
+	enum uk_event_status event_status;
 	struct posix_thread *pt, *ptn;
 	__bool nowait = false;
-	int ret;
+	int event_error;
 
 	UK_ASSERT(state == POSIX_PROCESS_EXITED ||
 		  state == POSIX_PROCESS_KILLED);
@@ -212,9 +216,11 @@ void pprocess_exit(struct posix_process *pprocess,
 	/* Notify handlers */
 	event_data.thread = NULL;
 	event_data.pid = pprocess->pid;
-	ret = uk_raise_event(POSIX_PROCESS_EXIT_EVENT, &event_data);
-	if (unlikely(ret < 0))
-		UK_CRASH("POSIX_PROCESS_EXIT_EVENT handler returned error\n");
+	event_status = uk_raise_event(POSIX_PROCESS_EXIT_EVENT, &event_data,
+				      &event_error);
+	if (unlikely(event_status == UK_EVENT_ERROR))
+		UK_CRASH("Exit event handler returned error (%d)\n",
+			 event_error);
 
 	uk_semaphore_up(&pprocess->exit_semaphore);
 

@@ -158,8 +158,9 @@ void uk_intctlr_irq_handle(struct __regs *regs, unsigned int irq)
 {
 	struct irq_handler *h;
 	int i;
-	int rc;
 	struct uk_intctlr_event_irq_data ctx;
+	enum uk_event_status event_status;
+	int event_error;
 #if CONFIG_LIBUKINTCTLR_ISR_ECTX_ASSERTIONS
 	__sz ectx_align = ukarch_ectx_align();
 	__u8 ectxbuf[ukarch_ectx_size() + ectx_align];
@@ -173,10 +174,10 @@ void uk_intctlr_irq_handle(struct __regs *regs, unsigned int irq)
 
 	ctx.regs = regs;
 	ctx.irq = irq;
-	rc = uk_raise_event(UK_INTCTLR_EVENT_IRQ, &ctx);
-	if (unlikely(rc < 0))
-		UK_CRASH("IRQ event handler returned error: %d\n", rc);
-	if (rc == UK_EVENT_HANDLED) {
+	event_status = uk_raise_event(UK_INTCTLR_EVENT_IRQ, &ctx, &event_error);
+	if (unlikely(event_status == UK_EVENT_ERROR))
+		UK_CRASH("IRQ event handler returned error: %d\n", event_error);
+	if (event_status == UK_EVENT_HANDLED) {
 		/* Skip all normal handlers if an event handler handled the
 		 * event
 		 */

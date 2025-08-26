@@ -6,14 +6,16 @@
 
 #include "../../vmem.h"
 
-#include <uk/assert.h>
-#include <uk/arch/traps.h>
-#include <uk/arch/types.h>
-#include <uk/print.h>
-#include <uk/config.h>
 #include <string.h>
 
-static int vmem_arch_pagefault(void *data)
+#include <uk/arch/traps.h>
+#include <uk/arch/types.h>
+#include <uk/assert.h>
+#include <uk/print.h>
+#include <uk/compiler.h>
+#include <uk/config.h>
+
+static enum uk_event_status vmem_arch_pagefault(void *data, int *error __unused)
 {
 	struct ukarch_trap_ctx *ctx = (struct ukarch_trap_ctx *)data;
 	__vaddr_t vaddr = (__vaddr_t)ctx->fault_address;

@@ -208,7 +208,9 @@ int pprocess_clonetab_init(const struct clone_args *cl_args, size_t cl_args_len,
 void pprocess_clonetab_term(struct uk_thread *child);
 
 #if CONFIG_LIBPOSIX_PROCESS_EXECVE
-int pprocess_raise_execve_event(struct posix_process_execve_event_data *data);
+enum uk_event_status
+pprocess_raise_execve_event(struct posix_process_execve_event_data *event_data,
+			    int *event_error);
 #endif /* CONFIG_LIBPOSIX_PROCESS_EXECVE */
 
 #endif /* CONFIG_LIBPOSIX_PROCESS_MULTITHREADING */

@@ -74,13 +74,14 @@
  * void some_function(void)
  * {
  *       struct myevent_data = { .dummy = 42 };
+ *       int error;
  *       int rc;
  *
- *       rc = uk_raise_event(myevent, &myevent_data);
- *       if (rc < 0)
- *               uk_pr_crit("an event handler returned an error!\n");
- *       else if (!rc)
- *               uk_pr_err("myevent not handled!\n");
+ *       rc = uk_raise_event(myevent, &myevent_data, &error);
+ *       if (unlikely(rc < UK_EVENT_ERROR))
+ *               uk_pr_crit("an event handler returned an error (%d)\n", error);
+ *       else if (rc == UK_EVENT_NOT_HANDLED)
+ *               uk_pr_err("myevent not handled\n");
  * }
  * ```
  * **libB/myhandler.c:**
@@ -88,19 +89,19 @@
  * #include <uk/event.h>
  * #include <uk/myevent.h>
  *
- * int handler1(void *arg)
+ * enum uk_event_status handler1(void *arg, int *error)
  * {
  *       struct myevent_data *data = (struct myevent_data *)arg;
  *       ...
  *       return UK_EVENT_HANDLED_CONT;
  * }
  *
- * int handler2(void *arg)
+ * enum uk_event_status handler2(void *arg, int *error)
  * {
  *       return UK_EVENT_HANDLED_CONT;
  * }
  *
- * int handler3(void *arg)
+ * enum uk_event_status handler3(void *arg, int *error)
  * {
  *       return UK_EVENT_HANDLED;
  * }
@@ -136,14 +137,22 @@ extern "C" {
  *
  * @param data
  *   Optional data parameter. The data is supplied when raising the event
+ * @param error
+ *   Pointer to error code. Set by the handler when returning UK_EVENT_ERROR.
  * @return
  *   One of the UK_EVENT_* macros on success, errno on < 0
  */
-typedef int (*uk_event_handler_t)(void *data);
+typedef enum uk_event_status (*uk_event_handler_t)(void *data, int *error);
 
-#define UK_EVENT_NOT_HANDLED	0  /* Event not handled. Try next handler. */
-#define UK_EVENT_HANDLED	1  /* Event handled. Stop calling handlers. */
-#define UK_EVENT_HANDLED_CONT	2  /* Event handled. Call next handler. */
+enum uk_event_status {
+	UK_EVENT_NOT_HANDLED,	/* Event not handled. Try next handler. */
+	UK_EVENT_HANDLED,	/* Event handled. Stop calling handlers. */
+	UK_EVENT_HANDLED_CONT,	/* Event handled. Call next handler. */
+	UK_EVENT_ERROR		/* Error while processing the event. The
+				 * handler must return an error code via
+				 * *error.
+				 */
+};
 
 struct uk_event {
 	const uk_event_handler_t *hlist_end;
@@ -259,32 +268,35 @@ struct uk_event {
  *   Pointer to the event to raise.
  * @param data
  *   Optional data supplied to the event handlers
+ * @param error
+ *   Error code set by the handler in case of an error.
  * @returns
- *   A negative error value if a handler returns one. Event processing
- *   immediately stops in this case. Otherwise:
  *   - UK_EVENT_HANDLED if a handler indicated that it successfully handled
  *     the event and event processing should stop with this handler.
  *   - UK_EVENT_HANDLED_CONT if at least one handler indicated that it
  *     successfully handled the event but event handling can continue, and no
  *     other handler returned UK_EVENT_HANDLED.
  *   - UK_EVENT_NOT_HANDLED if no handler handled the event.
+ *   - UK_EVENT_ERROR if a handler encountered an error while handling the
+ *     event. Event processing stops immediately in this case, and an errror
+ *     code is saved in *error.
  */
-static inline int uk_raise_event_ptr(struct uk_event *e, void *data)
+static inline enum uk_event_status
+uk_raise_event_ptr(struct uk_event *e, void *data, int *error)
 {
 	const uk_event_handler_t *itr;
-	int rc;
 	int ret = UK_EVENT_NOT_HANDLED;
 
 	uk_event_handler_foreach(itr, e) {
 		__uk_event_assert(*itr);
-		rc = ((*itr)(data));
-		if (unlikely(rc < 0))
-			return rc;
+		ret = ((*itr)(data, error));
+		if (unlikely(ret == UK_EVENT_ERROR))
+			return UK_EVENT_ERROR;
 
-		if (rc == UK_EVENT_HANDLED)
+		if (ret == UK_EVENT_HANDLED)
 			return UK_EVENT_HANDLED;
 
-		if (rc == UK_EVENT_HANDLED_CONT)
+		if (ret == UK_EVENT_HANDLED_CONT)
 			ret = UK_EVENT_HANDLED_CONT;
 	}
 
@@ -302,9 +314,9 @@ static inline int uk_raise_event_ptr(struct uk_event *e, void *data)
  * @return
  *   One of the UK_EVENT_* macros on success, errno on < 0
  */
-#define uk_raise_event(event, data)					\
+#define uk_raise_event(event, data, error)				\
 	({	_UK_EVT_IMPORT_EVENT(event);				\
-		uk_raise_event_ptr(UK_EVENT_PTR(event), data);	})
+		uk_raise_event_ptr(UK_EVENT_PTR(event), data, error);	})
 
 #ifdef __cplusplus
 }

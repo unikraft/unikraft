@@ -79,7 +79,7 @@ int uk_mydevice_init_metrics(struct uk_mydevice *dev)
 
 ```c
 /* This is the handler for UK_STORE_EVENT_CREATE_OBJECT */
-static int handle_create_object(void *arg)
+static enum uk_event_status handle_create_object(void *arg, int *error __unused)
 {
     struct uk_store_event_data *data = (struct uk_store_event_data *)arg;
 
@@ -114,6 +114,7 @@ UK_EVENT_HANDLER_(UK_STORE_EVENT_CREATE_OBJECT, handle_create_object);
 int uk_mydevice_teardown_metrics(struct uk_mydevice *dev)
 {
     struct uk_store_object *obj;
+    int error;
 
     /* this is looked up via library-specific means */
     obj = get_obj_by_device(dev);
@@ -124,7 +125,7 @@ int uk_mydevice_teardown_metrics(struct uk_mydevice *dev)
         .object_id = obj->id,
         .owner = NULL
     };
-    uk_raise_event(UK_STORE_EVENT_RELEASE_OBJECT, &event_data);
+    uk_raise_event(UK_STORE_EVENT_RELEASE_OBJECT, &event_data, &error);
 
     /* Decrement the refcount. The object will be freed as soon as
      * all consumers decrement the refcount.
@@ -139,7 +140,9 @@ int uk_mydevice_teardown_metrics(struct uk_mydevice *dev)
 
 ```c
 /* This is the handler for UK_STORE_EVENT_RELEASE_OBJECT */
-static int handle_release_object(struct uk_event_data *data)
+static
+enum uk_event_status handle_release_object(struct uk_event_data *data,
+					   int *error __unused)
 {
     struct uk_store_event_data *data = (struct uk_store_event_data *)arg;
 
@@ -155,6 +158,8 @@ static int handle_release_object(struct uk_event_data *data)
      * free, along with its entries.
      */
     uk_store_obj_release(obj);
+
+    return UK_EVENT_HANDLED;
 }
 
 /* Registers handler */

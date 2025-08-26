@@ -148,9 +148,10 @@ static inline void socket_event_raise(struct uk_socket_event_data *evd,
 		.raddr     = (evd->raddr_len == 0) ?
 				NULL : (const struct sockaddr *)&evd->raddr,
 	};
+	int err __unused;
 
 	evd->raise_cnt++;
-	uk_raise_event_ptr(evt, &emsg);
+	uk_raise_event_ptr(evt, &emsg, &err);
 
 	/* Update the state to reflect the change */
 	evd->state = new_state;

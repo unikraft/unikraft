@@ -367,7 +367,7 @@ void uk_fdtab_cloexec(void)
 
 #if CONFIG_LIBPOSIX_PROCESS_EXECVE
 #if CONFIG_LIBPOSIX_FDTAB_MULTITAB
-static int fdtab_handle_execve(void *data)
+static enum uk_event_status fdtab_handle_execve(void *data)
 {
 	struct posix_process_execve_event_data *edat = data;
 	struct uk_fdtab *tab = uk_thread_uktls_var(edat->thread, active_fdtab);
@@ -376,7 +376,7 @@ static int fdtab_handle_execve(void *data)
 	return UK_EVENT_HANDLED_CONT;
 }
 #else /* !CONFIG_LIBPOSIX_FDTAB_MULTITAB */
-static int fdtab_handle_execve(void *data)
+static uk_event_status fdtab_handle_execve(void *data)
 {
 	uk_fdtab_cloexec();
 	return UK_EVENT_HANDLED_CONT;

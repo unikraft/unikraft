@@ -28,8 +28,8 @@ struct nf_excpttab_entry {
 	__s32 handler;
 } __packed;
 
-typedef int (*nf_excpt_handler)(const struct nf_excpttab_entry *e,
-				struct ukarch_trap_ctx *ctx);
+typedef enum uk_event_status (*nf_excpt_handler)(const struct nf_excpttab_entry *e,
+			      struct ukarch_trap_ctx *ctx, int *error);
 
 #define _NF_DECLARE_EXCPTTAB_ENTRY_GETTER(field, type)			\
 static inline type							\
@@ -78,7 +78,9 @@ extern const struct nf_excpttab_entry uk_excpttab_end[];
 #define nf_excpttab_foreach(itr, excpttab_start, excpttab_end)		\
 	for ((itr) = (excpttab_start); (itr) < (excpttab_end); (itr)++)
 
-static inline int nf_handle_trap(__vaddr_t ip, struct ukarch_trap_ctx *ctx)
+static inline
+enum uk_event_status nf_handle_trap(__vaddr_t ip, struct ukarch_trap_ctx *ctx,
+				    int *error)
 {
 	const struct nf_excpttab_entry *itr;
 	nf_excpt_handler handler;
@@ -90,7 +92,7 @@ static inline int nf_handle_trap(__vaddr_t ip, struct ukarch_trap_ctx *ctx)
 			handler = nf_excpttab_get_handler(itr);
 			UK_ASSERT(handler);
 
-			return handler(itr, ctx);
+			return handler(itr, ctx, error);
 		}
 	}
 
