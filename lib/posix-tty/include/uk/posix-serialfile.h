@@ -11,7 +11,9 @@
 
 #include <uk/file.h>
 
-const struct uk_file *uk_serialfile_create(void);
+/* Public reference with static lifetime */
+
+extern const struct uk_file uk_file_serial;
 
 #endif /* CONFIG_LIBPOSIX_TTY_SERIAL */
 

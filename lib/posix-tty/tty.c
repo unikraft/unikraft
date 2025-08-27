@@ -48,7 +48,7 @@ static int init_posix_tty(struct uk_init_ctx *ictx __unused)
 	in_fname = STDIN_FNAME_VOID;
 	in_fnamelen = STDIN_FNAME_LEN_VOID;
 #elif CONFIG_LIBPOSIX_TTY_STDIN_SERIAL
-	in = uk_serialfile_create();
+	in = &uk_file_serial;
 	in_fname = STDIN_FNAME_SERIAL;
 	in_fnamelen = STDIN_FNAME_LEN_SERIAL;
 #else /* !CONFIG_LIBPOSIX_TTY_STDIN_* */
@@ -60,7 +60,7 @@ static int init_posix_tty(struct uk_init_ctx *ictx __unused)
 	out_fname = STDOUT_FNAME_NULL;
 	out_fnamelen = STDOUT_FNAME_LEN_NULL;
 #elif CONFIG_LIBPOSIX_TTY_STDOUT_SERIAL
-	out = uk_serialfile_create();
+	out = &uk_file_serial;
 	out_fname = STDOUT_FNAME_SERIAL;
 	out_fnamelen = STDOUT_FNAME_LEN_SERIAL;
 #else /* !CONFIG_LIBPOSIX_TTY_STDOUT_* */

@@ -270,7 +270,7 @@ static uk_file_refcnt serial_ref = UK_FILE_REFCNT_INITIALIZER(serial_ref);
 static struct uk_file_state serial_state = UK_FILE_STATE_EVENTS_INITIALIZER(
 	serial_state, UKFD_POLLIN|UKFD_POLLOUT);
 
-static const struct uk_file serial_file = {
+const struct uk_file uk_file_serial = {
 	.vol = SERIAL_VOLID,
 	.node = NULL,
 	.ops = &serial_ops,
@@ -278,11 +278,3 @@ static const struct uk_file serial_file = {
 	.state = &serial_state,
 	._release = uk_file_static_release
 };
-
-const struct uk_file *uk_serialfile_create(void)
-{
-	const struct uk_file *f = &serial_file;
-
-	uk_file_acquire(f);
-	return f;
-}
