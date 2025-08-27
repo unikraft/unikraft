@@ -271,7 +271,7 @@ int fstab_process_user(const struct ukplat_memregion_desc *initrd0)
 
 	for (size_t i = 0; i < ARRAY_SIZE(fstab_user); i++) {
 		if (!fstab_user[i])
-			break;
+			continue;
 
 		r = fstab_parse(fstab_user[i], &ent);
 		if (unlikely(r))
