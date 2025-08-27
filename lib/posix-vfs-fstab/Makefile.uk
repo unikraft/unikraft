@@ -1,5 +1,8 @@
 $(eval $(call addlib_s,libposix_vfs_fstab,$(CONFIG_LIBPOSIX_VFS_FSTAB)))
 
+# Register to uklibparam, sets "vfs" as parameter prefix (vfs.*)
+$(eval $(call addlib_paramprefix,libposix_vfs_fstab,vfs))
+
 LIBPOSIX_VFS_FSTAB_SRCS-$(CONFIG_LIBPOSIX_VFS_FSTAB_INIT) += $(LIBPOSIX_VFS_FSTAB_BASE)/fstab.c
 
 LIBPOSIX_VFS_FSTAB_SRCS-$(CONFIG_LIBPOSIX_VFS_FSTAB_EINITRD) += $(LIBPOSIX_VFS_FSTAB_BASE)/einitrd.S
