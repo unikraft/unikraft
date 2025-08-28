@@ -1144,7 +1144,8 @@ union ramfs_link {
 
 static
 int ramfs_linkin(struct ramfs_node *n, const char *name, size_t namelen,
-		 unsigned char dtype, union ramfs_link target, int flags)
+		 unsigned char dtype, union ramfs_link target,
+		 unsigned int mode, int flags)
 {
 	/* Lookup name dentry */
 	struct ramfs_dentry *dp = ramfs_dir_find(n, name, namelen);
@@ -1174,7 +1175,12 @@ int ramfs_linkin(struct ramfs_node *n, const char *name, size_t namelen,
 		uk_file_acquire(target.file);
 		break;
 	case RAMFS_DENT_SPEC:
-		dp->target.special = *target.special;
+		dp->target.special = (struct uk_fs_specfile){
+			.major = target.special->major,
+			.minor = target.special->minor,
+			.mode = mode,
+			/* TODO: use euid/egid */
+		};
 		break;
 	default:
 		UK_BUG();
@@ -1225,7 +1231,8 @@ struct ramfs_node *ramfs_live_fs_create(struct ramfs_node *n,
 
 	/* Link in if not tmpfile */
 	if (!(flags & O_TMPFILE)) {
-		err = ramfs_linkin(n, name, namelen, dtype, newlink, flags);
+		err = ramfs_linkin(n, name, namelen, dtype,
+				   newlink, mode, flags);
 		if (unlikely(err)) {
 			if (dtype == RAMFS_DENT_NODE)
 				ramfs_live_release(newlink.node);
