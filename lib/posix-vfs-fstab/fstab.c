@@ -18,7 +18,7 @@
 #include "fstab.h"
 
 #define FSTAB_VOL_ARGS_SEP ':'
-#define FSTAB_UKOPTS_ARGS_SEP FSTAB_VOL_ARGS_SEP
+#define FSTAB_UKOPTS_ARGS_SEP ','
 
 #define FSTAB_FSTYPE_EXTRACT "extract"
 
