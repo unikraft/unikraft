@@ -73,10 +73,10 @@ enum shim_combo {
 #endif /* CONFIG_LIBVFSCORE */
 };
 
+#if CONFIG_LIBVFSCORE
 static inline
 enum shim_combo shim_combo_of(int in_type, int out_type, void *op)
 {
-#if CONFIG_LIBVFSCORE
 	switch (in_type) {
 	case UK_SHIM_OFILE:
 		switch (out_type) {
@@ -99,10 +99,15 @@ enum shim_combo shim_combo_of(int in_type, int out_type, void *op)
 	default:
 		UK_BUG(); /* Do validation before */
 	}
-#else /* !CONFIG_LIBVFSCORE */
-	return op ? SHIM_OFILE_OFILE_OFF : SHIM_OFILE_OFILE;
-#endif /* !CONFIG_LIBVFSCORE */
 }
+#else /* !CONFIG_LIBVFSCORE */
+static inline
+enum shim_combo shim_combo_of(int in_type __unused, int out_type __unused,
+			      void *op)
+{
+	return op ? SHIM_OFILE_OFILE_OFF : SHIM_OFILE_OFILE;
+}
+#endif /* !CONFIG_LIBVFSCORE */
 
 #if CONFIG_LIBVFSCORE
 
