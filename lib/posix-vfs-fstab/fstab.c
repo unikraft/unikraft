@@ -308,7 +308,7 @@ int fstab_process_internal(const struct vfs_fstab_entry fstab[],
 #endif /* CONFIG_LIBPOSIX_VFS_FSTAB_BUILTIN || CONFIG_LIBPOSIX_VFS_FSTAB_FALLBACK */
 
 /* Assumes path is directly under `/` or an existing dir */
-static
+static __maybe_unused
 int fstab_mount_special(const char *path, const char *fstype,
 			const char *source, unsigned long flags, void *data)
 {
