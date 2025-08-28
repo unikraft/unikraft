@@ -134,8 +134,9 @@ static void *stack_memalign(struct uk_alloc *a, __sz align, __sz size)
 	__vaddr_t vaddr;
 
 	UK_ASSERT(a);
-	UK_ASSERT(align >= UKARCH_SP_ALIGN);
-	UK_ASSERT(IS_ALIGNED(align,  UKARCH_SP_ALIGN));
+
+	if (unlikely(!IS_ALIGNED(align, UKARCH_SP_ALIGN)))
+		return NULL;
 #if CONFIG_LIBUKALLOCSTACK_PAGE_GUARDS
 	/* If using page guards then we allocate stack VMA's instead. So,
 	 * the return address will always be page-aligned and the maximum
@@ -159,7 +160,8 @@ static void *stack_memalign(struct uk_alloc *a, __sz align, __sz size)
 	 * Therefore, make this constraint clear when using page guards
 	 * configuration: alignment must not be bigger than PAGE_SIZE.
 	 */
-	UK_ASSERT(align <= PAGE_SIZE);
+	if (unlikely(align > PAGE_SIZE))
+		return NULL;
 #endif /* CONFIG_LIBUKALLOCSTACK_PAGE_GUARDS */
 
 	if (unlikely(!size))
