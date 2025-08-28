@@ -82,7 +82,7 @@ UK_LIBPARAM_PARAM_ARR_ALIAS(seed, seedv_cmdl, __u32, CHACHA_SEED_LENGTH,
 static __bool initialized = __false;
 
 /* This value isn't important, as long as it's sufficiently asymmetric */
-static const char sigma[16] = "expand 32-byte k";
+static const char sigma[16] __nonstring = "expand 32-byte k";
 
 static inline __u32 uk_rotl32(__u32 v, int c)
 {
