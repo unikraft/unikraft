@@ -28,7 +28,7 @@ void uk_sparsebuf_memclear(struct uk_sparsebuf_cur *cur, __sz off, __sz len)
 
 	if (blen && buf) {
 		UK_ASSERT(blen >= len);
-		while (blen--)
+		while (len--)
 			*(buf++) = 0;
 	}
 }
