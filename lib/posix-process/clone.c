@@ -384,14 +384,6 @@ int uk_clone(struct clone_args *cl_args, size_t cl_args_len,
 
 	uk_thread_set_runnable(child);
 
-	/* Set the return value depending on whether
-	 * a thread or a process is created.
-	 */
-	if (cl_args->flags & CLONE_THREAD)
-		ret = child_tid;
-	else
-		ret = child_pid;
-
 	/* Assign the child to the scheduler */
 	ret = uk_sched_thread_add(s, child);
 	if (unlikely(ret)) {
@@ -406,6 +398,14 @@ int uk_clone(struct clone_args *cl_args, size_t cl_args_len,
 
 	if (flags & CLONE_PARENT_SETTID)
 		*((pid_t *)cl_args->parent_tid) = child_tid;
+
+	/* Set the return value depending on whether
+	 * a thread or a process is created.
+	 */
+	if (cl_args->flags & CLONE_THREAD)
+		ret = child_tid;
+	else
+		ret = child_pid;
 
 	/* CLONE_VFORK: Block the parent until the child calls execve()
 	 * or exit(). Yield to schedule the child.
