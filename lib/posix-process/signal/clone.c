@@ -171,6 +171,8 @@ static int uk_posix_clone_sighand(void *arg)
 	UK_ASSERT(event_data);
 	UK_ASSERT(event_data->cl_args);
 
+	cl_args = event_data->cl_args;
+
 	/* CLONE_SIGHAND and CLONE_CLEAR_SIGHAND should not be together */
 	if (unlikely((cl_args->flags & (CLONE_SIGHAND | CLONE_CLEAR_SIGHAND)) ==
 		     (CLONE_SIGHAND | CLONE_CLEAR_SIGHAND)))
