@@ -110,6 +110,7 @@ static void pprocess_clear_clone_tls(struct uk_thread *child __maybe_unused)
 
 UK_THREAD_INIT_PRIO(0x0, pprocess_clear_clone_tls, UK_PRIO_LATEST);
 
+#if CONFIG_LIBPOSIX_PROCESS_EXECVE
 /*
  * Raise execve event
  */
@@ -127,6 +128,7 @@ int pprocess_raise_execve_event(struct posix_process_execve_event_data *data)
 
 	return ret;
 }
+#endif /* CONFIG_LIBPOSIX_PROCESS_EXECVE */
 
 /*
  * Raise pthread exit event

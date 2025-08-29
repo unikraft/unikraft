@@ -145,7 +145,7 @@ void pprocess_exit(struct posix_process *pprocess,
 	struct posix_process *parent_process;
 	struct posix_thread *pt, *ptn;
 	__bool nowait = false;
-	int ret;
+	int ret __maybe_unused;
 
 	UK_ASSERT(state == POSIX_PROCESS_EXITED ||
 		  state == POSIX_PROCESS_KILLED);
