@@ -54,6 +54,9 @@ extern "C" {
 #ifndef __nonnull
 #define __nonnull              __attribute__((nonnull))
 #endif
+#ifndef __nonstring
+#define __nonstring            __attribute__((nonstring))
+#endif
 #ifndef __printf
 #define __printf(fmt, args)    __attribute__((format(printf, (fmt), (args))))
 #endif
