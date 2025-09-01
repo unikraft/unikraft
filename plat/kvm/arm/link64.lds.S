@@ -39,7 +39,8 @@ OUTPUT_ARCH(aarch64)
 
 PHDRS
 {
-	phdrs PT_LOAD FILEHDR PHDRS FLAGS(PHDRS_PF_R);
+	phdrs PT_PHDR PHDRS;
+	headers PT_LOAD PHDRS FILEHDR FLAGS(PHDRS_PF_R);
 	text PT_LOAD FLAGS(PHDRS_PF_RX);
 	rodata PT_LOAD FLAGS(PHDRS_PF_R);
 	data PT_LOAD;
@@ -68,6 +69,22 @@ SECTIONS {
 	PROVIDE(__executable_start = _base_addr);
 	. = _base_addr + SIZEOF_HEADERS;
 	PROVIDE(__phdr = .);
+
+	.headers :
+	{
+		/*
+		 * Add dummy PROGBITS data to have this section and its
+		 * corresponding Program Header associated
+		 * with a place relative to the other sections in
+		 * the memory layout.
+		 * Without this, the PT_LOAD segment containing the Program
+		 * headers will not have an associated section and it will
+		 * result in its base physical/virtual addresses being 0x0.
+		 */
+		LONG(0xDEADB0B0)
+		. = ALIGN(__PAGE_SIZE);
+		ASSERT((. < (_base_addr + __PAGE_SIZE)), "ELF Headers cross a page boundary");
+	} :headers
 
 	/* Code */
 	_text = .;
