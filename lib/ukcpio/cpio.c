@@ -38,6 +38,7 @@
 #include <limits.h>
 #include <errno.h>
 
+#include <uk/arch/paging.h>
 #include <uk/assert.h>
 #include <uk/compat_list.h>
 #include <uk/print.h>
@@ -483,9 +484,18 @@ ukcpio_extract(const char *dest, const void *buf, size_t buflen)
 	 * a CPIO archive, just initialize the region allocator based on the
 	 * minimum between the biggest possible contiguous allocation of the
 	 * current default allocator and the maximum possible count of CPIO
-	 * entries that could fit in the given buffer.
+	 * entries that could fit in the given buffer. In the case of the
+	 * latter, if the CPIO archive is very small, the division might
+	 * actually result in a number that is not even enough for the
+	 * allocator's metadata, so add PAGE_SIZE as a safety measure,
+	 * just in case.
+	 *
+	 * TODO: Find a better estimate than PAGE_SIZE, possibly a way for
+	 * allocators to give information about minimum required usable
+	 * memory for initialization.
 	 */
 	max_alloc = MIN((size_t)uk_alloc_maxalloc(a),
+			PAGE_SIZE +
 			buflen / sizeof(struct uk_cpio_header) *
 			sizeof(struct cpio_ilist_elm));
 	region_base = uk_malloc(a, max_alloc);
