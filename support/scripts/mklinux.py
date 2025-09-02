@@ -5,6 +5,9 @@ import os
 import re
 import subprocess
 
+# For ELF headers reading
+from struct import unpack
+
 # Linux arm64 boot header
 # https://www.kernel.org/doc/Documentation/arm64/booting.txt
 LINUX_ARM64_HDR = {
@@ -41,6 +44,24 @@ def get_sym_val(elf, sym):
         raise Exception("Found no " + sym + " symbol.")
 
     return int(re_out[0], 16)
+
+
+def get_pt_load_headers(elf):
+    with open(elf, "rb") as f:
+        # We assume the Program Headers immediately follow the ELF64 Headers
+        # (we control the layout through the linker script)
+        f.seek(32)
+        e_phoff = unpack("<" + "Q", f.read(8))[0]
+        assert (
+            e_phoff == 64
+        ), "Program headers are not immediately after ELF64 header"
+
+        f.seek(54)
+        e_phentsize = unpack("<" + "h", f.read(2))[0]
+        e_phnum = unpack("<" + "h", f.read(2))[0]
+
+        f.seek(0)
+        return f.read(e_phoff + e_phnum * e_phentsize)
 
 
 def main():
@@ -101,6 +122,33 @@ def main():
     total_size = os.path.getsize(opt.bin) + LINUX_ARM64_HDR_SIZE
     LINUX_ARM64_HDR["IMAGE_SIZE"][0] = align_up(total_size, 2**21)
 
+    # We place the Program Headers in a PT_LOAD ELF segment with the help of
+    # a dummy PROGBITS 4-byte-sized section ".headers". However, the Linux
+    # boot protocol on ARM64 involves no ELF loading so the ELF kernel is dumped
+    # as a raw binary directly. For this to work, we use objcopy to convert
+    # from ELF to raw binary. The way objcopy does this is with the help
+    # of ELF Sections (not Program Headers). It goes through each one and
+    # tries to write them into the newly converted file as if they were loaded
+    # in memory.
+    # Our problem is that we don't have a section associated with the contents
+    # of the Program Headers themselves so objcopy will end up not copying them,
+    # despite them being part of a loadable segment (it will only load
+    # ".headers"'s dummy 4 bytes). What objcopy will do is just copy
+    # .headers to offset 0 of raw binary, followed by whatever padding there
+    # is until .text.
+    # Besides not having the Program Headers loaded in memory together with
+    # the kernel, this also results in all offsets being off by
+    # Elf64_Ehdr(.e_phoff) + Elf64_Ehdr.e_phnum * Elf64_Ehdr.e_phentsize
+    # (assuming that e_phoff == sizeof(Elf64_Ehdr), i.e. Program Headers
+    # immediately follow the ELF header).
+    #
+    # To fix this, after writing the linux boot protocol header, simply append
+    # the ELF headers that are loadable but do not have a PROGBITS section
+    # associated with them, followed by our objcopy-created binary, since the
+    # latter will contain the loadable bytes that would have come right after
+    # the ELF headers we are interested in.
+    pt_load_hdrs = get_pt_load_headers(opt.elf)
+
     # Create final image
     with open(opt.bin, "r+b") as f:
         img = f.read()
@@ -111,6 +159,17 @@ def main():
                     LINUX_ARM64_HDR[field][1], "little"
                 )
             )
+        # Add the ELF Header + Program Headers that do not have a PROGBITS
+        # section associated
+        f.write(pt_load_hdrs)
+
+        # Ensure we do not cross a page (64-byte linux header not included)
+        # including the 4-byte dummy section
+        assert f.tell() < 4096 + 64 - 4, "ELF Headers cross a page boundary"
+
+        # We should now be at the offset where .headers should begin in the
+        # original ELF's first PT_LOAD segment, right after the headers.
+        # Write the rest of the image (from .headers and on).
         f.write(img)
 
 
