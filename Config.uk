@@ -154,6 +154,12 @@ config DEBUG_SYMBOLS_LVL3
 		support macro expansion.
 endchoice
 
+config ELF_PHDRS_IN_PT_LOAD
+	bool "ELF Program Headers in loadable segment (EXPERIMENTAL)"
+	help
+		Enables the final ELF image to have its Program Headers as part
+		of a loadable segment (Program Header with PT_LOAD).
+
 comment "Hint: Keep frame pointers to ease debugging"
 	depends on !OPTIMIZE_NOOMITFP && !DEBUG_SYMBOLS_LVL0
 

@@ -30,8 +30,10 @@
 
 PHDRS
 {
+#if CONFIG_ELF_PHDRS_IN_PT_LOAD
 	phdrs PT_PHDR PHDRS;
 	headers PT_LOAD PHDRS FILEHDR FLAGS(PHDRS_PF_R);
+#endif /* CONFIG_ELF_PHDRS_IN_PT_LOAD */
 	text PT_LOAD FLAGS(PHDRS_PF_RX);
 	rodata PT_LOAD FLAGS(PHDRS_PF_R);
 	data PT_LOAD;
@@ -42,23 +44,33 @@ PHDRS
 
 SECTIONS
 {
+#if CONFIG_ELF_PHDRS_IN_PT_LOAD
 	PROVIDE(__executable_start = BASE_ADDR);
 	. = BASE_ADDR + SIZEOF_HEADERS;
 	PROVIDE(__phdr = .);
+#endif /* CONFIG_ELF_PHDRS_IN_PT_LOAD */
 
+	. = BASE_ADDR;
 	_base_addr = BASE_ADDR;	/* Symbol to represent the load base address */
 
+#if CONFIG_ELF_PHDRS_IN_PT_LOAD
 	.headers :
 	{
 		/* prevent linker gc from removing multiboot header */
 		KEEP (*(.data.boot))
 		KEEP (*(.data.boot.*))
 	} :headers
+#endif /* CONFIG_ELF_PHDRS_IN_PT_LOAD */
 
 	/* Code */
 	_text = .;
 	.text :
 	{
+#if !CONFIG_ELF_PHDRS_IN_PT_LOAD
+		/* prevent linker gc from removing multiboot header */
+		KEEP (*(.data.boot))
+		KEEP (*(.data.boot.*))
+#endif /* !CONFIG_ELF_PHDRS_IN_PT_LOAD */
 		*(.text.boot)
 		*(.text.boot.*)
 

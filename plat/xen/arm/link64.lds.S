@@ -32,7 +32,9 @@ ENTRY(_libxenplat_zimageboot)
 
 PHDRS
 {
+#if CONFIG_ELF_PHDRS_IN_PT_LOAD
 	phdrs PT_LOAD FILEHDR PHDRS FLAGS(PHDRS_PF_R);
+#endif /* CONFIG_ELF_PHDRS_IN_PT_LOAD */
 	text PT_LOAD FLAGS(PHDRS_PF_RX);
 	rodata PT_LOAD FLAGS(PHDRS_PF_R);
 	data PT_LOAD;
@@ -47,9 +49,11 @@ SECTIONS
 
   _base_addr = .;		/* Symbol to represent the load base address */
 
+#if CONFIG_ELF_PHDRS_IN_PT_LOAD
   PROVIDE(__executable_start = _base_addr);
   . = _base_addr + SIZEOF_HEADERS;
   PROVIDE(__phdr = .);
+#endif /* CONFIG_ELF_PHDRS_IN_PT_LOAD */
 
   _text = .;			/* Text and read-only data */
   .text : {
