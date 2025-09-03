@@ -179,6 +179,24 @@ static inline int virtio_dev_reset(struct virtio_dev *vdev)
 }
 
 /**
+ * Get the current device status bits.
+ *
+ * @param vdev Reference to the virtio device
+ *
+ * @return
+ *  Device status bits
+ */
+static inline __u8 virtio_dev_status_get(struct virtio_dev *vdev)
+{
+	__u8 status = 0;
+
+	UK_ASSERT(vdev);
+	if (likely(vdev->cops->status_get))
+		status = vdev->cops->status_get(vdev);
+	return status;
+}
+
+/**
  * The function updates the status of the virtio device
  * @param vdev
  *      Reference to the virtio device.
