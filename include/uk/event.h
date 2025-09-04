@@ -164,6 +164,7 @@ struct uk_event {
 #define __UK_EVT_SECTION_LABEL(section, label)				\
 	__asm__ (							\
 		".pushsection \".uk_event_" section "\", \"a\"\n"	\
+		".global " #label "\n"					\
 		#label ":\n"						\
 		".popsection\n"						\
 	)
