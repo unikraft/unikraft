@@ -4,30 +4,26 @@ menuconfig LIBDEVFS
 	depends on LIBVFSCORE
 
 if LIBDEVFS
-	config LIBDEVFS_AUTOMOUNT
+config LIBDEVFS_AUTOMOUNT
 	bool "Mount /dev during boot"
-	default n
 
-	# hidden
-	config LIBDEVFS_DEV_NULL_ZERO
-		bool
-		default n
+# hidden
+config LIBDEVFS_DEV_NULL_ZERO
+	bool
 
-	config LIBDEVFS_DEV_NULL
-		bool "Register null device"
-		default y if LIBDEVFS_AUTOMOUNT
-		select LIBDEVFS_DEV_NULL_ZERO
-		default n
+config LIBDEVFS_DEV_NULL
+	bool "Register null device"
+	default y if LIBDEVFS_AUTOMOUNT
+	select LIBDEVFS_DEV_NULL_ZERO
 
-	config LIBDEVFS_DEV_ZERO
-		bool "Register zero device"
-		default y if LIBDEVFS_AUTOMOUNT
-		select LIBDEVFS_DEV_NULL_ZERO
-		default n
+config LIBDEVFS_DEV_ZERO
+	bool "Register zero device"
+	default y if LIBDEVFS_AUTOMOUNT
+	select LIBDEVFS_DEV_NULL_ZERO
 
-	config LIBDEVFS_DEV_STDOUT
-		bool "Register stdout device"
-		default y if LIBDEVFS_AUTOMOUNT
-		select LIBUKCONSOLE
-		default n
+config LIBDEVFS_DEV_STDOUT
+	bool "Register stdout device"
+	default y if LIBDEVFS_AUTOMOUNT
+	select LIBUKCONSOLE
+
 endif
