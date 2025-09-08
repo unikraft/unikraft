@@ -1,4 +1,5 @@
 device_create
+device_destroy
 device_open
 device_close
 device_read
