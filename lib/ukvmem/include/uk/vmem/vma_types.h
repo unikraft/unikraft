@@ -200,7 +200,6 @@ static inline int uk_vma_map_dma(struct uk_vas *vas, __vaddr_t *vaddr,
 	};
 
 	UK_ASSERT(PAGE_ALIGNED(paddr));
-	UK_ASSERT(!(flags & UK_VMA_MAP_UNINITIALIZED));
 
 	return uk_vma_map(vas, vaddr, len, attr, flags, name,
 			  &uk_vma_dma_ops, &args);
