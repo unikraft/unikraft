@@ -37,7 +37,7 @@
 #include <uk/init.h>
 #include <uk/posix-fdtab.h>
 
-#define MAXDEVNAME	12
+#define MAXDEVNAME	CONFIG_LIBDEVFS_MAXDEVNAME
 #define DO_RWMASK	0x3
 
 struct uio;

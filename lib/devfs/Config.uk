@@ -26,4 +26,8 @@ config LIBDEVFS_DEV_STDOUT
 	default y if LIBDEVFS_AUTOMOUNT
 	select LIBUKCONSOLE
 
+config LIBDEVFS_MAXDEVNAME
+	int "Maximum devfs entry name length"
+	default 256
+
 endif
