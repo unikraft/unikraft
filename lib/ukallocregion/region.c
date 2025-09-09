@@ -129,7 +129,7 @@ static int allocregion_posix_memalign(struct uk_alloc *a, void **memptr,
 	allocregion_do_bump(ar, size, align);
 	*memptr = ar->heap_pos;
 
-	uk_alloc_stats_count_alloc(&ar->a, b->heap_pos, size);
+	uk_alloc_stats_count_alloc(&ar->a, ar->heap_pos, size);
 	return 0;
 }
 
