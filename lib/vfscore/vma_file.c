@@ -60,8 +60,9 @@ int vma_op_file_new(struct uk_vas *vas, __vaddr_t vaddr __unused,
 	 * to the underlying file while the mapping is established will not be
 	 * reflected in memory.
 	 */
-	if ((*flags & UK_VMA_FILE_SHARED) && (attr & PAGE_ATTR_PROT_WRITE))
-		return -ENOTSUP;
+	/* if ((*flags & UK_VMA_FILE_SHARED) && (attr & PAGE_ATTR_PROT_WRITE))
+	 *	return -ENOTSUP;
+	 */
 
 	/* Since we cannot do ISR-safe file accesses in the fault handler,
 	 * we enforce full load at mapping time for now.
@@ -229,9 +230,10 @@ static int vma_op_file_merge(struct uk_vma *vma, struct uk_vma *next)
 
 static int vma_op_file_set_attr(struct uk_vma *vma, unsigned long attr)
 {
-	/* Writable shared mappings are not supported. */
-	if ((vma->flags & UK_VMA_FILE_SHARED) && (attr & PAGE_ATTR_PROT_WRITE))
-		return -EPERM;
+	/* Writable shared mappings are supported. */
+	/* if ((vma->flags & UK_VMA_FILE_SHARED) && (attr & PAGE_ATTR_PROT_WRITE))
+	 *	return -EPERM;
+	 */
 
 	/* Default handler */
 	return uk_vma_op_set_attr(vma, attr);

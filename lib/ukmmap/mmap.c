@@ -41,6 +41,8 @@
 struct mmap_addr {
 	void *begin;
 	void *end;
+	int flags;
+	size_t length;
 	struct mmap_addr *next;
 };
 
@@ -64,6 +66,30 @@ static struct mmap_addr *mmap_addr;
  *
  */
 
+static struct mmap_addr *find_shared_mapping(size_t len, int prot, int flags)
+{
+	struct mmap_addr *tmp = mmap_addr;
+
+	/* Only consider reusing for MAP_SHARED anonymous mappings */
+	if (!(flags & MAP_SHARED) || !(flags & MAP_ANON))
+		return NULL;
+
+	while (tmp) {
+		/*
+		 * Look for existing MAP_SHARED mapping with same
+		 * size and protection
+		 */
+		if ((tmp->flags & MAP_SHARED) &&
+		    (tmp->flags & MAP_ANON) &&
+		    tmp->length == len) {
+			return tmp;
+		}
+		tmp = tmp->next;
+	}
+
+	return NULL;
+}
+
 UK_SYSCALL_DEFINE(void*, mmap, void*, addr, size_t, len, int, prot,
 		int, flags, int, fildes, off_t, off)
 {
@@ -75,16 +101,30 @@ UK_SYSCALL_DEFINE(void*, mmap, void*, addr, size_t, len, int, prot,
 	}
 
 	/* Check if parameters match the ones that go use
-	 * Otherwise return 0 (unimplemented mmap)
+	 * Otherwise return MAP_FAILED (unimplemented mmap)
 	 */
 	if (fildes != -1 || off)
 		return MAP_FAILED;
-	if (!(prot & (PROT_READ|PROT_WRITE)) && (prot != 0))
+
+	if (!(prot & (PROT_READ | PROT_WRITE)) && (prot != 0))
 		return MAP_FAILED;
-	if (!(flags & (MAP_ANON|MAP_PRIVATE)) &&
-			!(flags & (MAP_FIXED|MAP_ANON|MAP_PRIVATE)) &&
-			!(flags & (MAP_NORESERVE|MAP_ANON|MAP_PRIVATE)))
+
+	/* Support MAP_SHARED in addition to existing MAP_PRIVATE patterns */
+	if (!(flags & (MAP_ANON | MAP_PRIVATE)) &&
+	    !(flags & (MAP_ANON | MAP_SHARED)) &&
+	    !(flags & (MAP_FIXED | MAP_ANON | MAP_PRIVATE)) &&
+	    !(flags & (MAP_FIXED | MAP_ANON | MAP_SHARED)) &&
+	    !(flags & (MAP_NORESERVE | MAP_ANON | MAP_PRIVATE)) &&
+	    !(flags & (MAP_NORESERVE | MAP_ANON | MAP_SHARED)))
 		return MAP_FAILED;
+
+	/* For MAP_SHARED, check if we can reuse an existing shared mapping */
+	if (flags & MAP_SHARED) {
+		struct mmap_addr *shared = find_shared_mapping(len, prot, flags);
+
+		if (shared && !addr)
+			return shared->begin;
+	}
 
 	while (tmp) {
 		if (addr) {
@@ -113,11 +153,15 @@ UK_SYSCALL_DEFINE(void*, mmap, void*, addr, size_t, len, int, prot,
 
 	new->begin = mem;
 	new->end = mem + len;
+	new->flags = flags;
+	new->length = len;
 	new->next = NULL;
+
 	if (!mmap_addr)
 		mmap_addr = new;
 	else
 		last->next = new;
+
 	return mem;
 }
 
