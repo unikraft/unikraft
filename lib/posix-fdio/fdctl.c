@@ -10,6 +10,7 @@
 #define _GNU_SOURCE
 #endif
 
+#include <sys/file.h>
 #include <sys/ioctl.h>
 
 #include <uk/atomic.h>
@@ -78,10 +79,21 @@ int uk_sys_fcntl(struct uk_ofile *of, int cmd, unsigned long arg)
 	}
 }
 
-int uk_sys_flock(struct uk_ofile *of __unused, int cmd __unused)
+int uk_sys_flock(struct uk_ofile *of __unused, int cmd)
 {
-	uk_pr_warn_once("STUB: flock\n");
-	return -ENOSYS;
+	/* We implement all locking ops as NOP stubs; revisit if needed */
+	switch (cmd) {
+	case LOCK_SH:
+	case LOCK_SH | LOCK_NB:
+	case LOCK_EX:
+	case LOCK_EX | LOCK_NB:
+	case LOCK_UN:
+	case LOCK_UN | LOCK_NB:
+		uk_pr_warn_once("STUB: flock always succeeds\n");
+		return 0;
+	default:
+		return -EINVAL;
+	}
 }
 
 int uk_sys_fsync(struct uk_ofile *of)
