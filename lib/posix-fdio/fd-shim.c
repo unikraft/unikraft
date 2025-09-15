@@ -489,6 +489,28 @@ UK_SYSCALL_R_DEFINE(int, fadvise64,
 	return r;
 }
 
+UK_SYSCALL_R_DEFINE(int, flock, int, fd, int, op)
+{
+	int r;
+	union uk_shim_file sf;
+
+	switch (uk_fdtab_shim_get(fd, &sf)) {
+	case UK_SHIM_OFILE:
+		r = uk_sys_flock(sf.ofile, op);
+		uk_ofile_release(sf.ofile);
+		break;
+#if CONFIG_LIBVFSCORE
+	case UK_SHIM_LEGACY:
+		r = vfscore_flock(sf.vfile, op);
+		fdrop(sf.vfile);
+		break;
+#endif /* CONFIG_LIBVFSCORE */
+	default:
+		r = -EBADF;
+	}
+	return r;
+}
+
 UK_LLSYSCALL_R_DEFINE(int, fcntl, int, fd,
 		      unsigned int, cmd, unsigned long, arg)
 {

@@ -162,6 +162,7 @@ vfscore_ftruncate
 vfscore_fallocate
 vfscore_fstat
 vfscore_fchmod
+vfscore_flock
 vfscore_fcntl
 vfscore_ioctl
 uk_vma_file_ops

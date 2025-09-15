@@ -622,31 +622,18 @@ UK_SYSCALL_R_DEFINE(int, newfstatat, int, dirfd, const char*, path,
 	return __fxstatat_helper(1, dirfd, path, st, flags);
 }
 
-UK_SYSCALL_R_DEFINE(int, flock, int, fd, int, operation)
+int vfscore_flock(struct vfscore_file *file __unused, int operation)
 {
-	struct vfscore_file *file;
-	int error;
-
-	error = fget(fd, &file);
-	if (error)
-		goto out_error;
-
 	switch (operation) {
 	case LOCK_SH:
 	case LOCK_SH | LOCK_NB:
 	case LOCK_EX:
 	case LOCK_EX | LOCK_NB:
 	case LOCK_UN:
-		break;
+		return 0;
 	default:
-		error = EINVAL;
-		goto out_error;
+		return -EINVAL;
 	}
-
-	return 0;
-
-	out_error:
-	return -error;
 }
 
 UK_TRACEPOINT(trace_vfs_readdir, "%d %#x", int, struct dirent*);
