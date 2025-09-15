@@ -73,6 +73,22 @@ int uk_sys_fcntl(struct uk_ofile *of, int cmd, unsigned long arg)
 		} while (!uk_compare_exchange_n(&of->mode, &mode, newmode));
 		return 0;
 	}
+	case F_SETLK:
+	case F_SETLKW:
+		/* We currently stub file locking; revisit if needed */
+		uk_pr_warn_once("STUB: F_SETLK(W) is NOP\n");
+		return 0;
+	case F_GETLK:
+	{
+		/* We report all file regions as immediately lockable */
+		struct flock *flk = (struct flock *)arg;
+
+		if (unlikely(!flk))
+			return -EFAULT;
+		flk->l_type = F_UNLCK;
+		uk_pr_warn_once("STUB: F_GETLK always reports unlocked\n");
+		return 0;
+	}
 	default:
 		uk_pr_warn("STUB: fcntl(%d)\n", cmd);
 		return -EINVAL;
