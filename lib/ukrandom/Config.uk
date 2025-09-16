@@ -40,8 +40,9 @@ config LIBUKRANDOM_GETRANDOM
 
 config LIBUKRANDOM_DEVFS
 	bool "Register random, urandom, and hwrng device to devfs"
-	select LIBDEVFS
-	depends on LIBVFSCORE
+	depends on HAVE_VFS
+	select LIBDEVFS if LIBVFSCORE
+	select LIBUKFS_DEVFS if LIBPOSIX_VFS
 	help
 		Registers /dev/random, /dev/urandom and /dev/hwrng to devfs.
 		Both /dev/random and /dev/urandom are fed with randomness
