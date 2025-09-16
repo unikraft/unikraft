@@ -927,7 +927,7 @@ ssize_t uk_sys_getcwd(char *buf, size_t len)
 		return -ERANGE;
 	memcpy(buf, cwdpath, cwdlen);
 	buf[cwdlen] = '\0';
-	return cwdlen;
+	return cwdlen + 1;
 }
 
 int uk_sys_chroot(const char *path)
