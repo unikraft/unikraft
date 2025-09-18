@@ -773,7 +773,9 @@ UK_SYSCALL_R_DEFINE(ssize_t, recvfrom, int, sock, void *, buf, size_t, len,
 		ret = posix_socket_recvfrom(of->file, buf, len, flags,
 					    from, fromlen);
 		uk_file_runlock(of->file);
-		if (!_SHOULD_BLOCK(mode) || !_ERR_BLOCK(ret))
+		if (!_SHOULD_BLOCK(mode) ||
+		    (flags & MSG_DONTWAIT) ||
+		    !_ERR_BLOCK(ret))
 			break;
 		(void)uk_file_poll(of->file, UKFD_POLLIN);
 	}
@@ -822,7 +824,9 @@ UK_SYSCALL_R_DEFINE(ssize_t, recvmsg, int, sock, struct msghdr *, msg,
 		uk_file_rlock(of->file);
 		ret = posix_socket_recvmsg(of->file, msg, flags);
 		uk_file_runlock(of->file);
-		if (!_SHOULD_BLOCK(mode) || !_ERR_BLOCK(ret))
+		if (!_SHOULD_BLOCK(mode) ||
+		    (flags & MSG_DONTWAIT) ||
+		    !_ERR_BLOCK(ret))
 			break;
 		(void)uk_file_poll(of->file, UKFD_POLLIN);
 	}
@@ -864,7 +868,9 @@ UK_SYSCALL_R_DEFINE(ssize_t, sendmsg, int, sock, const struct msghdr *, msg,
 		uk_file_rlock(of->file);
 		ret = posix_socket_sendmsg(of->file, msg, flags);
 		uk_file_runlock(of->file);
-		if (!_SHOULD_BLOCK(mode) || !_ERR_BLOCK(ret))
+		if (!_SHOULD_BLOCK(mode) ||
+		    (flags & MSG_DONTWAIT) ||
+		    !_ERR_BLOCK(ret))
 			break;
 		(void)uk_file_poll(of->file, UKFD_POLLOUT);
 	}
@@ -909,7 +915,9 @@ UK_SYSCALL_R_DEFINE(ssize_t, sendto, int, sock, const void *, buf, size_t, len,
 		ret = posix_socket_sendto(of->file, buf, len, flags,
 					  dest_addr, addrlen);
 		uk_file_runlock(of->file);
-		if (!_SHOULD_BLOCK(mode) || !_ERR_BLOCK(ret))
+		if (!_SHOULD_BLOCK(mode) ||
+		    (flags & MSG_DONTWAIT) ||
+		    !_ERR_BLOCK(ret))
 			break;
 		(void)uk_file_poll(of->file, UKFD_POLLOUT);
 	}
