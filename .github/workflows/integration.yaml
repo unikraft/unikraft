@@ -22,12 +22,12 @@ jobs:
           arch: x86_64
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
       with:
         submodules: recursive
 
     - name: Fetch helloworld
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       with:
         repository: unikraft/app-helloworld
         fetch-depth: 1
@@ -107,12 +107,12 @@ jobs:
           arch: x86_64
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
       with:
         submodules: recursive
 
     - name: Fetch helloworld
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       with:
         repository: unikraft/app-helloworld
         fetch-depth: 1
@@ -161,12 +161,12 @@ jobs:
           arch: x86_64
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
       with:
         submodules: recursive
 
     - name: Fetch helloworld
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       with:
         repository: unikraft/app-helloworld
         fetch-depth: 1

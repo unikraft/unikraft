@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     name: Action Lint
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Install action linter
         run: |
