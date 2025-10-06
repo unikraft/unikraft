@@ -371,7 +371,7 @@ void ukplat_memregion_list_coalesce(struct ukplat_memregion_list *list)
 				/* We do not allow overlaps of same priority
 				 * and of different flags.
 				 */
-				UK_ASSERT(ml->flags == mr->flags);
+				UK_ASSERT(ml->flags == mr->flags); // BUGBUG: 1410.
 				UK_ASSERT(PAGE_ALIGNED(ml->pbase));
 				UK_ASSERT(PAGE_ALIGNED(mr->pbase));
 
