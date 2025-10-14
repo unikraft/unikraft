@@ -19,6 +19,13 @@
 #include <uk/fs.h>
 #include <uk/fs/prio.h>
 
+#define STDIN_DEVNAME "stdin"
+#define STDIN_DEVNAME_LEN (sizeof(STDIN_DEVNAME) - 1)
+#define STDOUT_DEVNAME "stdout"
+#define STDOUT_DEVNAME_LEN (sizeof(STDOUT_DEVNAME) - 1)
+#define STDERR_DEVNAME "stderr"
+#define STDERR_DEVNAME_LEN (sizeof(STDERR_DEVNAME) - 1)
+
 static int init_posix_tty_devfs(const struct uk_file *in,
 				const struct uk_file *out,
 				const struct uk_file *err)
@@ -31,19 +38,22 @@ static int init_posix_tty_devfs(const struct uk_file *in,
 	/* We do not clean up created files on error, as they will be dropped
 	 * when the devfs root is released on system shutdown.
 	 */
-	r = uk_fs_createat(uk_fs_devfs_root, "stdin", 4, 0444, O_EXCL,
+	r = uk_fs_createat(uk_fs_devfs_root, STDIN_DEVNAME, STDIN_DEVNAME_LEN,
+			   0444, O_EXCL,
 			   (union uk_fs_create_target){ .file = in });
 	if (unlikely(PTRISERR(r))) {
 		uk_pr_err("Failed to create /dev/stdin: %d\n", PTR2ERR(r));
 		return PTR2ERR(r);
 	}
-	r = uk_fs_createat(uk_fs_devfs_root, "stdout", 4, 0222, O_EXCL,
+	r = uk_fs_createat(uk_fs_devfs_root, STDOUT_DEVNAME, STDOUT_DEVNAME_LEN,
+			   0222, O_EXCL,
 			   (union uk_fs_create_target){ .file = out });
 	if (unlikely(PTRISERR(r))) {
 		uk_pr_err("Failed to create /dev/stdout: %d\n", PTR2ERR(r));
 		return PTR2ERR(r);
 	}
-	r = uk_fs_createat(uk_fs_devfs_root, "stderr", 4, 0222, O_EXCL,
+	r = uk_fs_createat(uk_fs_devfs_root, STDERR_DEVNAME, STDERR_DEVNAME_LEN,
+			   0222, O_EXCL,
 			   (union uk_fs_create_target){ .file = err });
 	if (unlikely(PTRISERR(r))) {
 		uk_pr_err("Failed to create /dev/stderr: %d\n", PTR2ERR(r));
