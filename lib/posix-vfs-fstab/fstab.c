@@ -350,10 +350,9 @@ int fstab_mount_special(const char *path, const char *fstype,
 	int r;
 
 	r = fstab_mkdir(path);
-	if (unlikely(r)) {
-		uk_pr_err("Failed to create %s: %d\n", path, r);
-		return r;
-	}
+	if (unlikely(r))
+		uk_pr_warn("Failed to create %s: %d\n", path, r);
+		/* Try to mount anyway */
 	r = uk_sys_mount(source, path, fstype, flags, data);
 	if (unlikely(r)) {
 		uk_pr_err("Failed to mount special filesystem %s on %s: %d\n",
