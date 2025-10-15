@@ -1574,14 +1574,153 @@ out_src:
 }
 
 /* Mounting */
+
+int uk_posix_vfs_mount(const char *path, const struct uk_file *newroot)
+{
+	const struct uk_file *target;
+	const struct uk_file *parent = NULL;
+	const struct vfs_mtab_entry *parent_ent;
+	struct uk_fs_poslen p;
+	int ret;
+
+	/* Find mount target */
+	p = uk_fs_path_len_trail(path, 0);
+	target = vfs_lookup(NULL, path, p.len, 0);
+	if (unlikely(PTRISERR(target)))
+		return PTR2ERR(target);
+
+	if (!uk_fs_isdir(target)) {
+		/* Need to look up parent */
+		parent = vfs_lookup(NULL, path, p.pos, 0);
+		if (unlikely(PTRISERR(parent))) {
+			uk_file_release(target);
+			return PTR2ERR(parent);
+		}
+	}
+
+	/* uk_fs_mount */
+	uk_mutex_lock(&mtab.lock);
+	if (unlikely(mtab.top == CONFIG_LIBPOSIX_VFS_MAX_MOUNTS)) {
+		ret = -EMFILE;
+		goto out_unlock;
+	}
+	/* This takes a ref on newroot */
+	ret = uk_fs_mountat(target, &newroot);
+	if (unlikely(ret))
+		goto out_unlock;
+	if (uk_fs_isdir(newroot)) {
+		/* This takes a ref on target */
+		ret = uk_fs_graft(newroot, target);
+		if (unlikely(ret)) {
+			/* Undo the previous mount & drop ref */
+			const struct uk_file *prev = NULL;
+			int r __maybe_unused;
+
+			r = uk_fs_mountat(target, &prev);
+			UK_ASSERT(!r); /* This should never fail */
+			UK_ASSERT(prev == newroot);
+			uk_file_release(prev);
+			goto out_unlock;
+		}
+	}
+	/* Mount is now live in VFS, cannot fail past this point */
+	parent_ent = vfs_parent_mount(parent ? parent : target);
+	mtab.tab[mtab.top].point = target; /* Uses reference from graft */
+	mtab.tab[mtab.top].root = newroot; /* Uses reference from mount */
+	mtab.tab[mtab.top].parent_root = parent_ent ? parent_ent->root : NULL;
+	mtab.top++;
+	ret = 0;
+out_unlock:
+	uk_mutex_unlock(&mtab.lock);
+
+	if (parent)
+		uk_file_release(parent);
+	uk_file_release(target);
+	return ret;
+}
+
+static
+const struct uk_file *vfs_vopen(const char *source, const char *fstype,
+				unsigned long flags, void *data)
+{
+	const struct uk_fs_drv *drv = uk_fs_driver(fstype);
+	union uk_fs_vopen_vol vol = UK_FS_VOPEN_NULLVOL;
+	union uk_fs_vopen_data vdata = UK_FS_VOPEN_NULLDATA;
+	size_t fmt = UK_FS_VOPEN_VOL_IGNORE | UK_FS_VOPEN_DATA_IGNORE;
+	const struct uk_file *f;
+	int err = 0;
+
+	if (unlikely(!drv))
+		return ERR2PTR(-ENODEV);
+
+	/* Process source, if required */
+	if ((drv->formats & UK_FS_VOPEN_VOL_MASK) == UK_FS_VOPEN_VOL_IGNORE)
+		goto vol_done; /* Don't bother */
+	if ((drv->formats & UK_FS_VOPEN_VOL_FILE) &&
+	    source && source[0] == '/') {
+		/* source is absolute path; try to open */
+		f = vfs_lookup(NULL, source, strlen(source), 0);
+		if (!PTRISERR(f)) {
+			vol.file = f;
+			fmt |= UK_FS_VOPEN_VOL_FILE;
+			goto vol_done;
+		}
+		/* On failure remember error & try other options */
+		err = PTR2ERR(f);
+	}
+	if (drv->formats & UK_FS_VOPEN_VOL_RAW) {
+		vol.raw = source;
+		fmt |= UK_FS_VOPEN_VOL_RAW;
+		goto vol_done;
+	}
+	if (err)
+		return ERR2PTR(err);
+	else
+		return ERR2PTR(-EINVAL); /* Unsupported source expected */
+vol_done:
+	err = 0;
+
+	/* Process data, if required */
+	if ((drv->formats & UK_FS_VOPEN_DATA_MASK) == UK_FS_VOPEN_DATA_IGNORE)
+		goto data_done; /* Don't bother */
+	if ((drv->formats & UK_FS_VOPEN_DATA_FILE) &&
+	    data && ((const char *)data)[0] == '/') {
+		/* data is absolute path; try to open */
+		f = vfs_lookup(NULL, data, strlen(data), 0);
+		if (!PTRISERR(f)) {
+			vdata.file = f;
+			fmt |= UK_FS_VOPEN_DATA_FILE;
+			goto data_done;
+		}
+		/* On failure try to pass verbatim */
+		err = PTR2ERR(f);
+	}
+	if (drv->formats & UK_FS_VOPEN_DATA_RAW) {
+		vdata.raw = data;
+		fmt |= UK_FS_VOPEN_DATA_RAW;
+		goto data_done;
+	}
+	if (err) {
+		f = ERR2PTR(err);
+		goto out_vol;
+	}
+data_done:
+
+	/* Call vopen, drop refs & output */
+	f = drv->vopen(vol, flags, vdata, fmt);
+
+	if (fmt & UK_FS_VOPEN_DATA_FILE)
+		uk_file_release(vdata.file);
+out_vol:
+	if (fmt & UK_FS_VOPEN_VOL_FILE)
+		uk_file_release(vol.file);
+	return f;
+}
+
 int uk_sys_mount(const char *source, const char *targetpath, const char *fstype,
 		 unsigned long flags, void *data)
 {
-	const struct uk_file *target;
-	const struct uk_file *target_p;
-	const struct uk_file *newmnt;
-	const struct vfs_mtab_entry *parent_ent;
-	struct uk_fs_poslen p;
+	const struct uk_file *newroot;
 	int ret;
 
 	if (unlikely(flags & MS_REMOUNT)) {
@@ -1592,88 +1731,25 @@ int uk_sys_mount(const char *source, const char *targetpath, const char *fstype,
 		uk_pr_err("MS_MOVE not supported\n");
 		return -ENOSYS;
 	}
-
 	/* TODO: require privileges for (un)mounting */
-
-	/* Find mount target */
-	p = uk_fs_path_len_trail(targetpath, 0);
-	target = vfs_lookupat(vfs_atroot(NULL, targetpath, p.len),
-			      targetpath, p.len, 0);
-	if (unlikely(PTRISERR(target)))
-		return PTR2ERR(target);
-
-	/* Find mount point parent */
-	if (uk_fs_isdir(target)) {
-		uk_file_acquire(target);
-		target_p = target;
-	} else {
-		target_p = vfs_lookupat(vfs_atroot(NULL, targetpath, p.pos),
-					targetpath, p.pos, 0);
-		if (unlikely(PTRISERR(target_p))) {
-			ret = PTR2ERR(target_p);
-			goto out_targ;
-		}
-	}
 
 	if (flags & MS_BIND) {
 		const struct uk_file *src;
-		size_t srclen;
 
-		srclen = strlen(source);
-		src = vfs_lookupat(vfs_atroot(NULL, source, srclen),
-				   source, srclen, 0);
+		src = vfs_lookup(NULL, source, strlen(source), 0);
 
-		if (unlikely(PTRISERR(src))) {
-			ret = PTR2ERR(src);
-			goto out_targ_p;
-		}
-		newmnt = uk_fs_rebind(src, flags, data);
+		if (unlikely(PTRISERR(src)))
+			return PTR2ERR(src);
+		newroot = uk_fs_rebind(src, flags, data);
 		uk_file_release(src);
 	} else {
-		const struct uk_fs_drv *drv = uk_fs_driver(fstype);
-		union uk_fs_vopen_vol vvol;
-		union uk_fs_vopen_data vdata;
+		newroot = vfs_vopen(source, fstype, flags, data);
+	}
+	if (unlikely(PTRISERR(newroot)))
+		return PTR2ERR(newroot);
 
-		if (unlikely(!drv)) {
-			ret = -ENODEV;
-			goto out_targ_p;
-		}
-		vvol.raw = source;
-		vdata.raw = data;
-		newmnt = drv->vopen(vvol, flags, vdata,
-				    UK_FS_VOPEN_VOL_RAW | UK_FS_VOPEN_DATA_RAW);
-	}
-	if (unlikely(PTRISERR(newmnt))) {
-		ret = PTR2ERR(newmnt);
-		goto out_targ_p;
-	}
-	/* uk_fs_mount */
-	uk_mutex_lock(&mtab.lock);
-	if (unlikely(mtab.top == CONFIG_LIBPOSIX_VFS_MAX_MOUNTS)) {
-		ret = -EMFILE;
-		goto out_unlock;
-	}
-	if (uk_fs_isdir(newmnt)) {
-		ret = uk_fs_graft(newmnt, target);
-		if (unlikely(ret))
-			goto out_unlock;
-	}
-	ret = uk_fs_mountat(target, &newmnt);
-	if (unlikely(ret))
-		goto out_unlock;
-	/* Mount is now live in VFS, cannot fail past this point */
-	parent_ent = vfs_parent_mount(target_p);
-	mtab.tab[mtab.top].point = target;
-	mtab.tab[mtab.top].root = newmnt;
-	mtab.tab[mtab.top].parent_root = parent_ent ? parent_ent->root : NULL;
-	mtab.top++;
-out_unlock:
-	uk_mutex_unlock(&mtab.lock);
-	uk_file_release(newmnt);
-out_targ_p:
-	uk_file_release(target_p);
-out_targ:
-	uk_file_release(target);
+	ret = uk_posix_vfs_mount(targetpath, newroot);
+	uk_file_release(newroot);
 	return ret;
 }
 

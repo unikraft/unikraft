@@ -1,3 +1,6 @@
+# uk_posix_vfs_* API
+uk_posix_vfs_mount
+
 # uk_sys_* API
 # FS-wide ops
 uk_sys_sync

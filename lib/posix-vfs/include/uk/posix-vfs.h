@@ -18,6 +18,15 @@
 #include <uk/posix-fd.h>
 
 /*
+ * Unikraft API (not directly mappable to syscalls)
+ */
+
+/**
+ * Mount `node` on `path`.
+ */
+int uk_posix_vfs_mount(const char *path, const struct uk_file *node);
+
+/*
  * Internal syscalls
  */
 
