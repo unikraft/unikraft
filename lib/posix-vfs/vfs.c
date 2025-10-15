@@ -725,6 +725,15 @@ const struct uk_file *vfs_lookupat(const struct uk_file *atroot,
 #endif /* CONFIG_LIBPOSIX_VFS_SYMLIMIT_DEPTH */
 }
 
+/* Convenience for the common call vfs_lookupat(vfs_atroot(...), ...) */
+static inline
+const struct uk_file *vfs_lookup(const struct uk_file *start,
+				 const char *path, size_t len,
+				 unsigned int flags)
+{
+	return vfs_lookupat(vfs_atroot(start, path, len), path, len, flags);
+}
+
 #if CONFIG_LIBPOSIX_VFS_PERMISSIONS
 
 #define VFS_MODEMASK (UK_STATX_TYPE | UK_STATX_MODE | \
@@ -856,15 +865,12 @@ void uk_sys_sync(void)
 int uk_sys_statfs(const char *path, struct statfs *buf)
 {
 	const struct uk_file *target;
-	size_t pathlen;
 	int r;
 
 	if (unlikely(!path))
 		return -EFAULT;
 
-	pathlen = strlen(path);
-	target = vfs_lookupat(vfs_atroot(NULL, path, pathlen),
-			      path, pathlen, 0);
+	target = vfs_lookup(NULL, path, strlen(path), 0);
 	if (unlikely(PTRISERR(target)))
 		return PTR2ERR(target);
 
@@ -938,15 +944,12 @@ int uk_sys_chroot(const char *path)
 {
 	const struct uk_file *newroot;
 	const struct uk_file *prev;
-	size_t pathlen;
 	int err;
 
 	if (unlikely(!path))
 		return -EFAULT;
 
-	pathlen = strlen(path);
-	newroot = vfs_lookupat(vfs_atroot(NULL, path, pathlen),
-			       path, pathlen, 0);
+	newroot = vfs_lookup(NULL, path, strlen(path), 0);
 	if (unlikely(PTRISERR(newroot)))
 		return PTR2ERR(newroot);
 
@@ -979,15 +982,12 @@ int uk_sys_faccessat(const struct uk_file *f, const char *path,
 	const int lflags = (flags & AT_SYMLINK_NOFOLLOW) ?
 			   VFS_LOOKUP_NOFOLLOW : 0;
 	const struct uk_file *target;
-	size_t pathlen;
 	int ret;
 
 	if (unlikely((ret = vfs_check_path(path, 0))))
 		return ret;
 
-	pathlen = strlen(path);
-	target = vfs_lookupat(vfs_atroot(f, path, pathlen),
-			      path, pathlen, lflags);
+	target = vfs_lookup(f, path, strlen(path), lflags);
 	if (unlikely(PTRISERR(target)))
 		return PTR2ERR(target);
 	ret = (mode == F_OK) ? 0 : vfs_check_perms(target, mode);
@@ -1002,7 +1002,6 @@ int uk_sys_statx(const struct uk_file *f, const char *restrict path, int flags,
 			   VFS_LOOKUP_NOFOLLOW : 0;
 	const struct uk_file *target;
 	struct uk_ofile of;
-	size_t pathlen;
 	int ret;
 
 	if (unlikely(!statxbuf))
@@ -1010,9 +1009,7 @@ int uk_sys_statx(const struct uk_file *f, const char *restrict path, int flags,
 	if (unlikely((ret = vfs_check_path(path, flags))))
 		return ret;
 
-	pathlen = strlen(path);
-	target = vfs_lookupat(vfs_atroot(f, path, pathlen),
-			      path, pathlen, lflags);
+	target = vfs_lookup(f, path, strlen(path), lflags);
 	if (unlikely(PTRISERR(target)))
 		return PTR2ERR(target);
 
@@ -1046,7 +1043,6 @@ int uk_sys_fchownat(const struct uk_file *f, const char *path,
 			   VFS_LOOKUP_NOFOLLOW : 0;
 	const struct uk_file *target;
 	struct uk_ofile of;
-	size_t pathlen;
 	int ret;
 
 	if (unlikely(flags & ~(AT_EMPTY_PATH | AT_SYMLINK_NOFOLLOW)))
@@ -1054,9 +1050,7 @@ int uk_sys_fchownat(const struct uk_file *f, const char *path,
 	if (unlikely((ret = vfs_check_path(path, flags))))
 		return ret;
 
-	pathlen = strlen(path);
-	target = vfs_lookupat(vfs_atroot(f, path, pathlen),
-			      path, pathlen, lflags);
+	target = vfs_lookup(f, path, strlen(path), lflags);
 	if (unlikely(PTRISERR(target)))
 		return PTR2ERR(target);
 
@@ -1074,15 +1068,12 @@ int uk_sys_fchmodat(const struct uk_file *f, const char *path,
 			   VFS_LOOKUP_NOFOLLOW : 0;
 	const struct uk_file *target;
 	struct uk_ofile of;
-	size_t pathlen;
 	int ret;
 
 	if (unlikely((ret = vfs_check_path(path, 0))))
 		return ret;
 
-	pathlen = strlen(path);
-	target = vfs_lookupat(vfs_atroot(f, path, pathlen),
-			      path, pathlen, lflags);
+	target = vfs_lookup(f, path, strlen(path), lflags);
 	if (unlikely(PTRISERR(target)))
 		return PTR2ERR(target);
 
@@ -1098,14 +1089,12 @@ int uk_sys_futimesat(const struct uk_file *f, const char *path,
 {
 	const struct uk_file *target;
 	struct uk_ofile of;
-	size_t pathlen;
 	int ret;
 
 	if (unlikely((ret = vfs_check_path(path, 0))))
 		return ret;
 
-	pathlen = strlen(path);
-	target = vfs_lookupat(vfs_atroot(f, path, pathlen), path, pathlen, 0);
+	target = vfs_lookup(f, path, strlen(path), 0);
 	if (unlikely(PTRISERR(target)))
 		return PTR2ERR(target);
 	if (!times) {
@@ -1142,15 +1131,12 @@ int uk_sys_utimensat(const struct uk_file *f, const char *path,
 			   VFS_LOOKUP_NOFOLLOW : 0;
 	const struct uk_file *target;
 	struct uk_ofile of;
-	size_t pathlen;
 	int ret;
 
 	if (unlikely((ret = vfs_check_path(path, 0))))
 		return ret;
 
-	pathlen = strlen(path);
-	target = vfs_lookupat(vfs_atroot(f, path, pathlen),
-			      path, pathlen, lflags);
+	target = vfs_lookup(f, path, strlen(path), lflags);
 	if (unlikely(PTRISERR(target)))
 		return PTR2ERR(target);
 	if (!times ||
@@ -1194,7 +1180,6 @@ ssize_t uk_sys_readlinkat(const struct uk_file *f, const char *restrict path,
 {
 	const struct uk_file *target;
 	struct uk_fs_path linkpath;
-	size_t pathlen;
 	ssize_t ret;
 
 	if (unlikely(!buf))
@@ -1202,9 +1187,7 @@ ssize_t uk_sys_readlinkat(const struct uk_file *f, const char *restrict path,
 	if (unlikely((ret = vfs_check_path(path, 0))))
 		return ret;
 
-	pathlen = strlen(path);
-	target = vfs_lookupat(vfs_atroot(f, path, pathlen),
-			      path, pathlen, VFS_LOOKUP_NOFOLLOW);
+	target = vfs_lookup(f, path, strlen(path), VFS_LOOKUP_NOFOLLOW);
 	if (unlikely(PTRISERR(target)))
 		return PTR2ERR(target);
 	if (unlikely(!uk_fs_issym(target))) {
@@ -1230,12 +1213,9 @@ int uk_sys_truncate(const char *path, off_t len)
 {
 	const struct uk_file *target;
 	struct uk_ofile of;
-	size_t pathlen;
 	int ret;
 
-	pathlen = strlen(path);
-	target = vfs_lookupat(vfs_atroot(NULL, path, pathlen),
-			      path, pathlen, 0);
+	target = vfs_lookup(NULL, path, strlen(path), 0);
 	if (unlikely(PTRISERR(target)))
 		return PTR2ERR(target);
 
@@ -1264,7 +1244,7 @@ int uk_sys_mkdirat(const struct uk_file *f, const char *path, mode_t mode)
 	/* Lookup parent of path */
 	/* ignore trailing slashes (uniquely among *dir syscalls) */
 	p = uk_fs_path_len_trail(path, 1);
-	dir = vfs_lookupat(vfs_atroot(f, path, p.len), path, p.pos, 0);
+	dir = vfs_lookup(f, path, p.pos, 0);
 	if (unlikely(PTRISERR(dir)))
 		return PTR2ERR(dir);
 
@@ -1302,7 +1282,6 @@ int uk_sys_linkat(const struct uk_file *olddir, const char *oldpath,
 	union uk_fs_create_target target;
 	const struct uk_file *dest;
 	const struct uk_file *newlink;
-	size_t oldpathlen;
 	struct uk_fs_poslen np;
 	int ret;
 
@@ -1313,17 +1292,14 @@ int uk_sys_linkat(const struct uk_file *olddir, const char *oldpath,
 	if (unlikely((ret = vfs_check_path(oldpath, flags))))
 		return ret;
 
-	oldpathlen = strlen(oldpath);
-	target.file = vfs_lookupat(vfs_atroot(olddir, oldpath, oldpathlen),
-				   oldpath, oldpathlen,
-				   (flags & AT_SYMLINK_FOLLOW) ?
-				   0 : VFS_LOOKUP_NOFOLLOW);
+	target.file = vfs_lookup(olddir, oldpath, strlen(oldpath),
+				 (flags & AT_SYMLINK_FOLLOW) ?
+				 0 : VFS_LOOKUP_NOFOLLOW);
 	if (unlikely(PTRISERR(target.file)))
 		return PTR2ERR(target.file);
 
 	np = uk_fs_path_len_trail(newpath, 0);
-	dest = vfs_lookupat(vfs_atroot(newdir, newpath, np.pos),
-			    newpath, np.pos, 0);
+	dest = vfs_lookup(newdir, newpath, np.pos, 0);
 	if (unlikely(PTRISERR(dest))) {
 		ret = PTR2ERR(dest);
 		goto out_targ;
@@ -1369,7 +1345,7 @@ int uk_sys_symlinkat(const char *targetpath, const struct uk_file *f,
 		return ret;
 
 	p = uk_fs_path_len_trail(linkpath, 0);
-	dir = vfs_lookupat(vfs_atroot(f, linkpath, p.pos), linkpath, p.pos, 0);
+	dir = vfs_lookup(f, linkpath, p.pos, 0);
 	if (unlikely(PTRISERR(dir)))
 		return PTR2ERR(dir);
 
@@ -1427,7 +1403,7 @@ int uk_sys_mknodat(const struct uk_file *f, const char *path,
 		}
 
 	p = uk_fs_path_len_trail(path, 0);
-	dir = vfs_lookupat(vfs_atroot(f, path, p.pos), path, p.pos, 0);
+	dir = vfs_lookup(f, path, p.pos, 0);
 	if (unlikely(PTRISERR(dir)))
 		return PTR2ERR(dir);
 
@@ -1483,7 +1459,7 @@ int uk_sys_unlinkat(const struct uk_file *f, const char *path, int flags)
 
 	/* Get parent of path; rmdir ignores trailing slashes in path */
 	p = uk_fs_path_len_trail(path, !!(flags & AT_REMOVEDIR));
-	dir = vfs_lookupat(vfs_atroot(f, path, p.pos), path, p.pos, 0);
+	dir = vfs_lookup(f, path, p.pos, 0);
 	if (unlikely(PTRISERR(dir)))
 		return PTR2ERR(dir);
 
@@ -1557,8 +1533,7 @@ int uk_sys_renameat(const struct uk_file *olddir, const char *oldpath,
 		return ret;
 
 	op = uk_fs_path_len_trail(oldpath, 1);
-	sdir = vfs_lookupat(vfs_atroot(olddir, oldpath, op.pos),
-			    oldpath, op.pos, 0);
+	sdir = vfs_lookup(olddir, oldpath, op.pos, 0);
 	if (unlikely(PTRISERR(sdir)))
 		return PTR2ERR(sdir);
 	if (unlikely(!uk_fs_isdir(sdir))) {
@@ -1567,8 +1542,7 @@ int uk_sys_renameat(const struct uk_file *olddir, const char *oldpath,
 	}
 
 	np = uk_fs_path_len_trail(newpath, 0);
-	ddir = vfs_lookupat(vfs_atroot(newdir, newpath, np.pos),
-			    newpath, np.pos, 0);
+	ddir = vfs_lookup(newdir, newpath, np.pos, 0);
 	if (unlikely(PTRISERR(ddir))) {
 		ret = PTR2ERR(ddir);
 		goto out_src;
@@ -1706,16 +1680,13 @@ out_targ:
 int uk_sys_umount(const char *targetpath, int flags __unused)
 {
 	const struct uk_file *target;
-	size_t pathlen;
 	size_t mntidx;
 	int ret;
 	int inval __maybe_unused = 0;
 
 	/* TODO: require privileges for (un)mounting */
 
-	pathlen = strlen(targetpath);
-	target = vfs_lookupat(vfs_atroot(NULL, targetpath, pathlen),
-			      targetpath, pathlen, 0);
+	target = vfs_lookup(NULL, targetpath, strlen(targetpath), 0);
 	if (unlikely(PTRISERR(target)))
 		return PTR2ERR(target);
 
