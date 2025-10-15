@@ -1448,6 +1448,8 @@ attr UK_FS_TMPL_LIVE_DECL_FS_LOOKUP(drv)				\
 		ret = (live_fs_lookup)(n, &path[cur], len - cur,	\
 				       nod, out, &prog);		\
 		/* Interpret output */					\
+		if (unlikely(ret < 0))					\
+			break;						\
 		switch (ret) {						\
 		case UKFS_SUCCESS:					\
 			prog = len - cur;				\
@@ -1530,10 +1532,8 @@ attr UK_FS_TMPL_LIVE_DECL_FS_LOOKUP(drv)				\
 			goto out;					\
 									\
 		case UKFS_STOP_MNT: /* Cannot happen */			\
+		default:						\
 			UK_CRASH("Invalid lookup return from live driver\n");\
-		default: /* assert < 0; cleanup & return err */		\
-			UK_ASSERT(ret < 0);				\
-			goto out;					\
 		}							\
 		deep = 1;						\
 	}								\
