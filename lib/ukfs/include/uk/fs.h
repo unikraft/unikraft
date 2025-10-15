@@ -388,7 +388,7 @@ typedef int (*uk_fs_mount_func)(const struct uk_file *f,
 
 /**
  * Create a new filesystem instance for the filesystem containing `f`, using
- * mount options specified in `flags` and/or `opts`, and return a reference to
+ * mount options specified in `flags` and/or `data`, and return a reference to
  * the same file as `f` on this new binding.
  *
  * Drivers not wishing to support mounting a volume multiple times, including

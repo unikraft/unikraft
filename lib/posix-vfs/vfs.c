@@ -1648,13 +1648,18 @@ int uk_sys_mount(const char *source, const char *targetpath, const char *fstype,
 		newmnt = uk_fs_rebind(src, flags, data);
 		uk_file_release(src);
 	} else {
-		uk_fs_vopen_func vopen = uk_fs_driver(fstype);
+		const struct uk_fs_drv *drv = uk_fs_driver(fstype);
+		union uk_fs_vopen_vol vvol;
+		union uk_fs_vopen_data vdata;
 
-		if (unlikely(!vopen)) {
+		if (unlikely(!drv)) {
 			ret = -ENODEV;
 			goto out_targ_p;
 		}
-		newmnt = vopen(source, flags, data);
+		vvol.raw = source;
+		vdata.raw = data;
+		newmnt = drv->vopen(vvol, flags, vdata,
+				    UK_FS_VOPEN_VOL_RAW | UK_FS_VOPEN_DATA_RAW);
 	}
 	if (unlikely(PTRISERR(newmnt))) {
 		ret = PTR2ERR(newmnt);

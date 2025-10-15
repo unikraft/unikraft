@@ -91,8 +91,10 @@ union UK_FS_TMPL_LIVE_CREATE_TARGET(drv) {				\
  */
 #define UK_FS_TMPL_LIVE_OPS(drv, nodetype)				\
 /* Similar to ukfs vopen; return new root via nodetype */		\
-typedef nodetype (*drv##LIVEOP_VOPEN)(const void *vol, unsigned long flags,\
-				      const void *data);		\
+typedef nodetype (*drv##LIVEOP_VOPEN)(union uk_fs_vopen_vol vol,	\
+				      unsigned long flags,		\
+				      union uk_fs_vopen_data data,	\
+				      size_t fmt);			\
 \
 /* Standard ukfile operations */					\
 typedef ssize_t (*drv##LIVEOP_IO)(nodetype n, const struct iovec *iov,	\
@@ -1935,7 +1937,8 @@ attr const struct uk_fs_ops UK_FS_TMPL_LIVE_FSOPS_RODIR(drv) = {	\
  */
 #define UK_FS_TMPL_LIVE_DECL_VOPEN(drv)					\
 const struct uk_file *UK_FS_TMPL_LIVE_OP_VOPEN(drv)(			\
-	const void *vol, unsigned long flags, const void *data)
+	union uk_fs_vopen_vol vol, unsigned long flags,			\
+	union uk_fs_vopen_data data, size_t fmt)
 
 /**
  * Generate the ukfs vopen operation with regular linkage.
@@ -1986,7 +1989,7 @@ attr UK_FS_TMPL_LIVE_DECL_VOPEN(drv)					\
 	const struct uk_file *ret;					\
 	UK_FS_TMPL_LIVE_NODETYPE(drv) rootnode;				\
 									\
-	rootnode = (live_vopen)(vol, flags, data);			\
+	rootnode = (live_vopen)(vol, flags, data, fmt);			\
 	if (unlikely((err = (live_errnode)(rootnode))))			\
 		return ERR2PTR(err);					\
 									\

@@ -518,9 +518,10 @@ UK_FS_TMPL_LIVE_TYPES(ramfs, struct ramfs_node *);
 UK_FS_TMPL_LIVE_OPS(ramfs, struct ramfs_node *);
 
 static
-struct ramfs_node *ramfs_live_vopen(const void *vol __unused,
+struct ramfs_node *ramfs_live_vopen(union uk_fs_vopen_vol vol __unused,
 				    unsigned long flags __unused,
-				    const void *data __unused)
+				    union uk_fs_vopen_data data __unused,
+				    size_t fmt __unused)
 {
 	struct ramfs_node *rootnode;
 	int r;
@@ -1483,4 +1484,5 @@ static int ramfs_node_cmp(struct ramfs_node *a, struct ramfs_node *b)
 UK_FS_TMPL_LIVE_GENERATE_STATIC(ramfs, struct ramfs_node *, ramfs_node_cmp,
 				ramfs_liveops, 0);
 
-UK_FS_DRIVER_REGISTER(ramfs, UK_FS_TMPL_LIVE_OP_VOPEN(ramfs));
+UK_FS_DRIVER_REGISTER(ramfs, UK_FS_TMPL_LIVE_OP_VOPEN(ramfs),
+		      UK_FS_VOPEN_VOL_IGNORE | UK_FS_VOPEN_DATA_IGNORE);

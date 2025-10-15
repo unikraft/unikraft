@@ -9,4 +9,6 @@
 
 const struct uk_file *uk_fs_devfs_root;
 
-UK_FS_TMPL_PSEUDO(devfs, "ramfs", uk_fs_devfs_root, NULL, 0, NULL);
+UK_FS_TMPL_PSEUDO(devfs, "ramfs", uk_fs_devfs_root,
+		  UK_FS_VOPEN_NULLVOL, 0, UK_FS_VOPEN_NULLDATA,
+		  UK_FS_VOPEN_VOL_IGNORE | UK_FS_VOPEN_DATA_IGNORE);

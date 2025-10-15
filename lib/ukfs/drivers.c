@@ -15,7 +15,7 @@ extern const struct uk_fs_drv uk_fs_driver_list_end[];
 #define UKFS_DRIVER_COUNT \
 	(uk_fs_driver_list_end - uk_fs_driver_list_start)
 
-uk_fs_vopen_func uk_fs_driver(const char *fstype)
+const struct uk_fs_drv *uk_fs_driver(const char *fstype)
 {
 	const struct uk_fs_drv *drv = uk_fs_driver_list_start;
 	size_t len = UKFS_DRIVER_COUNT;
@@ -26,7 +26,7 @@ uk_fs_vopen_func uk_fs_driver(const char *fstype)
 		int r = strcmp(fstype, drv[mid].fstype);
 
 		if (!r)
-			return drv[mid].vopen;
+			return &drv[mid];
 		if (r < 0) {
 			len = mid;
 		} else {
