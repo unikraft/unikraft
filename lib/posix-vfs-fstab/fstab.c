@@ -11,6 +11,7 @@
 #include <uk/init.h>
 #include <uk/argparse.h>
 #include <uk/essentials.h>
+#include <uk/fs/driver.h>
 #include <uk/fs/pathutil.h>
 #include <uk/posix-vfs.h>
 #include <uk/plat/memory.h>
@@ -62,7 +63,7 @@ int fstab_extract(const struct vfs_fstab_entry *e,
 #if CONFIG_LIBPOSIX_VFS_FSTAB_EINITRD
 	} else if (!strcmp(e->dev, FSTAB_DEV_EINITRD)) {
 		base = (const void *)vfs_einitrd_start;
-		len = (uintptr_t)&vfs_einitrd_end - (uintptr_t)base;
+		len = VFS_EINITRD_LEN;
 #endif /* CONFIG_LIBPOSIX_VFS_FSTAB_EINITRD */
 	} else {
 		uk_pr_crit("Invalid initrd source: %s\n", e->dev);
@@ -149,6 +150,41 @@ int fstab_mkmp(const char *path)
 }
 
 static
+int fstab_mount_initrd(const struct vfs_fstab_entry *e,
+		       const void *base, size_t len)
+{
+	const struct uk_fs_drv *drv;
+	struct uk_fs_vopen_memimg img;
+	union uk_fs_vopen_vol vol;
+	union uk_fs_vopen_data data;
+	const struct uk_file *newroot;
+	int r;
+
+	drv = uk_fs_driver(e->fstype);
+	if (unlikely(!drv))
+		return -ENODEV;
+	if (unlikely(!uk_fs_vopen_supports(drv->formats, UK_FS_VOPEN_VOL_MASK,
+					   UK_FS_VOPEN_VOL_MEMIMG)))
+		return -EINVAL;
+	if (unlikely(!uk_fs_vopen_supports(drv->formats, UK_FS_VOPEN_DATA_MASK,
+					   UK_FS_VOPEN_DATA_RAW)))
+		return -EINVAL;
+	img.base = base;
+	img.len = len;
+	vol.memimg = &img;
+	data.raw = e->opts;
+
+	newroot = drv->vopen(vol, e->flags, data,
+			     UK_FS_VOPEN_VOL_MEMIMG | UK_FS_VOPEN_DATA_RAW);
+	if (unlikely(PTRISERR(newroot)))
+		return PTR2ERR(newroot);
+
+	r = uk_posix_vfs_mount(e->path, newroot);
+	uk_file_release(newroot);
+	return r;
+}
+
+static
 int fstab_mount(const struct vfs_fstab_entry *e,
 		const struct ukplat_memregion_desc *initrd0)
 {
@@ -178,12 +214,11 @@ int fstab_mount(const struct vfs_fstab_entry *e,
 			uk_pr_crit("Could not find an initrd!\n");
 			return -ENOENT;
 		}
-		r = uk_sys_mount((const void *)initrd0->vbase, e->path,
-				 e->fstype, e->flags, e->opts);
+		r = fstab_mount_initrd(e, (const void *)initrd0->vbase,
+				       initrd0->len);
 #if CONFIG_LIBPOSIX_VFS_FSTAB_EINITRD
 	} else if (!strcmp(e->dev, FSTAB_DEV_EINITRD)) {
-		r = uk_sys_mount((const void *)vfs_einitrd_start, e->path,
-				 e->fstype, e->flags, e->opts);
+		r = fstab_mount_initrd(e, vfs_einitrd_start, VFS_EINITRD_LEN);
 #endif /* CONFIG_LIBPOSIX_VFS_FSTAB_EINITRD */
 	} else {
 		r = uk_sys_mount(e->dev, e->path, e->fstype, e->flags, e->opts);

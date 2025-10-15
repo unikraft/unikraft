@@ -17,6 +17,8 @@
 extern const char vfs_einitrd_start[];
 extern const char vfs_einitrd_end;
 
+#define VFS_EINITRD_LEN (&vfs_einitrd_end - vfs_einitrd_start)
+
 #endif /* CONFIG_LIBPOSIX_VFS_FSTAB_EINITRD */
 
 #endif /* __UK_POSIX_VFS_FSTAB_EINITRD_H__ */
