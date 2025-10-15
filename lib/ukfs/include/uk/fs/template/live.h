@@ -1633,7 +1633,7 @@ attr UK_FS_TMPL_LIVE_DECL_FS_CREATE(drv)				\
 		live_target.ukfs.special = target.special;		\
 		break;							\
 	default:							\
-		live_target.livenode = NULL;				\
+		live_target.ukfs = UKFS_NOTARGET;			\
 	}								\
 									\
 	rnode = (live_fs_create)(drv##_FILE_NODE(f), name, len, mode,	\
@@ -1647,7 +1647,6 @@ attr UK_FS_TMPL_LIVE_DECL_FS_CREATE(drv)				\
 	case S_IFSOCK:							\
 	case S_IFIFO:							\
 		/* NULL is returned on success */			\
-		UK_ASSERT(!rnode);					\
 		return NULL;						\
 	default:							\
 		/* Convert rnode to ukfile & return */			\
