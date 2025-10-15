@@ -178,7 +178,9 @@ struct uk_fs_path {
  * The returned string is guaranteed a lifetime at least as long as `f`.
  * This operation should avoid any memory allocation or copying.
  * Callers must treat returned memory as immutable.
- * This operation cannot fail.
+ *
+ * This operation cannot meaningfully fail beyond critial I/O errors, signaled
+ * by an error value in the string pointer.
  *
  * @param f Symlink to read
  *

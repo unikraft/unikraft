@@ -521,6 +521,8 @@ const struct uk_file *_vfs_symfollow(const struct uk_file *sym,
 		return ERR2PTR(-ELOOP);
 
 	sympath = uk_fs_readlink(sym);
+	if (unlikely(PTRISERR(sympath.s)))
+		return ERR2PTR(PTR2ERR(sympath.s));
 	return _vfs_lookupat(vfs_atroot(parent, sympath.s, sympath.len),
 			     sympath.s, sympath.len, 0, lvl);
 }
@@ -546,6 +548,8 @@ const struct uk_file *_vfs_symfollow(const struct uk_file *sym,
 		return ERR2PTR(-ELOOP);
 
 	sympath = uk_fs_readlink(sym);
+	if (unlikely(PTRISERR(sympath.s)))
+		return ERR2PTR(PTR2ERR(sympath.s));
 	return _vfs_lookupat(vfs_atroot(parent, sympath.s, sympath.len),
 			     sympath.s, sympath.len, 0, nsyms);
 }
@@ -1210,6 +1214,10 @@ ssize_t uk_sys_readlinkat(const struct uk_file *f, const char *restrict path,
 
 	/* Symlinks uniquely don't have meaningful permissions to check */
 	linkpath = uk_fs_readlink(target);
+	if (unlikely(PTRISERR(linkpath.s))) {
+		ret = PTR2ERR(linkpath.s);
+		goto out;
+	}
 	ret = MIN(bufsz, linkpath.len);
 	memcpy(buf, linkpath.s, ret);
 out:
@@ -1818,6 +1826,10 @@ int vfs_lookupat_parent(const struct uk_file *atroot,
 		if (uk_fs_issym(target)) {
 			struct uk_fs_path p = uk_fs_readlink(target);
 
+			if (unlikely(PTRISERR(p.s))) {
+				ret = PTR2ERR(p.s);
+				break;
+			}
 			f = dir;
 			path = p.s;
 			pathlen = p.len;
