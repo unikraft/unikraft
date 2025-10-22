@@ -49,8 +49,6 @@ size_t uk_fs_path_sep(const char *path, size_t len)
 
 	if (!p)
 		return len;
-
-	UK_ASSERT(p >= path);
 	return (size_t)(p - path);
 }
 
