@@ -23,6 +23,7 @@ struct uk_fs_dirent {
 };
 
 /* Asserts to ensure dirent64 & uk_fs_dirent have identical layouts in memory */
+UK_CTASSERT(__alignof__(struct uk_fs_dirent) == __alignof__(struct dirent64));
 UK_CTASSERT(__offsetof(struct uk_fs_dirent, d_ino) ==
 	    __offsetof(struct dirent64, d_ino));
 UK_CTASSERT(__offsetof(struct uk_fs_dirent, d_off) ==
@@ -43,6 +44,34 @@ UK_CTASSERT(__offsetof(struct uk_fs_dirent, d_name) ==
 #define UKFS_DIRENT_RECLEN(namelen) \
 	ALIGN_UP(sizeof(struct uk_fs_dirent) + (namelen) + 1, \
 		 __alignof__(struct dirent64))
+
+/**
+ * Compute the length of the string in the `d_name` field, using `d_reclen`.
+ *
+ * Assumes a single terminating NUL, and arbitrary padding bytes up to the
+ * alignment requirements for a dirent.
+ */
+static inline
+size_t uk_fs_dirent_namelen(struct uk_fs_dirent *dp)
+{
+	size_t len;
+
+	UK_ASSERT(IS_ALIGNED(dp->d_reclen, __alignof__(struct dirent64)));
+
+	/* Start off with the maximum length according to the dirent */
+	len = dp->d_reclen - __offsetof(struct uk_fs_dirent, d_name);
+	if (len < __alignof__(struct dirent64))
+		/* String is short, just start from the beginning */
+		len = 0;
+	else
+		/* Roll back one alignment to guarantee we're in the string */
+		len -= __alignof__(struct uk_fs_dirent);
+
+	/* Advance until terminating NUL */
+	while (dp->d_name[len] != '\0')
+		len++;
+	return len;
+}
 
 /**
  * Get the next dirent after entry `dp` of size `sz`.
