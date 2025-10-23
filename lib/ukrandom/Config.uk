@@ -34,6 +34,21 @@ config LIBUKRANDOM_DTB_SEED
 		32-bit words. In that case any hardware RNG driver enabled
 		will be ignored.
 
+config LIBUKRANDOM_RESEED
+	bool "Periodic reseed"
+	depends on !LIBUKRANDOM_CMDLINE_SEED && !LIBUKRANDOM_DTB_SEED
+	default y
+	help
+		Periodically reseed the CSPRNG for forward secrecy.
+                Without reseeding, an attacker who obtains the internal
+		state of the RNG can derive past and future outputs.
+
+if LIBUKRANDOM_RESEED
+config LIBUKRANDOM_RESEED_INTERVAL
+	int "Reseed interval (sec)"
+	default 300
+endif
+
 config LIBUKRANDOM_GETRANDOM
 	bool "getrandom() system call"
 	depends on LIBSYSCALL_SHIM

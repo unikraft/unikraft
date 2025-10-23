@@ -43,9 +43,21 @@
 #include <uk/prio.h>
 #endif /* CONFIG_LIBUKRANDOM_DTB_SEED || CONFIG_LIBUKRANDOM_CMDLINE_SEED */
 
+#if CONFIG_LIBUKRANDOM_RESEED
+#include <uk/arch/time.h>
+#include <uk/errptr.h>
+#include <uk/prio.h>
+#include <uk/sched.h>
+#endif /* CONFIG_LIBUKRANDOM_RESEED */
+
 #include "swrand.h"
 
 struct uk_random_driver *driver;
+
+#if CONFIG_LIBUKRANDOM_RESEED
+static const
+__nsec reseed_interval = CONFIG_LIBUKRANDOM_RESEED_INTERVAL * UKARCH_NSEC_PER_SEC;
+#endif /* CONFIG_LIBUKRANDOM_RESEED */
 
 int __check_result uk_random_fill_buffer(void *buf, size_t buflen)
 {
@@ -98,13 +110,18 @@ int uk_random_init(struct uk_random_driver *drv)
 	return rc;
 }
 
+int __check_result uk_random_reseed(void)
+{
+	return uk_swrand_reseed();
+}
+
 #if CONFIG_LIBUKRANDOM_DTB_SEED || CONFIG_LIBUKRANDOM_CMDLINE_SEED
 /* Do not print a warning if the user did not pass a seed.
  * It may be the case that the application does not require
  * randomness, or that a hardware RNG will be initialized later
  * via init.
  *
- * For the same reasons, do not return an arror as that would cause
+ * For the same reasons, do not return an error as that would cause
  * init to trigger a fatal error. At the worst case the application
  * (or the kernel) will fail later, upon request for entropy.
  */
@@ -130,10 +147,36 @@ int uk_random_early_init(struct ukplat_bootinfo __maybe_unused *bi)
 	return 0;
 }
 
-int __check_result uk_random_reseed(void)
-{
-	return uk_swrand_reseed();
-}
-
 UK_BOOT_EARLYTAB_ENTRY(uk_random_early_init, UK_PRIO_AFTER(2));
 #endif /* CONFIG_LIBUKRANDOM_DTB_SEED */
+
+#if CONFIG_LIBUKRANDOM_RESEED
+static void __noreturn reseed_thread(void *arg __unused)
+{
+	int ret;
+
+	while (1) {
+		uk_sched_thread_sleep(reseed_interval);
+		uk_pr_debug("CSPRNG scheduled reseed\n");
+		ret = uk_random_reseed();
+		if (unlikely(ret))
+			UK_CRASH("Could not reseed the CSPRNG (%d)\n", ret);
+	}
+}
+
+static int reseed_thread_create(struct uk_init_ctx *ctx __unused)
+{
+	struct uk_thread *t;
+
+	t = uk_sched_thread_create(uk_sched_current(), reseed_thread,
+				   __NULL, "csprng_reseed");
+	if (unlikely(PTRISERR(t))) {
+		uk_pr_err("Could not create reseed thread (%d)\n", PTR2ERR(t));
+		return PTR2ERR(t);
+	}
+
+	return 0;
+}
+
+uk_lib_initcall_prio(reseed_thread_create, 0, UK_PRIO_LATEST);
+#endif /* CONFIG_LIBUKRANDOM_RESEED */
