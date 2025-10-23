@@ -8,11 +8,28 @@
 #define __UK_RANDOM_SWRAND_H__
 
 #include <uk/random/driver.h>
+#include <uk/spinlock.h>
+
+#include "chacha.h"
 
 /* Invalid pointer to differentiate between not initialized
  * libukrandom and initialized without an underlying driver.
  */
 #define UK_SWRAND_DRIVER_NONE	0xb0b0cafe
+
+#define UK_SWRAND_CTX_INIT() {		    \
+	.driver = __NULL,		    \
+	.lock = UK_SPINLOCK_INITIALIZER(),  \
+}
+
+#define UK_SWRAND_CTX(name)		    \
+	struct uk_swrand_ctx name = UK_SWRAND_CTX_INIT()
+
+struct uk_swrand_ctx {
+	struct uk_random_driver *driver;
+	struct chacha_ctx chacha;
+	struct uk_spinlock lock;
+};
 
 /* Initialize the CSPRNG. The CSPRNG is seeded with randomness
  * provided by the dtb's `/chosen/rng-seed` node.

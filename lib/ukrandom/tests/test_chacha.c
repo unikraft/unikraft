@@ -25,9 +25,6 @@
  *
  */
 
-void uk_quarterround(__u32 x[16], int a, int b, int c, int d);
-void uk_salsa20_wordtobyte(__u32 output[16], const __u32 in[16]);
-
 /* Sect. 2.2.1 */
 UK_TESTCASE(ukrandom_chacha, test_quarterround)
 {
@@ -38,7 +35,7 @@ UK_TESTCASE(ukrandom_chacha, test_quarterround)
 	x[8]  = 0x9b8d6f43;
 	x[12] = 0x01234567;
 
-	uk_quarterround(x, 0, 4, 8, 12);
+	chacha_quarterround(x, 0, 4, 8, 12);
 
 	UK_TEST_EXPECT(x[0]  == 0xea2a92f4);
 	UK_TEST_EXPECT(x[4]  == 0xcb1cf8ce);
@@ -54,7 +51,7 @@ UK_TESTCASE(ukrandom_chacha, test_quarterround_state)
 			0x53372767, 0xb00a5631, 0x974c541a, 0x359e9963,
 			0x5c971061, 0x3d631689, 0x2098d9d6, 0x91dbd320};
 
-	uk_quarterround(x, 2, 7, 8, 13);
+	chacha_quarterround(x, 2, 7, 8, 13);
 
 	UK_TEST_EXPECT(x[0] == 0x879531e0);
 	UK_TEST_EXPECT(x[1] == 0xc5ecf37d);
@@ -83,7 +80,7 @@ UK_TESTCASE(ukrandom_chacha, test_block_fn)
 			0x00000001, 0x09000000, 0x4a000000, 0x00000000};
 	__u32 out[16];
 
-	uk_salsa20_wordtobyte(out, in);
+	chacha_wordtobyte(out, in);
 
 	UK_TEST_EXPECT(out[0] == 0xe4e7f110);
 	UK_TEST_EXPECT(out[1] == 0x15593bd1);
@@ -112,7 +109,7 @@ UK_TESTCASE(ukrandom_chacha, test_block_fn_tv1)
 			0x00000000, 0x00000000, 0x00000000, 0x00000000};
 	__u32 out[16];
 
-	uk_salsa20_wordtobyte(out, in);
+	chacha_wordtobyte(out, in);
 
 	UK_TEST_EXPECT(out[0] == 0xade0b876);
 	UK_TEST_EXPECT(out[1] == 0x903df1a0);
@@ -141,7 +138,7 @@ UK_TESTCASE(ukrandom_chacha, test_block_fn_tv2)
 			0x00000001, 0x00000000, 0x00000000, 0x00000000};
 	__u32 out[16];
 
-	uk_salsa20_wordtobyte(out, in);
+	chacha_wordtobyte(out, in);
 
 	UK_TEST_EXPECT(out[0] == 0xbee7079f);
 	UK_TEST_EXPECT(out[1] == 0x7a385155);
@@ -170,7 +167,7 @@ UK_TESTCASE(ukrandom_chacha, test_block_fn_tv3)
 			0x00000001, 0x00000000, 0x00000000, 0x00000000};
 	__u32 out[16];
 
-	uk_salsa20_wordtobyte(out, in);
+	chacha_wordtobyte(out, in);
 
 	UK_TEST_EXPECT(out[0] == 0x2452eb3a);
 	UK_TEST_EXPECT(out[1] == 0x9249f8ec);
@@ -199,7 +196,7 @@ UK_TESTCASE(ukrandom_chacha, test_block_fn_tv4)
 			0x00000002, 0x00000000, 0x00000000, 0x00000000};
 	__u32 out[16];
 
-	uk_salsa20_wordtobyte(out, in);
+	chacha_wordtobyte(out, in);
 
 	UK_TEST_EXPECT(out[0] == 0xfb4dd572);
 	UK_TEST_EXPECT(out[1] == 0x4bc42ef1);
@@ -228,7 +225,7 @@ UK_TESTCASE(ukrandom_chacha, test_block_fn_tv5)
 			0x00000000, 0x00000000, 0x00000000, 0x02000000};
 	__u32 out[16];
 
-	uk_salsa20_wordtobyte(out, in);
+	chacha_wordtobyte(out, in);
 
 	UK_TEST_EXPECT(out[0] == 0x374dc6c2);
 	UK_TEST_EXPECT(out[1] == 0x3736d58c);
