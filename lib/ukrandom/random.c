@@ -130,5 +130,10 @@ int uk_random_early_init(struct ukplat_bootinfo __maybe_unused *bi)
 	return 0;
 }
 
+int __check_result uk_random_reseed(void)
+{
+	return uk_swrand_reseed();
+}
+
 UK_BOOT_EARLYTAB_ENTRY(uk_random_early_init, UK_PRIO_AFTER(2));
 #endif /* CONFIG_LIBUKRANDOM_DTB_SEED */

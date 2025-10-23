@@ -12,10 +12,17 @@
 #define CHACHA20_SEED_WORDS	8 /* 256-bit */
 #define CHACHA20_IV_WORDS	2 /* 16-bit */
 
+#define CHACHA_COUNTER_MAX  __U64_MAX
+
 struct chacha_ctx {
 	int k;
 	__u32 input[16], output[16];
 };
+
+static inline __u64 chacha_counter(struct chacha_ctx *ctx)
+{
+	return ((((__u64)ctx->input[13]) << 32) | ctx->input[12]);
+}
 
 /**
  * INTERNAL Initialize ChaCha

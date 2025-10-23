@@ -49,4 +49,7 @@ int uk_swrand_init(struct uk_random_driver **drv);
 /* Get a 32-bit random number */
 int __check_result uk_swrand_randr(__u32 *val);
 
+/* Reseed the CSPRNG */
+int uk_swrand_reseed(void);
+
 #endif /* __UK_RANDOM_SWRAND_H__ */

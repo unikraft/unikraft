@@ -129,12 +129,51 @@ int uk_swrand_init(struct uk_random_driver **drv)
 	return 0;
 }
 
+int __check_result uk_swrand_reseed(void)
+{
+	__u32 seedv[CHACHA20_SEED_WORDS];
+	int ret;
+
+	if (unlikely(!ctx.driver))
+		return -ENODEV;
+
+	if (unlikely(ctx.driver == (void *)UK_SWRAND_DRIVER_NONE)) {
+		uk_pr_err("Could not reseed, no driver\n");
+		return -ENODEV;
+	}
+
+	ret = (ctx.driver)->ops->seed_bytes_fb((__u8 *)seedv, sizeof(seedv));
+	if (unlikely(ret)) {
+		uk_pr_err("Could not reseed: Failed to collect entropy (%d)\n",
+			  ret);
+		return ret;
+	}
+
+	chacha_init(&ctx.chacha, seedv, iv, 0);
+
+	return 0;
+}
+
 int __check_result uk_swrand_randr(__u32 *val)
 {
+	int ret;
+
 	if (unlikely(!ctx.driver))
 		return -ENODEV;
 
 	uk_spin_lock(&ctx.lock);
+
+	/* Depending on the implementation of chacha_rand32()
+	 * this may skip the last block, which we favor over
+	 * increasing implementation complexity.
+	 */
+	if (chacha_counter(&ctx.chacha) == CHACHA_COUNTER_MAX) {
+		ret = uk_swrand_reseed();
+		if (unlikely(ret)) {
+			uk_spin_unlock(&ctx.lock);
+			return ret;
+		}
+	}
 
 	*val = chacha_rand32(&ctx.chacha);
 

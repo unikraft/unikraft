@@ -49,6 +49,15 @@ extern "C" {
  */
 int __check_result uk_random_fill_buffer(void *buf, __sz buflen);
 
+/**
+ * Reseed the CSPRNG
+ *
+ * Request libukrandom to reseed the CSPRNG
+ *
+ * @return zero on success, negative value on error.
+ */
+int __check_result uk_random_reseed(void);
+
 #ifdef __cplusplus
 }
 #endif
