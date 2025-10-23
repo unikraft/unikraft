@@ -84,18 +84,17 @@ __u32 chacha_rand32(struct chacha_ctx *ctx)
 {
 	__u32 res;
 
-	for (;;) {
-		chacha_wordtobyte(ctx->output, ctx->input);
-		ctx->input[12] = ctx->input[12] + 1;
-		if (ctx->input[12] == 0)
-			ctx->input[13]++;
-
-		if (ctx->k < 16) {
-			res = ctx->output[ctx->k];
-			ctx->k += 1;
-			return res;
-		}
-
-		ctx->k = 0;
+	if (ctx->k < 16) {
+		res = ctx->output[ctx->k];
+		ctx->k++;
+		return res;
 	}
+
+	chacha_wordtobyte(ctx->output, ctx->input);
+	ctx->input[12]++;
+	if (ctx->input[12] == 0)
+		ctx->input[13]++;
+
+	ctx->k = 1;
+	return ctx->output[0];
 }
