@@ -210,7 +210,6 @@ int uk_swrand_fdt_init(void *fdt, struct uk_random_driver **drv)
 int uk_swrand_cmdline_init(struct uk_random_driver **drv)
 {
 	__u32 seedv[CHACHA_SEED_LENGTH] = CHACHA_SEED_NOINIT;
-	unsigned int seedc = CHACHA_SEED_LENGTH;
 
 	/* FIXME This could theoretically (but extremely rarely)
 	 *       cause a false positive if the loader passes
@@ -218,7 +217,7 @@ int uk_swrand_cmdline_init(struct uk_random_driver **drv)
 	 *       a way to tell whether a param has been set other
 	 *       than checking against its value.
 	 */
-	if (!memcmp(seedv, seedv_cmdl, seedc)) {
+	if (!memcmp(seedv, seedv_cmdl, sizeof(seedv))) {
 		uk_pr_debug("Seed not set in the cmdline\n");
 		return -ENOTSUP;
 	}
@@ -238,7 +237,6 @@ int uk_swrand_cmdline_init(struct uk_random_driver **drv)
 
 int uk_swrand_init(struct uk_random_driver **drv)
 {
-	unsigned int seedc = CHACHA_SEED_LENGTH;
 	__u32 seedv[CHACHA_SEED_LENGTH];
 	unsigned int i __maybe_unused;
 	int ret;
@@ -250,7 +248,7 @@ int uk_swrand_init(struct uk_random_driver **drv)
 		return -ENODEV;
 	}
 
-	ret = (*drv)->ops->seed_bytes_fb((__u8 *)seedv, seedc);
+	ret = (*drv)->ops->seed_bytes_fb((__u8 *)seedv, sizeof(seedv));
 	if (unlikely(ret)) {
 		uk_pr_err("Could not initialize: Failed to collect entropy (%d)\n",
 			  ret);
