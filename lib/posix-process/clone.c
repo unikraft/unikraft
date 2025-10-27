@@ -32,6 +32,7 @@
  */
 
 #include <errno.h>
+#include <signal.h>
 #include <stdlib.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -354,6 +355,11 @@ int uk_clone(struct clone_args *cl_args, size_t cl_args_len,
 			uk_pr_err("Could not create process (%d)\n", ret);
 			goto err_free_child;
 		}
+
+		if (cl_args->exit_signal)
+			child_process->exit_signal = cl_args->exit_signal;
+		else
+			child_process->exit_signal = SIGCHLD;
 #else /* CONFIG_LIBPOSIX_PROCESS_MULTIPROCESS */
 		ret = -ENOTSUP;
 		goto err_free_child;

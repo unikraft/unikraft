@@ -67,6 +67,7 @@ struct posix_process {
 	struct uk_semaphore wait_semaphore;
 	struct uk_semaphore exit_semaphore;
 	enum posix_process_state state;
+	__u64 exit_signal;
 	int exit_status;
 
 	/* TODO: Mutex */

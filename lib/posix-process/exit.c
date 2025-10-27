@@ -69,15 +69,21 @@ static void pprocess_reparent_children(struct posix_process *pprocess)
 static inline int signal_exit(struct posix_process *pprocess)
 {
 	struct kern_sigaction *ks;
+	__u64 exit_signal;
 
 	UK_ASSERT(pprocess);
 	UK_ASSERT(pprocess->signal);
 
-	ks = KERN_SIGACTION(pprocess, SIGCHLD);
+	if (pprocess->exit_signal)
+		exit_signal = pprocess->exit_signal;
+	else
+		exit_signal = SIGCHLD;
+
+	ks = KERN_SIGACTION(pprocess, exit_signal);
 	if (ks->ks_handler == SIG_IGN || ks->ks_flags & SA_NOCLDWAIT)
 		return 1;
 
-	return pprocess_signal_send(pprocess, SIGCHLD, NULL);
+	return pprocess_signal_send(pprocess, exit_signal, NULL);
 }
 #endif /* CONFIG_LIBPOSIX_PROCESS_SIGNAL */
 
