@@ -22,7 +22,6 @@ static
 int uk_posix_clone_sighand(void *arg)
 {
 	struct posix_process_clone_event_data *event_data;
-
 	const struct clone_args *cl_args;
 	struct posix_process *pp; /* parent process */
 	struct posix_process *cp; /* child process */
@@ -36,15 +35,18 @@ int uk_posix_clone_sighand(void *arg)
 	UK_ASSERT(event_data);
 	UK_ASSERT(event_data->cl_args);
 	UK_ASSERT(event_data->child);
-	UK_ASSERT(event_data->parent);
 
 	cl_args = event_data->cl_args;
 
-	ppid = ukthread2pid(event_data->parent);
 	cpid = ukthread2pid(event_data->child);
-
-	pp = pid2pprocess(ppid);
 	cp = pid2pprocess(cpid);
+
+	if (event_data->parent) {
+		ppid = ukthread2pid(event_data->parent);
+		pp = pid2pprocess(ppid);
+	} else {
+		pp = __NULL;
+	}
 
 	ct = tid2pthread(ukthread2tid(event_data->child));
 
@@ -90,7 +92,7 @@ int uk_posix_clone_sighand(void *arg)
 	}
 
 	/* CLONE_CLEAR_SIGHAND: Reset child's signal dispositions to default. */
-	if (cl_args->flags & CLONE_CLEAR_SIGHAND) {
+	if (!pp || (cl_args->flags & CLONE_CLEAR_SIGHAND)) {
 		uk_pr_debug("CLONE_SIGHAND: pid %d gets default signal dispositions\n",
 			    cpid);
 
@@ -132,14 +134,16 @@ int uk_posix_clone_sighand(void *arg)
 	pprocess_signal_foreach(signum)
 		UK_INIT_LIST_HEAD(&cp->signal->sigqueue.list_head[signum]);
 
-	/* sigaltstack(2): Children created with clone() inherit the
-	 * parent's altstack settings, unless clone() was passed the
-	 * CLONE_VM and not CLONE_VFORK. In that case the altstack
-	 * inherited by the parent is disabled.
-	 */
-	memcpy(&cp->signal->altstack, &pp->signal->altstack, sizeof(stack_t));
-	if ((cl_args->flags & CLONE_VM) && !(cl_args->flags & CLONE_VFORK))
-		cp->signal->altstack.ss_flags = SS_DISABLE;
+	if (pp) {
+		/* sigaltstack(2): Children created with clone() inherit the
+		 * parent's altstack settings, unless clone() was passed the
+		 * CLONE_VM and not CLONE_VFORK. In that case the altstack
+		 * inherited by the parent is disabled.
+		 */
+		memcpy(&cp->signal->altstack, &pp->signal->altstack, sizeof(stack_t));
+		if ((cl_args->flags & CLONE_VM) && !(cl_args->flags & CLONE_VFORK))
+			cp->signal->altstack.ss_flags = SS_DISABLE;
+	}
 
 #if CONFIG_LIBPOSIX_PROCESS_SIGNALFD
 	/*
