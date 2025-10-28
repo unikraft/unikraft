@@ -493,6 +493,9 @@ static int fdtab_clone(void *arg)
 	child = event_data->child;
 	parent = event_data->parent;
 
+	if (!parent)
+		return UK_EVENT_HANDLED_CONT;
+
 	tab = uk_thread_uktls_var(parent, active_fdtab);
 	UK_ASSERT(tab); /* Do not call clone from raw threads */
 
