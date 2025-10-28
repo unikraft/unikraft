@@ -346,19 +346,67 @@ err_out:
 	return ERR2PTR(ret);
 }
 
+static inline int raise_process_clone_event(struct uk_thread *child,
+					    struct uk_thread *parent)
+{
+	struct posix_process_clone_event_data clone_data;
+	struct clone_args cl_args;
+	pid_t child_tid, child_pid;
+	pid_t parent_tid, parent_pid;
+	int ret;
+
+	UK_ASSERT(child);
+
+	child_tid = ukthread2tid(child);
+	child_pid = ukthread2pid(child);
+
+	if (parent) {
+		parent_tid = ukthread2tid(parent);
+		parent_pid = ukthread2pid(parent);
+	} else {
+		parent_tid = 0;
+		parent_pid = 0;
+	}
+
+	/* We pass the flags used when creating a new process
+	 * i.e. CLONE_VM | CLONE_VFORK | SIGCHLD.
+	 */
+	cl_args = (struct clone_args) {
+		.flags       = CLONE_VM | CLONE_VFORK,
+		.child_tid   = child_tid,
+		.parent_tid  = parent_tid,
+		.exit_signal = SIGCHLD,
+	};
+
+	clone_data = (struct posix_process_clone_event_data) {
+		.cl_args = &cl_args,
+		.cl_args_len = sizeof(cl_args),
+		.child = child,
+		.parent = parent,
+		.ppid = parent_pid,
+		.pid = child_pid,
+		.tid = child_tid,
+	};
+
+	ret = pprocess_raise_clone_event(&clone_data);
+	if (unlikely(ret < 0)) {
+		uk_pr_err("clone event error (%d)\n", ret);
+		return ret;
+	}
+
+	return 0;
+}
+
 #if CONFIG_LIBPOSIX_PROCESS_MULTIPROCESS
 pid_t uk_posix_process_run(uk_posix_process_mainlike_func fn,
 			   int argc, const char *argv[])
 {
 	struct posix_process_execve_event_data execve_data;
-	struct posix_process_clone_event_data clone_data;
 	struct posix_process *child_process;
 	struct uk_sched *s = uk_sched_current();
-	struct clone_args cl_args;
 	struct uk_thread *parent;
 	struct uk_thread *child;
 	pid_t parent_tid;
-	pid_t child_tid;
 	int ret;
 
 	UK_ASSERT(s);
@@ -385,30 +433,9 @@ pid_t uk_posix_process_run(uk_posix_process_mainlike_func fn,
 		uk_pr_err("Could not create process (%d)\n", ret);
 		goto err_free_thread;
 	}
-	child_tid = ukthread2tid(child);
 
-	/* Raise the clone event. We pass the flags used when creating
-	 * a new process, i.e. CLONE_VM | CLONE_VFORK | SIGCHLD.
-	 */
-	cl_args = (struct clone_args) {
-		.flags       = CLONE_VM | CLONE_VFORK,
-		.child_tid   = child_tid,
-		.parent_tid  = parent_tid,
-		.exit_signal = SIGCHLD,
-	};
-
-	clone_data = (struct posix_process_clone_event_data) {
-		.cl_args = &cl_args,
-		.cl_args_len = sizeof(cl_args),
-		.child = child,
-		.parent = parent,
-		.ppid = ukthread2pid(parent),
-		.pid = ukthread2pid(child),
-		.tid = child_tid,
-	};
-
-	ret = pprocess_raise_clone_event(&clone_data);
-	if (unlikely(ret < 0)) {
+	ret = raise_process_clone_event(child, parent);
+	if (unlikely(ret)) {
 		uk_pr_err("clone event error (%d)\n", ret);
 		goto err_free_thread;
 	}
@@ -480,6 +507,7 @@ static int posix_process_init(struct uk_init_ctx *ictx)
 {
 	struct posix_process *p;
 	struct uk_thread *t;
+	int ret;
 
 	UK_ASSERT(ictx);
 
@@ -502,7 +530,11 @@ static int posix_process_init(struct uk_init_ctx *ictx)
 		return PTR2ERR(p);
 	}
 
-	return 0;
+	ret = raise_process_clone_event(t, NULL);
+	if (unlikely(ret))
+		pprocess_release(p);
+
+	return ret;
 }
 
 uk_late_initcall(posix_process_init, 0x0);
