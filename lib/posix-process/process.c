@@ -62,7 +62,7 @@ static inline pid_t find_free_tid(void)
 	unsigned long found;
 
 	/* search starting from last position */
-	found = uk_find_next_zero_bit(tid_map, TIDMAP_SIZE, prev);
+	found = uk_find_next_zero_bit(tid_map, TIDMAP_SIZE, prev + 1);
 	if (found == TIDMAP_SIZE) {
 		/* search again starting from the beginning */
 		found = uk_find_first_zero_bit(tid_map, TIDMAP_SIZE);
