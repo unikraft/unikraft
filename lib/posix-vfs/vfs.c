@@ -299,6 +299,9 @@ int vfs_clone(void *arg)
 	child = event_data->child;
 	parent = event_data->parent;
 
+	if (!parent)
+		return UK_EVENT_HANDLED_CONT;
+
 	ctx = uk_thread_uktls_var(parent, vfs_ctx);
 	UK_ASSERT(ctx); /* Do not call clone from raw threads */
 	if ((cl_args->flags & CLONE_FS)) {
