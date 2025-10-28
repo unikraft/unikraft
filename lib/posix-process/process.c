@@ -216,9 +216,9 @@ int uk_posix_process_create_pthread(struct uk_thread *thread)
 }
 
 /* Create a new posix process for a given thread */
-int pprocess_create(struct uk_alloc *a,
-		    struct uk_thread *thread,
-		    struct uk_thread *parent)
+struct posix_process *pprocess_create(struct uk_alloc *a,
+				      struct uk_thread *thread,
+				      struct uk_thread *parent)
 {
 	struct posix_thread  *parent_pthread  = NULL;
 	struct posix_process *parent_pprocess = NULL;
@@ -335,7 +335,7 @@ int pprocess_create(struct uk_alloc *a,
 	uk_pr_debug("Process PID %d created (parent PID: %d)\n",
 		    (int) pprocess->pid,
 		    (int) ((pprocess->parent) ? pprocess->parent->pid : 0));
-	return 0;
+	return pprocess;
 
 err_free_pprocess:
 #if CONFIG_LIBPOSIX_PROCESS_SIGNAL
@@ -343,7 +343,7 @@ err_free_pprocess:
 #endif /* CONFIG_LIBPOSIX_PROCESS_SIGNAL */
 	uk_free(a, pprocess);
 err_out:
-	return ret;
+	return ERR2PTR(ret);
 }
 
 #if CONFIG_LIBPOSIX_PROCESS_MULTIPROCESS
@@ -352,6 +352,7 @@ pid_t uk_posix_process_run(uk_posix_process_mainlike_func fn,
 {
 	struct posix_process_execve_event_data execve_data;
 	struct posix_process_clone_event_data clone_data;
+	struct posix_process *child_process;
 	struct uk_sched *s = uk_sched_current();
 	struct clone_args cl_args;
 	struct uk_thread *parent;
@@ -378,8 +379,9 @@ pid_t uk_posix_process_run(uk_posix_process_mainlike_func fn,
 	}
 
 	/* Create new process */
-	ret = pprocess_create(uk_alloc_get_default(), child, parent);
-	if (unlikely(ret)) {
+	child_process = pprocess_create(uk_alloc_get_default(), child, parent);
+	if (unlikely(PTRISERR(child_process))) {
+		ret = PTR2ERR(child_process);
 		uk_pr_err("Could not create process (%d)\n", ret);
 		goto err_free_thread;
 	}
@@ -476,6 +478,7 @@ void pprocess_release(struct posix_process *pprocess)
 
 static int posix_process_init(struct uk_init_ctx *ictx)
 {
+	struct posix_process *p;
 	struct uk_thread *t;
 
 	UK_ASSERT(ictx);
@@ -493,7 +496,13 @@ static int posix_process_init(struct uk_init_ctx *ictx)
 	}
 
 	/* Create a POSIX process without parent ("init" process) */
-	return pprocess_create(uk_alloc_get_default(), t, NULL);
+	p = pprocess_create(uk_alloc_get_default(), t, NULL);
+	if (unlikely(PTRISERR(p))) {
+		uk_pr_err("Could not create process (%d)\n", PTR2ERR(p));
+		return PTR2ERR(p);
+	}
+
+	return 0;
 }
 
 uk_late_initcall(posix_process_init, 0x0);

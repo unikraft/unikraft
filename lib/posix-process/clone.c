@@ -123,6 +123,7 @@ int uk_clone(struct clone_args *cl_args, size_t cl_args_len,
 	     struct ukarch_execenv *execenv)
 {
 	struct posix_process_clone_event_data clone_event;
+	struct posix_process *child_process;
 	struct posix_process *pprocess;
 	struct posix_thread *pthread;
 	struct uk_thread *child = NULL;
@@ -349,8 +350,10 @@ int uk_clone(struct clone_args *cl_args, size_t cl_args_len,
 		}
 	} else {
 #if CONFIG_LIBPOSIX_PROCESS_MULTIPROCESS
-		ret = pprocess_create(uk_alloc_get_default(), child, t);
-		if (unlikely(ret)) {
+		child_process = pprocess_create(uk_alloc_get_default(),
+						child, t);
+		if (unlikely(PTRISERR(child_process))) {
+			ret = PTR2ERR(child_process);
 			uk_pr_err("Could not create process (%d)\n", ret);
 			goto err_free_child;
 		}

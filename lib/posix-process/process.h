@@ -195,8 +195,9 @@ struct posix_thread *pprocess_create_pthread(struct posix_process *pprocess,
  * @param parent parent processs
  * @return process on success or negative value on failure
  */
-int pprocess_create(struct uk_alloc *a, struct uk_thread *thread,
-		    struct uk_thread *parent);
+struct posix_process *pprocess_create(struct uk_alloc *a,
+				      struct uk_thread *thread,
+				      struct uk_thread *parent);
 
 int uk_clone(struct clone_args *cl_args, size_t cl_args_len,
 	     struct ukarch_execenv *execenv);
