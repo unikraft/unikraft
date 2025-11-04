@@ -76,19 +76,6 @@ static void uk_sigact_cont(int __unused sig)
 	uk_pr_warn("SIG_CONT not supported\n");
 }
 
-bool pprocess_signal_is_deliverable(struct posix_thread *pthread, int signum)
-{
-	struct posix_process *proc;
-
-	UK_ASSERT(pthread);
-	UK_ASSERT(signum);
-
-	proc = tid2pprocess(pthread->tid);
-	UK_ASSERT(proc);
-
-	return (!IS_MASKED(pthread, signum) && !IS_IGNORED(proc, signum));
-}
-
 static void handle_self(struct uk_signal *sig, const struct kern_sigaction *ks,
 			struct ukarch_execenv *execenv)
 {
@@ -403,17 +390,6 @@ void sys_error_handler(struct ukarch_execenv *ee __unused, long arg)
 		UK_BUG(); /* noreturn */
 	}
 
-	/* If the application masks or ignores this signal, panic.
-	 * A general-purpose OS would terminate the application.
-	 * Being a unikernel, we treat this as a non-recoverable
-	 * error instead.
-	 */
-	if (!pprocess_signal_is_deliverable(pthread, error->signum))
-		goto err_panic;
-
-	if (KERN_SIGACTION(pproc, error->signum)->ks_handler == SIG_DFL)
-		goto err_panic;
-
 	/* Prepare siginfo */
 	set_siginfo_kill(error->signum, &sig.siginfo);
 
@@ -421,8 +397,4 @@ void sys_error_handler(struct ukarch_execenv *ee __unused, long arg)
 	do_deliver(pthread, &sig, ee);
 
 	return;
-
-err_panic:
-	/* FIXME: Cascading faulting */
-	UK_CRASH("Cannot deliver SIGSEGV for pf at 0x%lx\n", error->vaddr);
 }
