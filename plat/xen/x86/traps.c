@@ -26,6 +26,7 @@
 #include <stddef.h>
 #include <xen-x86/traps.h>
 #include <xen-x86/hypercall.h>
+#include <uk/arch/traps.h>
 #include <uk/print.h>
 #include <uk/plat/common/lcpu.h>
 
@@ -80,4 +81,15 @@ __uptr traps_lcpu_get_except_stack_base(void)
 	UK_WARN_STUBBED();
 	return 0;
 }
+
+void ukarch_push_nested_exceptions(void)
+{
+	/* no exception stack */
+}
+
+void ukarch_pop_nested_exceptions(void)
+{
+	/* no exception stack */
+}
+
 #endif
