@@ -1,0 +1,52 @@
+# Invisible option to control the compilation of
+# native driver ops
+config LIBUKPLAT_NATIVE_PAL
+	bool
+	select LIBUKPLAT_NATIVE
+	select LIBUKPLAT_NATIVE_ADDR
+	select LIBUKPLAT_NATIVE_PAGE
+	select LIBUKPLAT_NATIVE_PT
+	select LIBUKPLAT_NATIVE_TLB
+
+# Platform configuration. These options can also be selected
+# by implementations that reuse code from liubkplat_native.
+config LIBUKPLAT_NATIVE
+	bool
+
+if LIBUKPLAT_NATIVE
+
+config LIBUKPLAT_NATIVE_ADDR
+	bool
+	depends on HAVE_PAGING
+
+config LIBUKPLAT_NATIVE_PAGE
+	bool
+	depends on HAVE_PAGING
+
+config LIBUKPLAT_NATIVE_PAGING
+	bool
+	depends on HAVE_PAGING
+	depends on LIBUKPLAT_NATIVE_ADDR
+	depends on LIBUKPLAT_NATIVE_PAGE
+	depends on LIBUKPLAT_NATIVE_PT
+	depends on LIBUKPLAT_NATIVE_TLB
+
+config LIBUKPLAT_NATIVE_PT
+	bool
+	depends on HAVE_PAGING
+	depends on LIBUKPLAT_NATIVE_ADDR
+	depends on LIBUKPLAT_NATIVE_PAGE
+
+if LIBUKPLAT_NATIVE_PT
+config LIBUKPLAT_NATIVE_PT_5LEVEL
+	bool
+	depends on ARCH_X86_64
+endif
+
+config LIBUKPLAT_NATIVE_TLB
+	bool
+	depends on HAVE_PAGING
+	# Only depend on LIBUKPLAT_NATIVE_PT for ARCH_X86_64
+	depends on !ARCH_X86_64 || LIBUKPLAT_NATIVE_PT
+
+endif

@@ -1,0 +1,4 @@
+uk_plat_native_paging_init
+uk_plat_native_pte_create
+uk_plat_native_attr_from_pte
+uk_plat_native_x86_64_pg_maxphysaddr

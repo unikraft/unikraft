@@ -6,6 +6,10 @@ menu "Interrupt controller"
 source "$(shell,$(UK_BASE)/support/build/config-submenu.sh -q -o '$(KCONFIG_DIR)/drivers-intctlr.uk' -r '$(KCONFIG_DRIV_BASE)/ukintctlr' -l '$(KCONFIG_DRIV_BASE)/ukintctlr' -e '$(KCONFIG_EXCLUDEDIRS)')"
 endmenu
 
+menu "Platform"
+source "$(shell,$(UK_BASE)/support/build/config-submenu.sh -q -o '$(KCONFIG_DIR)/drivers-plat.uk' -r '$(KCONFIG_DRIV_BASE)/plat' -l '$(KCONFIG_DRIV_BASE)/plat' -e '$(KCONFIG_EXCLUDEDIRS)')"
+endmenu
+
 menu "PS/2 controller"
 source "$(shell,$(UK_BASE)/support/build/config-submenu.sh -q -o '$(KCONFIG_DIR)/drivers-ukps2.uk' -r '$(KCONFIG_DRIV_BASE)/ukps2' -l '$(KCONFIG_DRIV_BASE)/ukps2' -e '$(KCONFIG_EXCLUDEDIRS)')"
 endmenu
