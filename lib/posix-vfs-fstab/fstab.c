@@ -412,5 +412,5 @@ int init_vfs_fstab(struct uk_init_ctx *ictx __unused)
 	return 0;
 }
 
-/* The fstab runs latest in the rootfs init cycle */
-uk_rootfs_initcall(init_vfs_fstab, 0);
+/* The fstab runs second-to-last in the rootfs init cycle */
+uk_rootfs_initcall_prio(init_vfs_fstab, 0, UK_PRIO_BEFORE(UK_PRIO_LATEST));
