@@ -7,4 +7,4 @@ SECTIONS
 		PROVIDE(posix_netlink_protocol_list_end = .);
 	}
 }
-INSERT BEFORE .data;
+INSERT AFTER .rodata;

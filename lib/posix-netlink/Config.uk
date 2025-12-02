@@ -4,7 +4,7 @@ config LIBPOSIX_NETLINK
 	select LIBUKMPI
 	select LIBUKMPI_MBOX
 	help
-	  This microlibrary allows other microlibraries to register a
-	  netlink protocol family, such as NETLINK_ROUTE, for their netlink
-	  module implementation. This library regsiters the POSIX socket API
-	  unikernel-wide and acts appropriately on a given file descriptor.
+		This microlibrary allows other microlibraries to register a
+		netlink protocol family, such as NETLINK_ROUTE, for their netlink
+		module implementation. This library registers the POSIX socket API
+		unikernel-wide and acts appropriately on a given file descriptor.
