@@ -52,7 +52,7 @@ static inline
 int uk_sparsebuf_truncate(const struct uk_sparsebuf_ctx *ctx,
 			  struct uk_sparsebuf_blk **headp, __sz size)
 {
-	const __sz pglo = ALIGN_UP(size, PAGE_SIZE);
+	const __sz pglo = ALIGN_UP(size, UK_PAGING_PAGE_SIZE);
 	const __sz rem = pglo - size;
 	struct uk_sparsebuf_cur cur;
 	__sz toscoop;
@@ -66,7 +66,7 @@ int uk_sparsebuf_truncate(const struct uk_sparsebuf_ctx *ctx,
 
 	toscoop = uk_sparsebuf_slice_pgend(uk_sparsebuf_slice_at(&cur)) - pglo;
 	r = uk_sparsebuf_scoop(ctx, headp, uk_sparsebuf_pgoff(pglo),
-			       toscoop / PAGE_SIZE);
+			       toscoop / UK_PAGING_PAGE_SIZE);
 	if (unlikely(r)) {
 		UK_ASSERT(r < 0);
 		return r;
@@ -99,9 +99,9 @@ int uk_sparsebuf_punch_hole(const struct uk_sparsebuf_ctx *ctx,
 			    __sz off, __sz len)
 {
 	const __sz end = off + len;
-	const __sz pglo = ALIGN_UP(off, PAGE_SIZE);
+	const __sz pglo = ALIGN_UP(off, UK_PAGING_PAGE_SIZE);
 	const __sz pgoff = uk_sparsebuf_pgoff(pglo);
-	const __sz pghi = ALIGN_DOWN(end, PAGE_SIZE);
+	const __sz pghi = ALIGN_DOWN(end, UK_PAGING_PAGE_SIZE);
 	const __sz npages = uk_sparsebuf_pgoff(pghi) - pgoff;
 	const __sz remlo = pglo - off;
 	const __sz remhi = end - pghi;

@@ -24,12 +24,13 @@ __ssz loop_pgin(uk_pod_pgin_func func,
 	__ssz r;
 
 	while (done < npages) {
-		r = func(addr, npages - done, __PADDR_INV, arg, base + done);
+		r = func(addr, npages - done, UK_PAGING_PADDR_INV, arg,
+			 base + done);
 		if (unlikely(r < 0))
 			return r;
 		UK_ASSERT(r > 0); /* func must make progress or error out */
 		done += r;
-		addr += r * PAGE_SIZE;
+		addr += r * UK_PAGING_PAGE_SIZE;
 	}
 	return done;
 }
@@ -47,7 +48,7 @@ __ssz loop_pgwb(uk_pod_pgwb_func func,
 			return r;
 		UK_ASSERT(r > 0); /* func must make progress or error out */
 		done += r;
-		addr += r * PAGE_SIZE;
+		addr += r * UK_PAGING_PAGE_SIZE;
 	}
 	return done;
 }
@@ -62,7 +63,7 @@ void *uk_pod_eager_alloc(struct uk_alloc *al,
 
 	if (unlikely(!buf))
 		return ERR2PTR(-ENOMEM);
-	UK_ASSERT(PAGE_ALIGNED((__uptr)buf));
+	UK_ASSERT(UK_PAGING_PAGE_ALIGNED((__uptr)buf));
 	r = loop_pgin(ops->pagein, buf, npages, arg, base);
 	/* Loop has either completed or errored (r < 0 || r == npages) */
 	if (unlikely(r < 0)) {
@@ -102,7 +103,7 @@ int uk_pod_eager_drop(struct uk_alloc *al __unused,
 		      void *addr, __sz npages,
 		      const struct uk_pod_pgio *ops, void *arg, __sz base)
 {
-	__ssz r = ops->pagein(addr, npages, __PADDR_INV, arg, base);
+	__ssz r = ops->pagein(addr, npages, UK_PAGING_PADDR_INV, arg, base);
 
 	/* Loop has either completed or errored (r < 0 || r == npages) */
 	if (unlikely(r < 0))

@@ -7,10 +7,9 @@
 #include <uk/arch/limits.h>
 #include <uk/nofault.h>
 #include <uk/arch/types.h>
-#include <uk/arch/traps.h>
-#include <uk/arch/paging.h>
 #include <uk/event.h>
 #include <uk/config.h>
+#include <uk/paging.h>
 
 #include "arch/maccess.h"
 
@@ -106,12 +105,12 @@ FAULT_2:
 		if (!(flags & UK_NOFAULTF_CONTINUE))
 			break;
 
-		UK_ASSERT(vaddr <= __VADDR_MAX - PAGE_SIZE);
+		UK_ASSERT(vaddr <= __VADDR_MAX - UK_PAGING_PAGE_SIZE);
 		UK_ASSERT(len >= l);
 
 		bytes += len - l;
-		vaddr += PAGE_SIZE;
-		l     -= MIN(PAGE_SIZE, l);
+		vaddr += UK_PAGING_PAGE_SIZE;
+		l     -= MIN(UK_PAGING_PAGE_SIZE, l);
 		len    = l;
 	} while (l > 0);
 
@@ -155,14 +154,14 @@ FAULT_2:
 		if (!(flags & UK_NOFAULTF_CONTINUE))
 			break;
 
-		UK_ASSERT((__vaddr_t)dst <= __VADDR_MAX - PAGE_SIZE);
-		UK_ASSERT((__vaddr_t)src <= __VADDR_MAX - PAGE_SIZE);
+		UK_ASSERT((__vaddr_t)dst <= __VADDR_MAX - UK_PAGING_PAGE_SIZE);
+		UK_ASSERT((__vaddr_t)src <= __VADDR_MAX - UK_PAGING_PAGE_SIZE);
 		UK_ASSERT(len >= l);
 
 		bytes += len - l;
-		dst   += PAGE_SIZE;
-		src   += PAGE_SIZE;
-		l     -= MIN(PAGE_SIZE, l);
+		dst   += UK_PAGING_PAGE_SIZE;
+		src   += UK_PAGING_PAGE_SIZE;
+		l     -= MIN(UK_PAGING_PAGE_SIZE, l);
 		len    = l;
 	} while (l > 0);
 

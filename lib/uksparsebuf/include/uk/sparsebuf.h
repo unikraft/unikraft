@@ -10,9 +10,9 @@
  * indeterminate size, composed of both allocated and sparse areas.
  *
  * Allocated memory is managed at the granularity of "pages" -- contiguous areas
- * of virtual memory of `PAGE_SIZE` -- with a number of consecutive pages
- * forming a "slice". Sparse buffers are optimized for fast lookup and iteration
- * over consecutive slices.
+ * of virtual memory of `UK_PAGING_PAGE_SIZE` -- with a number of consecutive
+ * pages forming a "slice". Sparse buffers are optimized for fast lookup and
+ * iteration over consecutive slices.
  *
  * Furthermore, reference counting is provided for allocated regions at page
  * granularity, allowing callers to keep track of which parts of the sparse
@@ -32,10 +32,10 @@
 #ifndef __UK_SPARSEBUF_H__
 #define __UK_SPARSEBUF_H__
 
-#include <uk/arch/paging.h>
 #include <uk/alloc.h>
 #include <uk/assert.h>
 #include <uk/essentials.h>
+#include <uk/paging.h>
 
 /**
  * Return the sparse buffer page offset of byte offset `off`.
@@ -43,7 +43,7 @@
 static inline
 __sz uk_sparsebuf_pgoff(__sz off)
 {
-	return off / PAGE_SIZE;
+	return off / UK_PAGING_PAGE_SIZE;
 }
 
 /**
@@ -82,7 +82,7 @@ struct uk_sparsebuf_slice {
 static inline
 __sz uk_sparsebuf_slice_size(const struct uk_sparsebuf_slice *sl)
 {
-	return sl->npages * PAGE_SIZE;
+	return sl->npages * UK_PAGING_PAGE_SIZE;
 }
 
 /**
@@ -91,7 +91,7 @@ __sz uk_sparsebuf_slice_size(const struct uk_sparsebuf_slice *sl)
 static inline
 __sz uk_sparsebuf_slice_offset(const struct uk_sparsebuf_slice *sl)
 {
-	return sl->pgoff * PAGE_SIZE;
+	return sl->pgoff * UK_PAGING_PAGE_SIZE;
 }
 
 /**
@@ -393,7 +393,7 @@ __sz uk_sparsebuf_memat(__sz off, struct uk_sparsebuf_cur *cur, char **bufp)
 		if (uk_sparsebuf_pg_before(pgoff, sl)) {
 			/* Not mapped; return number of zero bytes */
 			*bufp = __NULL;
-			return sl->pgoff * PAGE_SIZE - off;
+			return sl->pgoff * UK_PAGING_PAGE_SIZE - off;
 		} else if (uk_sparsebuf_pg_within(pgoff, sl)) {
 			/* Mapped; return buffer & number of bytes */
 			const __sz sloff = off - uk_sparsebuf_slice_offset(sl);

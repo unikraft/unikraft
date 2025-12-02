@@ -9,8 +9,9 @@
 #include <uk/assert.h>
 #include <uk/arch/traps.h>
 #include <uk/arch/types.h>
-#include <uk/print.h>
 #include <uk/config.h>
+#include <uk/print.h>
+
 #include <string.h>
 
 static int vmem_arch_pagefault(void *data)
@@ -25,9 +26,9 @@ static int vmem_arch_pagefault(void *data)
 	struct uk_vas *vas;
 	int rc;
 
-	if (ctx->esr & ARM64_PF_ESR_WnR)
+	if (ctx->esr & ESR_ISS_ABRT_WnR_SHIFT)
 		faulttype = UK_VMA_FAULT_WRITE;
-	else if (ctx->esr & ARM64_PF_ESR_ISV)
+	else if (ctx->esr & ESR_ISS_ABRT_ISV_MASK)
 		faulttype = UK_VMA_FAULT_EXEC;
 	else
 		faulttype = UK_VMA_FAULT_READ;

@@ -41,10 +41,10 @@
 #include <sys/sysinfo.h>
 #include <uk/syscall.h>
 
-#ifdef CONFIG_HAVE_PAGING
-#include <uk/plat/paging.h>
+#ifdef CONFIG_LIBUKPAGING
+#include <uk/paging.h>
 #include <uk/falloc.h>
-#endif /* CONFIG_HAVE_PAGING */
+#endif /* CONFIG_LIBUKPAGING */
 
 /**
  * The Unikraft `struct utsname` structure.
@@ -78,11 +78,11 @@ static struct utsname utsname = {
 
 UK_SYSCALL_R_DEFINE(int, sysinfo, struct sysinfo *, info)
 {
-#ifdef CONFIG_HAVE_PAGING
+#ifdef CONFIG_LIBUKPAGING
 	struct uk_pagetable *pt;
 	__sz total_memory;
 	unsigned int mem_unit = 1;
-#endif /* CONFIG_HAVE_PAGING */
+#endif /* CONFIG_LIBUKPAGING */
 
 	if (!info)
 		return -EFAULT;
@@ -91,8 +91,8 @@ UK_SYSCALL_R_DEFINE(int, sysinfo, struct sysinfo *, info)
 
 	info->procs = 1; /* number of processes */
 
-#ifdef CONFIG_HAVE_PAGING
-	pt = ukplat_pt_get_active();
+#ifdef CONFIG_LIBUKPAGING
+	pt = uk_paging_pt_get_active();
 
 	total_memory = pt->fa->total_memory;
 	while (total_memory > __UL_MAX) {
@@ -103,7 +103,7 @@ UK_SYSCALL_R_DEFINE(int, sysinfo, struct sysinfo *, info)
 	info->totalram = (unsigned long) (pt->fa->total_memory / mem_unit);
 	info->freeram = (unsigned long) (pt->fa->free_memory / mem_unit);
 	info->mem_unit = mem_unit;
-#endif /* CONFIG_HAVE_PAGING */
+#endif /* CONFIG_LIBUKPAGING */
 
 	return 0;
 }
@@ -131,21 +131,21 @@ long sysconf(int name)
 		return -1;
 #endif /* CONFIG_LIBPOSIX_USER */
 
-#ifdef CONFIG_HAVE_PAGING
+#ifdef CONFIG_LIBUKPAGING
 	if (name == _SC_PHYS_PAGES) {
 		struct uk_pagetable *pt;
 
-		pt = ukplat_pt_get_active();
-		return pt->fa->total_memory / PAGE_SIZE;
+		pt = uk_paging_pt_get_active();
+		return pt->fa->total_memory / UK_PAGING_PAGE_SIZE;
 	}
 
 	if (name == _SC_AVPHYS_PAGES) {
 		struct uk_pagetable *pt;
 
-		pt = ukplat_pt_get_active();
-		return pt->fa->free_memory / PAGE_SIZE;
+		pt = uk_paging_pt_get_active();
+		return pt->fa->free_memory / UK_PAGING_PAGE_SIZE;
 	}
-#endif /* CONFIG_HAVE_PAGING */
+#endif /* CONFIG_LIBUKPAGING */
 
 #if CONFIG_LIBPOSIX_FDTAB
 	if (name == _SC_OPEN_MAX)

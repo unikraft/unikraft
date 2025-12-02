@@ -36,12 +36,11 @@
 
 #include <uk/config.h>
 #include <uk/arch/types.h>
-#include <uk/arch/paging.h>
 #include <uk/list.h>
 #include <uk/alloc.h>
-#ifdef CONFIG_HAVE_PAGING
-#include <uk/plat/paging.h>
-#endif /* CONFIG_HAVE_PAGING */
+#ifdef CONFIG_LIBUKPAGING
+#include <uk/paging.h>
+#endif /* CONFIG_LIBUKPAGING */
 
 #ifdef __cplusplus
 extern "C" {
@@ -57,13 +56,13 @@ struct uk_vas {
 	/** Allocator to use for VMAs */
 	struct uk_alloc *a;
 
-#ifdef CONFIG_HAVE_PAGING
+#ifdef CONFIG_LIBUKPAGING
 	/** Page table that represents the virtual address space */
 	struct uk_pagetable *pt;
 
 	/** Base address where to start putting new VMAs */
 	__vaddr_t vma_base;
-#endif /* CONFIG_HAVE_PAGING */
+#endif /* CONFIG_LIBUKPAGING */
 
 	/** List of VMAs, sorted by address */
 	struct uk_list_head vma_list;
@@ -160,7 +159,7 @@ struct uk_vm_fault {
 	 */
 	const __vaddr_t vbase;
 
-#ifdef CONFIG_HAVE_PAGING
+#ifdef CONFIG_LIBUKPAGING
 	/**
 	 * Mapped physical address, if any. Modify to change mapping. The
 	 * physical memory must be aligned to its size.
@@ -191,7 +190,7 @@ struct uk_vm_fault {
 
 	/** Trap frame */
 	struct __regs *regs;
-#endif /* CONFIG_HAVE_PAGING */
+#endif /* CONFIG_LIBUKPAGING */
 };
 
 /** VMA operations */
@@ -271,8 +270,8 @@ struct uk_vma_ops {
 	 * responsible for resolving the fault by providing a physical
 	 * address that should be mapped at the faulting virtual address.
 	 *
-	 * The handler may use a temporary mapping (see ukplat_page_kmap()) to
-	 * initialize the physical memory.
+	 * The handler may use a temporary mapping (see uk_paging_page_kmap())
+	 * to initialize the physical memory.
 	 *
 	 * Cannot be __NULL, if the VMA should map physical memory.
 	 *
@@ -526,9 +525,9 @@ static inline const struct uk_vma *uk_vma_next(const struct uk_vma *vma)
  *   The virtual address space to operate on
  * @param[in,out] vaddr
  *   The virtual address where to create the virtual memory area. Must be
- *   aligned to the specified page size. Can be __VADDR_ANY to automatically
- *   select a virtual address. The variable will receive the address on
- *   success.
+ *   aligned to the specified page size. Can be UK_PAGING_VADDR_ANY to
+ *   automatically select a virtual address. The variable will receive the
+ *   address on success.
  * @param len
  *   The length of the virtual memory area in bytes. len must always be aligned
  *   to the desired page size. If UK_VMA_MAP_REPLACE is specified and vaddr+len

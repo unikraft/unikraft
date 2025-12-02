@@ -23,9 +23,10 @@ extern "C" {
  * be used to reduce page faults on initial stack access.
  *
  * NOTE: When using the page guards configuration, the maximum allowed
- * alignment for functions such as memalign/posix_memalign is PAGE_SIZE.
- * See comment in `stack_memalign()`. Additionally, just like any `memalign()`
- * or `posix_memalign()` calls, the alignment must be a power of 2.
+ * alignment for functions such as memalign/posix_memalign is
+ * UK_PAGING_PAGE_SIZE. See comment in `stack_memalign()`. Additionally,
+ * just like any `memalign()` or `posix_memalign()` calls, the alignment
+ * must be a power of 2.
  *
  * @param a
  *    The parent allocator used to allocate internal structures
@@ -34,19 +35,19 @@ extern "C" {
  *    stacks
  * @premapped_len
  *    The initial paged-in size from top to bottom, i.e. last
- *    premapped_len / PAGE_SIZE pages will be paged-in.
+ *    premapped_len / UK_PAGING_PAGE_SIZE pages will be paged-in.
  *     E.g.:
- *     - premapped_len == PAGE_SIZE * 2 => the top two pages (stacks grow top to
- *     bottom) of returned stacks will be paged-in and thus no page faults on
- *     them
+ *     - premapped_len == UK_PAGING_PAGE_SIZE * 2 => the top two pages (stacks
+ *     grow top to bottom) of returned stacks will be paged-in and thus no page
+ *     faults on them
  *     - premapped_len == 0 => no page of any of the allocated stacks is
  *     pre-mapped
  *     - premapped_len == <SOME_STACK_SIZE> then a uk_malloc(<SOME_STACK_SIZE>)
  *     would return a fully paged-in stack and a
- *     uk_malloc(<SOME_STACK_SIZE> + PAGE_SIZE) would return a stack whose all
- *     pages, except the first one, are paged-in. Consequently if allocating
- *     a stack whose size is smaller than premapped_len, it means the whole
- *     stack will be paged-in.
+ *     uk_malloc(<SOME_STACK_SIZE> + UK_PAGING_PAGE_SIZE) would return a stack
+ *     whose all pages, except the first one, are paged-in. Consequently if
+ *     allocating a stack whose size is smaller than premapped_len, it means the
+ *     whole stack will be paged-in.
  * @return
  *     Returns the stack allocator or NULL on error
  */

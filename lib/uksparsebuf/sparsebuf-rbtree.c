@@ -120,7 +120,7 @@ int sparsebuf_cut(struct uk_sparsebuf_blk **headp,
 		.external = sl->external,
 		.npages = rnp,
 		.refcnt = sl->refcnt,
-		.buf = sl->buf + lnp * PAGE_SIZE
+		.buf = sl->buf + lnp * UK_PAGING_PAGE_SIZE
 	};
 	/* Insert after original */
 	sparsebuf_rb_insert_next(map, cur->p, blk);

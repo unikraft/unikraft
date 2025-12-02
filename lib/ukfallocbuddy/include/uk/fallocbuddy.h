@@ -63,8 +63,8 @@ __sz uk_fallocbuddy_size(void);
  * Returns the size in bytes required for the metadata when adding a range of
  * physical memory to be managed by the allocator
  *
- * @param frames number of frames (i.e., PAGE_SIZE) to be added to allocator
- *
+ * @param frames number of frames (i.e., UK_PAGING_PAGE_SIZE) to be added to
+ *		 allocator
  * @return size of metadata in bytes
  */
 __sz uk_fallocbuddy_metadata_size(unsigned long frames);

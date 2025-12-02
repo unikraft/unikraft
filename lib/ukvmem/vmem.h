@@ -9,12 +9,11 @@
 
 #include <uk/vmem.h>
 #include <uk/assert.h>
-#include <uk/arch/paging.h>
-#ifdef CONFIG_HAVE_PAGING
-#include <uk/plat/paging.h>
-#endif /* CONFIG_HAVE_PAGING */
+#ifdef CONFIG_LIBUKPAGING
+#include <uk/paging.h>
+#endif /* CONFIG_LIBUKPAGING */
 
-#ifdef CONFIG_HAVE_PAGING
+#ifdef CONFIG_LIBUKPAGING
 /**
  * Architecture-independent page fault handler
  *
@@ -53,19 +52,20 @@ vmem_len_to_pages(struct uk_vma *vma, __sz len, unsigned long *flags)
 	UK_ASSERT(vma);
 	UK_ASSERT(flags);
 
-	to_lvl = MAX(vma->page_lvl, PAGE_LEVEL);
-	*flags = PAGE_FLAG_SIZE(to_lvl);
+	to_lvl = MAX(vma->page_lvl, UK_PAGING_PAGE_LEVEL);
+	*flags = UK_PAGING_PAGE_FLAG_SIZE(to_lvl);
 
-	UK_ASSERT(PAGE_Lx_ALIGNED(len, to_lvl));
-	return len / PAGE_Lx_SIZE(to_lvl);
+	UK_ASSERT(UK_PAGING_PAGE_Lx_ALIGNED(len, to_lvl));
+	return len / UK_PAGING_PAGE_Lx_SIZE(to_lvl);
 }
-#endif /* CONFIG_HAVE_PAGING */
+#endif /* CONFIG_LIBUKPAGING */
 
 /* Macros for safe VMA op invocation */
 #define _VMA_OP(vma, op, def, ...)					\
 	(((vma)->ops->op) ? (vma)->ops->op(vma, __VA_ARGS__) : (def))
 
-#define VMA_GETBASE(vma, ...)	_VMA_OP(vma, get_base, __VADDR_INV, __VA_ARGS__)
+#define VMA_GETBASE(vma, ...)	_VMA_OP(vma, get_base, UK_PAGING_VADDR_INV, \
+					__VA_ARGS__)
 #define VMA_FAULT(vma, ...)	_VMA_OP(vma, fault, -EFAULT, __VA_ARGS__)
 #define VMA_UNMAP(vma, ...)	_VMA_OP(vma, unmap, 0, __VA_ARGS__)
 #define VMA_SPLIT(vma, ...)	_VMA_OP(vma, split, 0, __VA_ARGS__)

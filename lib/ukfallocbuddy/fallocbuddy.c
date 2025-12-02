@@ -36,12 +36,12 @@
 #include <uk/config.h>
 #include <uk/essentials.h>
 #include <uk/arch/limits.h>
-#include <uk/arch/paging.h>
 #include <uk/assert.h>
 #include <uk/bitops.h>
 #include <uk/bitops/bitscan.h>
 #include <uk/atomic.h>
 #include <uk/list.h>
+#include <uk/paging.h>
 #include <uk/print.h>
 
 #include <string.h>
@@ -52,23 +52,23 @@
  * overwritten by frame data
  */
 #ifndef CONFIG_LIBUKFALLOCBUDDY_DEBUG
-#define BFA_DIRECT_MAPPED		CONFIG_HAVE_PAGING_DIRECTMAP
+#define BFA_DIRECT_MAPPED		CONFIG_LIBUKPAGING_DIRECTMAP
 #endif /* !CONFIG_LIBUKFALLOCBUDDY_DEBUG */
 
 #define BFA_MAX_ALLOC_SHIFT		CONFIG_LIBUKFALLOCBUDDY_MAX_ALLOC_ORDER
-#if BFA_MAX_ALLOC_SHIFT < PAGE_SHIFT
+#if BFA_MAX_ALLOC_SHIFT < UK_PAGING_PAGE_SHIFT
 #error The max allocation size must be greater than or equal to the frame size
 #elif BFA_MAX_ALLOC_SHIFT >= UK_BITS_PER_LONG
 #error The max allocation size exceeds the address space size
 #endif
 
-#define BFA_LEVELS			(BFA_MAX_ALLOC_SHIFT - PAGE_SHIFT + 1)
+#define BFA_LEVELS		(BFA_MAX_ALLOC_SHIFT - UK_PAGING_PAGE_SHIFT + 1)
 /* Ensure that the levels fit into the free list map */
 #if BFA_LEVELS >= 32
 #error Too many levels. Reduce max allocation size.
 #endif
 
-#define BFA_Lx_SHIFT(lvl)		((lvl) + PAGE_SHIFT)
+#define BFA_Lx_SHIFT(lvl)		((lvl) + UK_PAGING_PAGE_SHIFT)
 #define BFA_Lx_SIZE(lvl)		(1UL << BFA_Lx_SHIFT(lvl))
 #define BFA_Lx_MASK(lvl)		(~(BFA_Lx_SIZE(lvl) - 1))
 
@@ -78,8 +78,8 @@
 
 static inline unsigned int bfa_order_to_lvl(unsigned int order)
 {
-	UK_ASSERT(order >= PAGE_SHIFT);
-	return order - PAGE_SHIFT;
+	UK_ASSERT(order >= UK_PAGING_PAGE_SHIFT);
+	return order - UK_PAGING_PAGE_SHIFT;
 }
 
 /* Each zone is a contiguous range of physical frames. We use a hierarchical
@@ -177,9 +177,9 @@ static int bfa_do_free(struct buddy_framealloc *bfa, __paddr_t paddr, __sz len);
 #ifdef BFA_DIRECT_MAPPED
 #define BFA_MB_LOOKUP(zone, mbidx)				\
 	(struct bfa_memblock *)((__uptr)(zone)->blocks +	\
-		((__uptr)(mbidx) << PAGE_SHIFT))
+		((__uptr)(mbidx) << UK_PAGING_PAGE_SHIFT))
 #define BFA_MB_IDX(zone, mb)					\
-	(((__uptr)(mb) - (__uptr)(zone)->blocks) >> PAGE_SHIFT)
+	(((__uptr)(mb) - (__uptr)(zone)->blocks) >> UK_PAGING_PAGE_SHIFT)
 #else /* BFA_DIRECT_MAPPED */
 #define BFA_MB_LOOKUP(zone, mbidx)	((zone)->blocks + (mbidx))
 #define BFA_MB_IDX(zone, mb)		((mb) - (zone)->blocks)
@@ -192,7 +192,7 @@ static int bfa_do_free(struct buddy_framealloc *bfa, __paddr_t paddr, __sz len);
 #define BITS_PER_ZBIT_WORD		(sizeof(bfa_zbit_word_t) << 3)
 
 #define BFA_Lx_ZBIT_BITS(frames, lvl)				\
-	(BFA_Lx_ALIGN_UP(frames << PAGE_SHIFT, lvl) >> BFA_Lx_SHIFT(lvl))
+	(BFA_Lx_ALIGN_UP(frames << UK_PAGING_PAGE_SHIFT, lvl) >> BFA_Lx_SHIFT(lvl))
 
 #define BFA_Lx_ZBIT_SIZE(frames, lvl)				\
 	DIV_ROUND_UP(BFA_Lx_ZBIT_BITS(frames, lvl), 8)
@@ -492,13 +492,13 @@ static struct bfa_zone *bfa_zone_init(void *buffer, __paddr_t start, __sz len,
 
 	UK_ASSERT(len > 0);
 	UK_ASSERT(BFA_Lx_ALIGNED(len, 0));
-	frames = len >> PAGE_SHIFT;
+	frames = len >> UK_PAGING_PAGE_SHIFT;
 
 	UK_ASSERT(BFA_Lx_ALIGNED(start, 0));
 	UK_ASSERT(start <= __PADDR_MAX - len);
-#ifdef CONFIG_PAGING
-	UK_ASSERT(ukarch_paddr_range_isvalid(start, len));
-#endif /* CONFIG_PAGING */
+#ifdef CONFIG_LIBUKPAGING
+	UK_ASSERT(uk_paging_paddr_range_isvalid(start, len));
+#endif /* CONFIG_LIBUKPAGING */
 	zn->start = start;
 	zn->end = start + len;
 
@@ -506,7 +506,7 @@ static struct bfa_zone *bfa_zone_init(void *buffer, __paddr_t start, __sz len,
 
 	zn->nr_blocks = frames;
 #ifdef BFA_DIRECT_MAPPED
-	UK_ASSERT(dm_off != __VADDR_INV);
+	UK_ASSERT(dm_off != UK_PAGING_VADDR_INV);
 	zn->blocks = (struct bfa_memblock *)dm_off;
 	zn->bitmap[0] = (bfa_zbit_word_t *)(zn + 1);
 #else /* BFA_DIRECT_MAPPED */
@@ -590,7 +590,7 @@ static inline __paddr_t bfa_mb_to_paddr(struct bfa_zone *zone,
 
 	UK_ASSERT(mb >= zone->blocks && mb <= BFA_LAST_MB(zone));
 
-	paddr = (BFA_MB_IDX(zone, mb) << PAGE_SHIFT) + zone->start;
+	paddr = (BFA_MB_IDX(zone, mb) << UK_PAGING_PAGE_SHIFT) + zone->start;
 	UK_ASSERT(paddr < zone->end);
 
 	return paddr;
@@ -603,7 +603,7 @@ static inline struct bfa_memblock *bfa_paddr_to_mb(struct bfa_zone *zone,
 
 	UK_ASSERT(paddr >= zone->start && paddr < zone->end);
 
-	mb = BFA_MB_LOOKUP(zone, ((paddr - zone->start) >> PAGE_SHIFT));
+	mb = BFA_MB_LOOKUP(zone, ((paddr - zone->start) >> UK_PAGING_PAGE_SHIFT));
 	UK_ASSERT(mb <= BFA_LAST_MB(zone));
 
 	return mb;
@@ -1208,9 +1208,9 @@ static int bfa_alloc(struct uk_falloc *fa, __paddr_t *paddr,
 	__sz len;
 
 	UK_ASSERT(frames > 0);
-	UK_ASSERT(frames <= (__SZ_MAX / PAGE_SIZE));
+	UK_ASSERT(frames <= (__SZ_MAX / UK_PAGING_PAGE_SIZE));
 
-	len = frames * PAGE_SIZE;
+	len = frames * UK_PAGING_PAGE_SIZE;
 
 	/* There is only FALLOC_FLAG_ALIGNED which we implicitly fulfill */
 	UK_ASSERT((flags == 0) || (flags == FALLOC_FLAG_ALIGNED));
@@ -1218,7 +1218,7 @@ static int bfa_alloc(struct uk_falloc *fa, __paddr_t *paddr,
 	/* If a physical address is given, the caller wants to allocate this
 	 * exact memory range. Otherwise, just take a free one from the list.
 	 */
-	if (*paddr == __PADDR_ANY)
+	if (*paddr == UK_PAGING_PADDR_ANY)
 		return bfa_do_alloc_any(bfa, paddr, len);
 	else
 		return bfa_do_alloc(bfa, *paddr, len);
@@ -1285,9 +1285,9 @@ static int bfa_alloc_from_range(struct uk_falloc *fa, __paddr_t *paddr,
 	__sz len;
 
 	UK_ASSERT(frames > 0);
-	UK_ASSERT(frames <= (__SZ_MAX / PAGE_SIZE));
+	UK_ASSERT(frames <= (__SZ_MAX / UK_PAGING_PAGE_SIZE));
 
-	len = frames * PAGE_SIZE;
+	len = frames * UK_PAGING_PAGE_SIZE;
 
 	/* There is only FALLOC_FLAG_ALIGNED which we implicitly fulfill */
 	UK_ASSERT((flags == 0) || (flags == FALLOC_FLAG_ALIGNED));
@@ -1374,9 +1374,9 @@ static int bfa_do_free(struct buddy_framealloc *bfa, __paddr_t paddr, __sz len)
 	UK_ASSERT(len > 0);
 	UK_ASSERT(BFA_Lx_ALIGNED(len, 0));
 	UK_ASSERT(paddr <= (__PADDR_MAX - len));
-#ifdef CONFIG_PAGING
-	UK_ASSERT(ukarch_paddr_range_isvalid(paddr, len));
-#endif /* CONFIG_PAGING */
+#ifdef CONFIG_LIBUKPAGING
+	UK_ASSERT(uk_paging_paddr_range_isvalid(paddr, len));
+#endif /* CONFIG_LIBUKPAGING */
 
 	/* The memory area might cross multiple buddies and zones */
 	do {
@@ -1433,9 +1433,9 @@ static int bfa_free(struct uk_falloc *fa, __paddr_t paddr,
 	if (unlikely(frames == 0))
 		return 0;
 
-	UK_ASSERT(frames <= (__SZ_MAX / PAGE_SIZE));
+	UK_ASSERT(frames <= (__SZ_MAX / UK_PAGING_PAGE_SIZE));
 
-	len = frames * PAGE_SIZE;
+	len = frames * UK_PAGING_PAGE_SIZE;
 
 	return bfa_do_free(bfa, paddr, len);
 }
@@ -1448,9 +1448,9 @@ static int bfa_do_addmem(struct buddy_framealloc *bfa, void *metadata,
 	UK_ASSERT(len > 0);
 	UK_ASSERT(BFA_Lx_ALIGNED(len, 0));
 	UK_ASSERT(paddr <= (__PADDR_MAX - len));
-#ifdef CONFIG_PAGING
-	UK_ASSERT(ukarch_paddr_range_isvalid(paddr, len));
-#endif /* CONFIG_PAGING */
+#ifdef CONFIG_LIBUKPAGING
+	UK_ASSERT(uk_paging_paddr_range_isvalid(paddr, len));
+#endif /* CONFIG_LIBUKPAGING */
 
 	zone = bfa_zone_init(metadata, paddr, len, dm_off);
 
@@ -1475,9 +1475,9 @@ static int bfa_addmem(struct uk_falloc *fa, void *metadata, __paddr_t paddr,
 	if (unlikely(frames == 0))
 		return 0;
 
-	UK_ASSERT(frames <= (__SZ_MAX / PAGE_SIZE));
+	UK_ASSERT(frames <= (__SZ_MAX / UK_PAGING_PAGE_SIZE));
 
-	len = frames * PAGE_SIZE;
+	len = frames * UK_PAGING_PAGE_SIZE;
 
 	return bfa_do_addmem(bfa, metadata, paddr, len, dm_off);
 }

@@ -18,12 +18,12 @@ __ssz uk_pod_anon_pagein(void *addr, __sz npages, __paddr_t pa __unused,
 	 * - remove dependency on memset (and thus a libc)
 	 * - faster code because we know the buf & size are page-aligned
 	 */
-	char *__align(PAGE_SIZE) p;
+	char *__align(UK_PAGING_PAGE_SIZE) p;
 
-	UK_ASSERT(PAGE_ALIGNED((__uptr)addr));
+	UK_ASSERT(UK_PAGING_PAGE_ALIGNED((__uptr)addr));
 	p = addr;
 	/* The compiler will unroll this byte-wise loop with appropriate SIMD */
-	for (__sz i = 0; i < npages * PAGE_SIZE; i++)
+	for (__sz i = 0; i < npages * UK_PAGING_PAGE_SIZE; i++)
 		p[i] = 0;
 	return npages;
 }

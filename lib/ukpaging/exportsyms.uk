@@ -12,3 +12,4 @@ uk_paging_pt_get_active
 uk_paging_pt_init
 uk_paging_pt_set_active
 uk_paging_pt_walk
+uk_paging_virt_to_phys

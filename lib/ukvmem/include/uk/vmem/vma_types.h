@@ -7,10 +7,10 @@
 #ifndef __UK_VM_TYPES_H__
 #define __UK_VM_TYPES_H__
 
-#include <uk/vmem.h>
-#include <uk/config.h>
 #include <uk/arch/types.h>
-#include <uk/arch/paging.h>
+#include <uk/config.h>
+#include <uk/paging.h>
+#include <uk/vmem.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -111,10 +111,10 @@ extern const struct uk_vma_ops uk_vma_stack_ops;
 #define UK_VMA_STACK_GROWS_UP		(0x1UL << UK_VMA_MAP_EXTF_SHIFT)
 
 #define UK_VMA_STACK_TOP_GUARD_SIZE				\
-	(CONFIG_LIBUKVMEM_STACK_GUARD_PAGES_TOP * PAGE_SIZE)
+	(CONFIG_LIBUKVMEM_STACK_GUARD_PAGES_TOP * UK_PAGING_PAGE_SIZE)
 
 #define UK_VMA_STACK_BOTTOM_GUARD_SIZE				\
-	(CONFIG_LIBUKVMEM_STACK_GUARD_PAGES_BOTTOM * PAGE_SIZE)
+	(CONFIG_LIBUKVMEM_STACK_GUARD_PAGES_BOTTOM * UK_PAGING_PAGE_SIZE)
 
 #define UK_VMA_STACK_GUARDS_SIZE				\
 	(UK_VMA_STACK_TOP_GUARD_SIZE + UK_VMA_STACK_BOTTOM_GUARD_SIZE)
@@ -135,20 +135,20 @@ static inline int uk_vma_map_stack(struct uk_vas *vas, __vaddr_t *vaddr,
 	__vaddr_t va;
 	int rc;
 
-	UK_ASSERT(PAGE_ALIGNED(premapped_len));
+	UK_ASSERT(UK_PAGING_PAGE_ALIGNED(premapped_len));
 	UK_ASSERT(UK_VMA_MAP_SIZE_TO_ORDER(flags) == 0);
 
-	flags |= UK_VMA_MAP_SIZE(PAGE_SHIFT);
+	flags |= UK_VMA_MAP_SIZE(UK_PAGING_PAGE_SHIFT);
 
 	premapped_len = MIN(premapped_len, len);
 
 	rc = uk_vma_map(vas, vaddr, len + UK_VMA_STACK_GUARDS_SIZE,
-			PAGE_ATTR_PROT_RW, flags, name,
+			UK_PAGING_PAGE_ATTR_PROT_RW, flags, name,
 			&uk_vma_stack_ops, __NULL);
 	if (unlikely(rc))
 		return rc;
 
-	UK_ASSERT(PAGE_ALIGNED(len));
+	UK_ASSERT(UK_PAGING_PAGE_ALIGNED(len));
 
 	*vaddr += UK_VMA_STACK_BOTTOM_GUARD_SIZE;
 
@@ -199,7 +199,7 @@ static inline int uk_vma_map_dma(struct uk_vas *vas, __vaddr_t *vaddr,
 		.paddr = paddr,
 	};
 
-	UK_ASSERT(PAGE_ALIGNED(paddr));
+	UK_ASSERT(UK_PAGING_PAGE_ALIGNED(paddr));
 
 	return uk_vma_map(vas, vaddr, len, attr, flags, name,
 			  &uk_vma_dma_ops, &args);

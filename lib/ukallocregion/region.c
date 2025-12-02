@@ -55,7 +55,6 @@
 #include <sys/types.h>
 #include <uk/allocregion.h>
 #include <uk/alloc_impl.h>
-#include <uk/page.h>	/* round_pgup() */
 
 struct uk_allocregion {
 	struct uk_alloc a;

@@ -11,10 +11,9 @@
 
 #include <uk/essentials.h>
 #include <uk/arch/limits.h>
-#include <uk/arch/paging.h>
-#ifdef CONFIG_HAVE_PAGING
-#include <uk/plat/paging.h>
-#endif /* CONFIG_HAVE_PAGING */
+#ifdef CONFIG_LIBUKPAGING
+#include <uk/paging.h>
+#endif /* CONFIG_LIBUKPAGING */
 #include <uk/alloc.h>
 #include <uk/assert.h>
 #include <uk/list.h>
@@ -37,13 +36,13 @@ struct uk_vas *uk_vas_get_active(void)
 
 int uk_vas_set_active(struct uk_vas *vas)
 {
-#ifdef CONFIG_HAVE_PAGING
+#ifdef CONFIG_LIBUKPAGING
 	int rc;
 
-	rc = ukplat_pt_set_active(vas->pt);
+	rc = uk_paging_pt_set_active(vas->pt);
 	if (unlikely(rc))
 		return rc;
-#endif /* CONFIG_HAVE_PAGING */
+#endif /* CONFIG_LIBUKPAGING */
 
 	vmem_active_vas = vas;
 	return 0;
@@ -58,12 +57,12 @@ int uk_vas_init(struct uk_vas *vas, struct uk_pagetable *pt __maybe_unused,
 
 	vas->a = a;
 
-#ifdef CONFIG_HAVE_PAGING
+#ifdef CONFIG_LIBUKPAGING
 	vas->pt = pt;
 
-	vas->vma_base = PAGE_ALIGN_UP(CONFIG_LIBUKVMEM_DEFAULT_BASE);
-	UK_ASSERT(ukarch_vaddr_isvalid(vas->vma_base));
-#endif /* CONFIG_HAVE_PAGING */
+	vas->vma_base = UK_PAGING_PAGE_ALIGN_UP(CONFIG_LIBUKVMEM_DEFAULT_BASE);
+	UK_ASSERT(uk_paging_vaddr_isvalid(vas->vma_base));
+#endif /* CONFIG_LIBUKPAGING */
 
 	vas->flags = 0;
 
@@ -169,13 +168,13 @@ static int vmem_vma_find_range(struct uk_vas *vas, __vaddr_t *vaddr, __sz *len,
 
 		vstart = vma_start->start;
 	} else if (vstart > vma_start->start) {
-		algn_lvl = MAX(vma_start->page_lvl, PAGE_LEVEL);
-		if (!PAGE_Lx_ALIGNED(vstart, algn_lvl))
+		algn_lvl = MAX(vma_start->page_lvl, UK_PAGING_PAGE_LEVEL);
+		if (!UK_PAGING_PAGE_Lx_ALIGNED(vstart, algn_lvl))
 			return -EINVAL;
 	}
 
-	UK_ASSERT(PAGE_Lx_ALIGNED(vstart,
-		  MAX(vma_start->page_lvl, PAGE_LEVEL)));
+	UK_ASSERT(UK_PAGING_PAGE_Lx_ALIGNED(vstart, MAX(vma_start->page_lvl,
+							UK_PAGING_PAGE_LEVEL)));
 
 	/* Find the end VMA */
 	vma_end = vma_start;
@@ -206,19 +205,19 @@ static int vmem_vma_find_range(struct uk_vas *vas, __vaddr_t *vaddr, __sz *len,
 
 			vend = vma_end->end;
 		} else if (vend < vma_end->end) {
-			algn_lvl = MAX(vma_end->page_lvl, PAGE_LEVEL);
-			if (!PAGE_Lx_ALIGNED(vend, algn_lvl))
+			algn_lvl = MAX(vma_end->page_lvl, UK_PAGING_PAGE_LEVEL);
+			if (!UK_PAGING_PAGE_Lx_ALIGNED(vend, algn_lvl))
 				return -EINVAL;
 		}
 	}
 
-	UK_ASSERT(PAGE_Lx_ALIGNED(vend,
-		  MAX(vma_end->page_lvl, PAGE_LEVEL)));
+	UK_ASSERT(UK_PAGING_PAGE_Lx_ALIGNED(vend, MAX(vma_end->page_lvl,
+						      UK_PAGING_PAGE_LEVEL)));
 
 	UK_ASSERT(vend > vstart);
 	UK_ASSERT(vstart >= vma_start->start && vstart < vma_start->end);
 	UK_ASSERT(vend > vma_end->start && vend <= vma_end->end);
-	UK_ASSERT(ukarch_vaddr_range_isvalid(vstart, vl));
+	UK_ASSERT(uk_paging_vaddr_range_isvalid(vstart, vl));
 
 	*vaddr = vstart;
 	*len   = vend - vstart;
@@ -327,9 +326,11 @@ static int vmem_vma_split(struct uk_vma *vma, __vaddr_t vaddr,
 	UK_ASSERT(new_vma);
 
 	UK_ASSERT(vaddr >= vma->start && vaddr < vma->end);
-	UK_ASSERT(PAGE_Lx_ALIGNED(vaddr, MAX(vma->page_lvl, PAGE_LEVEL)));
-	UK_ASSERT(PAGE_Lx_ALIGNED(vma->end - vaddr,
-		  MAX(vma->page_lvl, PAGE_LEVEL)));
+	UK_ASSERT(UK_PAGING_PAGE_Lx_ALIGNED(vaddr, MAX(vma->page_lvl,
+						       UK_PAGING_PAGE_LEVEL)));
+	UK_ASSERT(UK_PAGING_PAGE_Lx_ALIGNED(vma->end - vaddr,
+					    MAX(vma->page_lvl,
+						UK_PAGING_PAGE_LEVEL)));
 
 	rc = VMA_SPLIT(vma, vaddr, &v);
 	if (unlikely(rc))
@@ -447,9 +448,10 @@ int uk_vma_op_unmap(struct uk_vma *vma, __vaddr_t vaddr, __sz len)
 {
 	UK_ASSERT(vaddr >= vma->start);
 	UK_ASSERT(vaddr + len <= vma->end);
-	UK_ASSERT(PAGE_ALIGNED(len));
+	UK_ASSERT(UK_PAGING_PAGE_ALIGNED(len));
 
-	return ukplat_page_unmap(vma->vas->pt, vaddr, len / PAGE_SIZE, 0);
+	return uk_paging_page_unmap(vma->vas->pt, vaddr,
+				    len / UK_PAGING_PAGE_SIZE, 0);
 }
 
 static void vmem_vma_unmap(struct uk_vma *vma, __vaddr_t vaddr, __sz len)
@@ -459,10 +461,12 @@ static void vmem_vma_unmap(struct uk_vma *vma, __vaddr_t vaddr, __sz len)
 	UK_ASSERT(vma);
 
 	UK_ASSERT(vaddr >= vma->start && vaddr < vma->end);
-	UK_ASSERT(PAGE_Lx_ALIGNED(vaddr, MAX(vma->page_lvl, PAGE_LEVEL)));
+	UK_ASSERT(UK_PAGING_PAGE_Lx_ALIGNED(vaddr, MAX(vma->page_lvl,
+						       UK_PAGING_PAGE_LEVEL)));
 	UK_ASSERT(vaddr <= __VADDR_MAX - len);
 	UK_ASSERT((vaddr + len) > vma->start && (vaddr + len) <= vma->end);
-	UK_ASSERT(PAGE_Lx_ALIGNED(len, MAX(vma->page_lvl, PAGE_LEVEL)));
+	UK_ASSERT(UK_PAGING_PAGE_Lx_ALIGNED(len, MAX(vma->page_lvl,
+						     UK_PAGING_PAGE_LEVEL)));
 	UK_ASSERT(len > 0);
 
 	rc = VMA_UNMAP(vma, vaddr, len);
@@ -542,12 +546,12 @@ static __vaddr_t vmem_first_fit(struct uk_vas *vas, __vaddr_t base, __sz align,
 	 */
 	uk_list_for_each_entry(cur, &vas->vma_list, vma_list) {
 		if (unlikely(vaddr > __VADDR_MAX - align))
-			return __VADDR_INV;
+			return UK_PAGING_VADDR_INV;
 
 		vaddr = ALIGN_UP(vaddr, align);
 
 		if (unlikely(vaddr > __VADDR_MAX - len))
-			return __VADDR_INV;
+			return UK_PAGING_VADDR_INV;
 
 		if (vaddr + len <= cur->start)
 			return vaddr;
@@ -556,7 +560,7 @@ static __vaddr_t vmem_first_fit(struct uk_vas *vas, __vaddr_t base, __sz align,
 	}
 
 	if (unlikely(vaddr > __VADDR_MAX - align))
-		return __VADDR_INV;
+		return UK_PAGING_VADDR_INV;
 
 	return ALIGN_UP(vaddr, align);
 }
@@ -569,8 +573,8 @@ static int vmem_mapx_populate(struct uk_pagetable *pt __unused,
 	struct uk_vm_fault fault = {
 		.vaddr = vaddr,
 		.vbase = vaddr,
-		.len   = PAGE_Lx_SIZE(level),
-		.paddr = PT_Lx_PTE_PADDR(*pte, level),
+		.len   = UK_PAGING_PAGE_Lx_SIZE(level),
+		.paddr = UK_PAGING_PT_Lx_PTE_PADDR(*pte, level),
 		.type  = UK_VMA_FAULT_SOFT | UK_VMA_FAULT_NONPRESENT,
 		.pte   = *pte,
 		.level = level,
@@ -584,14 +588,15 @@ static int vmem_mapx_populate(struct uk_pagetable *pt __unused,
 	rc = vma->ops->fault(vma, &fault);
 	if (unlikely(rc)) {
 		if (rc == -ENOMEM)
-			return UKPLAT_PAGE_MAPX_ETOOBIG;
+			return UK_PAGING_PAGE_MAPX_ETOOBIG;
 
 		return rc;
 	}
 
-	UK_ASSERT(PAGE_Lx_ALIGNED(fault.paddr, fault.level));
+	UK_ASSERT(UK_PAGING_PAGE_Lx_ALIGNED(fault.paddr, fault.level));
 
-	*pte = PT_Lx_PTE_SET_PADDR(fault.pte, fault.level, fault.paddr);
+	*pte = UK_PAGING_PT_Lx_PTE_SET_PADDR(fault.pte, fault.level,
+					     fault.paddr);
 
 	return 0;
 }
@@ -617,31 +622,32 @@ int uk_vma_map(struct uk_vas *vas, __vaddr_t *vaddr, __sz len,
 	if (order > 0) {
 		UK_ASSERT(order >= 12);
 
-		to_lvl   = PAGE_SHIFT_Lx(order);
+		to_lvl   = UK_PAGING_PAGE_SHIFT_Lx(order);
 		algn_lvl = to_lvl;
 
-		UK_ASSERT(PAGE_Lx_HAS(algn_lvl));
+		UK_ASSERT(UK_PAGING_PAGE_Lx_HAS(algn_lvl));
 	} else {
 		to_lvl   = -1;
-		algn_lvl = PAGE_LEVEL;
+		algn_lvl = UK_PAGING_PAGE_LEVEL;
 	}
 
-	if (unlikely(!PAGE_Lx_ALIGNED(len, algn_lvl)))
+	if (unlikely(!UK_PAGING_PAGE_Lx_ALIGNED(len, algn_lvl)))
 		return -EINVAL;
 
 	va = *vaddr;
-	if (va == __VADDR_ANY) {
+	if (va == UK_PAGING_VADDR_ANY) {
 		/* Select the first virtual address range starting at the
 		 * mapping base that can accommodate the requested VMA.
 		 */
 		base = (ops->get_base) ? ops->get_base(vas, args, flags) :
 					 vas->vma_base;
 
-		va = vmem_first_fit(vas, base, PAGE_Lx_SIZE(algn_lvl), len);
-		if (unlikely(va == __VADDR_INV))
+		va = vmem_first_fit(vas, base, UK_PAGING_PAGE_Lx_SIZE(algn_lvl),
+				    len);
+		if (unlikely(va == UK_PAGING_VADDR_INV))
 			return -ENOMEM;
 	} else {
-		if (unlikely(!PAGE_Lx_ALIGNED(va, algn_lvl)))
+		if (unlikely(!UK_PAGING_PAGE_Lx_ALIGNED(va, algn_lvl)))
 			return -EINVAL;
 
 		/* The caller specified an exact address to map to. We only
@@ -668,7 +674,7 @@ int uk_vma_map(struct uk_vas *vas, __vaddr_t *vaddr, __sz len,
 		}
 	}
 
-	UK_ASSERT(PAGE_Lx_ALIGNED(va, algn_lvl));
+	UK_ASSERT(UK_PAGING_PAGE_Lx_ALIGNED(va, algn_lvl));
 	UK_ASSERT(va <= __VADDR_MAX - len);
 
 	/* Applications can request invalid memory ranges in mmap. In case the
@@ -677,7 +683,7 @@ int uk_vma_map(struct uk_vas *vas, __vaddr_t *vaddr, __sz len,
 	 * engines (mozjs) do weird stuff to figure out the available address
 	 * bits.
 	 */
-	if (unlikely(!ukarch_vaddr_range_isvalid(va, len)))
+	if (unlikely(!uk_paging_vaddr_range_isvalid(va, len)))
 		return -ENOMEM;
 
 	/* Create a new VMA for the requested range. */
@@ -736,19 +742,19 @@ int uk_vma_map(struct uk_vas *vas, __vaddr_t *vaddr, __sz len,
 
 		if (vma->page_lvl >= 0) {
 			/* Enforce desired page size when populating the VMA */
-			flgs = PAGE_FLAG_SIZE(vma->page_lvl) |
-				PAGE_FLAG_FORCE_SIZE;
+			flgs = UK_PAGING_PAGE_FLAG_SIZE(vma->page_lvl) |
+				UK_PAGING_PAGE_FLAG_FORCE_SIZE;
 		} else {
 			flgs = 0;
 		}
 
-		rc = ukplat_page_mapx(vas->pt, vma->start, 0,
-				      len >> PAGE_Lx_SHIFT(algn_lvl),
-				      vma->attr, flgs,
-				      &(struct ukplat_page_mapx){
+		rc = uk_paging_page_mapx(vas->pt, vma->start, 0,
+					 len >> UK_PAGING_PAGE_Lx_SHIFT(algn_lvl),
+					 vma->attr, flgs,
+					 &(struct uk_paging_page_mapx){
 						.map = vmem_mapx_populate,
 						.ctx = vma,
-				      });
+					 });
 		if (unlikely(rc)) {
 			/* If the address range replaces existing mappings, we
 			 * have an unrecoverable error and the address range
@@ -769,9 +775,9 @@ int uk_vma_map(struct uk_vas *vas, __vaddr_t *vaddr, __sz len,
 
 int uk_vma_op_set_attr(struct uk_vma *vma, unsigned long attr)
 {
-	unsigned long pgs = uk_vma_len(vma) / PAGE_SIZE;
+	unsigned long pgs = uk_vma_len(vma) / UK_PAGING_PAGE_SIZE;
 
-	return ukplat_page_set_attr(vma->vas->pt, vma->start, pgs, attr, 0);
+	return uk_paging_page_set_attr(vma->vas->pt, vma->start, pgs, attr, 0);
 }
 
 static void vmem_vma_set_attr(struct uk_vma *vma, unsigned long attr)
@@ -863,12 +869,13 @@ static int vmem_mapx_advise(struct uk_pagetable *pt,
 	/* With advise it can happen that we get calls for pages already
 	 * present. Just ignore these.
 	 */
-	rc = ukarch_pte_read(pt_vaddr, level, PT_Lx_IDX(vaddr, level), &opte);
+	rc = uk_paging_pte_read(pt_vaddr, level,
+				UK_PAGING_PT_Lx_IDX(vaddr, level), &opte);
 	if (unlikely(rc))
 		return rc;
 
-	if (PT_Lx_PTE_PRESENT(opte, level))
-		return UKPLAT_PAGE_MAPX_ESKIP;
+	if (UK_PAGING_PT_Lx_PTE_PRESENT(opte, level))
+		return UK_PAGING_PAGE_MAPX_ESKIP;
 
 	return vmem_mapx_populate(pt, vaddr, pt_vaddr, level, pte, user);
 }
@@ -883,21 +890,21 @@ int uk_vma_op_advise(struct uk_vma *vma, __vaddr_t vaddr, __sz len,
 	/* WILLNEED takes precedence over DONTNEED */
 	if (advice & UK_VMA_ADV_WILLNEED) {
 		if (vma->page_lvl >= 0) {
-			flgs = PAGE_FLAG_SIZE(vma->page_lvl) |
-				PAGE_FLAG_FORCE_SIZE;
+			flgs = UK_PAGING_PAGE_FLAG_SIZE(vma->page_lvl) |
+				UK_PAGING_PAGE_FLAG_FORCE_SIZE;
 			lvl  = vma->page_lvl;
 		} else {
 			flgs = 0;
-			lvl  = PAGE_LEVEL;
+			lvl  = UK_PAGING_PAGE_LEVEL;
 		}
 
-		rc = ukplat_page_mapx(vma->vas->pt, vaddr, 0,
-				      len >> PAGE_Lx_SHIFT(lvl),
-				      vma->attr, flgs,
-				      &(struct ukplat_page_mapx){
+		rc = uk_paging_page_mapx(vma->vas->pt, vaddr, 0,
+					 len >> UK_PAGING_PAGE_Lx_SHIFT(lvl),
+					 vma->attr, flgs,
+					 &(struct uk_paging_page_mapx){
 						.map = vmem_mapx_advise,
 						.ctx = vma,
-				      });
+					 });
 		if (unlikely(rc))
 			return rc;
 	} else if (advice & UK_VMA_ADV_DONTNEED) {
@@ -921,8 +928,10 @@ static int vmem_vma_advise(struct uk_vma *vma, __vaddr_t vaddr, __sz len,
 	UK_ASSERT(vma);
 	UK_ASSERT(vaddr <= __VADDR_MAX - len);
 	UK_ASSERT(vaddr >= vma->start && vaddr + len <= vma->end);
-	UK_ASSERT(PAGE_Lx_ALIGNED(vaddr, MAX(vma->page_lvl, PAGE_LEVEL)));
-	UK_ASSERT(PAGE_Lx_ALIGNED(len, MAX(vma->page_lvl, PAGE_LEVEL)));
+	UK_ASSERT(UK_PAGING_PAGE_Lx_ALIGNED(vaddr, MAX(vma->page_lvl,
+						       UK_PAGING_PAGE_LEVEL)));
+	UK_ASSERT(UK_PAGING_PAGE_Lx_ALIGNED(len, MAX(vma->page_lvl,
+						     UK_PAGING_PAGE_LEVEL)));
 
 	return VMA_ADVISE(vma, vaddr, len, advice);
 }
@@ -961,16 +970,16 @@ int uk_vma_advise(struct uk_vas *vas, __vaddr_t vaddr, __sz len,
 	return vmem_vma_advise(vma, vaddr, vend - vaddr, advice);
 }
 
-#ifdef CONFIG_HAVE_PAGING
+#ifdef CONFIG_LIBUKPAGING
 static inline int vmem_largest_level(__vaddr_t vaddr, __sz len,
 				   unsigned int max_lvl)
 {
 	unsigned int lvl = max_lvl;
 
-	while (lvl > PAGE_LEVEL) {
-		if (PAGE_Lx_HAS(lvl) &&
-		    PAGE_Lx_ALIGNED(vaddr, lvl) &&
-		    PAGE_Lx_SIZE(lvl) <= len)
+	while (lvl > UK_PAGING_PAGE_LEVEL) {
+		if (UK_PAGING_PAGE_Lx_HAS(lvl) &&
+		    UK_PAGING_PAGE_Lx_ALIGNED(vaddr, lvl) &&
+		    UK_PAGING_PAGE_Lx_SIZE(lvl) <= len)
 			return lvl;
 
 		lvl--;
@@ -984,11 +993,11 @@ static inline int vmem_access_allowed(unsigned long attr,
 {
 	switch (faulttype & UK_VMA_FAULT_ACCESSTYPE) {
 	case UK_VMA_FAULT_READ:
-		return (attr & PAGE_ATTR_PROT_READ);
+		return (attr & UK_PAGING_PAGE_ATTR_PROT_READ);
 	case UK_VMA_FAULT_WRITE:
-		return (attr & PAGE_ATTR_PROT_WRITE);
+		return (attr & UK_PAGING_PAGE_ATTR_PROT_WRITE);
 	case UK_VMA_FAULT_EXEC:
-		return (attr & PAGE_ATTR_PROT_EXEC);
+		return (attr & UK_PAGING_PAGE_ATTR_PROT_EXEC);
 	}
 
 	return 0;
@@ -1013,8 +1022,8 @@ static int vmem_mapx_pagefault(struct uk_pagetable *pt __unused,
 	struct uk_vm_fault fault = {
 		.vaddr = ctx->vaddr,
 		.vbase = vaddr,
-		.len   = PAGE_Lx_SIZE(level),
-		.paddr = PT_Lx_PTE_PADDR(*pte, level),
+		.len   = UK_PAGING_PAGE_Lx_SIZE(level),
+		.paddr = UK_PAGING_PT_Lx_PTE_PADDR(*pte, level),
 		.type  = ctx->type,
 		.pte   = *pte,
 		.level = level,
@@ -1028,14 +1037,15 @@ static int vmem_mapx_pagefault(struct uk_pagetable *pt __unused,
 	rc = ctx->vma->ops->fault(ctx->vma, &fault);
 	if (unlikely(rc)) {
 		if (rc == -ENOMEM)
-			return UKPLAT_PAGE_MAPX_ETOOBIG;
+			return UK_PAGING_PAGE_MAPX_ETOOBIG;
 
 		return rc;
 	}
 
-	UK_ASSERT(PAGE_Lx_ALIGNED(fault.paddr, fault.level));
+	UK_ASSERT(UK_PAGING_PAGE_Lx_ALIGNED(fault.paddr, fault.level));
 
-	*pte = PT_Lx_PTE_SET_PADDR(fault.pte, fault.level, fault.paddr);
+	*pte = UK_PAGING_PT_Lx_PTE_SET_PADDR(fault.pte, fault.level,
+					     fault.paddr);
 
 	return 0;
 }
@@ -1043,7 +1053,7 @@ static int vmem_mapx_pagefault(struct uk_pagetable *pt __unused,
 int vmem_pagefault(__vaddr_t vaddr, unsigned int type, struct __regs *regs)
 {
 	const unsigned int demand_lvl =
-		PAGE_SHIFT_Lx(CONFIG_LIBUKVMEM_DEMAND_PAGE_IN_SIZE);
+		UK_PAGING_PAGE_SHIFT_Lx(CONFIG_LIBUKVMEM_DEMAND_PAGE_IN_SIZE);
 	struct uk_vas *vas;
 	struct uk_pagetable *pt;
 	struct mapx_pagefault_ctx ctx = {
@@ -1051,12 +1061,12 @@ int vmem_pagefault(__vaddr_t vaddr, unsigned int type, struct __regs *regs)
 		.type  = type,
 		.regs  = regs,
 	};
-	struct ukplat_page_mapx mapx = {
+	struct uk_paging_page_mapx mapx = {
 		.map = vmem_mapx_pagefault,
 		.ctx = &ctx,
 	};
 	__vaddr_t vbase;
-	unsigned int lvl = PAGE_LEVEL;
+	unsigned int lvl = UK_PAGING_PAGE_LEVEL;
 	unsigned long flags;
 	int rc;
 
@@ -1092,31 +1102,32 @@ int vmem_pagefault(__vaddr_t vaddr, unsigned int type, struct __regs *regs)
 	 * We cannot create pages larger than that. Afterwards, we adjust
 	 * according to alignment and VMA boundaries.
 	 */
-	if (ctx.vma->page_lvl < 0 && demand_lvl > PAGE_LEVEL) {
-		rc = ukplat_pt_walk(pt, vaddr, &lvl, __NULL, __NULL);
+	if (ctx.vma->page_lvl < 0 && demand_lvl > UK_PAGING_PAGE_LEVEL) {
+		rc = uk_paging_pt_walk(pt, vaddr, &lvl, __NULL, __NULL);
 		if (unlikely(rc))
 			return rc;
 
-		vbase = MAX(PAGE_Lx_ALIGN_DOWN(vaddr, lvl), ctx.vma->start);
+		vbase = MAX(UK_PAGING_PAGE_Lx_ALIGN_DOWN(vaddr, lvl),
+			    ctx.vma->start);
 
 		lvl = vmem_largest_level(vbase, ctx.vma->end - vbase,
 					 MIN(lvl, demand_lvl));
 
-		flags = PAGE_FLAG_FORCE_SIZE;
+		flags = UK_PAGING_PAGE_FLAG_FORCE_SIZE;
 	} else {
-		lvl   = MAX(ctx.vma->page_lvl, PAGE_LEVEL);
+		lvl   = MAX(ctx.vma->page_lvl, UK_PAGING_PAGE_LEVEL);
 		flags = 0;
 	}
 
-	vbase = PAGE_Lx_ALIGN_DOWN(vaddr, lvl);
+	vbase = UK_PAGING_PAGE_Lx_ALIGN_DOWN(vaddr, lvl);
 
 	UK_ASSERT(vbase >= ctx.vma->start &&
 		  vbase < ctx.vma->end);
-	UK_ASSERT(vbase <= __VADDR_MAX - PAGE_Lx_SIZE(lvl));
-	UK_ASSERT(vbase + PAGE_Lx_SIZE(lvl) >= ctx.vma->start &&
-		  vbase + PAGE_Lx_SIZE(lvl) <= ctx.vma->end);
+	UK_ASSERT(vbase <= __VADDR_MAX - UK_PAGING_PAGE_Lx_SIZE(lvl));
+	UK_ASSERT(vbase + UK_PAGING_PAGE_Lx_SIZE(lvl) >= ctx.vma->start &&
+		  vbase + UK_PAGING_PAGE_Lx_SIZE(lvl) <= ctx.vma->end);
 
-	return ukplat_page_mapx(pt, vbase, 0, 1, ctx.vma->attr,
-				PAGE_FLAG_SIZE(lvl) | flags, &mapx);
+	return uk_paging_page_mapx(pt, vbase, 0, 1, ctx.vma->attr,
+				UK_PAGING_PAGE_FLAG_SIZE(lvl) | flags, &mapx);
 }
-#endif /* CONFIG_HAVE_PAGING */
+#endif /* CONFIG_LIBUKPAGING */

@@ -41,13 +41,13 @@
 #include <errno.h>
 
 #include <uk/boot.h>
-#ifdef CONFIG_HAVE_PAGING
-#include <uk/plat/paging.h>
+#ifdef CONFIG_LIBUKPAGING
 #include <uk/falloc.h>
+#include <uk/paging.h>
 #ifdef CONFIG_LIBUKVMEM
 #include <uk/vmem.h>
 #endif /* CONFIG_LIBUKVMEM */
-#endif /* CONFIG_HAVE_PAGING */
+#endif /* CONFIG_LIBUKPAGING */
 /* FIXME: allocators are hard-coded for now */
 #if CONFIG_LIBUKBOOT_INITBBUDDY
 #include <uk/allocbbuddy.h>
@@ -69,7 +69,7 @@
 #include <uk/allocstack.h>
 #if CONFIG_LIBUKBOOT_ALLOCSTACK_PREMAP_ORDER
 #define ALLOCSTACK_INITIAL_SIZE				\
-	(PAGE_SIZE * (1 << CONFIG_LIBUKBOOT_ALLOCSTACK_PREMAP_ORDER))
+	(UK_PAGING_PAGE_SIZE * (1 << CONFIG_LIBUKBOOT_ALLOCSTACK_PREMAP_ORDER))
 #endif /* CONFIG_LIBUKBOOT_ALLOCSTACK_PREMAP_ORDER */
 #endif /* CONFIG_LIBUKBOOT_ALLOCSTACK */
 #if CONFIG_LIBUKSCHED
@@ -128,7 +128,7 @@ static struct uk_alloc *heap_init()
 {
 	struct uk_alloc *a = NULL;
 #ifdef CONFIG_LIBUKBOOT_HEAP_BASE
-	struct uk_pagetable *pt = ukplat_pt_get_active();
+	struct uk_pagetable *pt = uk_paging_pt_get_active();
 	__sz free_pages, alloc_pages;
 	__vaddr_t heap_base;
 #ifdef CONFIG_LIBUKVMEM
@@ -149,8 +149,8 @@ static struct uk_alloc *heap_init()
 	heap_base = CONFIG_LIBUKBOOT_HEAP_BASE;
 
 #ifdef CONFIG_LIBUKVMEM
-#define HEAP_INITIAL_PAGES		16
-#define HEAP_INITIAL_LEN		(HEAP_INITIAL_PAGES << PAGE_SHIFT)
+#define HEAP_INITIAL_PAGES	16
+#define HEAP_INITIAL_LEN	(HEAP_INITIAL_PAGES << UK_PAGING_PAGE_SHIFT)
 	/* In addition to paging, we have virtual address space management. We
 	 * will thus also represent the heap as a dedicated VMA to enable
 	 * on-demand paging for the heap. However, we have a chicken-egg
@@ -162,12 +162,14 @@ static struct uk_alloc *heap_init()
 	 * mappings and then create the VMA on top. Afterwards, we add the
 	 * remainder of the VMA to the allocator.
 	 */
-	rc = ukplat_page_map(pt, heap_base, __PADDR_ANY,
-			     HEAP_INITIAL_PAGES, PAGE_ATTR_PROT_RW, 0);
+	rc = uk_paging_page_map(pt, heap_base, UK_PAGING_PADDR_ANY,
+				HEAP_INITIAL_PAGES, UK_PAGING_PAGE_ATTR_PROT_RW,
+				0);
 	if (unlikely(rc))
 		return NULL;
 
-	a = uk_alloc_init((void *)heap_base, HEAP_INITIAL_PAGES << PAGE_SHIFT);
+	a = uk_alloc_init((void *)heap_base,
+			  HEAP_INITIAL_PAGES << UK_PAGING_PAGE_SHIFT);
 	if (unlikely(!a))
 		return NULL;
 
@@ -179,31 +181,33 @@ static struct uk_alloc *heap_init()
 	if (unlikely(rc))
 		return NULL;
 
-	free_pages  = pt->fa->free_memory >> PAGE_SHIFT;
-	alloc_pages = free_pages - PT_PAGES(free_pages);
+	free_pages  = pt->fa->free_memory >> UK_PAGING_PAGE_SHIFT;
+	alloc_pages = free_pages - UK_PAGING_PT_PAGES(free_pages);
 
 	vaddr = heap_base;
 	rc = uk_vma_map_anon(&kernel_vas, &vaddr,
-			     (alloc_pages + HEAP_INITIAL_PAGES) << PAGE_SHIFT,
-			     PAGE_ATTR_PROT_RW, UK_VMA_MAP_UNINITIALIZED,
+			     (alloc_pages + HEAP_INITIAL_PAGES) << UK_PAGING_PAGE_SHIFT,
+			     UK_PAGING_PAGE_ATTR_PROT_RW,
+			     UK_VMA_MAP_UNINITIALIZED,
 			     "heap");
 	if (unlikely(rc))
 		return NULL;
 
 	rc = uk_alloc_addmem(a, (void *)(heap_base + HEAP_INITIAL_LEN),
-			     (alloc_pages - HEAP_INITIAL_PAGES) << PAGE_SHIFT);
+			     (alloc_pages - HEAP_INITIAL_PAGES) << UK_PAGING_PAGE_SHIFT);
 	if (unlikely(rc))
 		return NULL;
 #else /* CONFIG_LIBUKVMEM */
-	free_pages  = pt->fa->free_memory >> PAGE_SHIFT;
-	alloc_pages = free_pages - PT_PAGES(free_pages);
+	free_pages  = pt->fa->free_memory >> UK_PAGING_PAGE_SHIFT;
+	alloc_pages = free_pages - UK_PAGING_PT_PAGES(free_pages);
 
-	rc = ukplat_page_map(pt, heap_base, __PADDR_ANY,
-			     alloc_pages, PAGE_ATTR_PROT_RW, 0);
+	rc = uk_paging_page_map(pt, heap_base, UK_PAGING_PADDR_ANY,
+				alloc_pages, UK_PAGING_PAGE_ATTR_PROT_RW, 0);
 	if (unlikely(rc))
 		return NULL;
 
-	a = uk_alloc_init((void *)heap_base, alloc_pages << PAGE_SHIFT);
+	a = uk_alloc_init((void *)heap_base,
+			  alloc_pages << UK_PAGING_PAGE_SHIFT);
 #endif /* !CONFIG_LIBUKVMEM */
 #else /* CONFIG_LIBUKBOOT_HEAP_BASE */
 	/* Paging is disabled so we still have the static boot page table set

@@ -182,7 +182,7 @@ extern "C" {
 #define UK_PAGING_PAGE_HUGE_ALIGNED(val)	\
 	UK_PAL_PAGE_HUGE_ALIGNED(val)
 
-#if !__ASSEMBLY__ /* TODO Move these inside CONFIG_LIBUKPAGING? */
+#if !__ASSEMBLY__
 
 /**
  * UK_PAGING_VADDR_INV / UK_PAGING_PADDR_INV definitions
@@ -309,10 +309,7 @@ extern "C" {
 #define UK_PAGING_PAGE_Lx_IS(pte, lvl)		    \
 	UK_PAL_PAGE_Lx_IS(pte, lvl)
 
-#endif /* !__ASSEMBLY__ */
-
 #if CONFIG_LIBUKPAGING
-#if !__ASSEMBLY__
 
 struct uk_falloc;
 
@@ -847,9 +844,9 @@ __paddr_t uk_paging_virt_to_phys(__vaddr_t address)
 	return (__paddr_t)address;
 }
 
-#endif /* !__ASSEMBLY__ */
 #endif /* !CONFIG_LIBUKPAGING */
 
+#endif /* !__ASSEMBLY__ */
 #ifdef __cplusplus
 }
 #endif

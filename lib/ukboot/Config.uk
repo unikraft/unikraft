@@ -139,7 +139,7 @@ endchoice
 config LIBUKBOOT_HEAP_BASE
 	hex "Heap base address"
 	default 0x400000000
-	depends on HAVE_PAGING
+	depends on LIBUKPAGING
 	depends on LIBUKBOOT_INITALLOC
 
 # Hidden configuration option that specifies that scheduling should be

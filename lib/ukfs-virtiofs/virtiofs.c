@@ -622,8 +622,9 @@ ssize_t virtiofs_live_mem(struct viofs_node *n,
 	}
 
 	/* Need to declare here; len may have been adjusted by previous block */
-	const size_t pgoff = off / PAGE_SIZE;
-	const size_t pgend = ALIGN_UP(off + len, PAGE_SIZE) / PAGE_SIZE;
+	const size_t pgoff = off / UK_PAGING_PAGE_SIZE;
+	const size_t pgend = ALIGN_UP(off + len, UK_PAGING_PAGE_SIZE) /
+			     UK_PAGING_PAGE_SIZE;
 	const size_t npages = pgend - pgoff;
 
 	r = virtiofs_ensure_open(n);
@@ -639,7 +640,7 @@ ssize_t virtiofs_live_mem(struct viofs_node *n,
 		);
 		if (unlikely(r <= 0))
 			return r;
-		return (pgoff + r) * PAGE_SIZE - off;
+		return (pgoff + r) * UK_PAGING_PAGE_SIZE - off;
 	case UKFILE_MEM_RELEASE:
 		r = uk_sparsebuf_ref_release(
 			&ctx, UK_SPARSEBUF_EMBED_HEADP(iohead, &rn->iomem.io),

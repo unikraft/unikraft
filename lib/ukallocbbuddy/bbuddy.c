@@ -53,7 +53,7 @@
 #include <uk/print.h>
 #include <uk/assert.h>
 #include <uk/list.h>
-#include <uk/page.h>
+#include <uk/paging.h>
 
 struct chunk_head {
 	struct uk_hlist_node link;
@@ -89,11 +89,12 @@ struct uk_bbpalloc {
  * for consistency. Useful when suspecting memory corruption.
  */
 
-#include <uk/arch/paging.h>
+#include <uk/paging.h>
 #define _FREESAN_NONCANON(x) ((x) && (~(uintptr_t)(x)))
 #define _FREESAN_BAD_CHUNKPTR(x) \
 	(((uintptr_t)x & (sizeof(void *) - 1)) || \
-	_FREESAN_NONCANON((uintptr_t)(x) >> PAGE_Lx_SHIFT(PT_LEVELS - 1)))
+	_FREESAN_NONCANON((uintptr_t)(x) >> \
+	UK_PAGING_PAGE_Lx_SHIFT(UK_PAGING_PT_LEVELS - 1)))
 
 #define _FREESAN_LOCFMT "\t@ %p (free_head[%zu](%p) + %zu): "
 
@@ -549,8 +550,8 @@ static int bbuddy_addmem(struct uk_alloc *a, void *base, size_t len)
 
 	freelist_sanitycheck(b->free_head);
 
-	min = round_pgup((uintptr_t)base);
-	max = round_pgdown((uintptr_t)base + (uintptr_t)len);
+	min = UK_PAGING_PAGE_ALIGN_UP((uintptr_t)base);
+	max = UK_PAGING_PAGE_ALIGN_DOWN((uintptr_t)base + (uintptr_t)len);
 	if (max < min) {
 		uk_pr_err("%"__PRIuptr": Failed to add memory region %"__PRIuptr"-%"__PRIuptr": Invalid range after applying page alignments\n",
 			  (uintptr_t) a, (uintptr_t) base,
@@ -563,7 +564,7 @@ static int bbuddy_addmem(struct uk_alloc *a, void *base, size_t len)
 	/* We should have at least one page for bitmap tracking
 	 * and one page for data.
 	 */
-	if (range < round_pgup(sizeof(*memr) + BYTES_PER_MAPWORD) +
+	if (range < UK_PAGING_PAGE_ALIGN_UP(sizeof(*memr) + BYTES_PER_MAPWORD) +
 			__PAGE_SIZE) {
 		uk_pr_err("%"__PRIuptr": Failed to add memory region %"__PRIuptr"-%"__PRIuptr": Not enough space after applying page alignments\n",
 			  (uintptr_t) a, (uintptr_t) base,
@@ -583,7 +584,7 @@ static int bbuddy_addmem(struct uk_alloc *a, void *base, size_t len)
 	 */
 	memr->nr_pages = range >> __PAGE_SHIFT;
 	memr->mm_alloc_bitmap = (unsigned long *) (min + sizeof(*memr));
-	memr_size = round_pgup(sizeof(*memr) +
+	memr_size = UK_PAGING_PAGE_ALIGN_UP(sizeof(*memr) +
 		DIV_ROUND_UP(memr->nr_pages, BITS_PER_BYTE));
 	memr->mm_alloc_bitmap_size = memr_size - sizeof(*memr);
 
@@ -640,12 +641,12 @@ struct uk_alloc *uk_allocbbuddy_init(void *base, size_t len)
 	uintptr_t min, max;
 	unsigned long i;
 
-	min = round_pgup((uintptr_t)base);
-	max = round_pgdown((uintptr_t)base + (uintptr_t)len);
+	min = UK_PAGING_PAGE_ALIGN_UP((uintptr_t)base);
+	max = UK_PAGING_PAGE_ALIGN_DOWN((uintptr_t)base + (uintptr_t)len);
 	UK_ASSERT(max > min);
 
 	/* Allocate space for allocator descriptor */
-	metalen = round_pgup(sizeof(*a) + sizeof(*b));
+	metalen = UK_PAGING_PAGE_ALIGN_UP(sizeof(*a) + sizeof(*b));
 
 	/* enough space for allocator available? */
 	if (min + metalen > max) {

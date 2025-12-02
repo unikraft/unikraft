@@ -38,18 +38,18 @@
 
 static inline unsigned long prot_to_attr(int prot)
 {
-	unsigned long attr = PAGE_ATTR_PROT_NONE;
+	unsigned long attr = UK_PAGING_PAGE_ATTR_PROT_NONE;
 
 	/* Note that specifying invalid values is not an error for mmap. You
 	 * just don't get any meaningful permissions on the area.
 	 */
 
 	if (prot & PROT_READ)
-		attr |= PAGE_ATTR_PROT_READ;
+		attr |= UK_PAGING_PAGE_ATTR_PROT_READ;
 	if (prot & PROT_WRITE)
-		attr |= PAGE_ATTR_PROT_WRITE;
+		attr |= UK_PAGING_PAGE_ATTR_PROT_WRITE;
 	if (prot & PROT_EXEC)
-		attr |= PAGE_ATTR_PROT_EXEC;
+		attr |= UK_PAGING_PAGE_ATTR_PROT_EXEC;
 
 	return attr;
 }
@@ -71,17 +71,17 @@ static int do_mmap(void **addr, size_t len, int prot, int flags, int fd,
 #endif /* CONFIG_LIBPOSIX_FDTAB */
 	void *vargs;
 	const struct uk_vma_ops *vops;
-	unsigned int order, lvl = PAGE_LEVEL;
+	unsigned int order, lvl = UK_PAGING_PAGE_LEVEL;
 	int rc;
 
 	if (unlikely(len == 0))
 		return -EINVAL;
 
 	/* len will overflow when aligning it to page size */
-	if (unlikely(len > __SZ_MAX - PAGE_SIZE))
+	if (unlikely(len > __SZ_MAX - UK_PAGING_PAGE_SIZE))
 		return -ENOMEM;
 
-	if (unlikely(offset < 0 || !PAGE_ALIGNED(offset)))
+	if (unlikely(offset < 0 || !UK_PAGING_PAGE_ALIGNED(offset)))
 		return -EINVAL;
 
 	if (unlikely((__sz)offset > __OFF_MAX - len))
@@ -100,7 +100,7 @@ static int do_mmap(void **addr, size_t len, int prot, int flags, int fd,
 		if (unlikely(flags & MAP_FIXED_NOREPLACE))
 			return -EPERM;
 
-		vaddr = __VADDR_ANY;
+		vaddr = UK_PAGING_VADDR_ANY;
 	}
 
 	if (flags & MAP_ANONYMOUS) {
@@ -122,20 +122,20 @@ static int do_mmap(void **addr, size_t len, int prot, int flags, int fd,
 			vflags |= UK_VMA_MAP_UNINITIALIZED;
 
 		if (flags & MAP_HUGETLB) {
-#ifdef PAGE_LARGE_SHIFT
+#ifdef UK_PAGING_PAGE_LARGE_SHIFT
 			order = (flags >> MAP_HUGE_SHIFT) & MAP_HUGE_MASK;
 			if (order == 0)
-				order = PAGE_LARGE_SHIFT;
+				order = UK_PAGING_PAGE_LARGE_SHIFT;
 
-			lvl = PAGE_SHIFT_Lx(order);
+			lvl = UK_PAGING_PAGE_SHIFT_Lx(order);
 
-			if (unlikely(!PAGE_Lx_HAS(lvl)))
+			if (unlikely(!UK_PAGING_PAGE_Lx_HAS(lvl)))
 				return -EINVAL;
 
 			vflags |= UK_VMA_MAP_SIZE(order);
 #else
 			return -EINVAL;
-#endif /* PAGE_LARGE_SHIFT */
+#endif /* UK_PAGING_PAGE_LARGE_SHIFT */
 		}
 
 		vargs = NULL;
@@ -160,7 +160,7 @@ static int do_mmap(void **addr, size_t len, int prot, int flags, int fd,
 		if (unlikely(flags & MAP_SYNC))
 			return -EOPNOTSUPP;
 
-		if (unlikely(!PAGE_ALIGNED(offset)))
+		if (unlikely(!UK_PAGING_PAGE_ALIGNED(offset)))
 			return -EINVAL;
 
 		switch (uk_fdtab_shim_get(fd, &sf)) {
@@ -197,7 +197,7 @@ static int do_mmap(void **addr, size_t len, int prot, int flags, int fd,
 	}
 
 	/* Linux will always align len to the selected page size */
-	len = PAGE_Lx_ALIGN_UP(len, lvl);
+	len = UK_PAGING_PAGE_Lx_ALIGN_UP(len, lvl);
 
 	if (flags & MAP_POPULATE)
 		vflags |= UK_VMA_MAP_POPULATE;
@@ -207,11 +207,12 @@ static int do_mmap(void **addr, size_t len, int prot, int flags, int fd,
 	/* MAP_NORESERVE : Ignored for now */
 
 	rc = uk_vma_map(vas, &vaddr, len, vattr, vflags, NULL, vops, vargs);
-	if (unlikely(rc && vaddr != __VADDR_ANY && !(flags & MAP_FIXED))) {
+	if (unlikely(rc && !(flags & MAP_FIXED) &&
+		     vaddr != UK_PAGING_VADDR_ANY)) {
 		/* If addr was meant as a hint and we fail to map, we retry
 		 * without specifying an address.
 		 */
-		vaddr = __VADDR_ANY;
+		vaddr = UK_PAGING_VADDR_ANY;
 		rc = uk_vma_map(vas, &vaddr, len, vattr, vflags, NULL, vops,
 				vargs);
 	}
@@ -249,7 +250,7 @@ UK_SYSCALL_R_DEFINE(int, munmap, void *, addr, size_t, len)
 	if (unlikely(len == 0))
 		return -EINVAL;
 
-	rc = uk_vma_unmap(vas, vaddr, PAGE_ALIGN_UP(len), 0);
+	rc = uk_vma_unmap(vas, vaddr, UK_PAGING_PAGE_ALIGN_UP(len), 0);
 	if (unlikely(rc)) {
 		if (rc == -ENOENT)
 			return 0;
@@ -271,7 +272,7 @@ UK_SYSCALL_R_DEFINE(int, mprotect, void *, addr, size_t, len, int, prot)
 	if (unlikely(prot & ~VALID_PROT_MASK))
 		return -EINVAL;
 
-	rc = uk_vma_set_attr(vas, vaddr, PAGE_ALIGN_UP(len), vattr,
+	rc = uk_vma_set_attr(vas, vaddr, UK_PAGING_PAGE_ALIGN_UP(len), vattr,
 			     UK_VMA_FLAG_STRICT_VMA_CHECK);
 	if (unlikely(rc)) {
 		if (rc == -ENOENT)
@@ -302,7 +303,7 @@ UK_SYSCALL_R_DEFINE(int, madvise, void *, addr, size_t, len, int, advice)
 		break;
 	}
 
-	rc = uk_vma_advise(vas, vaddr, PAGE_ALIGN_UP(len), vadvice,
+	rc = uk_vma_advise(vas, vaddr, UK_PAGING_PAGE_ALIGN_UP(len), vadvice,
 			   UK_VMA_FLAG_STRICT_VMA_CHECK);
 	if (unlikely(rc)) {
 		if (rc == -ENOENT)
