@@ -30,10 +30,6 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef __UKARCH_LCPU_H__
-#error Do not include this header directly
-#endif
-
 #include <uk/asm.h>
 
 /* PSTATE */

@@ -27,9 +27,8 @@
  * SUCH DAMAGE.
  */
 
-#ifndef __UKARCH_LCPU_H__
-#error Do not include this header directly
-#endif
+#ifndef __UK_ASM_LCPU_H__
+#define __UK_ASM_LCPU_H__
 
 #include <uk/asm.h>
 #include <uk/asm/arch.h>
@@ -421,3 +420,4 @@ static inline void ukarch_spinwait(void)
 }
 
 #endif /* !__ASSEMBLY__ */
+#endif /* __UK_ASM_LCPU_H__ */
