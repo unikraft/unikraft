@@ -12,6 +12,7 @@
 #include <string.h>
 #include <sys/uio.h>
 
+#include <uk/assert.h>
 #include <uk/essentials.h>
 
 /**
