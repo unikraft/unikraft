@@ -1,0 +1,7 @@
+config LIBVIRTIO_FS
+	bool "Virtio Filesystem device"
+	select LIBVIRTIO_BUS
+	select LIBUKSGLIST
+	select LIBUKSCHED
+	help
+		Driver for Virtio Filesystem devices.

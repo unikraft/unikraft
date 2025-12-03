@@ -1,0 +1,15 @@
+$(eval $(call addlib_s,libvirtio_fs,$(CONFIG_LIBVIRTIO_FS)))
+
+LIBVIRTIO_FS_CINCLUDES-y  += -I$(LIBVIRTIO_FS_BASE)/include
+
+CINCLUDES-$(CONFIG_LIBVIRTIO_FS) += -I$(LIBVIRTIO_FS_BASE)/include-public
+
+# common virtio headers
+LIBVIRTIO_FS_CINCLUDES-y  += -I$(LIBVIRTIO_BUS_BASE)/include
+LIBVIRTIO_FS_CINCLUDES-y  += -I$(LIBVIRTIO_RING_BASE)/include
+LIBVIRTIO_FS_CINCLUDES-y  += -I$(UK_DRIV_LIBVIRTIO_BASE)/include
+
+# TODO Remove as soon as plat dependencies go away
+LIBVIRTIO_FS_CINCLUDES-y  += -I$(UK_PLAT_COMMON_BASE)/include
+
+LIBVIRTIO_FS_SRCS-y += $(LIBVIRTIO_FS_BASE)/virtio_fs.c
