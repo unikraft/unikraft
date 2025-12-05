@@ -1,0 +1,19 @@
+menuconfig LIBUKFS_VIRTIOFS
+	bool "ukfs-virtiofs: Virtual I/O filesystem"
+	select LIBVIRTIO_FS
+	select LIBUKFILE
+	select LIBUKFS
+
+if LIBUKFS_VIRTIOFS
+
+config LIBUKFS_VIRTIOFS_IOMEM
+	bool "Local file caching & direct memory I/O"
+	select LIBUKPOD
+	select LIBUKPOD_DEFAULT
+	select LIBUKPOD_ANON
+	select LIBUKSPARSEBUF
+	help
+		Support for the ukfile mem() operation, required for supporting
+		shared file mappings.
+
+endif
