@@ -121,7 +121,7 @@
 #define TCR_SMP_ATTRS						\
 	(TCR_EL1_SH0_IS | TCR_EL1_SH1_IS)
 
-#ifdef CONFIG_PAGING
+#if CONFIG_HAVE_PAGING
 /* Set TCR attributes as required by the arm64 paging implementation:
  * 48-bit IA, 48-bit OA, 4KiB granule, TTBR0_EL1 walks enabled,
  * TTBR1_EL1 walks disabled.
@@ -131,11 +131,11 @@
 	 (TCR_EL1_TG0_4K << TCR_EL1_TG0_SHIFT) |		\
 	 TCR_EL1_EPD1_BIT | TCR_EL1_T0SZ(TCR_EL1_T0SZ_48) |	\
 	 TCR_EL1_IPS(TCR_EL1_IPS_48))
-#else
+#else /* ! CONFIG_HAVE_PAGING */
 #define TCR_INIT_FLAGS						\
 	(TCR_EL1_ASID_16 | TCR_CACHE_ATTRS | TCR_SMP_ATTRS |	\
 	 (TCR_EL1_TG0_4K << TCR_EL1_TG0_SHIFT))
-#endif /* CONFIG_PAGING */
+#endif /* !CONFIG_HAVE_PAGING */
 
 /* Default MAIR_EL1 configuration */
 
