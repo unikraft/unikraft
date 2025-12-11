@@ -276,7 +276,9 @@ unsigned char ramfs_dentry_type(const struct ramfs_dentry *dp)
 	case RAMFS_DENT_FILE:
 		return DT_UNKNOWN;
 	default:
-		UK_BUG();
+		uk_pr_err("Invalid dentry type %d; likely bug or corruption\n",
+			  dp->type);
+		return DT_UNKNOWN;
 	}
 }
 
@@ -291,7 +293,9 @@ ino_t ramfs_dentry_inode(const struct ramfs_dentry *dp)
 	case RAMFS_DENT_SPEC:
 		return (ino_t)(uintptr_t)dp;
 	default:
-		UK_BUG();
+		uk_pr_err("Invalid dentry type %d; likely bug or corruption\n",
+			  dp->type);
+		return 0;
 	}
 }
 
@@ -649,8 +653,6 @@ ssize_t ramfs_live_mem(struct ramfs_node *n, enum uk_file_mem_op op,
 		if (unlikely(total != len))
 			return -EINVAL;
 		break;
-	default:
-		return -EINVAL;
 	}
 
 	if (unlikely(!len))
@@ -675,7 +677,7 @@ ssize_t ramfs_live_mem(struct ramfs_node *n, enum uk_file_mem_op op,
 			n->statx.stx_size = off + len;
 		return r;
 	default:
-		UK_BUG(); /* Validate op beforehand */
+		return -EINVAL;
 	}
 }
 
@@ -989,7 +991,9 @@ int ramfs_dir_lookup(struct ramfs_node *n, const char *name, size_t len,
 		out_ukfs->special = dp->target.special;
 		return UKFS_STOP_SPEC;
 	default:
-		UK_BUG();
+		uk_pr_err("Invalid dentry type %d; likely bug or corruption\n",
+			  dp->type);
+		return -EIO;
 	}
 }
 
@@ -1242,15 +1246,7 @@ struct ramfs_node *ramfs_live_fs_create(struct ramfs_node *n,
 		ramfs_node_touch(n, RAMFS_TOUCH_MODIFY, mntflags);
 	}
 	/* Success */
-	switch (dtype) {
-	case RAMFS_DENT_SPEC:
-	case RAMFS_DENT_FILE:
-		return NULL;
-	case RAMFS_DENT_NODE:
-		return newlink.node;
-	default:
-		UK_BUG();
-	}
+	return dtype == RAMFS_DENT_NODE ? newlink.node : NULL;
 }
 
 static
