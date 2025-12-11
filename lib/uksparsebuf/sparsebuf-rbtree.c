@@ -144,7 +144,10 @@ int sparsebuf_separate(struct uk_sparsebuf_blk **headp,
 		uk_sparsebuf_advance(cur);
 	}
 	r = uk_sparsebuf_lookup(headp, epgoff, &ecur);
-	UK_ASSERT(r); /* Buffer cannot have been empty */
+	if (unlikely(!r)) {
+		uk_pr_err("Separate called on empty buffer; likely bug\n");
+		return -EIO;
+	}
 	if (uk_sparsebuf_pg_intersects(epgoff, uk_sparsebuf_slice_at(&ecur))) {
 		r = sparsebuf_cut(headp, &ecur, epgoff, alloc);
 		if (unlikely(r))
