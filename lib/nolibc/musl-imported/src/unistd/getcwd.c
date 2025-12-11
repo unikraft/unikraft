@@ -3,7 +3,12 @@
 #include <limits.h>
 #include <string.h>
 
-long uk_syscall_r_getcwd(char *buf, size_t sz);
+/* Includes for the internal `getcwd` syscall */
+#if CONFIG_LIBPOSIX_VFS
+#include <uk/posix-vfs.h>
+#else /* !CONFIG_LIBPOSIX_VFS */
+#error No suitable VFS stack enabled in config
+#endif /* !CONFIG_LIBPOSIX_VFS */
 
 char *getcwd(char *buf, size_t size)
 {
@@ -16,7 +21,7 @@ char *getcwd(char *buf, size_t size)
 		errno = EINVAL;
 		return 0;
 	}
-	long ret = uk_syscall_r_getcwd(p, size);
+	long ret = uk_sys_getcwd(p, size);
 	if (ret < 0)
 		return 0;
 	if (ret == 0 || p[0] != '/') {
