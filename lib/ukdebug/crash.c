@@ -82,7 +82,7 @@ __noreturn static void crash_shutdown(void)
 
 UK_EVENT(UK_CRASH_EVENT);
 
-void _uk_crash(struct __regs *regs, struct uk_crash_descr *descr)
+__noreturn void _uk_crash(struct __regs *regs, struct uk_crash_descr *descr)
 {
 	struct uk_crash_event_param param;
 #if HAVE_SMP
