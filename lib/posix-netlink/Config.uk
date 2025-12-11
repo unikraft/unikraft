@@ -3,6 +3,7 @@ config LIBPOSIX_NETLINK
 	select LIBPOSIX_SOCKET
 	select LIBUKMPI
 	select LIBUKMPI_MBOX
+	select LIBUKSTREAMBUF
 	help
 		This microlibrary allows other microlibraries to register a
 		netlink protocol family, such as NETLINK_ROUTE, for their netlink
