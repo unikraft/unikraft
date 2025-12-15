@@ -392,6 +392,7 @@ void ukarch_ectx_assert_equal(struct ukarch_ectx *state)
 			goto ectx_corrupted;
 		break;
 	case X86_SAVE_FXSAVE:
+	{
 		/* According to Intel SDM, XSAVE does not use bytes 511:416 */
 		struct x86_fxsave_ctx *fxsave1 = (struct x86_fxsave_ctx *)state;
 		struct x86_fxsave_ctx *fxsave2 =
@@ -401,8 +402,10 @@ void ukarch_ectx_assert_equal(struct ukarch_ectx *state)
 					sizeof(fxsave1->state))))
 			goto ectx_corrupted;
 		break;
+	}
 	case X86_SAVE_XSAVE:
 	case X86_SAVE_XSAVEOPT:
+	{
 		struct x86_xsave_ctx *xsave1 = (struct x86_xsave_ctx *)state;
 		struct x86_xsave_ctx *xsave2 = (struct x86_xsave_ctx *)current;
 
@@ -419,6 +422,7 @@ void ukarch_ectx_assert_equal(struct ukarch_ectx *state)
 					     X86_XSAVE_HDR_XSTATE_BV_AVXF)))
 			goto ectx_corrupted;
 		break;
+	}
 	default:
 		UK_CRASH("Unknown ectx method: %d\n", ectx_method);
 		return;
