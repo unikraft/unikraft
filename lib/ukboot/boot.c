@@ -179,7 +179,8 @@ static struct uk_alloc *heap_init()
 	if (unlikely(rc))
 		return NULL;
 
-	free_pages  = pt->fa->free_memory >> PAGE_SHIFT;
+	uk_falloc_get_free_memory(pt->fa, &free_pages);
+	free_pages >>= PAGE_SHIFT;
 	alloc_pages = free_pages - PT_PAGES(free_pages);
 
 	vaddr = heap_base;
@@ -195,7 +196,8 @@ static struct uk_alloc *heap_init()
 	if (unlikely(rc))
 		return NULL;
 #else /* CONFIG_LIBUKVMEM */
-	free_pages  = pt->fa->free_memory >> PAGE_SHIFT;
+	uk_falloc_get_free_memory(pt->fa, &free_pages);
+	free_pages >>= PAGE_SHIFT;
 	alloc_pages = free_pages - PT_PAGES(free_pages);
 
 	rc = ukplat_page_map(pt, heap_base, __PADDR_ANY,

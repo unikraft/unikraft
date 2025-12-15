@@ -52,7 +52,7 @@ static int get_free_memory(void *cookie, __u64 *out)
 
 	fa = (struct uk_falloc *)cookie;
 
-	*out = fa->free_memory;
+	*out = uk_load_n(&fa->free_memory);
 
 	return 0;
 }
@@ -66,7 +66,7 @@ static int get_total_memory(void *cookie, __u64 *out)
 
 	fa = (struct uk_falloc *)cookie;
 
-	*out = fa->total_memory;
+	*out = uk_load_n(&fa->total_memory);
 
 	return 0;
 }

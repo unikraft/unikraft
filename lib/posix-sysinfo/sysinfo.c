@@ -82,6 +82,8 @@ UK_SYSCALL_R_DEFINE(int, sysinfo, struct sysinfo *, info)
 	struct uk_pagetable *pt;
 	__sz total_memory;
 	unsigned int mem_unit = 1;
+	__sz info_totalram;
+	__sz info_freeram;
 #endif /* CONFIG_HAVE_PAGING */
 
 	if (!info)
@@ -94,14 +96,16 @@ UK_SYSCALL_R_DEFINE(int, sysinfo, struct sysinfo *, info)
 #ifdef CONFIG_HAVE_PAGING
 	pt = ukplat_pt_get_active();
 
-	total_memory = pt->fa->total_memory;
+	uk_falloc_get_total_memory(pt->fa, &total_memory);
 	while (total_memory > __UL_MAX) {
 		total_memory >>= 1;
 		mem_unit <<= 1;
 	}
 
-	info->totalram = (unsigned long) (pt->fa->total_memory / mem_unit);
-	info->freeram = (unsigned long) (pt->fa->free_memory / mem_unit);
+	uk_falloc_get_total_memory(pt->fa, &info_totalram);
+	info->totalram = (unsigned long)(info_totalram / mem_unit);
+	uk_falloc_get_free_memory(pt->fa, &info_freeram);
+	info->freeram = (unsigned long)(info_freeram / mem_unit);
 	info->mem_unit = mem_unit;
 #endif /* CONFIG_HAVE_PAGING */
 
@@ -134,16 +138,21 @@ long sysconf(int name)
 #ifdef CONFIG_HAVE_PAGING
 	if (name == _SC_PHYS_PAGES) {
 		struct uk_pagetable *pt;
+		__sz total_memory;
 
 		pt = ukplat_pt_get_active();
-		return pt->fa->total_memory / PAGE_SIZE;
+
+		uk_falloc_get_total_memory(pt->fa, &total_memory);
+		return total_memory / PAGE_SIZE;
 	}
 
 	if (name == _SC_AVPHYS_PAGES) {
 		struct uk_pagetable *pt;
+		__sz free_memory;
 
 		pt = ukplat_pt_get_active();
-		return pt->fa->free_memory / PAGE_SIZE;
+		uk_falloc_get_free_memory(pt->fa, &free_memory);
+		return free_memory / PAGE_SIZE;
 	}
 #endif /* CONFIG_HAVE_PAGING */
 

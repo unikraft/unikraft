@@ -642,7 +642,7 @@ static inline void bfa_fl_add_tail(struct buddy_framealloc *bfa,
 	bfa->free_list_map |= (1 << mb->level);
 
 	UK_ASSERT(mb->level < BFA_LEVELS);
-	bfa->fa.free_memory += BFA_Lx_SIZE(mb->level);
+	uk_falloc_add_free_memory(&bfa->fa, BFA_Lx_SIZE(mb->level));
 
 	uk_falloc_stats_global_memfree_incr(BFA_Lx_SIZE(mb->level));
 }
@@ -654,7 +654,7 @@ static inline void bfa_fl_add(struct buddy_framealloc *bfa,
 	bfa->free_list_map |= (1 << mb->level);
 
 	UK_ASSERT(mb->level < BFA_LEVELS);
-	bfa->fa.free_memory += BFA_Lx_SIZE(mb->level);
+	uk_falloc_add_free_memory(&bfa->fa, BFA_Lx_SIZE(mb->level));
 
 	uk_falloc_stats_global_memfree_incr(BFA_Lx_SIZE(mb->level));
 }
@@ -667,8 +667,9 @@ static inline void bfa_fl_del(struct buddy_framealloc *bfa,
 		bfa->free_list_map ^= (1 << mb->level);
 
 	UK_ASSERT(mb->level < BFA_LEVELS);
+	/* FIXME: figure out how to make both of these two lines atomic */
 	UK_ASSERT(bfa->fa.free_memory >= BFA_Lx_SIZE(mb->level));
-	bfa->fa.free_memory -= BFA_Lx_SIZE(mb->level);
+	uk_falloc_sub_free_memory(&bfa->fa, BFA_Lx_SIZE(mb->level));
 
 	uk_falloc_stats_global_memfree_decr(BFA_Lx_SIZE(mb->level));
 
@@ -1456,7 +1457,7 @@ static int bfa_do_addmem(struct buddy_framealloc *bfa, void *metadata,
 
 	/* Add zone to zone list */
 	bfa_zone_add(bfa, zone);
-	bfa->fa.total_memory += len;
+	uk_falloc_add_total_memory(&bfa->fa, len);
 
 	uk_falloc_stats_global_memtotal_incr(len);
 

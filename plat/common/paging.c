@@ -1472,6 +1472,7 @@ int ukplat_paging_init(void)
 	struct ukplat_memregion_desc *mrd;
 	unsigned long prot;
 	int rc;
+	__u64 kernel_pt_fa_free_mem;
 
 	/* Initialize the frame allocator with the free physical memory
 	 * regions supplied via the boot info. The new page table uses the
@@ -1507,7 +1508,9 @@ int ukplat_paging_init(void)
 	/* The frame allocator should've only had page-aligned memory regions
 	 * added to it. Make sure nothing happened in the meantime.
 	 */
-	UK_ASSERT(!(kernel_pt.fa->free_memory & ~PAGE_MASK));
+	uk_falloc_get_free_memory(kernel_pt.fa, &kernel_pt_fa_free_mem);
+	UK_ASSERT(!(kernel_pt_fa_free_mem & ~PAGE_MASK));
+
 
 	if (unlikely(!kernel_pt.fa))
 		return rc;
