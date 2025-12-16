@@ -406,14 +406,12 @@ pid_t uk_posix_process_run(uk_posix_process_mainlike_func fn,
 	struct uk_sched *s = uk_sched_current();
 	struct uk_thread *parent;
 	struct uk_thread *child;
-	pid_t parent_tid;
 	int ret;
 
 	UK_ASSERT(s);
 
 	parent = uk_thread_current();
-	parent_tid = ukthread2tid(parent);
-	UK_ASSERT(parent_tid > 0);
+	UK_ASSERT(ukthread2tid(parent) > 0);
 
 	/* Create container thread */
 	child = uk_thread_create_container(uk_alloc_get_default(),

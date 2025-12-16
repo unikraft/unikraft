@@ -271,7 +271,7 @@ UK_LLSYSCALL_R_DEFINE(int, exit_group, int, status)
 	uk_sched_thread_exit();
 }
 #else /* !CONFIG_LIBPOSIX_PROCESS_MULTITHREADING */
-void pprocess_exit_stub(int status)
+__noreturn void pprocess_exit_stub(int status)
 {
 	if (pprocess_thread_main) {
 		pprocess_exit_status = status;

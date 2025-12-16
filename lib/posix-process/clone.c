@@ -124,7 +124,7 @@ int uk_clone(struct clone_args *cl_args, size_t cl_args_len,
 	     struct ukarch_execenv *execenv)
 {
 	struct posix_process_clone_event_data clone_event;
-	struct posix_process *child_process;
+	struct posix_process *child_process __maybe_unused;
 	struct posix_process *pprocess;
 	struct posix_thread *pthread;
 	struct uk_thread *child = NULL;
