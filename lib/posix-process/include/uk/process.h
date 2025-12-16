@@ -84,7 +84,15 @@ int uk_posix_process_create_pthread(struct uk_thread *thread);
 
 #if CONFIG_LIBPOSIX_PROCESS_MULTIPROCESS
 
-typedef int (*uk_posix_process_mainlike_func)(int argc, char *argv[]);
+/**
+ * Main-like function that calls exit() when done instead of returning.
+ *
+ * Parameters are passed as void *, and are to be cast by the implementation to:
+ * - argc: int
+ * - argv: char * []
+ */
+typedef __noreturn void (*uk_posix_process_mainlike_func)(void *argc,
+							  void *argv);
 
 /**
  * Spawn a process that jumps into function.

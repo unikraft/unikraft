@@ -171,6 +171,17 @@ err_close_epollfd:
 }
 #endif /* CONFIG_LIBUKBOOT_GRACEFUL_SHUTDOWN */
 
+static __noreturn void init_mainlike(void *argc_arg, void *argv_arg)
+{
+	const int argc = (int)(intptr_t)argc_arg;
+	char **const argv = (char **)argv_arg;
+	int r;
+
+	r = do_main(argc, argv);
+	/* INIT main should never return; it should call exit() when done */
+	UK_CRASH("INIT main returned %d\n", r);
+}
+
 int do_init(int argc, char *argv[])
 {
 	struct signalfd_siginfo info;
@@ -196,7 +207,7 @@ int do_init(int argc, char *argv[])
 	}
 
 	/* Spawn application process */
-	application_pid = uk_posix_process_run(do_main, argc,
+	application_pid = uk_posix_process_run(init_mainlike, argc,
 					       (const char **)argv);
 
 	/* Wait for application to exit and reap reparented children */
