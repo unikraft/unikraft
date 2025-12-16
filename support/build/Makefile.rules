@@ -82,6 +82,12 @@ define measure_loc =
 $(shell $(OBJDUMP) -dl "$(1)" | grep '^/' | grep -v '^/[/*]' | $(SED) -e 's/ [(]discriminator .*[)]//g' | sort -u | wc -l)
 endef
 
+# Generate <target>.ukcmpdb.json compile db file
+# gen_compile_db $1:target
+define gen_compile_db =
+$(shell if [ $(call have_clang) = y ] ; then printf " -MJ $(addsuffix .ukcmpdb.json,$(1))" ; fi)
+endef
+
 ################################################################################
 #
 # Paths and Filenames
@@ -396,6 +402,7 @@ endef
 #
 # build_clean $1:target
 build_clean = $(1) $(addsuffix .cmd,$(1))
+build_clean += $(addsuffix .ukcmpdb.json,$(1))
 ifeq ($(CONFIG_RECORD_BUILDTIME_TIME),y)
 build_clean += $(addsuffix .time,$(1))
 endif
@@ -657,6 +664,7 @@ $(4): $(2)
 		       $$(CFLAGS) $$(CFLAGS-y) $$(CFLAGS_EXTRA) \
 		       $$($(call vprefix_lib,$(1),CFLAGS)) $$($(call vprefix_lib,$(1),CFLAGS-y)) \
 		       $$($(call vprefix_src,$(1),$(2),$(3),FLAGS)) $$($(call vprefix_src,$(1),$(2),$(3),FLAGS-y)) \
+		       $(call gen_compile_db,$(4)) \
 		       $(5) \
 		       $$(DBGFLAGS) $$(DBGFLAGS-y) \
 		       -D__LIBNAME__=$(1) -D__BASENAME__=$(notdir $(2)) $(if $(3),-D__VARIANT__=$(3)) \
