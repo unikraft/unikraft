@@ -76,12 +76,6 @@ extern "C" {
 	} while (0)
 #endif
 
-#define UK_BUGON(x)							\
-	UK_ASSERT(!(x))
-
-#define UK_BUG()							\
-	UK_BUGON(1)
-
 #ifdef __cplusplus
 }
 #endif

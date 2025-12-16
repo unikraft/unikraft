@@ -22,6 +22,16 @@ extern "C" {
 		uk_crash_trigger();					\
 	} while (0)
 
+/* Stops execution when reaching an impossible path, likely sign of a bug */
+#define UK_BUG() UK_CRASH("Impossible execution path\n")
+
+/* Conditional version of UK_BUG() */
+#define UK_BUGON(x)							\
+	do {								\
+		if (unlikely(x))					\
+			UK_BUG();					\
+	} while (0)
+
 /**
  * Triggers a system crash with the given register context and description.
  *
