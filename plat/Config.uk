@@ -59,38 +59,6 @@ config UKPLAT_LCPU_WAKEUP_IRQ
 
 endmenu
 
-menuconfig PAGING
-	bool "Virtual memory API"
-	default n
-	select LIBUKFALLOC
-	select LIBUKFALLOCBUDDY
-	help
-		Provide low-level functions for working with page tables,
-		(un)mapping of pages, and changing of mapping flags
-
-if PAGING
-
-config PAGING_5LEVEL
-	bool "Enable 5-level paging (experimental)"
-	default n
-	depends on ARCH_X86_64
-
-config PAGING_STATS
-	bool "Collect paging statistics"
-	default n
-
-endif
-
-config HAVE_PAGING
-	bool
-	default y if PAGING
-	default n
-
-config HAVE_PAGING_DIRECTMAP
-	bool
-	default y if PAGING && ARCH_X86_64
-	default n
-
 config ENFORCE_W_XOR_X
 	bool "Enforce W^X"
 	depends on PAGING && ARCH_ARM_64

@@ -1,0 +1,22 @@
+menuconfig LIBUKPAGING
+	bool "ukpaging: Virtual memory API"
+	depends on HAVE_PAGING
+	select LIBUKPAL
+	select LIBUKFALLOC
+	select LIBUKFALLOCBUDDY
+	help
+		Provide low-level functions for working with page tables,
+		(un)mapping of pages, and changing of mapping flags
+
+if LIBUKPAGING
+config LIBUKPAGING_DIRECTMAP
+	bool
+	default y if ARCH_ARM_64 || ARCH_X86_64
+
+config LIBUKPAGING_5LEVEL
+	bool "Enable 5-level paging (EXPERIMENTAL)"
+	depends on ARCH_X86_64 && HAVE_5LEVEL_PT
+
+config LIBUKPAGING_STATS
+	bool "Collect paging statistics"
+endif

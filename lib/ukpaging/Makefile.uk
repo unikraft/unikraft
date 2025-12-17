@@ -1,0 +1,20 @@
+$(eval $(call addlib_s,libukpaging,$(CONFIG_LIBUKPAGING)))
+
+# Headers always enabled to provide basic definitions like
+# PAGE_SIZE to configurations that don't select LIBUKPAGING.
+ASINCLUDES-y  += -I$(LIBUKPAGING_BASE)/include
+ASINCLUDES-y  += -I$(LIBUKPAGING_BASE)/arch/$(CONFIG_UK_ARCH)/include
+
+CINCLUDES-y   += -I$(LIBUKPAGING_BASE)/include
+CINCLUDES-y   += -I$(LIBUKPAGING_BASE)/arch/$(CONFIG_UK_ARCH)/include
+
+CXXINCLUDES-y += -I$(LIBUKPAGING_BASE)/include
+CXXINCLUDES-y += -I$(LIBUKPAGING_BASE)/arch/$(CONFIG_UK_ARCH)/include
+
+LIBUKPAGING_SRCS-y += $(LIBUKPAGING_BASE)/paging.c|isr
+
+# arm64
+LIBUKPAGING_SRCS-$(CONFIG_ARCH_ARM_64) += $(LIBUKPAGING_BASE)/arch/arm64/arch.c|isr
+
+# x86_64
+LIBUKPAGING_SRCS-$(CONFIG_ARCH_X86_64) += $(LIBUKPAGING_BASE)/arch/x86_64/arch.c|isr
