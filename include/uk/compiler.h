@@ -103,6 +103,14 @@ extern "C" {
 	extern __typeof(old) new __attribute__((weak, alias(#old)))
 #endif
 
+#ifndef likely
+#define likely(x)   (__builtin_expect((!!(x)), 1))
+#endif
+
+#ifndef unlikely
+#define unlikely(x) (__builtin_expect((!!(x)), 0))
+#endif
+
 /**
   * Mark a function as constructor
   * The compiler/linker will populate a function pointer
