@@ -22,6 +22,7 @@ else
 XEN_IMAGE       := $(XEN_RAW_IMAGE)
 endif
 XEN_DEBUG_IMAGE := $(XEN_IMAGE).dbg
+XEN_COMPILE_DB_IMAGE := $(BUILD_DIR)/compile_commands.json
 
 XEN_LD_SCRIPT_FLAGS := $(addprefix -Wl$(comma)-dT$(comma),\
 			 $(UK_PLAT_XEN_DEF_LDS))
@@ -87,6 +88,9 @@ $(XEN_IMAGE).gz: $(XEN_IMAGE)
 
 endif
 
+$(XEN_COMPILE_DB_IMAGE): $(XEN_IMAGE)
+	$(call build_compile_db,$(BUILD_DIR),$@)
+
 # register images to the build
 ifeq ($(CONFIG_PLAT_XEN),y)
 UK_DEBUG_IMAGES-y                     += $(XEN_DEBUG_IMAGE)
@@ -102,6 +106,7 @@ UK_IMAGES-$(CONFIG_OPTIMIZE_COMPRESS) += $(XEN_RAW_IMAGE).gz
 else
 UK_IMAGES-$(CONFIG_OPTIMIZE_COMPRESS) += $(XEN_IMAGE).gz
 endif
+UK_IMAGES-y                           += $(XEN_COMPILE_DB_IMAGE)
 endif
 
 # register image to the build
