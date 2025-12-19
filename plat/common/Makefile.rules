@@ -22,3 +22,7 @@ define build_linux =
 	$(call build_cmd,OBJCOPY,,$(1).bin, $(OBJCOPY) -O binary $(1))
 	$(call build_cmd,MKLINUX,,$(1).img, $(SCRIPTS_DIR)/mklinux.py $(1) $(2))
 endef
+
+define build_compile_db =
+	$(call build_cmd,COMPDB,,$(2),$(SCRIPTS_DIR)/mkcompiledb.py $(1) > $(2))
+endef
