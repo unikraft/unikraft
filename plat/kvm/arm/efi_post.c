@@ -4,7 +4,7 @@
  * You may not use this file except in compliance with the License.
  */
 #include <kvm/efi.h>
-#include <uk/arch/paging.h>
+#include <uk/paging.h>
 #include <uk/plat/common/bootinfo.h>
 #include <uk/plat/lcpu.h>
 #include <uk/plat/common/sections.h>

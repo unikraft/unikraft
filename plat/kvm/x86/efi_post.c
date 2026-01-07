@@ -4,7 +4,6 @@
  * You may not use this file except in compliance with the License.
  */
 #include <kvm/efi.h>
-#include <uk/arch/paging.h>
 #include <uk/plat/common/bootinfo.h>
 #include <uk/plat/lcpu.h>
 #include <x86/cpu.h>
@@ -33,7 +32,7 @@ void _ukplat_entry(void *, void *);
 
 extern void *x86_bpt_pml4;
 
-static __u8 __align(16) uk_efi_bootstack[__PAGE_SIZE];
+static __u8 __align(16) uk_efi_bootstack[UK_PAGING_PAGE_SIZE];
 
 static struct {
 	void *entry_fn;
@@ -86,7 +85,7 @@ void __noreturn uk_efi_jmp_to_kern()
 	uk_efi_boot_startup_args.bootstack = uk_efi_bootstack + __PAGE_SIZE;
 
 	ukplat_lcpu_disable_irq();
-	ukarch_pt_write_base((__paddr_t)&x86_bpt_pml4);
+	uk_paging_pt_write_base((__paddr_t)&x86_bpt_pml4);
 	unmask_8259_pic();
 	lapic_timer_disable();
 	pic_8259_elcr2_level_irq10_11();

@@ -35,9 +35,9 @@
 #include <arm/smccc.h>
 #include <uk/arch/limits.h>
 
-#if CONFIG_ENFORCE_W_XOR_X && CONFIG_PAGING
+#if CONFIG_ENFORCE_W_XOR_X && CONFIG_LIBUKPAGING
 #include <uk/plat/common/w_xor_x.h>
-#endif /* CONFIG_ENFORCE_W_XOR_X && CONFIG_PAGING */
+#endif /* CONFIG_ENFORCE_W_XOR_X && CONFIG_LIBUKPAGING */
 
 #ifdef CONFIG_ARM64_FEAT_PAUTH
 #include <arm/arm64/pauth.h>
@@ -145,9 +145,9 @@ void __no_pauth _ukplat_entry(void)
 	if (unlikely(rc))
 		UK_CRASH("Could not initialize paging (%d)\n", rc);
 
-#if CONFIG_ENFORCE_W_XOR_X && CONFIG_PAGING
+#if CONFIG_ENFORCE_W_XOR_X && CONFIG_LIBUKPAGING
 	enforce_w_xor_x();
-#endif /* CONFIG_ENFORCE_W_XOR_X && CONFIG_PAGING */
+#endif /* CONFIG_ENFORCE_W_XOR_X && CONFIG_LIBUKPAGING */
 
 #ifdef CONFIG_ARM64_FEAT_PAUTH
 	rc = ukplat_pauth_init();

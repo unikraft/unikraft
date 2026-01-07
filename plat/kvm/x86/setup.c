@@ -10,9 +10,9 @@
 #include <uk/plat/common/acpi.h>
 #include <uk/arch/limits.h>
 #include <uk/arch/types.h>
-#include <uk/arch/paging.h>
 #include <uk/asm/cfi.h>
 #include <uk/boot.h>
+#include <uk/paging.h>
 #include <uk/plat/console.h>
 #include <uk/assert.h>
 #include <uk/essentials.h>

@@ -31,8 +31,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <uk/asm/arch.h>
 #include <uk/config.h>
-#include <uk/arch/paging.h>
+#include <uk/paging.h>
 #include <uk/reloc.h>
 
 #define PTE_RO		X86_PTE_PRESENT
@@ -62,11 +63,11 @@
  * @param pte additional flags for PTE
  */
 .macro pte_page paddr, level, pte
-.ifeq (\level - PAGE_HUGE_LEVEL)
+.ifeq (\level - UK_PAGING_PAGE_HUGE_LEVEL)
 	pte \paddr, (\pte + X86_PTE_PSE)
 	.exitm
 .endif
-.ifeq (\level - PAGE_LARGE_LEVEL)
+.ifeq (\level - UK_PAGING_PAGE_LARGE_LEVEL)
 	pte \paddr, (\pte + X86_PTE_PSE)
 .else
 	pte \paddr, \pte
@@ -86,19 +87,19 @@
 .ifle \pages
 	.exitm
 .endif
-	pte_page (\paddr + PAGE_Lx_SIZE(\lvl) * 0), \lvl, \pte
+	pte_page (\paddr + UK_PAGING_PAGE_Lx_SIZE(\lvl) * 0), \lvl, \pte
 .ifgt \pages - 8
 	/* Have to do some unrolling to not exceed max nested macros */
-	pte_page (\paddr + PAGE_Lx_SIZE(\lvl) * 1), \lvl, \pte
-	pte_page (\paddr + PAGE_Lx_SIZE(\lvl) * 2), \lvl, \pte
-	pte_page (\paddr + PAGE_Lx_SIZE(\lvl) * 3), \lvl, \pte
-	pte_page (\paddr + PAGE_Lx_SIZE(\lvl) * 4), \lvl, \pte
-	pte_page (\paddr + PAGE_Lx_SIZE(\lvl) * 5), \lvl, \pte
-	pte_page (\paddr + PAGE_Lx_SIZE(\lvl) * 6), \lvl, \pte
-	pte_page (\paddr + PAGE_Lx_SIZE(\lvl) * 7), \lvl, \pte
-	pte_fill (\paddr + PAGE_Lx_SIZE(\lvl) * 8), (\pages - 8), \lvl, \pte
+	pte_page (\paddr + UK_PAGING_PAGE_Lx_SIZE(\lvl) * 1), \lvl, \pte
+	pte_page (\paddr + UK_PAGING_PAGE_Lx_SIZE(\lvl) * 2), \lvl, \pte
+	pte_page (\paddr + UK_PAGING_PAGE_Lx_SIZE(\lvl) * 3), \lvl, \pte
+	pte_page (\paddr + UK_PAGING_PAGE_Lx_SIZE(\lvl) * 4), \lvl, \pte
+	pte_page (\paddr + UK_PAGING_PAGE_Lx_SIZE(\lvl) * 5), \lvl, \pte
+	pte_page (\paddr + UK_PAGING_PAGE_Lx_SIZE(\lvl) * 6), \lvl, \pte
+	pte_page (\paddr + UK_PAGING_PAGE_Lx_SIZE(\lvl) * 7), \lvl, \pte
+	pte_fill (\paddr + UK_PAGING_PAGE_Lx_SIZE(\lvl) * 8), (\pages - 8), \lvl, \pte
 .else
-	pte_fill (\paddr + PAGE_Lx_SIZE(\lvl) * 1), (\pages - 1), \lvl, \pte
+	pte_fill (\paddr + UK_PAGING_PAGE_Lx_SIZE(\lvl) * 1), (\pages - 1), \lvl, \pte
 .endif
 .endm
 
@@ -166,19 +167,19 @@ x86_bpt_pdpt0: /* 1G pages */
 	pte_zero , 0x1fc
 
 /* Page table for 512 GiB direct-mapped physical memory */
-#ifdef CONFIG_PAGING
+#ifdef CONFIG_HAVE_PAGING
 .align 0x1000
 x86_bpt_pdpt511: /* 1G pages */
 	pte_fill 0x0000000000000000, 0x200, PDPT_LVL, PTE_RW
-#endif /* CONFIG_PAGING */
+#endif /* CONFIG_HAVE_PAGING */
 
 .align 0x1000
 .global x86_bpt_pml4
 x86_bpt_pml4:
 	ur_pte	x86_bpt_pdpt0, PTE_RW
 	pte_zero , 0x1fe
-#ifdef CONFIG_PAGING
+#ifdef CONFIG_HAVE_PAGING
 	ur_pte	x86_bpt_pdpt511, PTE_RW
 #else
 	pte_zero , 0x001
-#endif /* CONFIG_PAGING */
+#endif /* CONFIG_HAVE_PAGING */

@@ -59,13 +59,13 @@ ENTRY(start_mmu)
 	ldr x2, =MAIR_INIT_ATTR
 	msr mair_el1, x2
 
-#ifdef CONFIG_PAGING
+#if CONFIG_HAVE_PAGING
 	/* Set up TCR_EL1. The platform must provide a
 	 * configuration compatible with the paging API.
 	 */
 	ldr x2, =TCR_INIT_FLAGS
 	msr tcr_el1, x2
-#else /* CONFIG_PAGING */
+#else /* !CONFIG_HAVE_PAGING */
 	/* Get VIRT_BITS from id_aa64mmfr0_el1.PARange */
 	mrs x3, id_aa64mmfr0_el1
 	ur_ldr  x5, tcr_ips_bits
@@ -90,7 +90,7 @@ setup_tcr_el1:
 	orr x2, x5, x2
 	bfi x2, x3, #32, #3
 	msr tcr_el1, x2
-#endif /* CONFIG_PAGING */
+#endif /* !CONFIG_HAVE_PAGING */
 
 	/* save lr */
 	mov x22, x30

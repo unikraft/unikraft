@@ -44,11 +44,11 @@ arm64_bpt_l3_pt0:
 	ur_pte  arm64_bpt_l2_pt0, PTE_TYPE_TABLE
 	ur_pte  arm64_bpt_l2_pt1, PTE_TYPE_TABLE
 	pte_zero	, 509
-#if CONFIG_PAGING
+#if CONFIG_HAVE_PAGING
 	ur_pte  arm64_bpt_l2_pt511, PTE_TYPE_TABLE
-#else /* !CONFIG_PAGING */
+#else /* !CONFIG_HAVE_PAGING */
 	pte_zero	, 1
-#endif /* !CONFIG_PAGING */
+#endif /* !CONFIG_HAVE_PAGING */
 
 /* L2: 0 - 512GiB (1GiB / entry)
  *
@@ -70,7 +70,7 @@ arm64_bpt_l2_pt0:
 arm64_bpt_l2_pt1:
 	pte_fill	0x0000008000000000, 512, 2, PTE_BLOCK_NORMAL_RW
 
-#if CONFIG_PAGING
+#if CONFIG_HAVE_PAGING
 /* L2: 255.5 TiB - 256TiB (1GiB / entry)
  *
  * 0x0000ff8000000000 - 0x0000ffffffffffff	Direct-mapped
@@ -78,7 +78,7 @@ arm64_bpt_l2_pt1:
 .align 12
 arm64_bpt_l2_pt511:
 	pte_fill	0x0000000000000000, 512, 2, PTE_BLOCK_NORMAL_RW
-#endif /* CONFIG_PAGING */
+#endif /* CONFIG_HAVE_PAGING */
 
 /* L1: 2GiB - 3GiB (2MiB / entry)
  *

@@ -7,7 +7,7 @@
 #include <uk/essentials.h>
 #include <uk/arch/limits.h>
 #include <uk/arch/types.h>
-#include <uk/arch/paging.h>
+#include <uk/paging.h>
 #include <uk/plat/bootstrap.h>
 #include <uk/plat/common/bootinfo.h>
 #include <uk/plat/common/lcpu.h>
@@ -88,11 +88,11 @@ void multiboot_entry(struct lcpu *lcpu, struct multiboot_info *mi)
 	if (mi->flags & MULTIBOOT_INFO_MODS) {
 		mods = (multiboot_module_t *)(__uptr)mi->mods_addr;
 		for (i = 0; i < mi->mods_count; i++) {
-			mrd.pbase = PAGE_ALIGN_DOWN(mods[i].mod_start);
+			mrd.pbase = UK_PAGING_PAGE_ALIGN_DOWN(mods[i].mod_start);
 			mrd.vbase = mrd.pbase; /* 1:1 mapping */
 			mrd.pg_off = mods[i].mod_start - mrd.pbase;
 			mrd.len = mods[i].mod_end - mods[i].mod_start;
-			mrd.pg_count = PAGE_COUNT(mrd.pg_off + mrd.len);
+			mrd.pg_count = UK_PAGING_PAGE_COUNT(mrd.pg_off + mrd.len);
 			mrd.type  = UKPLAT_MEMRT_INITRD;
 			mrd.flags = UKPLAT_MEMRF_READ;
 
@@ -122,14 +122,15 @@ void multiboot_entry(struct lcpu *lcpu, struct multiboot_info *mi)
 
 			start = MAX(m->addr, __PAGE_SIZE);
 			end   = m->addr + m->len;
-			if (unlikely(end <= start || end - start < PAGE_SIZE))
+			if (unlikely(end <= start ||
+				     end - start < UK_PAGING_PAGE_SIZE))
 				continue;
 
-			mrd.pbase = PAGE_ALIGN_DOWN(start);
+			mrd.pbase = UK_PAGING_PAGE_ALIGN_DOWN(start);
 			mrd.vbase = mrd.pbase; /* 1:1 mapping */
 			mrd.pg_off = start - mrd.pbase;
 			mrd.len = end - start;
-			mrd.pg_count = PAGE_COUNT(mrd.pg_off + mrd.len);
+			mrd.pg_count = UK_PAGING_PAGE_COUNT(mrd.pg_off + mrd.len);
 
 			if (m->type == MULTIBOOT_MEMORY_AVAILABLE) {
 				mrd.type  = UKPLAT_MEMRT_FREE;
@@ -137,9 +138,9 @@ void multiboot_entry(struct lcpu *lcpu, struct multiboot_info *mi)
 					    UKPLAT_MEMRF_WRITE;
 
 				/* Free memory regions have
-				 * mrd.len == mrd.pg_count * PAGE_SIZE
+				 * mrd.len == mrd.pg_count * UK_PAGING_PAGE_SIZE
 				 */
-				mrd.len = PAGE_ALIGN_UP(mrd.len + mrd.pg_off);
+				mrd.len = UK_PAGING_PAGE_ALIGN_UP(mrd.len + mrd.pg_off);
 			} else {
 				mrd.type  = UKPLAT_MEMRT_RESERVED;
 				mrd.flags = UKPLAT_MEMRF_READ;

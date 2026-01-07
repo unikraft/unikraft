@@ -37,6 +37,7 @@
 #include <string.h>
 #include <uk/print.h>
 #include <uk/errptr.h>
+#include <uk/paging.h>
 #include <uk/plat/common/cpu.h>
 #include <uk/sglist.h>
 #include <uk/atomic.h>
@@ -45,7 +46,6 @@
 #include <virtio/virtio_bus.h>
 #ifdef CONFIG_LIBUKVMEM
 #include <uk/falloc.h>
-#include <uk/paging.h>
 #include <uk/vmem.h>
 #endif /* CONFIG_LIBUKVMEM */
 
@@ -314,7 +314,7 @@ __paddr_t virtqueue_physaddr(struct virtqueue *vq)
 	UK_ASSERT(vq);
 
 	vrq = to_virtqueue_vring(vq);
-	return uk_paging_virt_to_phys(vrq->vring_mem);
+	return uk_paging_virt_to_phys((__vaddr_t)vrq->vring_mem);
 }
 
 __paddr_t virtqueue_get_avail_addr(struct virtqueue *vq)

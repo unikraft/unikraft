@@ -5,7 +5,7 @@
  */
 
 #include <kvm/efi.h>
-#include <uk/arch/paging.h>
+#include <uk/paging.h>
 #include <uk/libid.h>
 #include <uk/plat/common/bootinfo.h>
 
@@ -234,7 +234,7 @@ uk_efi_get_mmap_retry:
 		/* Free the memory map previously allocated */
 		status = uk_efi_bs->free_pages((uk_efi_paddr_t)*map,
 					       DIV_ROUND_UP(*map_sz,
-							    PAGE_SIZE));
+							    UK_PAGING_PAGE_SIZE));
 		if (unlikely(status != UK_EFI_SUCCESS))
 			UK_EFI_CRASH("Failed to free previous memory map\n");
 	}
@@ -260,7 +260,7 @@ uk_efi_get_mmap_retry:
 	*map = (struct uk_efi_mem_desc *)uk_efi_alloc_max_paddr;
 	status = uk_efi_bs->allocate_pages(uk_efi_alloc_type,
 					   UK_EFI_LOADER_DATA,
-					   DIV_ROUND_UP(*map_sz, PAGE_SIZE),
+					   DIV_ROUND_UP(*map_sz, UK_PAGING_PAGE_SIZE),
 					   (uk_efi_paddr_t *)map);
 	if (unlikely(status != UK_EFI_SUCCESS))
 		UK_EFI_CRASH("Failed to allocate memory for map\n");
@@ -482,7 +482,7 @@ static void uk_efi_read_file(uk_efi_hndl_t dev_h, const char *file_name,
 	*buf = (char *)uk_efi_alloc_max_paddr;
 	status = uk_efi_bs->allocate_pages(uk_efi_alloc_type,
 					   UK_EFI_LOADER_DATA,
-					   DIV_ROUND_UP(*len, PAGE_SIZE),
+					   DIV_ROUND_UP(*len, UK_PAGING_PAGE_SIZE),
 					   (uk_efi_paddr_t *)buf);
 	if (unlikely(status != UK_EFI_SUCCESS))
 		UK_EFI_CRASH("Failed to allocate memory for file contents\n");
@@ -519,7 +519,7 @@ static void uk_efi_setup_bootinfo_cmdl(struct ukplat_bootinfo *bi)
 		cmdl = (char *)uk_efi_alloc_max_paddr;
 		status = uk_efi_bs->allocate_pages(uk_efi_alloc_type,
 						   UK_EFI_LOADER_DATA,
-						   DIV_ROUND_UP(len, PAGE_SIZE),
+						   DIV_ROUND_UP(len, UK_PAGING_PAGE_SIZE),
 						   (uk_efi_paddr_t *)&cmdl);
 		if (unlikely(status != UK_EFI_SUCCESS))
 			UK_EFI_CRASH("Failed to allocate memory for cmdl\n");
@@ -563,7 +563,7 @@ static void uk_efi_setup_bootinfo_initrd(struct ukplat_bootinfo *bi)
 	mrd.vbase = (__vaddr_t)initrd;
 	mrd.pg_off = 0;
 	mrd.len = len;
-	mrd.pg_count = PAGE_COUNT(len);
+	mrd.pg_count = UK_PAGING_PAGE_COUNT(len);
 	mrd.type = UKPLAT_MEMRT_INITRD;
 	mrd.flags = UKPLAT_MEMRF_READ;
 	rc = ukplat_memregion_list_insert(&bi->mrds, &mrd);
@@ -592,7 +592,7 @@ static void uk_efi_setup_bootinfo_dtb(struct ukplat_bootinfo *bi)
 	mrd.vbase = (__vaddr_t)dtb;
 	mrd.pg_off = 0;
 	mrd.len = len;
-	mrd.pg_count = PAGE_COUNT(len);
+	mrd.pg_count = UK_PAGING_PAGE_COUNT(len);
 	mrd.type = UKPLAT_MEMRT_DEVICETREE;
 	mrd.flags = UKPLAT_MEMRF_READ;
 	rc = ukplat_memregion_list_insert(&bi->mrds, &mrd);

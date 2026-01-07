@@ -7,7 +7,7 @@
 #include <uk/essentials.h>
 #include <uk/arch/limits.h>
 #include <uk/arch/types.h>
-#include <uk/arch/paging.h>
+#include <uk/paging.h>
 #include <uk/plat/bootstrap.h>
 #include <uk/plat/common/bootinfo.h>
 #include <uk/plat/common/lcpu.h>
@@ -60,12 +60,12 @@ lxboot_init_initrd(struct ukplat_bootinfo *bi, struct lxboot_params *bp)
 	if (initrd_addr == 0 || initrd_size == 0)
 		return;
 
-	mrd.pbase = PAGE_ALIGN_DOWN(initrd_addr);
+	mrd.pbase = UK_PAGING_PAGE_ALIGN_DOWN(initrd_addr);
 	mrd.vbase = mrd.pbase;
 	mrd.pg_off = initrd_addr - mrd.pbase;
 	mrd.len = initrd_size;
 	mrd.type = UKPLAT_MEMRT_INITRD;
-	mrd.pg_count = PAGE_COUNT(mrd.pg_off + initrd_size);
+	mrd.pg_count = UK_PAGING_PAGE_COUNT(mrd.pg_off + initrd_size);
 	mrd.flags = UKPLAT_MEMRF_READ;
 #ifdef CONFIG_UKPLAT_MEMRNAME
 	memcpy(mrd.name, "initrd", sizeof("initrd"));
@@ -91,26 +91,26 @@ lxboot_init_mem(struct ukplat_bootinfo *bi, struct lxboot_params *bp)
 		/* Kludge: Don't add zero-page, because the platform code does
 		 * not handle address zero well.
 		 */
-		start = MAX(entry->addr, PAGE_SIZE);
+		start = MAX(entry->addr, UK_PAGING_PAGE_SIZE);
 		end = entry->addr + entry->size;
 
 		if (end <= start)
 			continue;
 
-		mrd.pbase = PAGE_ALIGN_DOWN(start);
+		mrd.pbase = UK_PAGING_PAGE_ALIGN_DOWN(start);
 		mrd.vbase = mrd.pbase; /* 1:1 mapping */
 		mrd.pg_off = start - mrd.pbase;
 		mrd.len = end - start;
-		mrd.pg_count = PAGE_COUNT(mrd.pg_off + mrd.len);
+		mrd.pg_count = UK_PAGING_PAGE_COUNT(mrd.pg_off + mrd.len);
 
 		if (entry->type == LXBOOT_E820_TYPE_RAM) {
 			mrd.type = UKPLAT_MEMRT_FREE;
 			mrd.flags = UKPLAT_MEMRF_READ | UKPLAT_MEMRF_WRITE;
 
 			/* Free memory regions have
-			 * mrd.len == mrd.pg_count * PAGE_SIZE
+			 * mrd.len == mrd.pg_count * UK_PAGING_PAGE_SIZE
 			 */
-			mrd.len = PAGE_ALIGN_UP(mrd.len + mrd.pg_off);
+			mrd.len = UK_PAGING_PAGE_ALIGN_UP(mrd.len + mrd.pg_off);
 		} else {
 			mrd.type = UKPLAT_MEMRT_RESERVED;
 			mrd.flags = UKPLAT_MEMRF_READ;
