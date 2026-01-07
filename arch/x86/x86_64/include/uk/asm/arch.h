@@ -6,10 +6,6 @@
  * You may not use this file except in compliance with the License.
  */
 
-#ifndef __UKARCH_LCPU_H__
-#error Do not include this header directly
-#endif
-
 #include <uk/asm/apic.h>
 #include <uk/asm/fsgsbase.h>
 #include <uk/asm/pic.h>
