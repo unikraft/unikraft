@@ -97,7 +97,7 @@ struct pf_device {
 };
 UK_TAILQ_HEAD(pf_device_list, struct pf_device);
 
-#if CONFIG_PAGING
+#if CONFIG_LIBUKPAGING
 /**
  * (Re)map device memory
  *
@@ -109,7 +109,7 @@ UK_TAILQ_HEAD(pf_device_list, struct pf_device);
  * @return virtual address
  */
 __vaddr_t uk_bus_pf_devmap(__u64 base, __sz size);
-#endif /* CONFIG_PAGING */
+#endif /* CONFIG_LIBUKPAGING */
 
 #define PF_REGISTER_DRIVER(b)                  \
 	_PF_REGISTER_DRIVER(__LIBNAME__, b)

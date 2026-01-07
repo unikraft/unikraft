@@ -78,7 +78,8 @@ static inline void *page_alloc(struct uk_alloc *a, unsigned long num_pages)
 	if (a->palloc)
 		return uk_palloc(a, num_pages);
 	else
-		return uk_memalign(a, PAGE_SIZE, num_pages * PAGE_SIZE);
+		return uk_memalign(a, UK_PAGING_PAGE_SIZE,
+				   num_pages * UK_PAGING_PAGE_SIZE);
 }
 
 static inline void page_free(struct uk_alloc *a, void *ptr,
@@ -162,9 +163,9 @@ static int netfront_xmit(struct uk_netdev *n,
 	UK_ASSERT(n != NULL);
 	UK_ASSERT(txq != NULL);
 	UK_ASSERT(pkt != NULL);
-	UK_ASSERT(pkt->len < PAGE_SIZE);
+	UK_ASSERT(pkt->len < UK_PAGING_PAGE_SIZE);
 	UK_ASSERT(!pkt->next); /* TODO: Support for netbuf chains missing */
-	UK_ASSERT(((unsigned long) pkt->buf & ~PAGE_MASK) == 0);
+	UK_ASSERT(((unsigned long)pkt->buf & ~UK_PAGING_PAGE_MASK) == 0);
 
 	nfdev = to_netfront_dev(n);
 
@@ -243,7 +244,7 @@ static int netfront_rxq_enqueue(struct uk_netdev_rx_queue *rxq,
 	int notify;
 
 	/* buffer must be page aligned */
-	UK_ASSERT(((unsigned long) netbuf->buf & ~PAGE_MASK) == 0);
+	UK_ASSERT(((unsigned long)netbuf->buf & ~UK_PAGING_PAGE_MASK) == 0);
 
 	if (RING_FULL(&rxq->ring)) {
 		uk_pr_debug("rx queue is full\n");
@@ -481,9 +482,9 @@ static struct uk_netdev_tx_queue *netfront_txq_setup(struct uk_netdev *n,
 	sring = page_alloc(conf->a, 1);
 	if (!sring)
 		return ERR2PTR(-ENOMEM);
-	memset(sring, 0, PAGE_SIZE);
+	memset(sring, 0, UK_PAGING_PAGE_SIZE);
 	SHARED_RING_INIT(sring);
-	FRONT_RING_INIT(&txq->ring, sring, PAGE_SIZE);
+	FRONT_RING_INIT(&txq->ring, sring, UK_PAGING_PAGE_SIZE);
 	txq->ring_size = NET_TX_RING_SIZE;
 	txq->ring_ref = gnttab_grant_access(nfdev->xendev->otherend_id,
 		virt_to_mfn(sring), 0);
@@ -560,9 +561,9 @@ static struct uk_netdev_rx_queue *netfront_rxq_setup(struct uk_netdev *n,
 	sring = page_alloc(conf->a, 1);
 	if (!sring)
 		return ERR2PTR(-ENOMEM);
-	memset(sring, 0, PAGE_SIZE);
+	memset(sring, 0, UK_PAGING_PAGE_SIZE);
 	SHARED_RING_INIT(sring);
-	FRONT_RING_INIT(&rxq->ring, sring, PAGE_SIZE);
+	FRONT_RING_INIT(&rxq->ring, sring, UK_PAGING_PAGE_SIZE);
 	rxq->ring_size = NET_RX_RING_SIZE;
 	rxq->ring_ref = gnttab_grant_access(nfdev->xendev->otherend_id,
 		virt_to_mfn(sring), 0);
@@ -796,7 +797,7 @@ static void netfront_info_get(struct uk_netdev *n,
 	dev_info->max_mtu = nfdev->mtu;
 	dev_info->nb_encap_tx = 0;
 	dev_info->nb_encap_rx = 0;
-	dev_info->ioalign = PAGE_SIZE;
+	dev_info->ioalign = UK_PAGING_PAGE_SIZE;
 	dev_info->features = UK_NETDEV_F_RXQ_INTR | UK_NETDEV_F_PARTIAL_CSUM;
 }
 

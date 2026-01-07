@@ -306,7 +306,7 @@ static int vga_init(struct ukplat_bootinfo *bi)
 	mrd.vbase = X86_VIDEO_MEM_START;
 	mrd.pg_off = 0;
 	mrd.len = X86_VIDEO_MEM_LEN;
-	mrd.pg_count = PAGE_COUNT(X86_VIDEO_MEM_LEN);
+	mrd.pg_count = UK_PAGING_PAGE_COUNT(X86_VIDEO_MEM_LEN);
 	mrd.type = UKPLAT_MEMRT_RESERVED;
 	mrd.flags = UKPLAT_MEMRF_READ | UKPLAT_MEMRF_WRITE;
 	rc = ukplat_memregion_list_insert(&bi->mrds, &mrd);

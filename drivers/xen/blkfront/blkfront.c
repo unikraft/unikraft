@@ -55,7 +55,7 @@
 #define DRIVER_NAME		"xen-blkfront"
 
 #define SECTOR_INDEX_IN_PAGE(a, sector_size) \
-	(((a) & ~PAGE_MASK) / (sector_size))
+	(((a) & ~UK_PAGING_PAGE_MASK) / (sector_size))
 
 /* TODO Same interrupt macros we use in virtio-blk */
 #define BLKFRONT_INTR_EN             (1 << 0)
@@ -80,7 +80,8 @@ static inline void *page_alloc(struct uk_alloc *a, unsigned long num_pages)
 	if (a->palloc)
 		return uk_palloc(a, num_pages);
 	else
-		return uk_memalign(a, PAGE_SIZE, num_pages * PAGE_SIZE);
+		return uk_memalign(a, UK_PAGING_PAGE_SIZE,
+				   num_pages * UK_PAGING_PAGE_SIZE);
 }
 
 static inline void page_free(struct uk_alloc *a, void *ptr,
@@ -227,7 +228,7 @@ static void blkfront_request_map_grefs(struct blkif_request *ring_req,
 	nb_segments = blkfront_req->nb_segments;
 
 	for (gref_index = 0; gref_index < nb_segments; ++gref_index) {
-		data = start_sector + gref_index * PAGE_SIZE;
+		data = start_sector + gref_index * UK_PAGING_PAGE_SIZE;
 		ref_elem = blkfront_req->gref[gref_index];
 
 #if CONFIG_LIBBLKFRONT_GREFPOOL
@@ -273,7 +274,7 @@ static void blkif_request_init(struct blkif_request *ring_req,
 	 **/
 	start_sector = round_pgdown(start_data);
 	end_sector = round_pgup(end_data);
-	nb_segments = (end_sector - start_sector) / PAGE_SIZE;
+	nb_segments = (end_sector - start_sector) / UK_PAGING_PAGE_SIZE;
 	UK_ASSERT(nb_segments <= BLKIF_MAX_SEGMENTS_PER_REQUEST);
 
 	/* Set ring request */
@@ -285,7 +286,7 @@ static void blkif_request_init(struct blkif_request *ring_req,
 	/* Set for each page the offset of sectors used for request */
 	for (seg = 0; seg < nb_segments; ++seg) {
 		ring_req->seg[seg].first_sect = 0;
-		ring_req->seg[seg].last_sect = PAGE_SIZE / sector_size - 1;
+		ring_req->seg[seg].last_sect = UK_PAGING_PAGE_SIZE / sector_size - 1;
 	}
 
 	ring_req->seg[0].first_sect =
@@ -593,9 +594,9 @@ static int blkfront_ring_init(struct uk_blkdev_queue *queue)
 	if (!sring)
 		return -ENOMEM;
 
-	memset(sring, 0, PAGE_SIZE);
+	memset(sring, 0, UK_PAGING_PAGE_SIZE);
 	SHARED_RING_INIT(sring);
-	FRONT_RING_INIT(&queue->ring, sring, PAGE_SIZE);
+	FRONT_RING_INIT(&queue->ring, sring, UK_PAGING_PAGE_SIZE);
 
 	queue->ring_ref = gnttab_grant_access(dev->xendev->otherend_id,
 			virt_to_mfn(sring), 0);

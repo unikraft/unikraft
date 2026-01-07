@@ -434,7 +434,7 @@ static int gen_pci_probe(struct pf_device *pfdev __unused)
 		reg_size = reg_size << 32 | fdt32_to_cpu(prop[3]);
 	}
 
-#if CONFIG_PAGING
+#if CONFIG_LIBUKPAGING
 	vaddr = uk_bus_pf_devmap(reg_base, reg_size);
 	if (unlikely(PTRISERR(vaddr))) {
 		uk_pr_err("Could not map MMIO region at 0x%lx - 0x%lx (%d)\n",
@@ -442,9 +442,9 @@ static int gen_pci_probe(struct pf_device *pfdev __unused)
 		return PTR2ERR(vaddr);
 	}
 	pcw.config_base = vaddr;
-#else /* !CONFIG_PAGING */
+#else /* !CONFIG_LIBUKPAGING */
 	pcw.config_base = reg_base;
-#endif /* !CONFIG_PAGING */
+#endif /* !CONFIG_LIBUKPAGING */
 
 	pcw.config_space_size = reg_size;
 	uk_pr_info("generic pci config base(0x%lx), size(0x%lx)\n",

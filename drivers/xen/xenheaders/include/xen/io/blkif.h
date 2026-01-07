@@ -585,9 +585,9 @@
  * information about the segments. The number of indirect pages to use is
  * determined by the number of segments an indirect request contains. Every
  * indirect page can contain a maximum of
- * (PAGE_SIZE / sizeof(struct blkif_request_segment)) segments, so to
+ * (UK_PAGING_PAGE_SIZE / sizeof(struct blkif_request_segment)) segments, so to
  * calculate the number of indirect pages to use we have to do
- * ceil(indirect_segments / (PAGE_SIZE / sizeof(struct blkif_request_segment))).
+ * ceil(indirect_segments / (UK_PAGING_PAGE_SIZE / sizeof(struct blkif_request_segment))).
  *
  * If a backend does not recognize BLKIF_OP_INDIRECT, it should *not*
  * create the "feature-max-indirect-segments" node!
@@ -596,7 +596,7 @@
 
 /*
  * Maximum scatter/gather segments per request.
- * This is carefully chosen so that sizeof(blkif_ring_t) <= PAGE_SIZE.
+ * This is carefully chosen so that sizeof(blkif_ring_t) <= UK_PAGING_PAGE_SIZE.
  * NB. This could be 12 if the ring indexes weren't stored in the same page.
  */
 #define BLKIF_MAX_SEGMENTS_PER_REQUEST 11

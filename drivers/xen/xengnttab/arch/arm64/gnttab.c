@@ -87,7 +87,7 @@ grant_entry_v1_t *gnttab_arch_init(int nr_grant_frames)
 		xatp.size = 0;     // Seems to be unused
 		xatp.space = XENMAPSPACE_grant_table;
 		xatp.idx = i;
-		xatp.gpfn = (gnttab_table >> PAGE_SHIFT) + i;
+		xatp.gpfn = (gnttab_table >> UK_PAGING_PAGE_SHIFT) + i;
 		if (HYPERVISOR_memory_op(XENMEM_add_to_physmap, &xatp) != 0)
 			BUG();
 	}

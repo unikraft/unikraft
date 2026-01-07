@@ -92,14 +92,14 @@ static int arch_pci_driver_add_device(struct pci_driver *drv,
 	memcpy(&dev->addr, addr,  sizeof(dev->addr));
 	dev->drv = drv;
 
-#if CONFIG_PAGING
+#if CONFIG_LIBUKPAGING
 	/* TODO Properly query the BAR size */
 	base = uk_bus_pf_devmap(base, __PAGE_SIZE);
 	if (unlikely(PTRISERR(base))) {
 		uk_pr_err("Could not map device (%d)\n", PTR2ERR(base));
 		return PTR2ERR(base);
 	}
-#endif /* CONFIG_PAGING */
+#endif /* CONFIG_LIBUKPAGING */
 
 	dev->base = base;
 	dev->irq = irq;

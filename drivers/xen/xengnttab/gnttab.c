@@ -41,7 +41,7 @@
 /* NR_GRANT_FRAMES must be less than or equal to that configured in Xen */
 #define NR_GRANT_FRAMES         4
 #define NR_GRANT_ENTRIES \
-	(NR_GRANT_FRAMES * PAGE_SIZE / sizeof(grant_entry_v1_t))
+	(NR_GRANT_FRAMES * UK_PAGING_PAGE_SIZE / sizeof(grant_entry_v1_t))
 
 /*
  * Page allocations in this source file can benefit from a dedicated page alloc.
@@ -53,7 +53,8 @@ static inline void *page_alloc(struct uk_alloc *a, unsigned long num_pages)
 	if (a->palloc)
 		return uk_palloc(a, num_pages);
 	else
-		return uk_memalign(a, PAGE_SIZE, num_pages * PAGE_SIZE);
+		return uk_memalign(a, UK_PAGING_PAGE_SIZE,
+				   num_pages * UK_PAGING_PAGE_SIZE);
 }
 
 static struct gnttab {

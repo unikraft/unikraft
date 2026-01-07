@@ -58,7 +58,7 @@
 #define XEN_PCI_ERR_op_failed       (-5)
 
 /*
- * it should be PAGE_SIZE-sizeof(struct xen_pci_op))/sizeof(struct msix_entry))
+ * it should be UK_PAGING_PAGE_SIZE-sizeof(struct xen_pci_op))/sizeof(struct msix_entry))
  * Should not exceed 128
  */
 #define SH_INFO_MAX_VEC     128

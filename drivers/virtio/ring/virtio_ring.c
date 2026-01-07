@@ -40,15 +40,13 @@
 #include <uk/plat/common/cpu.h>
 #include <uk/sglist.h>
 #include <uk/atomic.h>
-#include <uk/plat/io.h>
 #include <virtio/virtio_ring.h>
 #include <virtio/virtqueue.h>
 #include <virtio/virtio_bus.h>
 #ifdef CONFIG_LIBUKVMEM
-#include <uk/arch/paging.h>
-#include <uk/plat/paging.h>
-#include <uk/vmem.h>
 #include <uk/falloc.h>
+#include <uk/paging.h>
+#include <uk/vmem.h>
 #endif /* CONFIG_LIBUKVMEM */
 
 #define VIRTQUEUE_MAX_SIZE  32768
@@ -316,7 +314,7 @@ __paddr_t virtqueue_physaddr(struct virtqueue *vq)
 	UK_ASSERT(vq);
 
 	vrq = to_virtqueue_vring(vq);
-	return ukplat_virt_to_phys(vrq->vring_mem);
+	return uk_paging_virt_to_phys(vrq->vring_mem);
 }
 
 __paddr_t virtqueue_get_avail_addr(struct virtqueue *vq)
@@ -471,18 +469,19 @@ struct virtqueue *virtqueue_create(__u16 queue_id, __u16 nr_descs, __u16 align,
 
 	ring_size = vring_size(nr_descs, align);
 #ifdef CONFIG_LIBUKVMEM
-	struct uk_pagetable *pt = ukplat_pt_get_active();
-	__paddr_t paddr = __PADDR_ANY;
-	__vaddr_t vaddr = __VADDR_ANY;
+	struct uk_pagetable *pt = uk_paging_pt_get_active();
+	__paddr_t paddr = UK_PAGING_PADDR_ANY;
+	__vaddr_t vaddr = UK_PAGING_VADDR_ANY;
 
-	ring_size = PAGE_ALIGN_UP(ring_size);
+	ring_size = UK_PAGING_PAGE_ALIGN_UP(ring_size);
 
-	rc = pt->fa->falloc(pt->fa, &paddr, ring_size >> PAGE_SHIFT, 0);
+	rc = pt->fa->falloc(pt->fa, &paddr,
+			    ring_size >> UK_PAGING_PAGE_SHIFT, 0);
 	if (unlikely(rc))
 		goto err_freevq;
 
 	rc = uk_vma_map_dma(uk_vas_get_active(), &vaddr, ring_size,
-			    PAGE_ATTR_PROT_RW, UK_VMA_MAP_POPULATE,
+			    UK_PAGING_PAGE_ATTR_PROT_RW, UK_VMA_MAP_POPULATE,
 			    "virtqueue", paddr);
 	if (unlikely(rc))
 		goto err_freevq;

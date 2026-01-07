@@ -31,16 +31,17 @@
  */
 
 #include <string.h>
-#include <uk/print.h>
-#include <uk/plat/memory.h>
-#include <uk/plat/common/cpu.h>
 #include <uk/bus/platform.h>
+#include <uk/print.h>
 #include <uk/plat/common/bootinfo.h>
+#include <uk/plat/common/cpu.h>
+#include <uk/plat/memory.h>
+#include <uk/plat/native/paging.h>
 
-#if CONFIG_PAGING
+#if CONFIG_LIBUKPAGING
 #include <uk/errptr.h>
-#include <uk/plat/paging.h>
-#endif /* CONFIG_PAGING */
+#include <uk/paging.h>
+#endif /* CONFIG_LIBUKPAGING */
 
 #if CONFIG_LIBUKBUS_PLATFORM_FDT
 #include <libfdt.h>
@@ -235,7 +236,7 @@ static int pf_init(struct uk_alloc *a)
 	return 0;
 }
 
-#if CONFIG_PAGING
+#if CONFIG_LIBUKPAGING
 __vaddr_t uk_bus_pf_devmap(__paddr_t base, __sz size)
 {
 	struct uk_pagetable *pt;
@@ -245,14 +246,14 @@ __vaddr_t uk_bus_pf_devmap(__paddr_t base, __sz size)
 	__paddr_t paddr;
 	int rc;
 
-	attr = PAGE_ATTR_PROT_RW;
+	attr = UK_PAGING_PAGE_ATTR_PROT_RW;
 #ifdef CONFIG_ARCH_ARM_64
-	attr |= PAGE_ATTR_TYPE_DEVICE_nGnRnE;
+	attr |= UK_PLAT_NATIVE_PAGE_ATTR_TYPE_DEVICE_nGnRnE;
 #endif /* CONFIG_ARCH_ARM_64 */
 
-	pages = ALIGN_UP(size, __PAGE_SIZE) >> PAGE_SHIFT;
+	pages = ALIGN_UP(size, __PAGE_SIZE) >> UK_PAGING_PAGE_SHIFT;
 
-	pt = ukplat_pt_get_active();
+	pt = uk_paging_pt_get_active();
 
 	paddr = ALIGN_DOWN(base, __PAGE_SIZE);
 	vaddr = ALIGN_DOWN(base, __PAGE_SIZE);
@@ -262,12 +263,12 @@ __vaddr_t uk_bus_pf_devmap(__paddr_t base, __sz size)
 	 * bringing up secondary cores.
 	 *
 	 * Notice that updating the attributes of an already mapped region
-	 * can potentialy fail, as ukplat_page_map() will also return EEXIST
+	 * can potentialy fail, as uk_paging_page_map() will also return EEXIST
 	 * for a partially mapped region too. Addressing this problem by
 	 * remapping a region page-by-page is too slow for devices with large
 	 * regions like PCI.
 	 */
-	rc = ukplat_page_map(pt, vaddr, paddr, pages, attr, 0);
+	rc = uk_paging_page_map(pt, vaddr, paddr, pages, attr, 0);
 	if (unlikely(rc && rc != -EEXIST)) {
 		uk_pr_err("Could not map MMIO Region at 0x%lx - 0x%lx (%d)\n",
 			  base, base + size, rc);
@@ -275,14 +276,14 @@ __vaddr_t uk_bus_pf_devmap(__paddr_t base, __sz size)
 	}
 
 	if (rc == -EEXIST) {
-		rc = ukplat_page_unmap(pt, vaddr, pages, 0);
+		rc = uk_paging_page_unmap(pt, vaddr, pages, 0);
 		if (unlikely(rc)) {
 			uk_pr_err("Could not unmap MMIO Region at 0x%lx - 0x%lx (%d)\n",
 				  base, base + size, rc);
 			return rc;
 		}
 
-		rc = ukplat_page_map(pt, vaddr, paddr, pages, attr, 0);
+		rc = uk_paging_page_map(pt, vaddr, paddr, pages, attr, 0);
 		if (unlikely(rc)) {
 			uk_pr_err("Could not map MMIO Region at 0x%lx - 0x%lx (%d)\n",
 				  base, base + size, rc);
@@ -292,7 +293,7 @@ __vaddr_t uk_bus_pf_devmap(__paddr_t base, __sz size)
 
 	return (__vaddr_t)base;
 }
-#endif /* CONFIG_PAGING */
+#endif /* CONFIG_LIBUKPAGING */
 
 void _pf_register_driver(struct pf_driver *drv)
 {

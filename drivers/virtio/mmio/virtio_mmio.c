@@ -477,14 +477,14 @@ int virtio_mmio_add_dev(struct pf_device *pfdev)
 
 	UK_ASSERT(pfdev != NULL);
 
-#if CONFIG_PAGING
+#if CONFIG_LIBUKPAGING
 	pfdev->base = uk_bus_pf_devmap(pfdev->base, pfdev->size);
 	if (unlikely(PTRISERR(pfdev->base))) {
 		uk_pr_err("Could not map the device (%d)\n",
 			  PTR2ERR(pfdev->base));
 		return PTR2ERR(pfdev->base);
 	}
-#endif /* CONFIG_PAGING */
+#endif /* CONFIG_LIBUKPAGING */
 
 	vm_dev = uk_malloc(a, sizeof(*vm_dev));
 	if (!vm_dev) {

@@ -75,7 +75,8 @@ static inline void *page_alloc(struct uk_alloc *a, unsigned long num_pages)
 	if (a->palloc)
 		return uk_palloc(a, num_pages);
 	else
-		return uk_memalign(a, PAGE_SIZE, num_pages * PAGE_SIZE);
+		return uk_memalign(a, UK_PAGING_PAGE_SIZE,
+				   num_pages * UK_PAGING_PAGE_SIZE);
 }
 
 static inline void page_free(struct uk_alloc *a, void *ptr,
@@ -217,8 +218,9 @@ static void p9front_free_dev_ring(struct p9front_dev *p9fdev, int idx)
 	unbind_evtchn(ring->evtchn);
 	for (i = 0; i < (1 << p9fdev->ring_order); i++)
 		gnttab_end_access(ring->intf->ref[i]);
-	page_free(a, ring->data.in,
-		  1ul << (p9fdev->ring_order + XEN_PAGE_SHIFT - PAGE_SHIFT));
+	page_free(a, ring->data.in, 1UL << (p9fdev->ring_order +
+					    XEN_PAGE_SHIFT -
+					    UK_PAGING_PAGE_SHIFT));
 	gnttab_end_access(ring->ref);
 	page_free(a, ring->intf, 1);
 	ring->initialized = false;
@@ -259,7 +261,7 @@ static int p9front_allocate_dev_ring(struct p9front_dev *p9fdev, int idx)
 		rc = -ENOMEM;
 		goto out;
 	}
-	memset(ring->intf, 0, PAGE_SIZE);
+	memset(ring->intf, 0, UK_PAGING_PAGE_SIZE);
 
 	/* Grant access to the allocated page to the backend. */
 	ring->ref = gnttab_grant_access(xendev->otherend_id,
@@ -267,8 +269,9 @@ static int p9front_allocate_dev_ring(struct p9front_dev *p9fdev, int idx)
 	UK_ASSERT(ring->ref != GRANT_INVALID_REF);
 
 	/* Allocate memory for the data. */
-	data_bytes = page_alloc(a, 1ul << (p9fdev->ring_order +
-					   XEN_PAGE_SHIFT - PAGE_SHIFT));
+	data_bytes = page_alloc(a, 1UL << (p9fdev->ring_order +
+					   XEN_PAGE_SHIFT -
+					   UK_PAGING_PAGE_SHIFT));
 	if (!data_bytes) {
 		rc = -ENOMEM;
 		goto out_free_intf;
@@ -326,7 +329,9 @@ out_free_grants:
 	for (i = 0; i < (1 << p9fdev->ring_order); i++)
 		gnttab_end_access(ring->intf->ref[i]);
 	page_free(a, data_bytes,
-		  1ul << (p9fdev->ring_order + XEN_PAGE_SHIFT - PAGE_SHIFT));
+		  1UL << (p9fdev->ring_order +
+			  XEN_PAGE_SHIFT -
+			  UK_PAGING_PAGE_SHIFT));
 out_free_intf:
 	gnttab_end_access(ring->ref);
 	page_free(a, ring->intf, 1);

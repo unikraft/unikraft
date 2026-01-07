@@ -56,10 +56,10 @@
 #include <uk/intctlr/limits.h>
 #include <uk/ofw/fdt.h>
 
-#if CONFIG_PAGING
+#if CONFIG_LIBUKPAGING
 #include <uk/bus/platform.h>
 #include <uk/errptr.h>
-#endif /* CONFIG_PAGING */
+#endif /* CONFIG_LIBUKPAGING */
 
 #define GIC_MAX_IRQ	UK_INTCTLR_MAX_IRQ
 
@@ -697,7 +697,7 @@ static int gicv3_do_probe(void)
 }
 #endif /* !CONFIG_UKPLAT_ACPI */
 
-#if CONFIG_PAGING
+#if CONFIG_LIBUKPAGING
 static int gicv3_map(void)
 {
 	__vaddr_t vbase;
@@ -722,7 +722,7 @@ static int gicv3_map(void)
 
 	return 0;
 }
-#endif /* CONFIG_PAGING */
+#endif /* CONFIG_LIBUKPAGING */
 
 /**
  * Probe device tree for GICv3
@@ -757,13 +757,13 @@ int gicv3_probe(struct _gic_dev **dev)
 		return rc;
 	}
 
-#if CONFIG_PAGING
+#if CONFIG_LIBUKPAGING
 	rc = gicv3_map();
 	if (unlikely(rc)) {
 		uk_pr_err("Could not map device (%d)\n", rc);
 		return rc;
 	}
-#endif /* CONFIG_PAGING */
+#endif /* CONFIG_LIBUKPAGING */
 
 	uk_pr_info("Found GICv3 on:\n");
 	uk_pr_info("\tDistributor  : 0x%lx - 0x%lx\n",	gicv3_drv.dist_mem_addr,

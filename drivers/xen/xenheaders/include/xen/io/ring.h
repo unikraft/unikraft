@@ -92,18 +92,20 @@ typedef unsigned int RING_IDX;
  *     mytag_back_ring_t  - The 'back' half of the ring.
  *
  * To initialize a ring in your code you need to know the location and size
- * of the shared memory area (PAGE_SIZE, for instance). To initialise
+ * of the shared memory area (UK_PAGING_PAGE_SIZE, for instance). To initialise
  * the front half:
  *
  *     mytag_front_ring_t front_ring;
  *     SHARED_RING_INIT((mytag_sring_t *)shared_page);
- *     FRONT_RING_INIT(&front_ring, (mytag_sring_t *)shared_page, PAGE_SIZE);
+ *     FRONT_RING_INIT(&front_ring, (mytag_sring_t *)shared_page,
+ *		       UK_PAGING_PAGE_SIZE);
  *
  * Initializing the back follows similarly (note that only the front
  * initializes the shared ring):
  *
  *     mytag_back_ring_t back_ring;
- *     BACK_RING_INIT(&back_ring, (mytag_sring_t *)shared_page, PAGE_SIZE);
+ *     BACK_RING_INIT(&back_ring, (mytag_sring_t *)shared_page,
+ *		      UK_PAGING_PAGE_SIZE);
  */
 
 #define DEFINE_RING_TYPES(__name, __req_t, __rsp_t)                     \
@@ -371,7 +373,7 @@ typedef struct __name##_back_ring __name##_back_ring_t
  */
 
 #ifndef XEN_PAGE_SHIFT
-/* The PAGE_SIZE for ring protocols and hypercall interfaces is always
+/* The UK_PAGING_PAGE_SIZE for ring protocols and hypercall interfaces is always
  * 4K, regardless of the architecture, and page granularity chosen by
  * operating systems.
  */

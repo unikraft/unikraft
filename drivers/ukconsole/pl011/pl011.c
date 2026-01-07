@@ -33,10 +33,10 @@
 #include <uk/alloc.h>
 #endif /* CONFIG_LIBUKALLOC */
 
-#if CONFIG_PAGING
+#if CONFIG_LIBUKPAGING
 #include <uk/bus/platform.h>
 #include <uk/errptr.h>
-#endif /* CONFIG_PAGING */
+#endif /* CONFIG_LIBUKPAGING */
 
 #if CONFIG_LIBPL011_EARLY_CONSOLE
 #include <uk/boot/earlytab.h>
@@ -351,14 +351,14 @@ static int init(struct uk_init_ctx *ictx __unused)
 			return rc;
 		}
 
-#if CONFIG_PAGING
+#if CONFIG_LIBUKPAGING
 		/* Map device region */
 		dev.base = uk_bus_pf_devmap(dev.base, dev.size);
 		if (unlikely(PTRISERR(dev.base))) {
 			uk_pr_err("Could not map pl011\n");
 			return PTR2ERR(dev.base);
 		}
-#endif /* !CONFIG_PAGING */
+#endif /* CONFIG_LIBUKPAGING */
 
 #if CONFIG_LIBPL011_EARLY_CONSOLE
 		/* `ukconsole` mandates that there is only a single

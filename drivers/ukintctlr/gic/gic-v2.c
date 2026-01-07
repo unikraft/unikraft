@@ -50,10 +50,10 @@
 #include <uk/intctlr/limits.h>
 #include <uk/ofw/fdt.h>
 
-#if CONFIG_PAGING
+#if CONFIG_LIBUKPAGING
 #include <uk/bus/platform.h>
 #include <uk/errptr.h>
-#endif /* CONFIG_PAGING */
+#endif /* CONFIG_LIBUKPAGING */
 
 /* Max CPU interface for GICv2 */
 #define GIC_MAX_CPUIF		8
@@ -613,7 +613,7 @@ static int gicv2_do_probe(void)
 }
 #endif /* !CONFIG_UKPLAT_ACPI */
 
-#if CONFIG_PAGING
+#if CONFIG_LIBUKPAGING
 static int gicv2_map(void)
 {
 	__vaddr_t vbase;
@@ -638,7 +638,7 @@ static int gicv2_map(void)
 
 	return 0;
 }
-#endif /* CONFIG_PAGING */
+#endif /* CONFIG_LIBUKPAGING */
 
 /**
  * Probe device tree or ACPI for GICv2
@@ -673,13 +673,13 @@ int gicv2_probe(struct _gic_dev **dev)
 		return rc;
 	}
 
-#if CONFIG_PAGING
+#if CONFIG_LIBUKPAGING
 	rc = gicv2_map();
 	if (unlikely(rc)) {
 		uk_pr_err("Could not map device (%d)\n", rc);
 		return rc;
 	}
-#endif /* CONFIG_PAGING */
+#endif /* CONFIG_LIBUKPAGING */
 
 	uk_pr_info("Found GICv2 on:\n");
 	uk_pr_info("\tDistributor  : 0x%lx - 0x%lx\n",

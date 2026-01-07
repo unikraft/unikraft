@@ -239,7 +239,7 @@ __u16 virtiofs_maxsegs(const struct uk_virtiofs_iovec *iov,
 	__sz segs = 0;
 
 	for (int i = 0; i < iovlen; i++)
-		segs += iov[i].iov_len / PAGE_SIZE + 1;
+		segs += iov[i].iov_len / UK_PAGING_PAGE_SIZE + 1;
 	return (segs > max) ? max : (__u16)segs;
 }
 
