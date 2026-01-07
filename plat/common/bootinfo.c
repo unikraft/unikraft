@@ -99,7 +99,8 @@ void ukplat_bootinfo_print(void)
 		}
 
 		uk_pr_info(" %012lx-%012lx %012lx-%012lx %c%c%c %016lx %s %s\n",
-			   mrd->pbase, mrd->pbase + mrd->pg_count * PAGE_SIZE,
+			   mrd->pbase,
+			   mrd->pbase + mrd->pg_count * UK_PAGING_PAGE_SIZE,
 			   mrd->pbase + mrd->pg_off,
 			   mrd->pbase + mrd->pg_off + mrd->len,
 			   (mrd->flags & UKPLAT_MEMRF_READ) ? 'r' : '-',

@@ -34,10 +34,10 @@
 #define __PLAT_CMN_MEMORY_H__
 
 #include <uk/config.h>
+#include <uk/arch/types.h>
 #include <uk/assert.h>
 #include <uk/essentials.h>
-#include <uk/arch/paging.h>
-#include <uk/arch/types.h>
+#include <uk/paging.h>
 #include <uk/plat/memory.h>
 
 #include <errno.h>
@@ -158,7 +158,7 @@ ukplat_memregion_list_insert_legacy_hi_mem(struct ukplat_memregion_list *list)
 				.vbase = X86_BIOS_ROM_START,
 				.pg_off = 0,
 				.len = X86_BIOS_ROM_LEN,
-				.pg_count = PAGE_COUNT(X86_BIOS_ROM_LEN),
+				.pg_count = UK_PAGING_PAGE_COUNT(X86_BIOS_ROM_LEN),
 				.type  = UKPLAT_MEMRT_RESERVED,
 				.flags = UKPLAT_MEMRF_READ,
 			});
@@ -174,7 +174,7 @@ ukplat_memregion_list_insert_legacy_hi_mem(struct ukplat_memregion_list *list)
 				.vbase = X86_BIOS_ROM_START,
 				.pg_off = 0,
 				.len   = X86_BIOS_ROM_LEN,
-				.pg_count = PAGE_COUNT(X86_BIOS_ROM_LEN),
+				.pg_count = UK_PAGING_PAGE_COUNT(X86_BIOS_ROM_LEN),
 				.type  = UKPLAT_MEMRT_RESERVED,
 				.flags = UKPLAT_MEMRF_READ,
 			});
@@ -195,7 +195,7 @@ ukplat_memregion_alloc_sipi_vect(void)
 	__sz len;
 
 	len = (__sz)((__uptr)x86_start16_end - (__uptr)x86_start16_begin);
-	len = PAGE_ALIGN_UP(len);
+	len = UK_PAGING_PAGE_ALIGN_UP(len);
 	x86_start16_addr = (__uptr)ukplat_memregion_alloc(len,
 							  UKPLAT_MEMRT_RESERVED,
 							  UKPLAT_MEMRF_READ  |
@@ -381,7 +381,8 @@ ukplat_memregion_print_desc(struct ukplat_memregion_desc *mrd)
 	}
 
 	uk_pr_debug(" %012lx-%012lx %012lx-%012lx %c%c%c %016lx %s %s\n",
-		    mrd->pbase, mrd->pbase + mrd->pg_count * PAGE_SIZE,
+		    mrd->pbase,
+		    mrd->pbase + mrd->pg_count * UK_PAGING_PAGE_SIZE,
 		    mrd->pbase + mrd->pg_off,
 		    mrd->pbase + mrd->pg_off + mrd->len,
 		    (mrd->flags & UKPLAT_MEMRF_READ) ? 'r' : '-',

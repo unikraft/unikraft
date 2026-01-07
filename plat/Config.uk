@@ -61,7 +61,7 @@ endmenu
 
 config ENFORCE_W_XOR_X
 	bool "Enforce W^X"
-	depends on PAGING && ARCH_ARM_64
+	depends on LIBUKPAGING && ARCH_ARM_64
 	default y
 	help
 		During boot the protection settings of all memory
@@ -97,4 +97,10 @@ config HAVE_SHUTDOWN_DISPATCHER
 	bool
 
 config HAVE_REBOOT
+	bool
+
+config HAVE_PAGING
+	bool
+
+config HAVE_5LEVEL_PT
 	bool

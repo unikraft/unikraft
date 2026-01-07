@@ -32,11 +32,11 @@
  */
 #include <uk/arch/lcpu.h>
 #include <uk/arch/ctx.h>
+#include <uk/paging.h>
 #include <uk/plat/config.h>
 #include <uk/plat/common/bootinfo.h>
 #include <uk/plat/common/acpi.h>
 #include <uk/plat/lcpu.h>
-#include <uk/plat/io.h>
 #include <uk/ofw/fdt.h>
 #include <arm/smccc.h>
 #include <arm/arm64/cpu.h>
@@ -331,7 +331,7 @@ int lcpu_arch_mp_init(void *arg)
 	 * starting secondary CPUs. We thus do the translation here once and
 	 * cache the result.
 	 */
-	lcpu_start_paddr = ukplat_virt_to_phys(lcpu_start);
+	lcpu_start_paddr = uk_paging_virt_to_phys((__vaddr_t)lcpu_start);
 
 	return do_arch_mp_init(arg);
 }
