@@ -92,3 +92,41 @@
 #define X86_EFER_LMSLE		(1 << 13)
 #define X86_EFER_FFXSR		(1 << 14)
 #define X86_EFER_TCE		(1 << 15)
+
+/* Page Tables */
+
+/* Note: Some flags only apply to page PTEs, not page table PTEs */
+#define X86_PTE_PRESENT			0x001UL
+#define X86_PTE_RW			0x002UL
+#define X86_PTE_US			0x004UL
+#define X86_PTE_PWT			0x008UL
+#define X86_PTE_PCD			0x010UL
+#define X86_PTE_ACCESSED		0x020UL
+#define X86_PTE_DIRTY			0x040UL
+#define X86_PTE_PSE			0x080UL
+#define X86_PTE_GLOBAL			0x100UL
+#define X86_PTE_USER1_MASK		0xE00UL
+#define X86_PTE_USER2_MASK		(0x7FUL << 52)
+#define X86_PTE_MPK_MASK		(0xFUL << 59)
+#define X86_PTE_NX			(1UL << 63)
+
+#define X86_PAGE_ATTR_WRITECOMBINE	0x08 /* Page allows write-combining */
+
+/* Page fault error code bits */
+#define X86_PF_EC_P			0x0001UL /* 0=non-present, 1=prot */
+#define X86_PF_EC_WR			0x0002UL /* 0=read, 1=write */
+#define X86_PF_EC_US			0x0004UL /* 0=kernel, 1=user */
+#define X86_PF_EC_RSVD			0x0008UL /* reserved bit in PTE */
+#define X86_PF_EC_ID			0x0010UL /* instruction fetch */
+#define X86_PF_EC_PK			0x0020UL /* protection key violation */
+#define X86_PF_EC_SS			0x0040UL /* shadow stack access */
+#define X86_PF_EC_SGX			0x8000UL /* SGX access control viol. */
+#define X86_PF_EC_HLAT			0x0080UL /* no translation using HLAT */
+
+/* Page attribute table (PAT) */
+#define X86_PAT_UC			0x00 /* Uncacheable (UC)*/
+#define X86_PAT_WC			0x01 /* Write combining (WC) */
+#define X86_PAT_WT			0x04 /* Write through (WT) */
+#define X86_PAT_WP			0x05 /* Write protected (WP) */
+#define X86_PAT_WB			0x06 /* Write back (WB) */
+#define X86_PAT_UCM			0x07 /* Uncached (UC-) */
