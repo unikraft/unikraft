@@ -47,6 +47,6 @@ void __stack_chk_fail(void)
 {
 	unsigned long sp;
 
-	sp = ukarch_read_sp() & STACK_MASK_TOP;
+	sp = uk_arch_read_sp() & STACK_MASK_TOP;
 	UK_CRASH("Stack smashing detected. SP %p\n", (void *) sp);
 }

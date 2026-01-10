@@ -24,16 +24,16 @@ static int vmem_arch_pagefault(void *data)
 	struct uk_vas *vas;
 	int rc;
 
-	if (ctx->error_code & X86_PF_EC_WR)
+	if (ctx->error_code & UK_ARCH_PF_EC_WR)
 		faulttype = UK_VMA_FAULT_WRITE;
-	else if (ctx->error_code & X86_PF_EC_ID)
+	else if (ctx->error_code & UK_ARCH_PF_EC_ID)
 		faulttype = UK_VMA_FAULT_EXEC;
 	else
 		faulttype = UK_VMA_FAULT_READ;
 
-	if (!(ctx->error_code & X86_PF_EC_P))
+	if (!(ctx->error_code & UK_ARCH_PF_EC_P))
 		faulttype |= UK_VMA_FAULT_NONPRESENT;
-	else if (ctx->error_code & X86_PF_EC_RSVD)
+	else if (ctx->error_code & UK_ARCH_PF_EC_RSVD)
 		faulttype |= UK_VMA_FAULT_MISCONFIG;
 
 	rc = vmem_pagefault(vaddr, faulttype, ctx->regs);

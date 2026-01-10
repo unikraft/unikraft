@@ -5,7 +5,7 @@
  * You may not use this file except in compliance with the License.
  */
 
-#include <uk/asm/arch.h>
+#include <uk/arch.h>
 #include <uk/arch/types.h>
 #include <uk/asm/lcpu.h>
 #include <uk/essentials.h>

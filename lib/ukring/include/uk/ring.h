@@ -33,6 +33,8 @@
 #define __UK_RING_H__
 
 #include <errno.h>
+#include <uk/arch.h>
+#include <uk/arch/util.h>
 #include <uk/mutex.h>
 #include <uk/print.h>
 #include <uk/config.h>
@@ -52,14 +54,14 @@ struct uk_ring {
 	int               br_prod_size;
 	int               br_prod_mask;
 	uint64_t          br_drops;
-	volatile uint32_t br_cons_head __align(CACHE_LINE_SIZE);
+	volatile uint32_t br_cons_head __align(UK_ARCH_CACHE_LINE_SIZE);
 	volatile uint32_t br_cons_tail;
 	int               br_cons_size;
 	int               br_cons_mask;
 #ifdef DEBUG_BUFRING
 	struct uk_mutex  *br_lock;
 #endif
-	void             *br_ring[0] __align(CACHE_LINE_SIZE);
+	void             *br_ring[0] __align(UK_ARCH_CACHE_LINE_SIZE);
 };
 
 /*
@@ -91,7 +93,7 @@ uk_ring_enqueue(struct uk_ring *br, void *buf)
 		cons_tail = br->br_cons_tail;
 
 		if (prod_next == cons_tail) {
-			rmb();
+			uk_arch_rmb();
 			if (prod_head == br->br_prod_head && cons_tail == br->br_cons_tail) {
 				br->br_drops++;
 				critical_exit();
@@ -114,7 +116,7 @@ uk_ring_enqueue(struct uk_ring *br, void *buf)
 	 * to complete 
 	 */
 	while (br->br_prod_tail != prod_head)
-		ukarch_spinwait();
+		uk_arch_spinwait();
 	uk_store_n(&br->br_prod_tail, prod_next);
 	critical_exit();
 	return 0;
@@ -152,7 +154,7 @@ uk_ring_dequeue_mc(struct uk_ring *br)
 	 * to complete
 	 */
 	while (br->br_cons_tail != cons_head)
-		ukarch_spinwait();
+		uk_arch_spinwait();
 
 	uk_store_n(&br->br_cons_tail, cons_next);
 	critical_exit();

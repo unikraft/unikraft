@@ -24,8 +24,11 @@ void execve_arch_execenv_init(struct ukarch_execenv *execenv_new,
 	 * FIXME re-arch: use GDT macros once moved out of plat/common
 	 */
 	execenv_new->regs.eflags = execenv->regs.eflags;
-	execenv_new->regs.cs = 8; /* GDT_DESC_OFFSET(GDT_DESC_CODE) */
-	execenv_new->regs.ss = 16; /* GDT_DESC_OFFSET(GDT_DESC_DATA) */
+
+	/* UK_ARCH_GDT_DESC_OFFSET(UK_ARCH_GDT_DESC_CODE) */
+	execenv_new->regs.cs = 8;
+	/* UK_ARCH_GDT_DESC_OFFSET(UK_ARCH_GDT_DESC_DATA) */
+	execenv_new->regs.ss = 16;
 
 	/* Copy current ectx to inerhit platform-initialized regs like mxcsr */
 	ukarch_ectx_sanitize((struct ukarch_ectx *)&execenv_new->ectx);

@@ -8,13 +8,13 @@
 #include "gdbsup.h"
 #include "../../gdbstub.h"
 
+#include <errno.h>
+
+#include <uk/arch.h>
+#include <uk/assert.h>
 #include <uk/bitops.h>
 #include <uk/isr/string.h>
 #include <uk/plat/lcpu.h>
-
-#ifndef X86_EFLAGS_TF
-#define X86_EFLAGS_TF UK_BIT(8)
-#endif
 
 /* We get here via traps raised by the platform
  * TODO: Once the crash screen PR is merged, crashes can land us here
@@ -25,13 +25,13 @@ static int gdb_arch_dbg_trap(int errnr, struct __regs *regs)
 	int r;
 
 	/* Unset trap flag, i.e., continue */
-	regs->eflags &= ~X86_EFLAGS_TF;
+	regs->eflags &= ~UK_ARCH_RFLAGS_TF;
 
 	r = gdb_dbg_trap(errnr, regs);
 	if (r < 0) {
 		return r;
 	} else if (r == GDB_DBG_STEP) { /* Single step */
-		regs->eflags |= X86_EFLAGS_TF;
+		regs->eflags |= UK_ARCH_RFLAGS_TF;
 	}
 
 	return 0;
