@@ -3,6 +3,7 @@
  * Licensed under the BSD-3-Clause License (the "License").
  * You may not use this file except in compliance with the License.
  */
+#include <uk/asm/fsgsbase.h>
 #include <uk/assert.h>
 #include <uk/arch/ctx.h>
 

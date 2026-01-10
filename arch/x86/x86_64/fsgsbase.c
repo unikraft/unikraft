@@ -4,18 +4,19 @@
  * You may not use this file except in compliance with the License.
  */
 
+#include <uk/asm/fsgsbase.h>
 #include <uk/arch/lcpu.h>
 #include <uk/ctors.h>
 #include <x86/cpu.h>
 
 static void wrmsrgsbase(__uptr gsbase)
 {
-	wrmsrl(X86_MSR_GS_BASE, gsbase);
+	uk_arch_wrmsrl(UK_ARCH_MSR_GS_BASE, gsbase);
 }
 
 static __uptr rdmsrgsbase(void)
 {
-	return rdmsrl(X86_MSR_GS_BASE);
+	return uk_arch_rdmsrl(UK_ARCH_MSR_GS_BASE);
 }
 
 static __uptr rdgsbase_cr4fsgsbase(void)
@@ -44,22 +45,22 @@ static void wrgsbase_cr4fsgsbase(__uptr gsbase)
 
 static void wrmsrkgsbase(__uptr kgsbase)
 {
-	wrmsrl(X86_MSR_KERNEL_GS_BASE, kgsbase);
+	uk_arch_wrmsrl(UK_ARCH_MSR_KERNEL_GS_BASE, kgsbase);
 }
 
 static __uptr rdmsrkgsbase(void)
 {
-	return rdmsrl(X86_MSR_KERNEL_GS_BASE);
+	return uk_arch_rdmsrl(UK_ARCH_MSR_KERNEL_GS_BASE);
 }
 
 static void wrmsrfsbase(__uptr fsbase)
 {
-	wrmsrl(X86_MSR_FS_BASE, fsbase);
+	uk_arch_wrmsrl(UK_ARCH_MSR_FS_BASE, fsbase);
 }
 
 static __uptr rdmsrfsbase(void)
 {
-	return rdmsrl(X86_MSR_FS_BASE);
+	return uk_arch_rdmsrl(UK_ARCH_MSR_FS_BASE);
 }
 
 static __uptr rdfsbase_cr4fsgsbase(void)
@@ -97,8 +98,8 @@ static void init_fsgsbasefns(void)
 {
 	__u32 eax, ebx, ecx, edx;
 
-	ukarch_x86_cpuid(7, 0, &eax, &ebx, &ecx, &edx);
-	if (ebx & X86_CPUID7_EBX_FSGSBASE) {
+	uk_arch_cpuid(7, 0, &eax, &ebx, &ecx, &edx);
+	if (ebx & UK_ARCH_CPUID7_EBX_FSGSBASE) {
 		wrgsbasefn = wrgsbase_cr4fsgsbase;
 		rdgsbasefn = rdgsbase_cr4fsgsbase;
 		wrfsbasefn = wrfsbase_cr4fsgsbase;

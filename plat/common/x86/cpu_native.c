@@ -32,20 +32,6 @@
 
 #include <x86/cpu.h>
 
-void halt(void)
-{
-	__asm__ __volatile__ ("hlt" : : : "memory");
-}
-
-unsigned long read_cr2(void)
-{
-	unsigned long cr2;
-
-	__asm__ __volatile__("mov %%cr2, %0" : "=r"(cr2));
-
-	return cr2;
-}
-
 #ifdef CONFIG_KVM_VMM_QEMU
 
 /* The port used by QEMU by default for the isa-debug-exit device */

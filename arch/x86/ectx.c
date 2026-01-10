@@ -106,24 +106,24 @@ static void _init_ectx_store(void)
 	 * contains "1" after this asm expression. See the "Warning" note at
 	 * https://gcc.gnu.org/onlinedocs/gcc/Extended-Asm.html#InputOperands
 	 */
-	ukarch_x86_cpuid(1, 0, &eax, &ebx, &ecx, &edx);
-	if (ecx & X86_CPUID1_ECX_OSXSAVE) {
-		ukarch_x86_cpuid(0xd, 1, &eax, &ebx, &ecx, &edx);
-		if (eax & X86_CPUIDD1_EAX_XSAVEOPT) {
+	uk_arch_cpuid(1, 0, &eax, &ebx, &ecx, &edx);
+	if (ecx & UK_ARCH_CPUID1_ECX_OSXSAVE) {
+		uk_arch_cpuid(0xd, 1, &eax, &ebx, &ecx, &edx);
+		if (eax & UK_ARCH_CPUIDD1_EAX_XSAVEOPT) {
 			ectx_method = X86_SAVE_XSAVEOPT;
 			uk_pr_debug("Load/store of extended CPU state: XSAVEOPT\n");
 		} else {
 			ectx_method = X86_SAVE_XSAVE;
 			uk_pr_debug("Load/store of extended CPU state: XSAVE\n");
 		}
-		ukarch_x86_cpuid(0xd, 0, &eax, &ebx, &ecx, &edx);
+		uk_arch_cpuid(0xd, 0, &eax, &ebx, &ecx, &edx);
 		ectx_size = ebx;
 		ectx_align = __alignof(struct x86_xsave_ctx);
 
 		UK_ASSERT(ectx_size == sizeof(struct x86_xsave_ctx) ||
 			  ectx_size == __offsetof(struct x86_xsave_ctx,
 						  avx_state));
-	} else if (edx & X86_CPUID1_EDX_FXSR) {
+	} else if (edx & UK_ARCH_CPUID1_EDX_FXSR) {
 		ectx_method = X86_SAVE_FXSAVE;
 		ectx_size = sizeof(struct x86_fxsave_ctx);
 		ectx_align = __alignof(struct x86_fxsave_ctx);

@@ -42,21 +42,8 @@
 extern "C" {
 #endif
 
+#include <uk/arch/util.h>
 #include <uk/asm/lcpu.h>
-
-#ifndef __ASSEMBLY__
-#ifndef mb
-#define mb()      __barrier()
-#endif
-
-#ifndef rmb
-#define rmb()     __barrier()
-#endif
-
-#ifndef wmb
-#define wmb()     __barrier()
-#endif
-#endif /* !__ASSEMBLY__ */
 
 #ifdef __cplusplus
 }
