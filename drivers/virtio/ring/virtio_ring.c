@@ -38,7 +38,6 @@
 #include <uk/print.h>
 #include <uk/errptr.h>
 #include <uk/paging.h>
-#include <uk/plat/common/cpu.h>
 #include <uk/sglist.h>
 #include <uk/atomic.h>
 #include <virtio/virtio_ring.h>
@@ -145,7 +144,7 @@ int virtqueue_intr_enable(struct virtqueue *vq)
 		 * interrupt. This is inline with the requirement from
 		 * virtio specification section 3.2.2
 		 */
-		mb();
+		uk_arch_mb();
 		/* Check if there are further descriptors */
 		if (virtqueue_hasdata(vq)) {
 			virtqueue_intr_disable(vq);
@@ -173,7 +172,7 @@ static inline void virtqueue_ring_update_avail(struct virtqueue_vring *vrq,
 	 * Write barrier to make sure we push the descriptor on the available
 	 * descriptor and then increment available index.
 	 */
-	wmb();
+	uk_arch_wmb();
 	vrq->vring.avail->idx++;
 }
 
@@ -232,7 +231,7 @@ void virtqueue_host_notify(struct virtqueue *vq)
 	 * that the virtqueue index update operation happened. Note that this
 	 * function is declared as inline.
 	 */
-	mb();
+	uk_arch_mb();
 
 	if (vq->vq_notify_host && virtqueue_notify_enabled(vq)) {
 		uk_pr_debug("notify queue %d\n", vq->queue_id);
@@ -368,7 +367,7 @@ int virtqueue_buffer_dequeue(struct virtqueue *vq, void **cookie, __u32 *len)
 	 * We are reading from the used descriptor information updated by the
 	 * host.
 	 */
-	rmb();
+	uk_arch_rmb();
 	head_idx = elem->id;
 	if (len)
 		*len = elem->len;

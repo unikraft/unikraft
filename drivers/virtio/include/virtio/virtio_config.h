@@ -35,7 +35,6 @@
 
 #include <uk/arch/types.h>
 #include <uk/config.h>
-#include <uk/plat/common/cpu.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -70,13 +69,13 @@ static inline void virtio_cwrite_bytes(const void *addr, const __u8 offset,
 		io_addr = ((unsigned long)addr) + offset + (i * type_len);
 		switch (type_len) {
 		case 1:
-			outb(io_addr, ((__u8 *)buf)[i * type_len]);
+			uk_arch_outb(io_addr, ((__u8 *)buf)[i * type_len]);
 			break;
 		case 2:
-			outw(io_addr, ((__u16 *)buf)[i * type_len]);
+			uk_arch_outw(io_addr, ((__u16 *)buf)[i * type_len]);
 			break;
 		case 4:
-			outl(io_addr, ((__u32 *)buf)[i * type_len]);
+			uk_arch_outl(io_addr, ((__u32 *)buf)[i * type_len]);
 			break;
 		default:
 			UK_CRASH("Unsupported virtio write operation\n");
@@ -96,16 +95,16 @@ static inline void virtio_cread_bytes(const void *addr, const __u8 offset,
 		io_addr = ((unsigned long)addr) + offset + (i * type_len);
 		switch (type_len) {
 		case 1:
-			((__u8 *)buf)[i * type_len] = inb(io_addr);
+			((__u8 *)buf)[i * type_len] = uk_arch_inb(io_addr);
 			break;
 		case 2:
-			((__u16 *)buf)[i * type_len] = inw(io_addr);
+			((__u16 *)buf)[i * type_len] = uk_arch_inw(io_addr);
 			break;
 		case 4:
-			((__u32 *)buf)[i * type_len] = inl(io_addr);
+			((__u32 *)buf)[i * type_len] = uk_arch_inl(io_addr);
 			break;
 		case 8:
-			((__u64  *)buf)[i * type_len] = inq(io_addr);
+			((__u64  *)buf)[i * type_len] = uk_arch_inq(io_addr);
 			break;
 		default:
 			UK_CRASH("Unsupported virtio read operation\n");
@@ -126,13 +125,13 @@ void virtio_mmio_cwrite_bytes(const void *addr, const __u8 offset,
 		io_addr = ((unsigned long)addr) + offset + (i * type_len);
 		switch (type_len) {
 		case 1:
-			writeb((__u8 *)io_addr, ((__u8 *)buf)[i * type_len]);
+			uk_arch_writeb(io_addr, ((__u8 *)buf)[i * type_len]);
 			break;
 		case 2:
-			writew((__u16 *)io_addr, ((__u16 *)buf)[i * type_len]);
+			uk_arch_writew(io_addr, ((__u16 *)buf)[i * type_len]);
 			break;
 		case 4:
-			writel((__u32 *)io_addr, ((__u32 *)buf)[i * type_len]);
+			uk_arch_writel(io_addr, ((__u32 *)buf)[i * type_len]);
 			break;
 		default:
 			UK_CRASH("Unsupported virtio write operation\n");
@@ -153,16 +152,16 @@ void virtio_mmio_cread_bytes(const void *addr, const __u8 offset,
 		io_addr = ((unsigned long)addr) + offset + (i * type_len);
 		switch (type_len) {
 		case 1:
-			((__u8 *)buf)[i * type_len] = readb((__u8 *)io_addr);
+			((__u8 *)buf)[i * type_len] = uk_arch_readb(io_addr);
 			break;
 		case 2:
-			((__u16 *)buf)[i * type_len] = readw((__u16 *)io_addr);
+			((__u16 *)buf)[i * type_len] = uk_arch_readw(io_addr);
 			break;
 		case 4:
-			((__u32 *)buf)[i * type_len] = readl((__u32 *)io_addr);
+			((__u32 *)buf)[i * type_len] = uk_arch_readl(io_addr);
 			break;
 		case 8:
-			((__u64  *)buf)[i * type_len] = readq((__u64  *)io_addr);
+			((__u64  *)buf)[i * type_len] = uk_arch_readq(io_addr);
 			break;
 		default:
 			UK_CRASH("Unsupported virtio read operation\n");
@@ -172,8 +171,8 @@ void virtio_mmio_cread_bytes(const void *addr, const __u8 offset,
 #else  /* !CONFIG_ARCH_X86_64 */
 
 /* IO barriers */
-#define __iormb()		rmb()
-#define __iowmb()		wmb()
+#define __iormb()		uk_arch_rmb()
+#define __iowmb()		uk_arch_wmb()
 
 #define virtio_mmio_cwrite_bytes	virtio_cwrite_bytes
 #define virtio_mmio_cread_bytes		virtio_cread_bytes

@@ -53,15 +53,14 @@
 
 #include <string.h>
 #include <uk/print.h>
-#include <uk/plat/common/cpu.h>
 #include <uk/bus/pci.h>
 
 #define PCI_CONF_READ(type, ret, a, s)					\
 	do {								\
 		__u32 _conf_data;					\
-		outl(PCI_CONFIG_ADDR, (a) | PCI_CONF_##s);		\
-		_conf_data = ((inl(PCI_CONFIG_DATA) >> PCI_CONF_##s##_SHFT) \
-			      & PCI_CONF_##s##_MASK);			\
+		uk_arch_outl(PCI_CONFIG_ADDR, (a) | PCI_CONF_##s);	\
+		_conf_data = ((uk_arch_inl(PCI_CONFIG_DATA) >>		\
+			       PCI_CONF_##s##_SHFT) & PCI_CONF_##s##_MASK);\
 		*(ret) = (type) _conf_data;				\
 	} while (0)
 
@@ -125,8 +124,8 @@ static int probe_function(__u32 bus, __u32 device, __u32 function)
 			| (device << PCI_DEVICE_SHIFT)
 			| (function << PCI_FUNCTION_SHIFT);
 
-	outl(PCI_CONFIG_ADDR, config_addr);
-	config_data = inl(PCI_CONFIG_DATA);
+	uk_arch_outl(PCI_CONFIG_ADDR, config_addr);
+	config_data = uk_arch_inl(PCI_CONFIG_DATA);
 
 	devid.vendor_id = config_data & PCI_DEVICE_ID_MASK;
 	if (devid.vendor_id == PCI_INVALID_ID) {

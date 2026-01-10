@@ -45,9 +45,9 @@
 #include "../xen-compat.h"
 
 #if __XEN_INTERFACE_VERSION__ < 0x00030208
-#define xen_mb()  mb()
-#define xen_rmb() rmb()
-#define xen_wmb() wmb()
+#define xen_mb()  uk_arch_mb()
+#define xen_rmb() uk_arch_rmb()
+#define xen_wmb() uk_arch_wmb()
 #endif
 
 typedef unsigned int RING_IDX;

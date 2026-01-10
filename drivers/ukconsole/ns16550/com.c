@@ -138,48 +138,37 @@ UK_LIBPARAM_PARAM_ALIAS(early_port, &early_dev.port, __u16,
 #endif /* CONFIG_LIBUKLIBPARAM */
 #endif /* CONFIG_LIBNS16550_EARLY_CONSOLE */
 
-static inline void outb(__u16 port, __u8 v)
-{
-	__asm__ __volatile__("outb %0,%1" : : "a"(v), "dN"(port));
-}
-
-static inline __u8 inb(__u16 port)
-{
-	__u8 v;
-
-	__asm__ __volatile__("inb %1,%0" : "=a"(v) : "dN"(port));
-	return v;
-}
-
 static inline void com_setup(int port_addr, __u8 bauddiv_lo, __u8 bauddiv_hi)
 {
 	/* Disable all interrupts */
-	outb(COM_INTR(port_addr), 0x00);
+	uk_arch_outb(COM_INTR(port_addr), 0x00);
 	/* Enable DLAB (set baudrate divisor) */
-	outb(COM_CTRL(port_addr), DLAB);
+	uk_arch_outb(COM_CTRL(port_addr), DLAB);
 	/* Div (lo byte) */
-	outb(COM_DIV_LO(port_addr), bauddiv_lo);
+	uk_arch_outb(COM_DIV_LO(port_addr), bauddiv_lo);
 	/* Div (hi byte) */
-	outb(COM_DIV_HI(port_addr), bauddiv_hi);
+	uk_arch_outb(COM_DIV_HI(port_addr), bauddiv_hi);
 	/* Set 8N1, clear DLAB */
-	outb(COM_CTRL(port_addr), PROT);
+	uk_arch_outb(COM_CTRL(port_addr), PROT);
 }
 
 static inline int com_check_tx_empty(int port_addr)
 {
-	return (int)inb(COM_STATUS(port_addr)) & COM_STATUS_TX_READY_BIT;
+	return (int)uk_arch_inb(COM_STATUS(port_addr)) &
+		COM_STATUS_TX_READY_BIT;
 }
 
 static inline void com_write(int port_addr, char chr)
 {
 	while (!com_check_tx_empty(port_addr))
 		;
-	outb(COM_DATA(port_addr), chr);
+	uk_arch_outb(COM_DATA(port_addr), chr);
 }
 
 static inline int com_check_rx_ready(int port_addr)
 {
-	return (int)inb(COM_STATUS(port_addr)) & COM_STATUS_RX_READY_BIT;
+	return (int)uk_arch_inb(COM_STATUS(port_addr)) &
+		COM_STATUS_RX_READY_BIT;
 }
 
 __ssz com_out(struct uk_console *dev, const char *buf, __sz len)
@@ -211,7 +200,7 @@ __ssz com_in(struct uk_console *dev, char *buf, __sz len)
 	for (i = 0; i < len; i++) {
 		if (!com_check_rx_ready(com_dev->port))
 			return i;
-		buf[i] = inb(COM_DATA(com_dev->port));
+		buf[i] = uk_arch_inb(COM_DATA(com_dev->port));
 	}
 
 	return len;

@@ -402,7 +402,7 @@ static int blkfront_queue_enqueue(struct uk_blkdev_queue *queue,
 	ring->req_prod_pvt = ring_idx + 1;
 
 	/* Memory barrier */
-	wmb();
+	uk_arch_wmb();
 out:
 	return rc;
 
@@ -491,7 +491,7 @@ static int blkfront_queue_dequeue(struct uk_blkdev_queue *queue,
 
 	ring = &queue->ring;
 	prod = ring->sring->rsp_prod;
-	rmb(); /* Ensure we see queued responses up to 'rp'. */
+	uk_arch_rmb(); /* Ensure we see queued responses up to 'rp'. */
 	cons = ring->rsp_cons;
 
 	/* No new descriptor since last dequeue operation */

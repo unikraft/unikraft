@@ -143,7 +143,7 @@ struct hvm_hw_cpu {
     uint64_t msr_efer;
     uint64_t msr_tsc_aux;
 
-    /* guest's idea of what rdtsc() would return */
+    /* guest's idea of what uk_arch_rdtsc() would return */
     uint64_t tsc;
 
     /* pending event, if any */
@@ -257,7 +257,7 @@ struct hvm_hw_cpu_compat {
     uint64_t msr_efer;
     /*uint64_t msr_tsc_aux; COMPAT */
 
-    /* guest's idea of what rdtsc() would return */
+    /* guest's idea of what uk_arch_rdtsc() would return */
     uint64_t tsc;
 
     /* pending event, if any */

@@ -40,7 +40,8 @@
 #include <uk/assert.h>
 #include <uk/arch/limits.h>
 #include <x86/cpu.h>
-#include <uk/asm/arch.h>
+#include <uk/arch.h>
+#include <uk/asm/apic.h>
 
 #include <errno.h>
 
@@ -49,24 +50,24 @@ static inline int x2apic_enable(void)
 	__u32 eax, ebx, ecx, edx;
 
 	/* Check for x2APIC support */
-	cpuid(1, 0, &eax, &ebx, &ecx, &edx);
-	if (!(ecx & X86_CPUID1_ECX_x2APIC))
+	uk_arch_cpuid(1, 0, &eax, &ebx, &ecx, &edx);
+	if (!(ecx & UK_ARCH_CPUID1_ECX_X2APIC))
 		return -ENOTSUP;
 
 	/* Check if APIC is active */
-	rdmsr(APIC_MSR_BASE, &eax, &edx);
+	uk_arch_rdmsr(APIC_MSR_BASE, &eax, &edx);
 	if (!(eax & APIC_BASE_EN))
 		return -ENOTSUP;
 
 	/* Switch to x2APIC mode */
 	eax |= APIC_BASE_EXTD;
-	wrmsr(APIC_MSR_BASE, eax, edx);
+	uk_arch_wrmsr(APIC_MSR_BASE, eax, edx);
 
 	/* Set APIC software enable flag if necessary */
-	rdmsr(APIC_MSR_SVR, &eax, &edx);
+	uk_arch_rdmsr(APIC_MSR_SVR, &eax, &edx);
 	if ((eax & APIC_SVR_EN) == 0) {
 		eax |= APIC_SVR_EN;
-		wrmsr(APIC_MSR_SVR, eax, edx);
+		uk_arch_wrmsr(APIC_MSR_SVR, eax, edx);
 	}
 
 	/*
@@ -88,7 +89,7 @@ static inline void x2apic_send_ipi(int irqno, int dest)
 	      | APIC_ICR_DESTMODE_PHYSICAL | APIC_ICR_DMODE_FIXED
 	      | (32 + irqno);
 
-	wrmsr(APIC_MSR_ICR, eax, dest);
+	uk_arch_wrmsr(APIC_MSR_ICR, eax, dest);
 }
 
 static inline void x2apic_send_self_ipi(int irqno)
@@ -99,7 +100,7 @@ static inline void x2apic_send_self_ipi(int irqno)
 
 	eax = (32 + irqno);
 
-	wrmsr(APIC_MSR_SELF_IPI, eax, 0);
+	uk_arch_wrmsr(APIC_MSR_SELF_IPI, eax, 0);
 }
 
 static inline void x2apic_send_nmi(int dest)
@@ -109,7 +110,7 @@ static inline void x2apic_send_nmi(int dest)
 	eax = APIC_ICR_TRIGGER_LEVEL | APIC_ICR_LEVEL_ASSERT
 	      | APIC_ICR_DESTMODE_PHYSICAL | APIC_ICR_DMODE_NMI;
 
-	wrmsr(APIC_MSR_ICR, eax, dest);
+	uk_arch_wrmsr(APIC_MSR_ICR, eax, dest);
 }
 
 static inline void x2apic_send_sipi(__vaddr_t addr, int dest)
@@ -122,7 +123,7 @@ static inline void x2apic_send_sipi(__vaddr_t addr, int dest)
 	      | APIC_ICR_DESTMODE_PHYSICAL | APIC_ICR_DMODE_SUP
 	      | (addr >> __PAGE_SHIFT);
 
-	wrmsr(APIC_MSR_ICR, eax, dest);
+	uk_arch_wrmsr(APIC_MSR_ICR, eax, dest);
 }
 
 static inline void x2apic_send_iipi(int dest)
@@ -132,7 +133,7 @@ static inline void x2apic_send_iipi(int dest)
 	eax = APIC_ICR_TRIGGER_LEVEL | APIC_ICR_LEVEL_ASSERT
 	      | APIC_ICR_DESTMODE_PHYSICAL | APIC_ICR_DMODE_INIT;
 
-	wrmsr(APIC_MSR_ICR, eax, dest);
+	uk_arch_wrmsr(APIC_MSR_ICR, eax, dest);
 }
 
 /* Deassert only supported on Pentium and P6 familiy processors */
@@ -140,12 +141,12 @@ static inline void x2apic_send_iipi(int dest)
 
 static inline void x2apic_clear_errors(void)
 {
-	wrmsr(APIC_MSR_ESR, 0, 0);
+	uk_arch_wrmsr(APIC_MSR_ESR, 0, 0);
 }
 
 static inline void x2apic_ack_interrupt(void)
 {
-	wrmsr(APIC_MSR_EOI, 0, 0);
+	uk_arch_wrmsr(APIC_MSR_EOI, 0, 0);
 }
 
 /* We only support x2APIC at the moment */

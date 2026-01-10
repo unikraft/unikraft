@@ -34,7 +34,6 @@
 #include <uk/bus/platform.h>
 #include <uk/print.h>
 #include <uk/plat/common/bootinfo.h>
-#include <uk/plat/common/cpu.h>
 #include <uk/plat/memory.h>
 #include <uk/plat/native/paging.h>
 

@@ -93,7 +93,7 @@ int pci_generic_config_read(__u8 bus, __u8 devfn,
 	void *addr;
 
 	/* add rmb before io read */
-	rmb();
+	uk_arch_rmb();
 	addr = pci_ecam_map_bus(bus, devfn, where);
 	if (!addr) {
 		*(int *)val = ~0;
@@ -131,7 +131,7 @@ int pci_generic_config_write(__u8 bus, __u8 devfn,
 		uk_pr_err("not support size pci config write\n");
 
 	/* add wmb after io write */
-	wmb();
+	uk_arch_wmb();
 
 	return 0;
 }

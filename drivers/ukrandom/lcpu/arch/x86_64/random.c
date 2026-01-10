@@ -133,14 +133,14 @@ struct uk_random_driver_ops *device_init(void)
 {
 	__u32 eax, ebx, ecx, edx;
 
-	ukarch_x86_cpuid(1, 0, &eax, &ebx, &ecx, &edx);
-	if (unlikely(!(ecx & X86_CPUID1_ECX_RDRAND))) {
+	uk_arch_cpuid(1, 0, &eax, &ebx, &ecx, &edx);
+	if (unlikely(!(ecx & UK_ARCH_CPUID1_ECX_RDRAND))) {
 		uk_pr_debug("RDRAND not available on this CPU\n");
 		return ERR2PTR(-ENOTSUP);
 	}
 
-	ukarch_x86_cpuid(7, 0, &eax, &ebx, &ecx, &edx);
-	if (ebx & X86_CPUID7_EBX_RDSEED)
+	uk_arch_cpuid(7, 0, &eax, &ebx, &ecx, &edx);
+	if (ebx & UK_ARCH_CPUID7_EBX_RDSEED)
 		have_rdseed = __true;
 	else
 		uk_pr_warn("RDSEED not available on this CPU, falling back to RDRAND\n");

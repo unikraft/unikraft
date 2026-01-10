@@ -116,7 +116,7 @@ static void gnttab_grant_init(grant_ref_t gref, domid_t domid,
 	gnttab.table[gref].domid = domid;
 
 	/* Memory barrier */
-	wmb();
+	uk_arch_wmb();
 }
 
 static void gnttab_grant_permit_access(grant_ref_t gref, domid_t domid,
@@ -225,7 +225,7 @@ unsigned long gnttab_end_transfer(grant_ref_t gref)
 		flags = *pflags;
 
 	/* Read the frame number /after/ reading completion status. */
-	rmb();
+	uk_arch_rmb();
 	frame = gnttab.table[gref].frame;
 
 	put_free_entry(gref);

@@ -53,7 +53,6 @@
 
 #include <string.h>
 #include <uk/print.h>
-#include <uk/plat/common/cpu.h>
 #include <uk/bus/pci.h>
 
 extern int arch_pci_probe(struct uk_alloc *pha);

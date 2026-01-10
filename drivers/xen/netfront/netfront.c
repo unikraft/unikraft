@@ -119,7 +119,7 @@ static int network_tx_buf_gc(struct uk_netdev_tx_queue *txq)
 	int count = 0;
 
 	prod = txq->ring.sring->rsp_prod;
-	rmb(); /* Ensure we see responses up to 'rp'. */
+	uk_arch_rmb(); /* Ensure we see responses up to 'rp'. */
 
 	for (cons = txq->ring.rsp_cons; cons != prod; cons++) {
 		tx_rsp = RING_GET_RESPONSE(&txq->ring, cons);
@@ -215,7 +215,7 @@ static int netfront_xmit(struct uk_netdev *n,
 	status = UK_NETDEV_STATUS_SUCCESS;
 
 	txq->ring.req_prod_pvt = req_prod + 1;
-	wmb(); /* Ensure backend sees requests */
+	uk_arch_wmb(); /* Ensure backend sees requests */
 
 	RING_PUSH_REQUESTS_AND_CHECK_NOTIFY(&txq->ring, notify);
 	if (notify)
@@ -276,7 +276,7 @@ static int netfront_rxq_enqueue(struct uk_netdev_rx_queue *rxq,
 	UK_ASSERT(rxq->gref[id] != GRANT_INVALID_REF);
 
 	rx_req->gref = rxq->gref[id];
-	wmb(); /* Ensure backend sees requests */
+	uk_arch_wmb(); /* Ensure backend sees requests */
 	rxq->ring.req_prod_pvt = req_prod + 1;
 
 	RING_PUSH_REQUESTS_AND_CHECK_NOTIFY(&rxq->ring, notify);
@@ -299,7 +299,7 @@ static int netfront_rxq_dequeue(struct uk_netdev_rx_queue *rxq,
 	UK_ASSERT(netbuf != NULL);
 
 	prod = rxq->ring.sring->rsp_prod;
-	rmb(); /* Ensure we see queued responses up to 'rp'. */
+	uk_arch_rmb(); /* Ensure we see queued responses up to 'rp'. */
 	cons = rxq->ring.rsp_cons;
 	/* No new descriptor since last dequeue operation */
 	if (cons == prod) {
