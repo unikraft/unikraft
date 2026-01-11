@@ -1,48 +1,24 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
-/*
- * Authors: Florian Schmidt <florian.schmidt@neclab.eu>
- *          Simon Kuenzer <simon.kuenzer@neclab.eu>
- *
- * Copyright (c) 2018, NEC Europe Ltd., NEC Corporation. All rights reserved.
+/* Copyright (c) 2018, NEC Europe Ltd., NEC Corporation. All rights reserved.
  * Copyright (c) 2021, NEC Laboratories Europe GmbH, NEC Corporation.
  *                     All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- *
- * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- * 3. Neither the name of the copyright holder nor the names of its
- *    contributors may be used to endorse or promote products derived from
- *    this software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
- * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGE.
+ * Copyright (c) 2025, Unikraft GmbH and The Unikraft Authors.
+ * Licensed under the BSD-3-Clause License (the "License").
+ * You may not use this file except in compliance with the License.
  */
 
-#include <stdbool.h>
-#include <uk/arch/ctx.h>
-#include <uk/arch/lcpu.h>
+
+#include <uk/arch.h>
+#include <uk/asm.h>
 #include <uk/arch/types.h>
+#include <uk/arch/util.h>
 #include <uk/ctors.h>
 #include <uk/essentials.h>
 #include <uk/assert.h>
 #include <uk/print.h>
 #include <uk/print/hexdump.h>
 #include <uk/isr/string.h> /* memset_isr */
+#include <uk/lcpu/core.h>
 
 enum x86_save_method {
 	X86_SAVE_NONE = 0,
@@ -94,7 +70,7 @@ struct x86_xsave_ctx {
 
 static enum x86_save_method ectx_method;
 static __sz ectx_size;
-static __sz ectx_align = 0x0;
+static __sz ectx_align;
 
 static void _init_ectx_store(void)
 {
@@ -140,23 +116,10 @@ static void _init_ectx_store(void)
 	 *       so that we can detect if _init_ectx_store() was called.
 	 */
 }
+
 UK_CTOR_PRIO(_init_ectx_store, 0);
 
-__sz ukarch_ectx_size(void)
-{
-	UK_ASSERT(ectx_align); /* Do not call when not yet initialized */
-
-	return ectx_size;
-}
-
-__sz ukarch_ectx_align(void)
-{
-	UK_ASSERT(ectx_align); /* Do not call when not yet initialized */
-
-	return ectx_align;
-}
-
-void ukarch_ectx_sanitize(struct ukarch_ectx *state)
+void uk_plat_native_ectx_sanitize(struct uk_plat_native_ectx *state)
 {
 	UK_ASSERT(ectx_align); /* Do not call when not yet initialized */
 	UK_ASSERT(state);
@@ -183,20 +146,7 @@ void ukarch_ectx_sanitize(struct ukarch_ectx *state)
 	}
 }
 
-void ukarch_ectx_init(struct ukarch_ectx *state)
-{
-	UK_ASSERT(ectx_align); /* Do not call when not yet initialized */
-	UK_ASSERT(state);
-	UK_ASSERT(IS_ALIGNED((__uptr) state, ectx_align));
-
-	/* Initialize extregs area:
-	 * Zero out and then save a valid layout to it.
-	 */
-	memset_isr(state, 0, ectx_size);
-	ukarch_ectx_store(state);
-}
-
-void ukarch_ectx_store(struct ukarch_ectx *state)
+void uk_plat_native_ectx_store(struct uk_plat_native_ectx *state)
 {
 	UK_ASSERT(ectx_align); /* Do not call when not yet initialized */
 	UK_ASSERT(state);
@@ -223,7 +173,20 @@ void ukarch_ectx_store(struct ukarch_ectx *state)
 	}
 }
 
-void ukarch_ectx_load(struct ukarch_ectx *state)
+void uk_plat_native_ectx_init(struct uk_plat_native_ectx *state)
+{
+	UK_ASSERT(ectx_align); /* Do not call when not yet initialized */
+	UK_ASSERT(state);
+	UK_ASSERT(IS_ALIGNED((__uptr)state, ectx_align));
+
+	/* Initialize extregs area:
+	 * Zero out and then save a valid layout to it.
+	 */
+	memset_isr(state, 0, ectx_size);
+	uk_plat_native_ectx_store(state);
+}
+
+void uk_plat_native_ectx_load(struct uk_plat_native_ectx *state)
 {
 	UK_ASSERT(ectx_align); /* Do not call when not yet initialized */
 	UK_ASSERT(state);
@@ -284,21 +247,21 @@ static inline int x86_xsave_substate_memcmp(const struct x86_xsave_ctx *ctx1,
 	return 0;
 }
 
-static inline bool mem_iszero(const void *mem, __sz len)
+static inline __bool mem_iszero(const void *mem, __sz len)
 {
 	for (__sz i = 0; i < len; i++)
 		if (((const __u8 *)mem)[i] != 0)
-			return false;
+			return __false;
 
-	return true;
+	return __true;
 }
 
 /*
  * Check if a state component has the initial values defined by the
  * architecture (all zeroes).
  */
-static inline bool x86_xsave_substate_isinit(const struct x86_xsave_ctx *ctx,
-					     __u64 substate)
+static inline __bool x86_xsave_substate_isinit(const struct x86_xsave_ctx *ctx,
+					       __u64 substate)
 {
 	switch (substate) {
 	case X86_XSAVE_HDR_XSTATE_BV_X87F:
@@ -313,8 +276,8 @@ static inline bool x86_xsave_substate_isinit(const struct x86_xsave_ctx *ctx,
 	}
 }
 
-static inline bool x86_xsave_mxcsr_iseq(const struct x86_xsave_ctx *ctx1,
-					const struct x86_xsave_ctx *ctx2)
+static inline __bool x86_xsave_mxcsr_iseq(const struct x86_xsave_ctx *ctx1,
+					  const struct x86_xsave_ctx *ctx2)
 {
 	/*
 	 * Bytes 27:24 of XSAVE area are for the MXCSR register which is
@@ -323,9 +286,9 @@ static inline bool x86_xsave_mxcsr_iseq(const struct x86_xsave_ctx *ctx1,
 	return ctx1->mxcsr == ctx2->mxcsr;
 }
 
-static bool x86_xsave_substate_iseq(const struct x86_xsave_ctx *ctx1,
-				    const struct x86_xsave_ctx *ctx2,
-				    __u64 substate)
+static __bool x86_xsave_substate_iseq(const struct x86_xsave_ctx *ctx1,
+				      const struct x86_xsave_ctx *ctx2,
+				      __u64 substate)
 {
 	__u64 ctx1_bitf, ctx2_bitf;
 
@@ -333,7 +296,7 @@ static bool x86_xsave_substate_iseq(const struct x86_xsave_ctx *ctx1,
 	ctx2_bitf = ctx2->xsave_hdr.xstate_bv & substate;
 
 	if (!ctx1_bitf && !ctx2_bitf)
-		return true;
+		return __true;
 
 	if (ctx1_bitf != ctx2_bitf)
 		return x86_xsave_substate_isinit(ctx1_bitf ? ctx1 : ctx2,
@@ -342,7 +305,7 @@ static bool x86_xsave_substate_iseq(const struct x86_xsave_ctx *ctx1,
 	return x86_xsave_substate_memcmp(ctx1, ctx2, substate) == 0;
 }
 
-static inline bool x86_xsave_hdr_isvalid(const struct x86_xsave_ctx *ctx)
+static inline __bool x86_xsave_hdr_isvalid(const struct x86_xsave_ctx *ctx)
 {
 	const __u64 xhdr_supp_mask = X86_XSAVE_HDR_XSTATE_BV_X87F |
 				     X86_XSAVE_HDR_XSTATE_BV_SSEF |
@@ -358,14 +321,15 @@ static inline bool x86_xsave_hdr_isvalid(const struct x86_xsave_ctx *ctx)
 	       mem_iszero(xhdr->rsvd, sizeof(xhdr->rsvd));
 }
 
-void ukarch_ectx_assert_equal(struct ukarch_ectx *state)
+void uk_plat_native_ectx_assert_equal(struct uk_plat_native_ectx *state)
 {
 	__u8 ectxbuf[ectx_size + ectx_align];
-	struct ukarch_ectx *current;
+	struct uk_plat_native_ectx *current;
 
 	/* Store the current state */
-	current = (struct ukarch_ectx *)ALIGN_UP((__uptr)ectxbuf, ectx_align);
-	ukarch_ectx_init(current);
+	current = (struct uk_plat_native_ectx *)ALIGN_UP((__uptr)ectxbuf,
+							 ectx_align);
+	uk_plat_native_ectx_init(current);
 
 	/*
 	 * When using XSAVE(OPT) two ectx memory areas may differ
@@ -415,11 +379,11 @@ void ukarch_ectx_assert_equal(struct ukarch_ectx *state)
 		if (unlikely(!x86_xsave_hdr_isvalid(xsave1) ||
 			     !x86_xsave_mxcsr_iseq(xsave1, xsave2) ||
 			     !x86_xsave_substate_iseq(xsave1, xsave2,
-					     X86_XSAVE_HDR_XSTATE_BV_X87F) ||
+						X86_XSAVE_HDR_XSTATE_BV_X87F) ||
 			     !x86_xsave_substate_iseq(xsave1, xsave2,
-					     X86_XSAVE_HDR_XSTATE_BV_SSEF) ||
+						X86_XSAVE_HDR_XSTATE_BV_SSEF) ||
 			     !x86_xsave_substate_iseq(xsave1, xsave2,
-					     X86_XSAVE_HDR_XSTATE_BV_AVXF)))
+						X86_XSAVE_HDR_XSTATE_BV_AVXF)))
 			goto ectx_corrupted;
 		break;
 	}

@@ -7,11 +7,18 @@ config LIBUKPLAT_NATIVE_PAL
 	select LIBUKPLAT_NATIVE_PAGE
 	select LIBUKPLAT_NATIVE_PT
 	select LIBUKPLAT_NATIVE_TLB
+	select LIBUKPLAT_NATIVE_ECTX
+	select LIBUKPLAT_NATIVE_EXCEPT
+	select LIBUKPLAT_NATIVE_AUXSP
+	select LIBUKPLAT_NATIVE_LCPU
+	select LIBUKPLAT_NATIVE_REGS
+	select LIBUKPLAT_NATIVE_SYSCTX
 
 # Platform configuration. These options can also be selected
 # by implementations that reuse code from liubkplat_native.
 config LIBUKPLAT_NATIVE
 	bool
+	select HAVE_CPU_MULTI_PHASE_STARTUP if ARCH_X86_64
 
 if LIBUKPLAT_NATIVE
 
@@ -48,5 +55,34 @@ config LIBUKPLAT_NATIVE_TLB
 	depends on HAVE_PAGING
 	# Only depend on LIBUKPLAT_NATIVE_PT for ARCH_X86_64
 	depends on !ARCH_X86_64 || LIBUKPLAT_NATIVE_PT
+
+config LIBUKPLAT_NATIVE_ECTX
+	bool
+
+if LIBUKPLAT_NATIVE_ECTX
+
+config LIBUKPLAT_NATIVE_ECTX_ISR_ASSERTIONS
+	bool "Check for unmodified ECTX in interrupt handlers"
+
+endif
+
+config LIBUKPLAT_NATIVE_AUXSP
+	bool
+
+config LIBUKPLAT_NATIVE_LCPU
+	bool
+
+config LIBUKPLAT_NATIVE_PAGING
+	bool
+
+config LIBUKPLAT_NATIVE_REGS
+	bool
+
+config LIBUKPLAT_NATIVE_EXCEPT
+	bool
+	select LIBUKPLAT_NATIVE_REGS
+
+config LIBUKPLAT_NATIVE_SYSCTX
+	bool
 
 endif

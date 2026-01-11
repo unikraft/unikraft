@@ -13,7 +13,4 @@ config LIBUKINTCTLR_MAX_HANDLERS_PER_IRQ
 	int "Maximum number of handlers per IRQ"
 	default 8
 
-config LIBUKINTCTLR_ISR_ECTX_ASSERTIONS
-	bool "Check for unmodified ECTX in interrupt handlers"
-
 endif
