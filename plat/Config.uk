@@ -104,3 +104,6 @@ config HAVE_PAGING
 
 config HAVE_5LEVEL_PT
 	bool
+
+config HAVE_CPU_MULTI_PHASE_STARTUP
+	bool
