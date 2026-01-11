@@ -1,0 +1,24 @@
+menuconfig LIBUKLCPU
+	bool "uklcpu: Generic logical CPU interface"
+	select LIBUKPAL
+	default y
+
+if LIBUKLCPU
+
+if HAVE_SMP
+
+config LIBUKLCPU_RUN_IRQ
+	int "Remote Function IRQ#"
+	default 5 if ARCH_ARM_64
+	default 13 if ARCH_X86_64
+	depends on HAVE_SMP
+
+config LIBUKLCPU_WAKEUP_IRQ
+	int "Wakeup IRQ#"
+	default 6 if ARCH_ARM_64
+	default 14 if ARCH_X86_64
+	depends on HAVE_SMP
+
+endif
+
+endif
