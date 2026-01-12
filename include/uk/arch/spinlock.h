@@ -101,11 +101,11 @@ typedef struct __spinlock {
 #define UKARCH_SPINLOCK_INITIALIZER()	{}
 #define ukarch_spin_init(lock)		(void)(lock)
 #define ukarch_spin_lock(lock)		\
-	do { barrier(); (void)(lock); } while (0)
+	do { __barrier(); (void)(lock); } while (0)
 #define ukarch_spin_unlock(lock)	\
-	do { barrier(); (void)(lock); } while (0)
-#define ukarch_spin_trylock(lock)	({ barrier(); (void)(lock); 1; })
-#define ukarch_spin_is_locked(lock)	({ barrier(); (void)(lock); 0; })
+	do { __barrier(); (void)(lock); } while (0)
+#define ukarch_spin_trylock(lock)	({ __barrier(); (void)(lock); 1; })
+#define ukarch_spin_is_locked(lock)	({ __barrier(); (void)(lock); 0; })
 
 #endif /* CONFIG_HAVE_SMP */
 

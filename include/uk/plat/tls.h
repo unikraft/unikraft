@@ -35,10 +35,9 @@
 #define __UKPLAT_TLS_H__
 
 #include <uk/config.h>
+#include <uk/essentials.h>
 #include <uk/arch/types.h>
 #include <uk/arch/tls.h>
-#include <uk/arch/lcpu.h>
-#include <uk/essentials.h>
 #if CONFIG_LIBUKDEBUG
 #include <uk/assert.h>
 #endif /* CONFIG_LIBUKDEBUG */
@@ -112,7 +111,7 @@ ukplat_tlsp_exec(__uptr tlsp, ukplat_tlsp_exec_fn fn, void *argp)
 #endif
 
 	orig_tlsp = ukplat_tlsp_get();
-	barrier();
+	__barrier();
 	ukplat_tlsp_set(tlsp);
 	ret = (*fn)(argp);
 	ukplat_tlsp_set(orig_tlsp);
