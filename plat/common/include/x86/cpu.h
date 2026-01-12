@@ -79,28 +79,27 @@ static inline void _init_syscall(void)
 	int have_syscall = 0;
 
 	/* Check for availability of extended features */
-	ukarch_x86_cpuid(0x80000000, 0, &eax, &ebx, &ecx, &edx);
+	uk_arch_cpuid(0x80000000, 0, &eax, &ebx, &ecx, &edx);
 	if (eax >= 0x80000001) {
-		ukarch_x86_cpuid(0x80000001, 0, &eax, &ebx, &ecx, &edx);
-		have_syscall = (edx & X86_CPUID3_SYSCALL);
+		uk_arch_cpuid(0x80000001, 0, &eax, &ebx, &ecx, &edx);
+		have_syscall = (edx & UK_ARCH_CPUID3_SYSCALL);
 	}
 
 	if (!have_syscall)
 		UK_CRASH("CPU does not support SYSCALL/SYSRET!\n");
 
 	/* Enable and program syscall/sysret */
-	wrmsrl(X86_MSR_EFER,
-	       rdmsrl(X86_MSR_EFER)
-	       | X86_EFER_LMA | X86_EFER_LME | X86_EFER_SCE);
-	wrmsrl(X86_MSR_STAR,
-	       (0x08ULL << 48) | (0x08ULL << 32));
-	wrmsrl(X86_MSR_LSTAR,
-	       (__uptr) _ukplat_syscall);
+	uk_arch_wrmsrl(UK_ARCH_MSR_EFER,
+		       uk_arch_rdmsrl(UK_ARCH_MSR_EFER) |
+		       UK_ARCH_EFER_LMA | UK_ARCH_EFER_LME | UK_ARCH_EFER_SCE);
+	uk_arch_wrmsrl(UK_ARCH_MSR_STAR, (0x08ULL << 48) | (0x08ULL << 32));
+	uk_arch_wrmsrl(UK_ARCH_MSR_LSTAR, (__uptr)_ukplat_syscall);
 
 	/* Clear IF flag during an interrupt */
-	wrmsrl(X86_MSR_SYSCALL_MASK,
-	       X86_EFLAGS_TF | X86_EFLAGS_DF | X86_EFLAGS_IF
-	       | X86_EFLAGS_AC | X86_EFLAGS_NT);
+	uk_arch_wrmsrl(UK_ARCH_MSR_SYSCALL_MASK,
+		       UK_ARCH_EFLAGS_TF | UK_ARCH_EFLAGS_DF |
+		       UK_ARCH_EFLAGS_IF | UK_ARCH_EFLAGS_AC |
+		       UK_ARCH_EFLAGS_NT);
 
 	uk_pr_info("SYSCALL entrance @ %p\n", _ukplat_syscall);
 }
@@ -110,8 +109,8 @@ static inline void _init_syscall(void)
 static inline void _check_ospke(void)
 {
 	__u32 eax, ebx, ecx, edx;
-	cpuid(0x7, 0, &eax, &ebx, &ecx, &edx);
-	if (!(ecx & X86_CPUID7_ECX_OSPKE)) {
+	uk_arch_cpuid(0x7, 0, &eax, &ebx, &ecx, &edx);
+	if (!(ecx & UK_ARCH_CPUID7_ECX_OSPKE)) {
 		/* if PKU is not enabled, abort the boot process. Images
 		 * compiled with HAVE_X86PKU are *specialized* to be executed on
 		 * PKU-enabled hardware. This allows us to avoid checks later at

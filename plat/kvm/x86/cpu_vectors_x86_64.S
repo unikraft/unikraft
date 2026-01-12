@@ -24,10 +24,10 @@
  */
 /* Taken from solo5 */
 
+#include <uk/arch.h>
 #include <x86/traps.h>
 #include <uk/asm/cfi.h>
 #include <uk/intctlr.h>
-#include <kvm-x86/traps.h>
 
 .altmacro
 
@@ -180,7 +180,7 @@ TRAP_ENTRY simd_error,       0
 TRAP_ENTRY virt_error,       0
 
 .set irqno, 0
-.rept IDT_NUM_ENTRIES-32
+.rept UK_ARCH_IDT_NUM_ENTRIES-32
 IRQ_ENTRY %irqno
 .set irqno, irqno + 1
 .endr

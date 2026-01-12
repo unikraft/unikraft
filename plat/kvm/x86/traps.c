@@ -32,8 +32,7 @@
 #include <uk/plat/lcpu.h>
 #include <uk/plat/config.h>
 #include <x86/cpu.h>
-#include <x86/desc.h>
-#include <kvm-x86/traps.h>
+#include <x86/traps.h>
 
 /*
  * CPUs should get dedicated IRQ and exception stacks. We use the interrupt
@@ -80,20 +79,19 @@ UKPLAT_PER_LCPU_ARRAY_DEFINE(__u8, lcpu_except_stack,
 			     3 * CPU_EXCEPT_STACK_SIZE);
 
 static __align(8)
-UKPLAT_PER_LCPU_DEFINE(struct tss64, cpu_tss);
+UKPLAT_PER_LCPU_DEFINE(struct uk_arch_tss64, cpu_tss);
 
 static __align(8)
-UKPLAT_PER_LCPU_ARRAY_DEFINE(struct seg_desc32, cpu_gdt64, GDT_NUM_ENTRIES);
+UKPLAT_PER_LCPU_ARRAY_DEFINE(struct uk_arch_seg_desc32, cpu_gdt64,
+			     UK_ARCH_GDT_NUM_ENTRIES);
 
 static void gdt_init(__lcpuidx idx)
 {
-	volatile struct desc_table_ptr64 gdtptr; /* needs to be volatile so
-						  * setting its values is not
-						  * optimized out
-						  */
+	/* needs to be volatile so setting its values is not optimized out */
+	volatile struct uk_arch_desc_table_ptr64 gdtptr;
 
-	cpu_gdt64[idx][GDT_DESC_CODE].raw = GDT_DESC_CODE64_VAL;
-	cpu_gdt64[idx][GDT_DESC_DATA].raw = GDT_DESC_DATA64_VAL;
+	cpu_gdt64[idx][UK_ARCH_GDT_DESC_CODE].raw = UK_ARCH_GDT_DESC_CODE64_VAL;
+	cpu_gdt64[idx][UK_ARCH_GDT_DESC_DATA].raw = UK_ARCH_GDT_DESC_DATA64_VAL;
 
 	gdtptr.limit = sizeof(cpu_gdt64[idx]) - 1;
 	gdtptr.base = (__u64) &cpu_gdt64[idx];
@@ -110,7 +108,7 @@ static void gdt_init(__lcpuidx idx)
 		"lretq\n"
 		:
 		: "m"(gdtptr),
-		  "i"(GDT_DESC_OFFSET(GDT_DESC_CODE))
+		  "i"(UK_ARCH_GDT_DESC_OFFSET(UK_ARCH_GDT_DESC_CODE))
 		: "rax", "memory" : jump_to_new_cs);
 jump_to_new_cs:
 
@@ -124,13 +122,13 @@ jump_to_new_cs:
 		"movl	%1, %%fs\n"
 		"movl	%1, %%gs\n"
 		:
-		: "r"(GDT_DESC_OFFSET(GDT_DESC_DATA)),
+		: "r"(UK_ARCH_GDT_DESC_OFFSET(UK_ARCH_GDT_DESC_DATA)),
 		  "r"(0));
 }
 
 static void tss_init(__lcpuidx idx)
 {
-	struct seg_desc64 *tss_desc;
+	struct uk_arch_seg_desc64 *tss_desc;
 
 	cpu_tss[idx].ist[0] =
 		(__u64)&lcpu_except_stack[idx][CPU_EXCEPT_STACK_SIZE * 3];
@@ -139,21 +137,23 @@ static void tss_init(__lcpuidx idx)
 	cpu_tss[idx].ist[2] =
 		(__u64)&lcpu_except_stack[idx][CPU_EXCEPT_STACK_SIZE];
 
-	tss_desc = (void *) &cpu_gdt64[idx][GDT_DESC_TSS_LO];
+	tss_desc = (void *)&cpu_gdt64[idx][UK_ARCH_GDT_DESC_TSS_LO];
 	tss_desc->limit_lo	= sizeof(cpu_tss[idx]);
 	tss_desc->base_lo	= (__u64) &(cpu_tss[idx]);
 	tss_desc->base_hi	= (__u64) &(cpu_tss[idx]) >> 24;
-	tss_desc->type		= GDT_DESC_TYPE_TSS_AVAIL;
+	tss_desc->type		= UK_ARCH_GDT_DESC_TYPE_TSS_AVAIL;
 	tss_desc->p		= 1;
 
 	__asm__ __volatile__(
 		"ltr	%0\n"
 		:
-		: "r"((__u16) (GDT_DESC_OFFSET(GDT_DESC_TSS_LO))));
+		: "r"((__u16)
+		      (UK_ARCH_GDT_DESC_OFFSET(UK_ARCH_GDT_DESC_TSS_LO))));
 }
 
 static __align(8)
-UKPLAT_PER_LCPU_ARRAY_DEFINE(struct seg_gate_desc64, cpu_idt, IDT_NUM_ENTRIES);
+UKPLAT_PER_LCPU_ARRAY_DEFINE(struct uk_arch_seg_gate_desc64, cpu_idt,
+			     UK_ARCH_IDT_NUM_ENTRIES);
 
 static
 UKPLAT_PER_LCPU_DEFINE(__u8, idt_ist_disable_nesting);
@@ -164,8 +164,8 @@ static UKPLAT_PER_LCPU_ARRAY_DEFINE(__u8, idt_ist_saved, IDT_IST_SAVE_LEN);
 
 void ukarch_push_nested_exceptions(void)
 {
-	struct seg_gate_desc64 *desc;
-	struct seg_gate_desc64 *idt;
+	struct uk_arch_seg_gate_desc64 *desc;
+	struct uk_arch_seg_gate_desc64 *idt;
 	__u8 *disable_nesting;
 	__u8 *ist_saved;
 	struct lcpu *lcpu;
@@ -191,8 +191,8 @@ void ukarch_push_nested_exceptions(void)
 
 void ukarch_pop_nested_exceptions(void)
 {
-	struct seg_gate_desc64 *desc;
-	struct seg_gate_desc64 *idt;
+	struct uk_arch_seg_gate_desc64 *desc;
+	struct uk_arch_seg_gate_desc64 *idt;
 	__u8 *disable_nesting;
 	__u8 *ist_saved;
 	struct lcpu *lcpu;
@@ -222,12 +222,12 @@ DECLARE_TRAP_EC(nmi,           "NMI",                  UKARCH_TRAP_NMI)
 DECLARE_TRAP_EC(double_fault,  "double fault",         NULL)
 DECLARE_TRAP_EC(virt_error,    "virtualization error", NULL)
 
-static struct desc_table_ptr64 idtptr;
+static struct uk_arch_desc_table_ptr64 idtptr;
 
 static inline void idt_fillgate(unsigned int num, void *fun, unsigned int ist)
 {
-	struct seg_gate_desc64 *desc;
-	struct seg_gate_desc64 *idt;
+	struct uk_arch_seg_gate_desc64 *desc;
+	struct uk_arch_seg_gate_desc64 *idt;
 
 	idt = ukplat_per_lcpu_current(cpu_idt);
 	desc = &idt[num];
@@ -237,10 +237,10 @@ static inline void idt_fillgate(unsigned int num, void *fun, unsigned int ist)
 	 */
 	desc->offset_hi	= (__u64) fun >> 16;
 	desc->offset_lo	= (__u64) fun & 0xffff;
-	desc->selector	= IDT_DESC_OFFSET(IDT_DESC_CODE);
+	desc->selector	= UK_ARCH_IDT_DESC_OFFSET(UK_ARCH_IDT_DESC_CODE);
 	desc->ist	= ist;
-	desc->type	= IDT_DESC_TYPE_INTR;
-	desc->dpl	= IDT_DESC_DPL_KERNEL;
+	desc->type	= UK_ARCH_IDT_DESC_TYPE_INTR;
+	desc->dpl	= UK_ARCH_IDT_DESC_DPL_KERNEL;
 	desc->p		= 1;
 }
 

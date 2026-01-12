@@ -31,13 +31,13 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <uk/asm/arch.h>
+#include <uk/arch.h>
 #include <uk/config.h>
 #include <uk/paging.h>
 #include <uk/reloc.h>
 
-#define PTE_RO		X86_PTE_PRESENT
-#define PTE_RW		(X86_PTE_PRESENT | X86_PTE_RW)
+#define PTE_RO		UK_ARCH_PTE_PRESENT
+#define PTE_RW		(UK_ARCH_PTE_PRESENT | UK_ARCH_PTE_RW)
 
 #define PT_LVL		0
 #define PD_LVL		1
@@ -64,11 +64,11 @@
  */
 .macro pte_page paddr, level, pte
 .ifeq (\level - UK_PAGING_PAGE_HUGE_LEVEL)
-	pte \paddr, (\pte + X86_PTE_PSE)
+	pte \paddr, (\pte + UK_ARCH_PTE_PSE)
 	.exitm
 .endif
 .ifeq (\level - UK_PAGING_PAGE_LARGE_LEVEL)
-	pte \paddr, (\pte + X86_PTE_PSE)
+	pte \paddr, (\pte + UK_ARCH_PTE_PSE)
 .else
 	pte \paddr, \pte
 .endif

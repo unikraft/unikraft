@@ -126,7 +126,7 @@ struct lcpu *lcpu_get_current(void)
 __isr __uptr traps_lcpu_get_except_stack_base(void);
 __isr struct lcpu *lcpu_get_current_in_except(void)
 {
-	return lcpu_get((ukarch_read_sp() -
+	return lcpu_get((uk_arch_read_sp() -
 			 traps_lcpu_get_except_stack_base()) /
 			(CPU_EXCEPT_STACK_SIZE * 3));
 }
@@ -166,7 +166,7 @@ int lcpu_init(struct lcpu *this_lcpu)
 #endif /* CONFIG_HAVE_SMP */
 
 	/* Write back changes before marking CPU as online */
-	wmb();
+	uk_arch_wmb();
 
 	/* Put the CPU in busy state. This will mark it as online. After this
 	 * point, functions may be queued to the CPU. However, IRQs are still
@@ -188,7 +188,7 @@ static void __noreturn lcpu_halt(struct lcpu *this_cpu, int error_code)
 		/* Although we should not be able to recover via regular
 		 * interrupts, we might receive NMIs so loop to be safe.
 		 */
-		halt();
+		uk_arch_halt();
 	}
 }
 
@@ -242,7 +242,7 @@ int lcpu_fn_enqueue(struct lcpu *lcpu, const struct ukplat_lcpu_func *fn)
 	/* Ensure everything is written back when we return and the arch
 	 * support code will raise the IRQ
 	 */
-	wmb();
+	uk_arch_wmb();
 
 	return 0;
 }
@@ -252,7 +252,7 @@ static void lcpu_fn_dequeue(struct lcpu *this_lcpu, struct ukplat_lcpu_func *fn)
 	*fn = this_lcpu->fn;
 
 	/* Ensure that we have captured the whole function object */
-	rmb();
+	uk_arch_rmb();
 
 	UK_ASSERT(fn->fn);
 
@@ -369,7 +369,7 @@ void __weak __noreturn lcpu_entry_default(struct lcpu *this_lcpu)
 			/* Besides interrupts in general, the halt can be
 			 * interrupted by calls to ukplat_lcpu_run().
 			 */
-			halt();
+			uk_arch_halt();
 		}
 	}
 }
@@ -438,7 +438,7 @@ retry:
 		/* Ensure that the startup arguments have been written back
 		 * before issuing the startup call
 		 */
-		wmb();
+		uk_arch_wmb();
 
 		rc = lcpu_arch_start(lcpu, flags);
 		if (unlikely(rc)) {

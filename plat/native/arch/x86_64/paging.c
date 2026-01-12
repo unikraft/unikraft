@@ -11,7 +11,7 @@
 #include <errno.h>
 
 #include <uk/arch/types.h>
-#include <uk/asm/arch.h>
+#include <uk/arch.h>
 #include <uk/assert.h>
 #include <uk/plat/native/addr.h>
 #include <uk/plat/native/paging.h>
@@ -26,45 +26,45 @@ int uk_plat_native_paging_init(void)
 	__u64 efer;
 
 	/* Check for availability of extended features */
-	ukarch_x86_cpuid(0x80000000, 0, &eax, &ebx, &ecx, &edx);
+	uk_arch_cpuid(0x80000000, 0, &eax, &ebx, &ecx, &edx);
 	if (eax < 0x80000008)
 		return -ENOTSUP;
 
 	/* Check for 1GiB page support. We assume 64-bit and NX support */
-	ukarch_x86_cpuid(0x80000001, 0, &eax, &ebx, &ecx, &edx);
+	uk_arch_cpuid(0x80000001, 0, &eax, &ebx, &ecx, &edx);
 
-	UK_ASSERT(edx & X86_CPUID81_LM);
-	UK_ASSERT(edx & X86_CPUID81_NX);
+	UK_ASSERT(edx & UK_ARCH_CPUID81_LM);
+	UK_ASSERT(edx & UK_ARCH_CPUID81_NX);
 
-	if (unlikely(!(edx & X86_CPUID81_PAGE1GB))) {
+	if (unlikely(!(edx & UK_ARCH_CPUID81_PAGE1GB))) {
 		uk_pr_crit("%s not supported.\n", "1GiB pages");
 		return -ENOTSUP;
 	}
 
 	/* Enable the NX bit */
-	efer = rdmsrl(X86_MSR_EFER);
-	efer |= X86_EFER_NXE;
-	wrmsrl(X86_MSR_EFER, efer);
+	efer = uk_arch_rdmsrl(UK_ARCH_MSR_EFER);
+	efer |= UK_ARCH_EFER_NXE;
+	uk_arch_wrmsrl(UK_ARCH_MSR_EFER, efer);
 
 #if UK_PLAT_NATIVE_PT_LEVELS == 5
-	ukarch_x86_cpuid(0x7, 0, &eax, &ebx, &ecx, &edx);
+	uk_arch_cpuid(0x7, 0, &eax, &ebx, &ecx, &edx);
 
-	if (unlikely(!(ecx & X86_CPUID7_ECX_LA57))) {
+	if (unlikely(!(ecx & UK_ARCH_CPUID7_ECX_LA57))) {
 		uk_pr_crit("%s not supported.\n", "5-level paging");
 		return -ENOTSUP;
 	}
 #endif /* UK_PLAT_NATIVE_PT_LEVELS == 5 */
 
 	/* Check for PAT support */
-	ukarch_x86_cpuid(0x1, 0, &eax, &ebx, &ecx, &edx);
-	if (unlikely(!(edx & X86_CPUID1_EDX_PAT))) {
+	uk_arch_cpuid(0x1, 0, &eax, &ebx, &ecx, &edx);
+	if (unlikely(!(edx & UK_ARCH_CPUID1_EDX_PAT))) {
 		uk_pr_crit("Page table attributes are not supported.\n");
 		return -ENOTSUP;
 	}
 	/* Reset PAT to default value */
-	wrmsrl(X86_MSR_PAT, __X86_64_PAT_DEFAULT);
+	uk_arch_wrmsrl(UK_ARCH_MSR_PAT, __X86_64_PAT_DEFAULT);
 
-	ukarch_x86_cpuid(0x80000008, 0, &eax, &ebx, &ecx, &edx);
+	uk_arch_cpuid(0x80000008, 0, &eax, &ebx, &ecx, &edx);
 
 	max_addr_bit = (eax & __X86_64_PG_VADDR_MASK) >> __X86_64_PG_VADDR_SHIFT;
 	if (unlikely(max_addr_bit < __X86_64_VADDR_BITS)) {

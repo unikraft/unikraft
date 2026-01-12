@@ -58,7 +58,7 @@ void do_unhandled_trap(int trapnr, char *str, struct __regs *regs,
 	unsigned long vaddr;
 	int rc;
 
-	vaddr = read_cr2(); /* valid conditionally to trap type */
+	vaddr = uk_arch_rdcr2(); /* valid conditionally to trap type */
 	ctx = (struct ukarch_trap_ctx){regs, trapnr, str, error_code, 0, vaddr};
 
 	rc = uk_raise_event(UK_EVENT_UNHANDLED_EXCEPTION, &ctx);

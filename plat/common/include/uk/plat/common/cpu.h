@@ -47,7 +47,7 @@
 ({				\
 	local_irq_disable();	\
 		for (;;)	\
-			halt();	\
+			uk_arch_halt();	\
 })
 
 #endif /* __PLAT_CMN_CPU_H__ */

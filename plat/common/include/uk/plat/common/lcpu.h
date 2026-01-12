@@ -109,10 +109,10 @@ UK_CTASSERT(sizeof(struct lcpu_sargs) == LCPU_SARGS_SIZE);
 
 #define LCPU_MEMBERS_SIZE		(LCPU_ARCH_OFFSET  + LCPU_ARCH_SIZE)
 #define LCPU_SIZE						\
-	ALIGN_UP(LCPU_MEMBERS_SIZE, CACHE_LINE_SIZE)
+	ALIGN_UP(LCPU_MEMBERS_SIZE, UK_ARCH_CACHE_LINE_SIZE)
 
 #ifndef __ASSEMBLY__
-struct __align(CACHE_LINE_SIZE) lcpu {
+struct __align(UK_ARCH_CACHE_LINE_SIZE) lcpu {
 	/* Current CPU state (LCPU_STATE_*).
 	 * Working on it with atomic instructions - must be 8-byte aligned
 	 */

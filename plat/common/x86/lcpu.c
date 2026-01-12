@@ -34,6 +34,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <uk/asm/fsgsbase.h>
 #include <uk/arch/ctx.h>
 #include <uk/config.h>
 #include <uk/assert.h>
@@ -61,7 +62,7 @@ __lcpuid lcpu_arch_id(void)
 {
 	__u32 eax, ebx, ecx, edx;
 
-	cpuid(1, 0, &eax, &ebx, &ecx, &edx);
+	uk_arch_cpuid(1, 0, &eax, &ebx, &ecx, &edx);
 	return (ebx >> 24);
 }
 

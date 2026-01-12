@@ -76,7 +76,7 @@ static inline int _raise_event_##event(int trapnr, const char *str,	\
 					unsigned long error_code) {	\
 	struct ukarch_trap_ctx ctx = {regs, trapnr, str, error_code,	\
 				      0, /* filled by handler */	\
-				      read_cr2()}; /* pf addr */	\
+				      uk_arch_rdcr2()}; /* pf addr */	\
 	return uk_raise_event(event, &ctx);				\
 }
 

@@ -33,7 +33,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <kvm-x86/traps.h>
+#include <uk/arch.h>
 #include <uk/arch/lcpu.h>
 #include <uk/asm.h>
 #include <uk/asm/cfi.h>
@@ -167,7 +167,7 @@ ENTRY(_ukplat_syscall)
 	subq	$(UKARCH_EXECENV_SIZE - __REGS_SIZEOF), %rsp
 	.cfi_adjust_cfa_offset (UKARCH_EXECENV_SIZE - __REGS_SIZEOF)
 
-	pushq_cfi	$(GDT_DESC_OFFSET(GDT_DESC_DATA))
+	pushq_cfi	$(UK_ARCH_GDT_DESC_OFFSET(UK_ARCH_GDT_DESC_DATA))
 
 	pushq_reg_cfi r11
 	.cfi_rel_offset rsp, 0
@@ -185,9 +185,10 @@ ENTRY(_ukplat_syscall)
 	 */
 	pushfq			/* eflags */
 	.cfi_adjust_cfa_offset 8
-	orq	$X86_EFLAGS_IF, 0(%rsp)
+	orq	$UK_ARCH_EFLAGS_IF, 0(%rsp)
 
-	pushq_cfi	$(GDT_DESC_OFFSET(GDT_DESC_CODE))	/* cs */
+	/* cs */
+	pushq_cfi	$(UK_ARCH_GDT_DESC_OFFSET(UK_ARCH_GDT_DESC_CODE))
 	pushq_reg_cfi rcx	/* rcx contains the next rip on syscall exit */
 
 	pushq_reg_cfi rax	/* orig_rax */

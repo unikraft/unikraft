@@ -30,6 +30,7 @@
 #ifndef __PLAT_CMN_X86_TLS_H__
 #define __PLAT_CMN_X86_TLS_H__
 
+#include <uk/asm/fsgsbase.h>
 #include <x86/cpu.h> /* rdmsrl, wrmsrl */
 #include <uk/arch/lcpu.h>
 

@@ -54,7 +54,7 @@
  */
 static void qemu_debug_exit(int value)
 {
-	outw(QEMU_ISA_DEBUG_EXIT_PORT, value);
+	uk_arch_outw(QEMU_ISA_DEBUG_EXIT_PORT, value);
 }
 #endif /* CONFIG_KVM_VMM_QEMU */
 
@@ -64,7 +64,7 @@ void system_off(enum ukplat_gstate request __maybe_unused)
 	/* Trigger the reset line via the PS/2 controller. On firecracker
 	 * this will shutdown the VM.
 	 */
-	outb(0x64, 0xFE);
+	uk_arch_outb(0x64, 0xFE);
 #endif /* CONFIG_KVM_VMM_FIRECRACKER */
 
 #ifdef CONFIG_KVM_VMM_QEMU
@@ -77,7 +77,8 @@ void system_off(enum ukplat_gstate request __maybe_unused)
 	 */
 	if (request == UKPLAT_CRASH) {
 		qemu_debug_exit(QEMU_ISA_DEBUG_EXIT_CRASH);
-		outb(QEMU_PVPANIC_EXIT_PORT, QEMU_PVPANIC_GUEST_PANICKED);
+		uk_arch_outb(QEMU_PVPANIC_EXIT_PORT,
+			     QEMU_PVPANIC_GUEST_PANICKED);
 	}
 #endif /* CONFIG_KVM_VMM_QEMU */
 
@@ -88,7 +89,7 @@ void system_off(enum ukplat_gstate request __maybe_unused)
 	 * harmless if we're not running on QEMU, especially considering we're
 	 * already shutting down, so who cares if we crash.
 	 */
-	outw(0x604, 0x2000);
+	uk_arch_outw(0x604, 0x2000);
 
 #ifdef CONFIG_KVM_VMM_QEMU
 	/*

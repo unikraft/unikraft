@@ -58,7 +58,7 @@
 	do { \
 		unsigned long __f; \
 		asm volatile("pushf" __SZ " ; pop" __SZ " %0" : "=g"(__f)); \
-		x = (__f & X86_EFLAGS_IF) ? 1 : 0; \
+		x = (__f & UK_ARCH_EFLAGS_IF) ? 1 : 0; \
 	} while (0)
 
 #define __restore_flags(x) \

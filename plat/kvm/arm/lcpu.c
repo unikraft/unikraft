@@ -53,7 +53,7 @@ void ukplat_lcpu_halt_irq(void)
 	 *
 	 * See Linux `cpu_do_idle(void)` implementation
 	 */
-	halt();
+	uk_arch_halt();
 }
 
 unsigned long ukplat_lcpu_save_irqf(void)

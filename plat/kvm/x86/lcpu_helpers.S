@@ -52,7 +52,7 @@
 .macro LCPU_ENABLE_FPU_SSE
 	/* Enable numeric exceptions and coprocessor monitor */
 	movq	%cr0, %rdi
-	orl	$(X86_CR0_NE | X86_CR0_MP), %edi
+	orl	$(UK_ARCH_CR0_NE | UK_ARCH_CR0_MP), %edi
 	movq	%rdi, %cr0
 
 	fninit
@@ -63,7 +63,7 @@ ldmxcsr_rval_addr:
 	.long	0x1f80		/* Power-on default */
 
 	movq	%cr4, %rdi
-	orl	$(X86_CR4_OSFXSR | X86_CR4_OSXMMEXCPT), %edi
+	orl	$(UK_ARCH_CR4_OSFXSR | UK_ARCH_CR4_OSXMMEXCPT), %edi
 	movq	%rdi, %cr4
 
 	ur_mov	ldmxcsr_rval_addr, %ebx, 4
@@ -76,15 +76,15 @@ ldmxcsr_rval_addr:
 /**
  * Enable the XSAVE feature. Jump to the fail label if not successful.
  *
- * @in: ECX according to cpuid(eax=0x1)
+ * @in: ECX according to uk_arch_cpuid(eax=0x1)
  * @clobbers: RDI
  */
 .macro LCPU_ENABLE_XSAVE fail_label
-	testl	$(X86_CPUID1_ECX_XSAVE), %ecx
+	testl	$(UK_ARCH_CPUID1_ECX_XSAVE), %ecx
 	jz	\fail_label
 
 	movq	%cr4, %rdi
-	orl	$(X86_CR4_OSXSAVE), %edi
+	orl	$(UK_ARCH_CR4_OSXSAVE), %edi
 	movq	%rdi, %cr4
 .endm
 
@@ -92,17 +92,17 @@ ldmxcsr_rval_addr:
  * Enable Advanced Vector Extensions (AVX). Jump to the fail label if not
  * successful.
  *
- * @in: ECX according to cpuid(eax=0x1)
+ * @in: ECX according to uk_arch_cpuid(eax=0x1)
  * @clobbers: RAX, RDI
  */
 .macro LCPU_ENABLE_AVX fail_label
-	testl	$(X86_CPUID1_ECX_AVX), %ecx
+	testl	$(UK_ARCH_CPUID1_ECX_AVX), %ecx
 	jz	\fail_label
 
 	movq	%rcx, %rdi
 	xorl	%ecx, %ecx
 	xgetbv
-	orl	$(X86_XCR0_SSE | X86_XCR0_AVX), %eax
+	orl	$(UK_ARCH_XCR0_SSE | UK_ARCH_XCR0_AVX), %eax
 	xsetbv
 	movq	%rdi, %rcx
 .endm
@@ -110,15 +110,15 @@ ldmxcsr_rval_addr:
 /**
  * Enable FS/GSBASE. Jump to the fail label if not successful.
  *
- * @in: EBX according to cpuid(eax=7, ecx=0)
+ * @in: EBX according to uk_arch_cpuid(eax=7, ecx=0)
  * @clobbers: RDI
  */
 .macro LCPU_ENABLE_FSGSBASE fail_label
-	testl	$(X86_CPUID7_EBX_FSGSBASE), %ebx
+	testl	$(UK_ARCH_CPUID7_EBX_FSGSBASE), %ebx
 	jz	\fail_label
 
 	movq	%cr4, %rdi
-	orl	$(X86_CR4_FSGSBASE), %edi
+	orl	$(UK_ARCH_CR4_FSGSBASE), %edi
 	movq	%rdi, %cr4
 .endm
 
@@ -126,27 +126,27 @@ ldmxcsr_rval_addr:
  * Enable Memory Protection Keys (PKU). Jump to the fail label if not
  * successful.
  *
- * @in: ECX according to cpuid(eax=7, ecx=0)
+ * @in: ECX according to uk_arch_cpuid(eax=7, ecx=0)
  * @clobbers: RAX, RDI
  */
 .macro LCPU_ENABLE_PKU fail_label
-	testl	$(X86_CPUID7_ECX_PKU), %ecx
+	testl	$(UK_ARCH_CPUID7_ECX_PKU), %ecx
 	jz	\fail_label
 
 	movq	%cr4, %rdi
 
 	/* Only enable if we have XSAVE */
-	testl	$(X86_CR4_OSXSAVE), %edi
+	testl	$(UK_ARCH_CR4_OSXSAVE), %edi
 	jz	\fail_label
 
-	orl	$(X86_CR4_PKE), %edi
+	orl	$(UK_ARCH_CR4_PKE), %edi
 	movq	%rdi, %cr4
 
 	/* Also enable XSAVE for the PKRU */
 	movq	%rcx, %rdi
 	xorl	%ecx, %ecx
 	xgetbv
-	orl	$(X86_XCR0_PKRU), %eax
+	orl	$(UK_ARCH_XCR0_PKRU), %eax
 	xsetbv
 	movq	%rdi, %rcx
 .endm
