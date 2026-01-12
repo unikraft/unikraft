@@ -88,6 +88,10 @@ extern "C" {
 #define __naked                __attribute__((naked))
 #endif
 
+#ifndef __barrier
+#define __barrier() __asm__ __volatile__("" : : : "memory")
+#endif
+
 #ifndef __alias
 #define __alias(old, new) \
 	extern __typeof(old) new __attribute__((alias(#old)))

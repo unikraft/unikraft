@@ -45,20 +45,16 @@ extern "C" {
 #include <uk/asm/lcpu.h>
 
 #ifndef __ASSEMBLY__
-#ifndef barrier
-#define barrier() __asm__ __volatile__("" : : : "memory")
-#endif
-
 #ifndef mb
-#define mb()      barrier()
+#define mb()      __barrier()
 #endif
 
 #ifndef rmb
-#define rmb()     barrier()
+#define rmb()     __barrier()
 #endif
 
 #ifndef wmb
-#define wmb()     barrier()
+#define wmb()     __barrier()
 #endif
 #endif /* !__ASSEMBLY__ */
 
