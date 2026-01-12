@@ -30,6 +30,12 @@
 	END(_name)
 #endif
 
+#ifndef EQUIV_GLOBALSYM
+#define EQUIV_GLOBALSYM(_name, _expr)					\
+	.global _name;							\
+	.equiv _name, _expr
+#endif
+
 #ifndef _AC
 #define _AC(X,Y)			X
 #endif
@@ -59,6 +65,14 @@
 #define ENDPROC(_name)							\
 	".type " STRINGIFY(_name) ", %function\n\t"			\
 	END(_name)
+#endif
+
+#ifndef EQUIV_GLOBALSYM
+#define EQUIV_GLOBALSYM(_name, _expr)					\
+	asm (								\
+		".global " STRINGIFY(_name) "\n\t"			\
+		".equiv " STRINGIFY(_name) ", " STRINGIFY(_expr) "\n\t"	\
+	)
 #endif
 
 #ifndef _AC
