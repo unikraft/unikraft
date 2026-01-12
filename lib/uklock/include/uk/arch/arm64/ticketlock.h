@@ -126,11 +126,11 @@ typedef struct __ticketlock {
 #define UKARCH_TICKETLOCK_INITIALIZER()	{}
 #define ukarch_ticket_init(lock)		(void)(lock)
 #define ukarch_ticket_lock(lock)		\
-	do { barrier(); (void)(lock); } while (0)
+	do { __barrier(); (void)(lock); } while (0)
 #define ukarch_ticket_unlock(lock)	\
-	do { barrier(); (void)(lock); } while (0)
-#define ukarch_ticket_trylock(lock)	({ barrier(); (void)(lock); 1; })
-#define ukarch_ticket_is_locked(lock)	({ barrier(); (void)(lock); 0; })
+	do { __barrier(); (void)(lock); } while (0)
+#define ukarch_ticket_trylock(lock)	({ __barrier(); (void)(lock); 1; })
+#define ukarch_ticket_is_locked(lock)	({ __barrier(); (void)(lock); 0; })
 
 #endif /* CONFIG_HAVE_SMP */
 

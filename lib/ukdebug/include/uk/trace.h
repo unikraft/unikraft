@@ -240,7 +240,7 @@ static inline void __uk_trace_finalize_buff(char *new_buff_pos, void *cookie)
 	head->time = ukplat_monotonic_clock();
 	head->size = size - sizeof(*head);
 	head->cookie = cookie;
-	barrier();
+	__barrier();
 	head->magic = UK_TP_HEADER_MAGIC;
 }
 
