@@ -187,7 +187,7 @@ void xencons_flush(void)
 		return;
 
 	while (intf->out_cons < intf->out_prod)
-		barrier();
+		__barrier();
 }
 
 static int hv_console_input(char *str, unsigned int maxlen)
