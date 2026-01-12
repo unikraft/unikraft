@@ -97,12 +97,12 @@ void ukplat_lcpu_irqs_handle_pending(void)
 #ifdef XEN_HAVE_PV_UPCALL_MASK
 		vcpu->evtchn_upcall_mask = 1;
 #endif
-		barrier();
+		__barrier();
 		do_hypervisor_callback(NULL);
-		barrier();
+		__barrier();
 #ifdef XEN_HAVE_PV_UPCALL_MASK
 		vcpu->evtchn_upcall_mask = save;
-		barrier();
+		__barrier();
 #endif
 	};
 }

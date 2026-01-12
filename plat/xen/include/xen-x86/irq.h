@@ -49,17 +49,17 @@
 		_vcpu =                                                        \
 		    &HYPERVISOR_shared_info->vcpu_info[smp_processor_id()];    \
 		_vcpu->evtchn_upcall_mask = 1;                                 \
-		barrier();                                                     \
+		__barrier();                                                   \
 	} while (0)
 
 #define __sti()                                                                \
 	do {                                                                   \
 		vcpu_info_t *_vcpu;                                            \
-		barrier();                                                     \
+		__barrier();                                                   \
 		_vcpu =                                                        \
 		    &HYPERVISOR_shared_info->vcpu_info[smp_processor_id()];    \
 		_vcpu->evtchn_upcall_mask = 0;                                 \
-		barrier(); /* unmask then check (avoid races) */               \
+		__barrier(); /* unmask then check (avoid races) */             \
 		if (unlikely(_vcpu->evtchn_upcall_pending))                    \
 			ukplat_lcpu_irqs_handle_pending();		       \
 	} while (0)
@@ -75,11 +75,11 @@
 #define __restore_flags(x)                                                     \
 	do {                                                                   \
 		vcpu_info_t *_vcpu;                                            \
-		barrier();                                                     \
+		__barrier();						       \
 		_vcpu =                                                        \
 		    &HYPERVISOR_shared_info->vcpu_info[smp_processor_id()];    \
 		if ((_vcpu->evtchn_upcall_mask = (x)) == 0) {                  \
-			barrier(); /* unmask then check (avoid races) */       \
+			__barrier(); /* unmask then check (avoid races) */     \
 			if (unlikely(_vcpu->evtchn_upcall_pending))            \
 				ukplat_lcpu_irqs_handle_pending();             \
 		}                                                              \
@@ -94,7 +94,7 @@
 		    &HYPERVISOR_shared_info->vcpu_info[smp_processor_id()];    \
 		(x) = _vcpu->evtchn_upcall_mask;                               \
 		_vcpu->evtchn_upcall_mask = 1;                                 \
-		barrier();                                                     \
+		__barrier();						       \
 	} while (0)
 
 #define irqs_disabled()                                                        \
