@@ -8,7 +8,6 @@
 #ifndef __PLAT_CMN_ARM_TRAPS_H__
 #define __PLAT_CMN_ARM_TRAPS_H__
 
-#include <uk/arch/traps.h>
 
 #define DECLARE_TRAP_EVENT(event)	\
 	UK_EVENT(event)

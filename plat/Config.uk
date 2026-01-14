@@ -31,33 +31,16 @@ endif
 
 endif
 
-config UKPLAT_LCPU_MAXCOUNT
+config UKPLAT_CPU_MAXCOUNT
 	int "Maximum number of supported logical CPUs"
 	range 1 256
 	default 1
 
 config HAVE_SMP
 	bool
-	default y if UKPLAT_LCPU_MAXCOUNT > 1
-	select LIBUKINTCTLR_APIC if (ARCH_X86_64 && UKPLAT_LCPU_MAXCOUNT > 1)
+	default y if UKPLAT_CPU_MAXCOUNT > 1
+	select LIBUKINTCTLR_APIC if (ARCH_X86_64 && UKPLAT_CPU_MAXCOUNT > 1)
 	select UKPLAT_ACPI if ARCH_X86_64
-
-menu "Multiprocessor Configuration"
-	depends on HAVE_SMP
-
-config UKPLAT_LCPU_RUN_IRQ
-	int "Remote Function IRQ#"
-	default 5 if ARCH_ARM_64
-	default 13 if ARCH_X86_64
-	depends on ((ARCH_ARM_64 || ARCH_X86_64) && PLAT_KVM)
-
-config UKPLAT_LCPU_WAKEUP_IRQ
-	int "Wakeup IRQ#"
-	default 6 if ARCH_ARM_64
-	default 14 if ARCH_X86_64
-	depends on ((ARCH_ARM_64 || ARCH_X86_64) && PLAT_KVM)
-
-endmenu
 
 config ENFORCE_W_XOR_X
 	bool "Enforce W^X"

@@ -25,8 +25,7 @@
 #include <uk/plat/common/sections.h>
 #include <uk/plat/common/bootinfo.h>
 #include <uk/plat/common/acpi.h>
-#include <uk/plat/lcpu.h>
-#include <uk/plat/common/lcpu.h>
+#include <uk/lcpu.h>
 #include <uk/assert.h>
 #include <uk/boot.h>
 #include <uk/intctlr.h>
@@ -178,9 +177,9 @@ void __no_pauth _ukplat_entry(void)
 		UK_CRASH("Failed to initialize bootstrapping CPU: %d\n", rc);
 
 #ifdef CONFIG_HAVE_SMP
-	rc = lcpu_mp_init(CONFIG_UKPLAT_LCPU_RUN_IRQ,
-			  CONFIG_UKPLAT_LCPU_WAKEUP_IRQ,
-			  (void *)bi->dtb);
+	rc = uk_lcpu_mp_init(CONFIG_UKPLAT_LCPU_RUN_IRQ,
+			     CONFIG_UKPLAT_LCPU_WAKEUP_IRQ,
+			     (void *)bi->dtb);
 	if (unlikely(rc))
 		UK_CRASH("SMP initialization failed: %d.\n", rc);
 #endif /* CONFIG_HAVE_SMP */
@@ -195,5 +194,5 @@ void __no_pauth _ukplat_entry(void)
 	uk_pr_info("Switch from bootstrap stack to stack @%p\n", bstack);
 
 	lcpu_arch_jump_to(bstack, uk_boot_entry);
-	ukplat_lcpu_halt();
+	uk_lcpu_halt();
 }

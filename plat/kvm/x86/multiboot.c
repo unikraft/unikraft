@@ -10,7 +10,7 @@
 #include <uk/paging.h>
 #include <uk/plat/bootstrap.h>
 #include <uk/plat/common/bootinfo.h>
-#include <uk/plat/common/lcpu.h>
+#include <uk/lcpu.h>
 #include <uk/plat/common/memory.h>
 #include <uk/plat/common/sections.h>
 #include <uk/reloc.h>
@@ -21,7 +21,7 @@
 
 #define multiboot_crash(msg, rc)	ukplat_crash()
 
-void _ukplat_entry(struct lcpu *lcpu, struct ukplat_bootinfo *bi);
+void _ukplat_entry(struct uk_lcpu *lcpu, struct ukplat_bootinfo *bi);
 
 static inline void mrd_insert(struct ukplat_bootinfo *bi,
 			      const struct ukplat_memregion_desc *mrd)
@@ -41,7 +41,7 @@ static inline void mrd_insert(struct ukplat_bootinfo *bi,
  * 1:1 boot page table set. Physical and virtual addresses thus match for all
  * regions in the mapped range.
  */
-void multiboot_entry(struct lcpu *lcpu, struct multiboot_info *mi)
+void multiboot_entry(struct uk_lcpu *lcpu, struct multiboot_info *mi)
 {
 	struct ukplat_bootinfo *bi;
 	struct ukplat_memregion_desc mrd = {0};

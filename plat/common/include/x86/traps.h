@@ -9,9 +9,7 @@
 #ifndef __UKARCH_TRAPS_X86_64_H__
 #define __UKARCH_TRAPS_X86_64_H__
 
-#include <uk/arch/lcpu.h>
-#include <uk/arch/traps.h>
-#include <uk/plat/common/lcpu.h>
+#include <uk/lcpu.h>
 
 #define TRAP_divide_error        0
 #define TRAP_debug               1
@@ -65,49 +63,6 @@ DECLARE_ASM_TRAP(machine_check);
 DECLARE_ASM_TRAP(simd_error);
 DECLARE_ASM_TRAP(virt_error);
 DECLARE_ASM_TRAP(security_error);
-
-void do_unhandled_trap(int trapnr, char *str, struct __regs *regs,
-		unsigned long error_code);
-
-#define DECLARE_TRAP_EVENT(event)					\
-UK_EVENT(event);							\
-static inline int _raise_event_##event(int trapnr, const char *str,	\
-				       struct __regs *regs,		\
-					unsigned long error_code) {	\
-	struct ukarch_trap_ctx ctx = {regs, trapnr, str, error_code,	\
-				      0, /* filled by handler */	\
-				      uk_arch_rdcr2()}; /* pf addr */	\
-	return uk_raise_event(event, &ctx);				\
-}
-
-#define _raise_event_NULL(...) (0)
-
-#define DECLARE_TRAP(name, str, event)					\
-void do_##name(struct __regs *regs)					\
-{									\
-	int rc;								\
-	rc = _raise_event_##event(TRAP_##name, str, regs, 0);		\
-	if (unlikely(rc < 0))						\
-		uk_pr_crit("trap handler returned error: %d\n", rc);	\
-									\
-	if (rc == UK_EVENT_NOT_HANDLED)					\
-		do_unhandled_trap(TRAP_##name, str, regs, 0);		\
-}
-
-#define DECLARE_TRAP_EC(name, str, event)				\
-void do_##name(struct __regs *regs, unsigned long error_code)		\
-{									\
-	int rc;								\
-	rc = _raise_event_##event(TRAP_##name, str, regs, error_code);	\
-	if (unlikely(rc < 0))						\
-		uk_pr_crit("trap handler returned error: %d\n", rc);	\
-									\
-	if (rc == UK_EVENT_NOT_HANDLED)					\
-		do_unhandled_trap(TRAP_##name, str, regs, error_code);	\
-}
-
-void traps_table_init(void);
-void traps_lcpu_init(struct lcpu *current);
 #endif /* !__ASSEMBLY__ */
 
 #endif /* __UKARCH_TRAPS_X86_64_H__ */

@@ -34,10 +34,9 @@
  */
 
 #include <uk/arch.h>
-#include <uk/arch/lcpu.h>
+#include <uk/lcpu.h>
 #include <uk/asm.h>
 #include <uk/asm/cfi.h>
-#include <uk/plat/common/lcpu.h>
 #include <uk/arch/ctx.h>
 
 ENTRY(_ukplat_syscall)
@@ -47,13 +46,13 @@ ENTRY(_ukplat_syscall)
 	cli
 
 	/* Switch to Unikraft's gs_base, which contains pointer to the current
-	 * LCPU's `struct lcpu`.
+	 * LCPU's `struct uk_lcpu`.
 	 */
 	swapgs
 
 	/* We can now use the scratch register %r11 (SYSv ABI) to temporarily
 	 * store the current stack pointer and switch to the auxiliary stack
-	 * of the current thread, which is also stored in `struct lcpu`'s
+	 * of the current thread, which is also stored in `struct uk_lcpu`'s
 	 * `auxsp` field.
 	 * We thus achieve a complete switch to another stack while preserving
 	 * the context of the application.
@@ -66,7 +65,7 @@ ENTRY(_ukplat_syscall)
 	 * in corrupted memory or we could unwantedly modify variables stored
 	 * in the Red Zone.
 	 */
-	movq	%gs:LCPU_AUXSP_OFFSET, %rsp
+	movq	%gs:UK_LCPU_AUXSP_OFFSET, %rsp
 
 	/* Describing the rsp relative to GS would make it necessary to emit
 	 * raw CFI. Instead of doing so, mark rsp as undefined temporarily
@@ -96,29 +95,29 @@ ENTRY(_ukplat_syscall)
 	 * C handler should look like the following:
 	 *
 	 *               lcpu->auxsp (AUXSP aligned)
-	 *                  +-------------+ ^
-	 *                  |             | | EXECENV_END_ALIGN
-	 *                ^ |<----------->| |             ^
-	 *         8 bytes| |pushed auxsp | |             |
-	 *                v |-------------| v             |
-	 *                ^ |  struct     | ^             |
-	 *                | |  __regs     | |__REGS_SIZEOF|
-	 *                | |-------------| v             |
-	 *                | |  struct     | ^             |uk_syscall_ctx
-	 *      struct    | |ukarch_sysctx| |SYSCTX_SIZE  |
-	 *  ukarch_execenv| |-------------| v             |
-	 *                | |             | ^             |
-	 *                | |  struct     | |             |
-	 *                | | ukarch_ectx | |ECTX_SIZE    |
-	 *                | |             | |             |
-	 *                | |             | |             |
-	 *                | |             | |             |
-	 *                v +-------------+ v             v
+	 *                  +--------------+ ^
+	 *                  |              | | EXECENV_END_ALIGN
+	 *                ^ |<------------>| |			 ^
+	 *         8 bytes| |pushed auxsp  | |             	 |
+	 *                v |--------------| v             	 |
+	 *                ^ |  struct      | ^             	 |
+	 *                | |uk_lcpu_regs  | |UK_LCPU_REGS_SIZE	 |
+	 *                | |--------------| v			 |
+	 *                | |  struct      | ^             	 |uk_syscall_ctx
+	 *      struct    | |uk_lcpu_sysctx| |UK_LCPU_SYSCTX_SIZE|
+	 *  ukarch_execenv| |--------------| v			 |
+	 *                | |              | ^             	 |
+	 *                | |  struct      | |             	 |
+	 *                | | uk_lcpu_ectx | |UK_LCPU_ECTX_SIZE  |
+	 *                | |              | |			 |
+	 *                | |              | |             	 |
+	 *                | |              | |             	 |
+	 *                v +-------------+ v			 v
 	 *                       stack
 	 *                       pointer
 	 *
-	 * Where ukarch_sysctx/ukarch_ectx/__regs is filled in the following,
-	 * after making room for it.
+	 * Where uk_lcpu_sysctx/uk_lcpu_ectx/uk_lcpu_regs is filled in the
+	 * following, after making room for it.
 	 */
 
 	/* Create the room */
@@ -137,7 +136,7 @@ ENTRY(_ukplat_syscall)
 	.cfi_adjust_cfa_offset (UKARCH_EXECENV_END_ALIGN - 8)
 
 	/* Push out auxsp for faster access later. */
-	pushq	%gs:LCPU_AUXSP_OFFSET
+	pushq	%gs:UK_LCPU_AUXSP_OFFSET
 	.cfi_adjust_cfa_offset 8
 
 	/**
@@ -164,8 +163,8 @@ ENTRY(_ukplat_syscall)
 	 * auxiliary stack because it is allocated with this exact alignment
 	 * in mind.
 	 */
-	subq	$(UKARCH_EXECENV_SIZE - __REGS_SIZEOF), %rsp
-	.cfi_adjust_cfa_offset (UKARCH_EXECENV_SIZE - __REGS_SIZEOF)
+	subq	$(UKARCH_EXECENV_SIZE - UK_LCPU_REGS_SIZE), %rsp
+	.cfi_adjust_cfa_offset (UKARCH_EXECENV_SIZE - UK_LCPU_REGS_SIZE)
 
 	pushq_cfi	$(UK_ARCH_GDT_DESC_OFFSET(UK_ARCH_GDT_DESC_DATA))
 
@@ -173,9 +172,9 @@ ENTRY(_ukplat_syscall)
 	.cfi_rel_offset rsp, 0
 
 	/*
-	 * Push arguments in the order of 'struct __regs' to the stack.
+	 * Push arguments in the order of 'struct uk_lcpu_regs' to the stack.
 	 * We are going to handover a reference to this stack area as
-	 * `struct __regs *` argument to the system call handler.
+	 * `struct uk_lcpu_regs *` argument to the system call handler.
 	 */
 	/* We now have %ss and %rsp on the frame, finish classic trap frame */
 	/* Push EFLAGS register. Additionally, since we pushed it with IRQs
@@ -210,8 +209,8 @@ ENTRY(_ukplat_syscall)
 	pushq_reg_cfi r15
 
 	/* padding */
-	subq  $(__REGS_PAD_SIZE), %rsp
-	.cfi_adjust_cfa_offset __REGS_PAD_SIZE
+	subq  $(UK_LCPU_X86_64_REGS_OFFSETOF_R15), %rsp
+	.cfi_adjust_cfa_offset UK_LCPU_X86_64_REGS_OFFSETOF_R15
 	sti
 
 	/*
@@ -224,21 +223,21 @@ ENTRY(_ukplat_syscall)
 
 	/**
 	 * Store execenv's stored ECTX which resides at offset:
-	 * sizeof(struct __regs) + sizeof(struct ukarch_sysctx) from beginning
-	 * of execenv.
+	 * sizeof(struct uk_lcpu_regs) + sizeof(struct uk_lcpu_sysctx)
+	 * from beginning of execenv.
 	 *
 	 * NOTE: Always sanitize the ECTX slot first to ensure that the XSAVE
 	 * header is not dirty.
 	 */
-	addq	$(__REGS_SIZEOF + UKARCH_SYSCTX_SIZE), %rdi
-	call	ukarch_ectx_sanitize
+	addq	$(UK_LCPU_REGS_SIZE + UK_LCPU_SYSCTX_SIZE), %rdi
+	call	UK_LCPU_ECTX_SANITIZE_FNSYM
 	/**
 	 * After function calls, %rsp preserved value of execenv pointer so
 	 * restore that into %rdi.
 	 */
 	movq	%rsp, %rdi
-	addq	$(__REGS_SIZEOF + UKARCH_SYSCTX_SIZE), %rdi
-	call	ukarch_ectx_store
+	addq	$(UK_LCPU_REGS_SIZE + UK_LCPU_SYSCTX_SIZE), %rdi
+	call	UK_LCPU_ECTX_STORE_FNSYM
 
 	/**
 	 * After function calls, %rsp preserved value of execenv pointer so
@@ -248,10 +247,10 @@ ENTRY(_ukplat_syscall)
 
 	/**
 	 * Store execenv's system context which resides at offset:
-	 * sizeof(struct __regs) from beginning of execenv.
+	 * sizeof(struct uk_lcpu_regs) from beginning of execenv.
 	 */
-	addq	$(__REGS_SIZEOF), %rdi
-	call	ukarch_sysctx_store
+	addq	$(UK_LCPU_REGS_SIZE), %rdi
+	call	UK_LCPU_SYSCTX_STORE_FNSYM
 	movq	%rsp, %rdi
 
 	/*
@@ -279,11 +278,11 @@ ENTRY(_ukplat_syscall)
 
 	/**
 	 * Load execenv's stored ECTX which resides at offset:
-	 * sizeof(struct __regs) + sizeof(struct ukarch_sysctx) from beginning
-	 * of execenv.
+	 * sizeof(struct uk_lcpu_regs) + sizeof(struct uk_lcpu_sysctx)
+	 * from beginning of execenv.
 	 */
-	addq	$(__REGS_SIZEOF + UKARCH_SYSCTX_SIZE), %rdi
-	call	ukarch_ectx_load
+	addq	$(UK_LCPU_REGS_SIZE + UK_LCPU_SYSCTX_SIZE), %rdi
+	call	UK_LCPU_ECTX_LOAD_FNSYM
 
 	/**
 	 * As stated previously, after function calls, %rsp preserved value of
@@ -293,14 +292,14 @@ ENTRY(_ukplat_syscall)
 
 	/**
 	 * Load execenv's stored system context which resides at offset:
-	 * sizeof(struct __regs) from beginning of execenv.
+	 * sizeof(struct uk_lcpu_regs) from beginning of execenv.
 	 */
-	addq	$(__REGS_SIZEOF), %rdi
-	call	ukarch_sysctx_load
+	addq	$(UK_LCPU_REGS_SIZE), %rdi
+	call	UK_LCPU_SYSCTX_LOAD_FNSYM
 
 	/* Load the updated state back to registers */
-	addq $(__REGS_PAD_SIZE), %rsp
-	.cfi_adjust_cfa_offset -__REGS_PAD_SIZE
+	addq $(UK_LCPU_X86_64_REGS_OFFSETOF_R15), %rsp
+	.cfi_adjust_cfa_offset -UK_LCPU_X86_64_REGS_OFFSETOF_R15
 	popq_reg_cfi r15
 	popq_reg_cfi r14
 	popq_reg_cfi r13

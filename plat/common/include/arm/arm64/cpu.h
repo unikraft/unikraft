@@ -39,7 +39,7 @@
 #include <uk/alloc.h>
 #include <uk/assert.h>
 #include <arm/smccc.h>
-#include <uk/plat/common/lcpu.h>
+#include <uk/lcpu.h>
 
 static inline void _init_cpufeatures(void)
 {

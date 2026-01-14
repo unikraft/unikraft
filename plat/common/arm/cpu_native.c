@@ -35,7 +35,8 @@
 #include <arm/psci.h>
 #include <uk/assert.h>
 #include <arm/smccc.h>
-#include <uk/plat/common/lcpu.h>
+#include <uk/asm/lcpu.h>
+#include <uk/lcpu.h>
 
 
 /*

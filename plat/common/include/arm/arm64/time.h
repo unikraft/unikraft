@@ -32,7 +32,7 @@
 #ifndef UK_PLAT_COMMON_ARM64_TIME_H
 #define UK_PLAT_COMMON_ARM64_TIME_H
 
-#include <uk/plat/lcpu.h>
+#include <uk/lcpu.h>
 #include <uk/plat/common/cpu.h>
 
 #define	get_el0(x)	SYSREG_READ64(x ##_el0)

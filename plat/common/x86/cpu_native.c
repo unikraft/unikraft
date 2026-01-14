@@ -30,7 +30,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <x86/cpu.h>
+#include <uk/arch.h>
+#include <uk/arch/util.h>
+#include <uk/plat/bootstrap.h>
 
 #ifdef CONFIG_KVM_VMM_QEMU
 

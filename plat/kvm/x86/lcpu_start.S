@@ -39,8 +39,8 @@
 #include <uk/config.h>
 #include <uk/arch.h>
 #include <uk/asm.h>
-#include <uk/plat/common/lcpu.h>
 #include <uk/reloc.h>
+#include <uk/lcpu.h>
 #include "lcpu_helpers.S"
 
 #define SEC_BEGIN(x)		.globl x86_##x##_begin; x86_##x##_begin = .;
@@ -194,7 +194,7 @@ SEC_END(start16)
  * execute/read permission and DS must have read/write permission. Interrupts
  * must be disabled. A20 gate must be enabled.
  *
- * NOTE: We assume a pointer to a struct lcpu_sargs in EDI and a pointer to
+ * NOTE: We assume a pointer to a struct uk_lcpu_sargs in EDI and a pointer to
  * potential platform boot arguments in ESI (e.g., multiboot) if this is the
  * first boot.
  */
@@ -282,7 +282,7 @@ END(lcpu_start32)
  * read/write permission. ES and ES must be the same as DS. Interrupts must be
  * disabled.
  *
- * NOTE: We assume a pointer to a struct lcpu_sargs in RDI and a pointer to
+ * NOTE: We assume a pointer to a struct uk_lcpu_sargs in RDI and a pointer to
  * potential platform boot arguments in RSI (e.g., multiboot) if this is the
  * first boot. In that case, we setup the CPU with the provided startup
  * arguments.
@@ -304,20 +304,20 @@ ENTRY(lcpu_start64)
 	shrl	$24, %ebx
 
 	/* Use APIC_ID * LCPU_SIZE for indexing the cpu structure */
-	movl	$LCPU_SIZE, %eax
+	movl	$UK_LCPU_SIZE, %eax
 	imul	%ebx, %eax
 
 	/* Compute pointer into CPU struct array and store it in RBP
 	 * We do not use the frame pointer, yet
 	 * TODO: We are leaking implementation details. `lcpus` is defined
-	 * with `UKPLAT_PER_LCPU_DEFINE`. Find a way to properly access
+	 * with `UK_PER_LCPU_DEFINE`. Find a way to properly access
 	 * this `lcpus` here.
 	 */
-	leaq	lcpus(%rip), %rbp
+	leaq	uk_lcpus(%rip), %rbp
 	addq	%rax, %rbp
 
 	/* Put CPU into init state */
-	movl	$LCPU_STATE_INIT, LCPU_STATE_OFFSET(%rbp)
+	movl	$UK_LCPU_STATE_INIT, UK_LCPU_STATE_OFFSET(%rbp)
 
 	/* Enable FPU and SSE */
 	LCPU_ENABLE_FPU_SSE
@@ -362,15 +362,15 @@ no_pku:
 	jz	no_args
 
 	/* Initialize the CPU configuration with the supplied startup args */
-	movq	LCPU_SARGS_ENTRY_OFFSET(%r8), %rax
-	movq	LCPU_SARGS_STACKP_OFFSET(%r8), %rsp
+	movq	UK_LCPU_SARGS_ENTRY_OFFSET(%r8), %rax
+	movq	UK_LCPU_SARGS_STACKP_OFFSET(%r8), %rsp
 
 	jmp	jump_to_entry
 
 no_args:
 	/* Load the stack pointer and the entry address from the CPU struct */
-	movq	LCPU_ENTRY_OFFSET(%rbp), %rax
-	movq	LCPU_STACKP_OFFSET(%rbp), %rsp
+	movq	UK_LCPU_ENTRY_OFFSET(%rbp), %rax
+	movq	UK_LCPU_STACKP_OFFSET(%rbp), %rsp
 
 jump_to_entry:
 	/* According to System V AMD64 the stack pointer must be aligned to
@@ -403,7 +403,7 @@ fail:
 	LCPU_EARLY_COM1_INIT
 	LCPU_EARLY_COM1_PRINT lcpu_start64_fail_msg
 
-	movl	$LCPU_STATE_HALTED, LCPU_STATE_OFFSET(%rbp)
+	movl	$UK_LCPU_STATE_HALTED, UK_LCPU_STATE_OFFSET(%rbp)
 
 fail_loop:
 	cli

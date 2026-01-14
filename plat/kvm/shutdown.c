@@ -22,14 +22,13 @@
  */
 
 #include <errno.h>
-#include <uk/plat/common/cpu.h>
-#include <uk/plat/common/irq.h>
 #include <uk/print.h>
 #include <uk/plat/bootstrap.h>
 #include <kvm/efi.h>
 #include <uk/plat/common/bootinfo.h>
+#include <uk/lcpu.h>
 
-static void cpu_halt(void) __noreturn;
+void system_off(enum ukplat_gstate request);
 
 #ifdef CONFIG_KVM_BOOT_PROTO_EFI_STUB
 static void uk_efi_rs_reset_system(enum uk_efi_reset_type reset_type)
@@ -74,12 +73,8 @@ void ukplat_terminate(enum ukplat_gstate request)
 	 * If we got here, there is no way to initiate "shutdown" on virtio
 	 * without ACPI, so just halt.
 	 */
-	cpu_halt();
-}
-
-static void cpu_halt(void)
-{
-	__CPU_HALT();
+	uk_lcpu_disable_irq();
+	uk_lcpu_halt();
 }
 
 int ukplat_suspend(void)

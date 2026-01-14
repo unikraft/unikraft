@@ -28,6 +28,7 @@
 #include <x86/traps.h>
 #include <uk/asm/cfi.h>
 #include <uk/intctlr.h>
+#include <uk/lcpu.h>
 
 .altmacro
 
@@ -69,7 +70,7 @@
 	popq_reg_cfi rdi
 .endm
 
-.macro TRAP_ENTRY trapname, has_ec
+.macro TRAP_ENTRY trapname, trapnr, has_ec
 ENTRY(ASM_TRAP_SYM(\trapname))
 	.cfi_startproc simple
 	.cfi_signal_frame
@@ -101,15 +102,18 @@ ENTRY(ASM_TRAP_SYM(\trapname))
 	pushq_cfi $0                        /* no error code, pass 0 */
 .endif
 	PUSH_CALLER_SAVE
-	subq $__REGS_PAD_SIZE, %rsp         /* we have some padding */
-	.cfi_adjust_cfa_offset __REGS_PAD_SIZE
+	/* we have some padding */
+	subq $UK_LCPU_X86_64_REGS_OFFSETOF_R15, %rsp
+	.cfi_adjust_cfa_offset UK_LCPU_X86_64_REGS_OFFSETOF_R15
 
-	movq %rsp, %rdi
-	movq __REGS_OFFSETOF_ORIG_RAX(%rsp), %rsi
-	call do_\trapname
+	movq $\trapnr, %rdi
+	movq %rsp, %rsi
+	movq UK_LCPU_X86_64_REGS_OFFSETOF_ORIG_RAX(%rsp), %rdx
+	call uk_plat_native_except_err_handler
 
-	addq $__REGS_PAD_SIZE, %rsp         /* we have some padding */
-	.cfi_adjust_cfa_offset -__REGS_PAD_SIZE
+	/* we have some padding */
+	addq $UK_LCPU_X86_64_REGS_OFFSETOF_R15, %rsp
+	.cfi_adjust_cfa_offset -UK_LCPU_X86_64_REGS_OFFSETOF_R15
 	POP_CALLER_SAVE
 	addq $8, %rsp                       /* discard error code */
 	.cfi_adjust_cfa_offset -8
@@ -142,15 +146,17 @@ ENTRY(cpu_irq_\irqno)
 
 	pushq_cfi $0                        /* no error code */
 	PUSH_CALLER_SAVE
-	subq $__REGS_PAD_SIZE, %rsp         /* we have some padding */
-	.cfi_adjust_cfa_offset __REGS_PAD_SIZE
+	/* we have some padding */
+	subq $UK_LCPU_X86_64_REGS_OFFSETOF_R15, %rsp
+	.cfi_adjust_cfa_offset UK_LCPU_X86_64_REGS_OFFSETOF_R15
 
 	movq %rsp, %rdi
 	movq $\irqno, %rsi
-	call uk_intctlr_xpic_handle_irq
+	call uk_plat_native_except_irq_handler
 
-	addq $__REGS_PAD_SIZE, %rsp         /* we have some padding */
-	.cfi_adjust_cfa_offset -__REGS_PAD_SIZE
+	/* we have some padding */
+	addq $UK_LCPU_X86_64_REGS_OFFSETOF_R15, %rsp
+	.cfi_adjust_cfa_offset -UK_LCPU_X86_64_REGS_OFFSETOF_R15
 	POP_CALLER_SAVE
 	addq $8, %rsp
 	.cfi_adjust_cfa_offset -8
@@ -159,25 +165,25 @@ ENTRY(cpu_irq_\irqno)
 	.cfi_endproc
 .endm
 
-TRAP_ENTRY divide_error,     0
-TRAP_ENTRY debug,            0
-TRAP_ENTRY nmi,              0
-TRAP_ENTRY int3,             0
-TRAP_ENTRY overflow,         0
-TRAP_ENTRY bounds,           0
-TRAP_ENTRY invalid_op,       0
-TRAP_ENTRY no_device,        0
-TRAP_ENTRY double_fault,     1
-TRAP_ENTRY invalid_tss,      1
-TRAP_ENTRY no_segment,       1
-TRAP_ENTRY stack_error,      1
-TRAP_ENTRY gp_fault,         1
-TRAP_ENTRY page_fault,       1
-TRAP_ENTRY coproc_error,     0
-TRAP_ENTRY alignment_check,  1
-TRAP_ENTRY machine_check,    0
-TRAP_ENTRY simd_error,       0
-TRAP_ENTRY virt_error,       0
+TRAP_ENTRY divide_error,     UK_ARCH_TRAPNUM_DIVIDE_ERROR, 0
+TRAP_ENTRY debug,            UK_ARCH_TRAPNUM_DEBUG, 0
+TRAP_ENTRY nmi,              UK_ARCH_TRAPNUM_NMI, 0
+TRAP_ENTRY int3,             UK_ARCH_TRAPNUM_INT3, 0
+TRAP_ENTRY overflow,         UK_ARCH_TRAPNUM_OVERFLOW, 0
+TRAP_ENTRY bounds,           UK_ARCH_TRAPNUM_BOUNDS, 0
+TRAP_ENTRY invalid_op,       UK_ARCH_TRAPNUM_INVALID_OP, 0
+TRAP_ENTRY no_device,        UK_ARCH_TRAPNUM_NO_DEVICE, 0
+TRAP_ENTRY double_fault,     UK_ARCH_TRAPNUM_DOUBLE_FAULT, 1
+TRAP_ENTRY invalid_tss,      UK_ARCH_TRAPNUM_INVALID_TSS, 1
+TRAP_ENTRY no_segment,       UK_ARCH_TRAPNUM_NO_SEGMENT, 1
+TRAP_ENTRY stack_error,      UK_ARCH_TRAPNUM_STACK_ERROR, 1
+TRAP_ENTRY gp_fault,         UK_ARCH_TRAPNUM_GP_FAULT, 1
+TRAP_ENTRY page_fault,       UK_ARCH_TRAPNUM_PAGE_FAULT, 1
+TRAP_ENTRY coproc_error,     UK_ARCH_TRAPNUM_COPROC_ERROR, 0
+TRAP_ENTRY alignment_check,  UK_ARCH_TRAPNUM_ALIGNMENT_CHECK, 1
+TRAP_ENTRY machine_check,    UK_ARCH_TRAPNUM_MACHINE_CHECK, 0
+TRAP_ENTRY simd_error,       UK_ARCH_TRAPNUM_SIMD_ERROR, 0
+TRAP_ENTRY virt_error,       UK_ARCH_TRAPNUM_VIRT_ERROR, 0
 
 .set irqno, 0
 .rept UK_ARCH_IDT_NUM_ENTRIES-32

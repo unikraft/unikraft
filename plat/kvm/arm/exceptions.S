@@ -27,9 +27,9 @@
  *
  */
 #include <uk/arch/ctx.h>
-#include <uk/arch/lcpu.h>
 #include <uk/asm.h>
-#include <uk/plat/common/lcpu.h>
+#include <uk/asm/lcpu.h>
+#include <uk/lcpu.h>
 #include <uk/plat/config.h>
 #include <uk/reloc.h>
 
@@ -163,7 +163,7 @@
 	 *         8 bytes| |pushed auxsp | |             |
 	 *                v |-------------| v             |
 	 *                ^ |  struct     | ^             |
-	 *                | |  __regs     | |__REGS_SIZEOF|
+	 *                | |  __regs     | |UK_LCPU_REGS_SIZE|
 	 *                | |-------------| v             |
 	 *                | |  struct     | ^             |uk_syscall_ctx
 	 *      struct    | |ukarch_sysctx| |SYSCTX_SIZE  |

@@ -5,8 +5,7 @@
  */
 #include <kvm/efi.h>
 #include <uk/plat/common/bootinfo.h>
-#include <uk/plat/lcpu.h>
-#include <x86/cpu.h>
+#include <uk/lcpu.h>
 
 /* Slave Controller Edge/Level Triggered Register */
 #define PIC2_ELCR2					0x4D1
@@ -84,7 +83,7 @@ void __noreturn uk_efi_jmp_to_kern()
 	uk_efi_boot_startup_args.entry_fn = &_ukplat_entry;
 	uk_efi_boot_startup_args.bootstack = uk_efi_bootstack + __PAGE_SIZE;
 
-	ukplat_lcpu_disable_irq();
+	uk_lcpu_disable_irq();
 	uk_paging_pt_write_base((__paddr_t)&x86_bpt_pml4);
 	unmask_8259_pic();
 	lapic_timer_disable();

@@ -31,8 +31,7 @@
 #define __PLAT_CMN_X86_TLS_H__
 
 #include <uk/asm/fsgsbase.h>
-#include <x86/cpu.h> /* rdmsrl, wrmsrl */
-#include <uk/arch/lcpu.h>
+#include <uk/lcpu.h>
 
 /**
  * NOTE: These are subject to change in the scope of the Plat Re-arch project.

@@ -10,14 +10,14 @@
 #include <uk/paging.h>
 #include <uk/plat/bootstrap.h>
 #include <uk/plat/common/bootinfo.h>
-#include <uk/plat/common/lcpu.h>
+#include <uk/lcpu.h>
 #include <uk/plat/common/memory.h>
 #include <uk/plat/common/sections.h>
 #include <kvm-x86/lxboot.h>
 
 #define lxboot_crash(rc, msg, ...) ukplat_crash()
 
-void _ukplat_entry(struct lcpu *lcpu, struct ukplat_bootinfo *bi);
+void _ukplat_entry(struct uk_lcpu *lcpu, struct ukplat_bootinfo *bi);
 
 static void
 lxboot_init_cmdline(struct ukplat_bootinfo *bi, struct lxboot_params *bp)
@@ -132,7 +132,7 @@ lxboot_init_mem(struct ukplat_bootinfo *bi, struct lxboot_params *bp)
 			     "Failed to insert legacy high memory region\n");
 }
 
-void lxboot_entry(struct lcpu *lcpu, struct lxboot_params *bp)
+void lxboot_entry(struct uk_lcpu *lcpu, struct lxboot_params *bp)
 {
 	struct ukplat_bootinfo *bi;
 

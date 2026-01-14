@@ -33,7 +33,7 @@
 #include <uk/arch/types.h>
 #include <uk/assert.h>
 #include <uk/plat/time.h>
-#include <uk/plat/lcpu.h>
+#include <uk/lcpu.h>
 #include <uk/bitops.h>
 #include <uk/plat/common/cpu.h>
 #include <arm/time.h>
@@ -229,7 +229,7 @@ void generic_timer_cpu_block_until(__u64 until_ns)
 {
 	__u64 now_ns, now_ticks, until_ticks;
 
-	UK_ASSERT(ukplat_lcpu_irqs_disabled());
+	UK_ASSERT(uk_lcpu_irqs_disabled());
 
 	/* Record current ns */
 	now_ns = generic_timer_monotonic_ticks(&now_ticks);
@@ -246,8 +246,8 @@ void generic_timer_cpu_block_until(__u64 until_ns)
 		/* Give the IRQ handler a chance to handle whatever woke
 		 * us up
 		 */
-		ukplat_lcpu_enable_irq();
-		ukplat_lcpu_disable_irq();
+		uk_lcpu_enable_irq();
+		uk_lcpu_disable_irq();
 	}
 }
 

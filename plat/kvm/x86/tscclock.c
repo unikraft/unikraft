@@ -52,9 +52,10 @@
  * SUCH DAMAGE.
  */
 
-#include <uk/plat/lcpu.h>
+#include <stdint.h>
+
+#include <uk/lcpu.h>
 #include <uk/plat/time.h>
-#include <x86/cpu.h>
 #include <uk/timeconv.h>
 #include <uk/print.h>
 #include <uk/assert.h>
@@ -172,7 +173,7 @@ static __u64 rtc_gettimeofday(void)
 	struct uktimeconv_bmkclock dt;
 	unsigned long flags;
 
-	flags = ukplat_lcpu_save_irqf();
+	flags = uk_lcpu_save_irqf();
 
 	/*
 	 * If RTC_UIP is down, we have at least 244us to obtain a
@@ -188,7 +189,7 @@ static __u64 rtc_gettimeofday(void)
 	dt.dt_mon = uktimeconv_bcdtobin(rtc_read(RTC_MONTH));
 	dt.dt_year = uktimeconv_bcdtobin(rtc_read(RTC_YEAR)) + 2000;
 
-	ukplat_lcpu_restore_irqf(flags);
+	uk_lcpu_restore_irqf(flags);
 
 	return uktimeconv_bmkclock_to_nsec(&dt);
 }
@@ -329,7 +330,7 @@ static void tscclock_cpu_block(__u64 until)
 	__u64 delta_ticks;
 	unsigned int ticks;
 
-	UK_ASSERT(ukplat_lcpu_irqs_disabled());
+	UK_ASSERT(uk_lcpu_irqs_disabled());
 
 	now = ukplat_monotonic_clock();
 
@@ -346,9 +347,9 @@ static void tscclock_cpu_block(__u64 until)
 		 * the hopes that we might get new work and can do something
 		 * else than spin.
 		 */
-		ukplat_lcpu_enable_irq();
+		uk_lcpu_enable_irq();
 		uk_arch_nop(); /* ints are enabled 1 instr after sti */
-		ukplat_lcpu_disable_irq();
+		uk_lcpu_disable_irq();
 		return;
 	}
 
@@ -379,7 +380,7 @@ static void tscclock_cpu_block(__u64 until)
 	 * able to distinguish if the interrupt was the PIT interrupt
 	 * and no other, but this will do for now.
 	 */
-	ukplat_lcpu_halt_irq();
+	uk_lcpu_halt_irq();
 }
 
 unsigned long sched_have_pending_events;

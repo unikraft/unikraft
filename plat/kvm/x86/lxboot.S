@@ -6,7 +6,7 @@
 
 #include <uk/config.h>
 #include <uk/asm.h>
-#include <uk/plat/common/lcpu.h>
+#include <uk/lcpu.h>
 
 #include <kvm-x86/lxboot.h>
 
@@ -55,9 +55,9 @@ ENTRY(_lxboot_entry)
 	/* startup args for boot CPU */
 	leaq	lcpu_boot_startup_args(%rip), %rdi
 	leaq	lxboot_entry(%rip), %rax
-	movq	%rax, LCPU_SARGS_ENTRY_OFFSET(%rdi)
+	movq	%rax, UK_LCPU_SARGS_ENTRY_OFFSET(%rdi)
 	leaq	lcpu_bootstack(%rip), %rax
-	movq	%rax, LCPU_SARGS_STACKP_OFFSET(%rdi)
+	movq	%rax, UK_LCPU_SARGS_STACKP_OFFSET(%rdi)
 
 	leaq	x86_bpt_pml4(%rip), %rax
 	movq	%rax, %cr3

@@ -9,13 +9,13 @@
 #include <arm/cpu.h>
 #include <arm/traps.h>
 
-#include <uk/arch/lcpu.h>
 #include <uk/arch/types.h>
 #include <uk/arch/ctx.h>
 #include <uk/print.h>
 #include <uk/assert.h>
 #include <uk/intctlr/gic.h>
-#include <uk/plat/lcpu.h>
+#include <uk/asm/lcpu.h>
+#include <uk/lcpu.h>
 #include <uk/plat/syscall.h>
 
 #ifdef CONFIG_ARM64_FEAT_MTE
@@ -175,23 +175,23 @@ extern void ukplat_syscall_handler(struct uk_syscall_ctx *usc);
 
 static int arm64_syscall_adapter(void *data)
 {
-	struct ukarch_trap_ctx *ctx = (struct ukarch_trap_ctx *)data;
+	struct uk_lcpu_except_err_ctx *ctx = data;
 	struct ukarch_execenv *execenv = (struct ukarch_execenv *)ctx->regs;
 
 	/* Save extended register state */
-	ukarch_ectx_sanitize((struct ukarch_ectx *)&execenv->ectx);
-	ukarch_ectx_store((struct ukarch_ectx *)&execenv->ectx);
+	uk_lcpu_ectx_sanitize((struct uk_lcpu_ectx *)&execenv->ectx);
+	uk_lcpu_ectx_store((struct uk_lcpu_ectx *)&execenv->ectx);
 
 	/* Save system context state */
-	ukarch_sysctx_store(&execenv->sysctx);
+	uk_lcpu_sysctx_store(&execenv->sysctx);
 
 	ukplat_syscall_handler((struct uk_syscall_ctx *)execenv);
 
 	/* Restore system context state */
-	ukarch_sysctx_load(&execenv->sysctx);
+	uk_lcpu_sysctx_load(&execenv->sysctx);
 
 	/* Restore extended register state */
-	ukarch_ectx_load((struct ukarch_ectx *)&execenv->ectx);
+	uk_lcpu_ectx_load((struct uk_lcpu_ectx *)&execenv->ectx);
 
 	return 1; /* Success */
 }

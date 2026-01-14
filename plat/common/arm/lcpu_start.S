@@ -33,7 +33,7 @@
  */
 
  #include <uk/asm.h>
- #include <uk/plat/common/lcpu.h>
+ #include <uk/lcpu.h>
  #include <uk/reloc.h>
 
 .text

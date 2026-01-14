@@ -34,7 +34,6 @@
 #ifndef __PLAT_COMMON_X86_DELAY_H__
 #define __PLAT_COMMON_X86_DELAY_H__
 
-#include <x86/cpu.h>
 
 /*
  * Delay the execution for a given amount of microseconds/ milliseconds.
