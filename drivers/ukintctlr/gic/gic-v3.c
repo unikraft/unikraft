@@ -43,7 +43,7 @@
 #include <uk/assert.h>
 #include <uk/bitops.h>
 #include <uk/asm.h>
-#include <uk/plat/lcpu.h>
+#include <uk/lcpu.h>
 #ifdef CONFIG_UKPLAT_ACPI
 #include <uk/plat/common/acpi.h>
 #endif /* CONFIG_UKPLAT_ACPI */

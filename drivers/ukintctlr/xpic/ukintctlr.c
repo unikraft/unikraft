@@ -4,8 +4,10 @@
  */
 #include <errno.h>
 #include <uk/assert.h>
+#include <uk/event.h>
 #include <uk/config.h>
 #include <uk/intctlr.h>
+#include <uk/lcpu.h>
 
 #if CONFIG_LIBUKINTCTLR_APIC
 #include <uk/intctlr/apic.h>
@@ -20,9 +22,15 @@ static int configure_irq(struct uk_intctlr_irq *irq __unused)
 	return 0;
 }
 
-void uk_intctlr_xpic_handle_irq(struct __regs *regs, unsigned int irq)
+static int uk_intctlr_xpic_handle_irq(void *data)
 {
-	uk_intctlr_irq_handle(regs, irq);
+	struct uk_lcpu_except_irq_ctx *ctx;
+	unsigned long irq;
+
+	ctx = data;
+	uk_intctlr_irq_handle(ctx);
+
+	irq = uk_lcpu_except_irq_ctx_get_irq(ctx);
 
 #if CONFIG_LIBUKINTCTLR_APIC
 	apic_ack_interrupt();
@@ -37,7 +45,11 @@ void uk_intctlr_xpic_handle_irq(struct __regs *regs, unsigned int irq)
 #else   /* !CONFIG_LIBUKINTCTLR_APIC */
 	pic_ack_irq(irq);
 #endif /* !CONFIG_LIBUKINTCTLR_APIC */
+
+	return UK_EVENT_HANDLED;
 }
+
+UK_EVENT_HANDLER(UK_LCPU_EXCEPT_EVENT_IRQ, uk_intctlr_xpic_handle_irq);
 
 int uk_intctlr_probe(void)
 {

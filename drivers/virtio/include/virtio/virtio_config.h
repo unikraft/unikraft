@@ -33,6 +33,7 @@
 #ifndef __VIRTIO_CONFIG_H__
 #define __VIRTIO_CONFIG_H__
 
+#include <uk/arch/util.h>
 #include <uk/arch/types.h>
 #include <uk/config.h>
 
@@ -117,12 +118,13 @@ void virtio_mmio_cwrite_bytes(const void *addr, const __u8 offset,
 			      const void *buf, int len, int type_len)
 {
 	int i = 0;
-	__u64 io_addr;
+	void *io_addr;
 	int count;
 
 	count  = len / type_len;
 	for (i = 0; i < count; i++) {
-		io_addr = ((unsigned long)addr) + offset + (i * type_len);
+		io_addr = (void *)
+			  ((const char *)addr + offset + (i * type_len));
 		switch (type_len) {
 		case 1:
 			uk_arch_writeb(io_addr, ((__u8 *)buf)[i * type_len]);
@@ -144,12 +146,13 @@ void virtio_mmio_cread_bytes(const void *addr, const __u8 offset,
 			     void *buf, int len, int type_len)
 {
 	int i = 0;
-	__u64 io_addr;
+	void *io_addr;
 	int count;
 
 	count = len / type_len;
 	for (i = 0; i < count; i++) {
-		io_addr = ((unsigned long)addr) + offset + (i * type_len);
+		io_addr = (void *)
+			  ((const char *)addr + offset + (i * type_len));
 		switch (type_len) {
 		case 1:
 			((__u8 *)buf)[i * type_len] = uk_arch_readb(io_addr);

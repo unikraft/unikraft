@@ -74,7 +74,7 @@
 #include <inttypes.h>
 #include <string.h>
 #include <uk/plat/console.h>
-#include <uk/arch/lcpu.h>
+#include <uk/lcpu.h>
 #include <uk/assert.h>
 #include <uk/essentials.h>
 #include <uk/config.h>
@@ -218,7 +218,7 @@ static int hv_console_input(char *str, unsigned int maxlen)
 }
 
 static void hv_console_event(evtchn_port_t port __unused,
-			     struct __regs *regs __unused,
+			     struct uk_lcpu_regs *regs __unused,
 			     void *data __unused)
 {
 	/* NOT IMPLEMENTED YET */

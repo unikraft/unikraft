@@ -677,7 +677,7 @@ err:
 
 /* Handler for event channel notifications */
 static void blkfront_handler(evtchn_port_t port __unused,
-		struct __regs *regs __unused, void *arg)
+		struct uk_lcpu_regs *regs __unused, void *arg)
 {
 	struct uk_blkdev_queue *queue;
 

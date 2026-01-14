@@ -32,6 +32,7 @@
  *
  */
 #include <string.h>
+#include <uk/arch/util.h>
 #include <uk/essentials.h>
 #include <libfdt.h>
 #include <uk/ofw/fdt.h>

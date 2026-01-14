@@ -36,7 +36,7 @@
 #include <string.h>
 #include <uk/alloc.h>
 #include <uk/print.h>
-#include <uk/plat/lcpu.h>
+#include <uk/lcpu.h>
 #include <uk/intctlr.h>
 #include <uk/bus.h>
 #include <uk/bitops.h>
@@ -289,11 +289,11 @@ static int vm_interrupt(void *opaque)
 	}
 
 	if (likely(status & VIRTIO_MMIO_INT_VRING)) {
-		flags = ukplat_lcpu_save_irqf();
+		flags = uk_lcpu_save_irqf();
 		UK_TAILQ_FOREACH(vq, &vm_dev->vdev.vqs, next) {
 			rc |= virtqueue_ring_interrupt(vq);
 		}
-		ukplat_lcpu_restore_irqf(flags);
+		uk_lcpu_restore_irqf(flags);
 
 		/* If this is a virtio interrupt, then it MUST
 		 * be handled by one of the drivers.
@@ -360,9 +360,9 @@ static struct virtqueue *vm_setup_vq(struct virtio_dev *vdev,
 		virtio_mmio_cwrite32(vm_dev->base, VIRTIO_MMIO_QUEUE_READY, 1);
 	}
 
-	flags = ukplat_lcpu_save_irqf();
+	flags = uk_lcpu_save_irqf();
 	UK_TAILQ_INSERT_TAIL(&vm_dev->vdev.vqs, vq, next);
-	ukplat_lcpu_restore_irqf(flags);
+	uk_lcpu_restore_irqf(flags);
 
 err_exit:
 	return vq;

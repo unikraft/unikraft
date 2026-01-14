@@ -37,7 +37,7 @@
 #include <errno.h>
 #include <uk/errptr.h>
 #include <uk/arch/types.h>
-#include <uk/arch/lcpu.h>
+#include <uk/lcpu.h>
 #include <uk/alloc.h>
 #include <uk/bus.h>
 #include <virtio/virtio_config.h>

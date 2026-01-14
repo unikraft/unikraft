@@ -29,8 +29,7 @@
 #include <sys/types.h>
 #include <stdint.h>
 #include <string.h>
-#include <x86/cpu.h>
-#include <x86/irq.h>
+#include <uk/arch.h>
 #include <uk/console/driver.h>
 #include <uk/prio.h>
 #include <uk/boot/earlytab.h>
@@ -118,7 +117,7 @@ static void vga_update_cursor(void)
 	unsigned long irq_flags;
 	uint8_t old;
 
-	local_irq_save(irq_flags);
+	irq_flags = uk_lcpu_save_irqf();
 	old = uk_arch_inb(areg);
 	/* Cursor Location High */
 	uk_arch_outb(areg, 0x0e);
@@ -129,7 +128,7 @@ static void vga_update_cursor(void)
 	uk_arch_outb(dreg, ((terminal_row * VGA_WIDTH) +
 			    terminal_column) & 0xff);
 	uk_arch_outb(areg, old);
-	local_irq_restore(irq_flags);
+	uk_lcpu_restore_irqf(irq_flags);
 }
 
 static void vga_putc(char c)
@@ -154,10 +153,10 @@ static void vga_putc(char c)
 	 * code paths running through this function concurrently), but at
 	 * least we stay inside the video memory.
 	 */
-	local_irq_save(irq_flags);
+	irq_flags = uk_lcpu_save_irqf();
 	row = terminal_row;
 	column = terminal_column;
-	local_irq_restore(irq_flags);
+	uk_lcpu_restore_irqf(irq_flags);
 
 	switch (c) {
 	case '\a':
@@ -197,10 +196,10 @@ static void vga_putc(char c)
 		break;
 	}
 
-	local_irq_save(irq_flags);
+	irq_flags = uk_lcpu_save_irqf();
 	terminal_row = row;
 	terminal_column = column;
-	local_irq_restore(irq_flags);
+	uk_lcpu_restore_irqf(irq_flags);
 
 	vga_update_cursor();
 }
@@ -256,7 +255,7 @@ static int vga_init(struct ukplat_bootinfo *bi)
 	terminal_column = 0;
 	terminal_color = vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
 
-	local_irq_save(irq_flags);
+	irq_flags = uk_lcpu_save_irqf();
 	if (!vga_check_settings()) {
 		__u8 val;
 
@@ -300,7 +299,7 @@ static int vga_init(struct ukplat_bootinfo *bi)
 	uk_arch_outb(dreg, 0x0e);
 	uk_arch_outb(areg, 0x0b);
 	uk_arch_outb(dreg, 0x0f);
-	local_irq_restore(irq_flags);
+	uk_lcpu_restore_irqf(irq_flags);
 
 	clear_terminal();
 

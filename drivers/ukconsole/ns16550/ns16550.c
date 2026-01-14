@@ -27,8 +27,8 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-#include "uk/arch/lcpu.h"
 #include <libfdt.h>
+#include <uk/arch/util.h>
 #include <uk/assert.h>
 #include <uk/config.h>
 #include <uk/init.h>

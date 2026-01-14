@@ -41,6 +41,7 @@
 #include <uk/arch/limits.h>
 #include <x86/cpu.h>
 #include <uk/arch.h>
+#include <uk/arch/util.h>
 #include <uk/asm/apic.h>
 
 #include <errno.h>

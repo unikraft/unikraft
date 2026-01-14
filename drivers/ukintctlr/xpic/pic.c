@@ -23,10 +23,10 @@
 /* Taken from solo5 platform_intr.c */
 
 #include <uk/asm/pic.h>
-#include <uk/arch/lcpu.h>
+#include <uk/arch.h>
+#include <uk/arch/util.h>
 #include <uk/essentials.h>
 #include <uk/intctlr.h>
-#include <x86/cpu.h>
 
 static void pic_mask_irq(unsigned int irq);
 static void pic_clear_irq(unsigned int irq);

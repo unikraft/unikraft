@@ -23,7 +23,7 @@
 #endif
 #include <uk/arch/limits.h>
 #include <uk/atomic.h>
-#include <uk/plat/lcpu.h>
+#include <uk/lcpu.h>
 #include <uk/semaphore.h>
 #include <uk/xen/gnttab.h>
 #if defined(__i386__) || defined(__x86_64__)
@@ -75,7 +75,7 @@ static grant_ref_t get_free_entry(void)
 
 	uk_semaphore_down(&gnttab.sem);
 
-	flags = ukplat_lcpu_save_irqf();
+	flags = uk_lcpu_save_irqf();
 
 	gref = gnttab.gref_list[0];
 	UK_ASSERT(gref >= GNTTAB_NR_RESERVED_ENTRIES &&
@@ -86,7 +86,7 @@ static grant_ref_t get_free_entry(void)
 	gnttab.inuse[gref] = 1;
 #endif
 
-	ukplat_lcpu_restore_irqf(flags);
+	uk_lcpu_restore_irqf(flags);
 
 	return gref;
 }
@@ -95,7 +95,7 @@ static void put_free_entry(grant_ref_t gref)
 {
 	unsigned long flags;
 
-	flags = ukplat_lcpu_save_irqf();
+	flags = uk_lcpu_save_irqf();
 
 #ifdef DBGGNT
 	UK_ASSERT(gnttab.inuse[gref]);
@@ -104,7 +104,7 @@ static void put_free_entry(grant_ref_t gref)
 	gnttab.gref_list[gref] = gnttab.gref_list[0];
 	gnttab.gref_list[0] = gref;
 
-	ukplat_lcpu_restore_irqf(flags);
+	uk_lcpu_restore_irqf(flags);
 
 	uk_semaphore_up(&gnttab.sem);
 }

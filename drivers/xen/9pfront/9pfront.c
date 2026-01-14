@@ -181,7 +181,7 @@ static void p9front_recv(struct p9front_dev_ring *ring)
 }
 
 static void p9front_handler(evtchn_port_t evtchn,
-			    struct __regs *regs __unused,
+			    struct uk_lcpu_regs *regs __unused,
 			    void *arg)
 {
 	struct p9front_dev_ring *ring = arg;

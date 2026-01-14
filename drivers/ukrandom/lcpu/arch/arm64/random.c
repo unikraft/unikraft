@@ -5,7 +5,7 @@
  */
 
 #include <errno.h>
-#include <uk/arch/lcpu.h>
+#include <uk/lcpu.h>
 #include <uk/errptr.h>
 #include <uk/print.h>
 #include <uk/random/driver.h>

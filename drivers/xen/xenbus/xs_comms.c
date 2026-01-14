@@ -581,7 +581,7 @@ static __noreturn void xs_thread_func(void *ign __unused)
 }
 
 static void xs_evtchn_handler(evtchn_port_t port,
-		struct __regs *regs __unused, void *ign __unused)
+		struct uk_lcpu_regs *regs __unused, void *ign __unused)
 {
 	UK_ASSERT(xsh.evtchn == port);
 	uk_waitq_wake_up(&xsh.waitq);

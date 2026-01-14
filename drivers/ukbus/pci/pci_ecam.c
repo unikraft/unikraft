@@ -34,6 +34,7 @@
 #include <uk/bus/platform.h>
 #include <uk/errptr.h>
 #include <uk/list.h>
+#include <uk/arch/util.h>
 #include <uk/alloc.h>
 #include <uk/print.h>
 #include <uk/plat/common/cpu.h>

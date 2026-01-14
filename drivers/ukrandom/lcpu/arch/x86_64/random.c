@@ -5,7 +5,8 @@
  */
 
 #include <errno.h>
-#include <uk/arch/lcpu.h>
+#include <uk/arch/util.h>
+#include <uk/lcpu.h>
 #include <uk/arch/types.h>
 #include <uk/errptr.h>
 #include <uk/print.h>

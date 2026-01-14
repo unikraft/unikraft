@@ -20,6 +20,7 @@
  */
 #include <libfdt.h>
 #include <uk/assert.h>
+#include <uk/arch/util.h>
 #include <uk/bitops.h>
 #include <uk/init.h>
 #include <uk/libparam.h>

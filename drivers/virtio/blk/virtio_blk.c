@@ -31,7 +31,7 @@
 #include <virtio/virtio_blk.h>
 #include <uk/sglist.h>
 #include <uk/blkdev_driver.h>
-#include <uk/plat/lcpu.h>
+#include <uk/lcpu.h>
 
 #define DRIVER_NAME		"virtio-blk"
 #define DEFAULT_SECTOR_SIZE	512
@@ -278,9 +278,9 @@ static void virtio_blkdev_queue_cleanup_requests(struct uk_blkdev_queue *queue)
 	/* Move all entries to local list, while ensuring no interrupt fiddles
 	 * with the list pointers.
 	 */
-	ukplat_lcpu_disable_irq();
+	uk_lcpu_disable_irq();
 	uk_list_splice_init(&queue->free_list, &list);
-	ukplat_lcpu_enable_irq();
+	uk_lcpu_enable_irq();
 
 	/* Free all old requests */
 	uk_list_for_each_entry_safe(request, request_tmp, &list,
