@@ -189,7 +189,8 @@ static inline void virtio_cwrite_bytes(const void *addr, const __u8 offset,
 
 	count  = len / type_len;
 	for (i = 0; i < count; i++) {
-		io_addr = (void *)addr + offset + (i * type_len);
+		io_addr = (void *)
+			  ((const char *)addr + offset + (i * type_len));
 		__iowmb();
 		switch (type_len) {
 		case 1:
@@ -216,7 +217,8 @@ static inline void virtio_cread_bytes(const void *addr, const __u8 offset,
 
 	count = len / type_len;
 	for (i = 0; i < count; i++) {
-		io_addr = (void *)addr + offset + (i * type_len);
+		io_addr = (void *)
+			  ((const char *)addr + offset + (i * type_len));
 		switch (type_len) {
 		case 1:
 			((__u8 *)buf)[i * type_len] = ioreg_read8(io_addr);
