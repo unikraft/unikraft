@@ -38,8 +38,9 @@
 
 #include <uk/arch/types.h>
 #include <uk/asm/ctx.h>
-#include <uk/asm/sysctx.h>
 #include <uk/essentials.h>
+
+#include <uk/lcpu.h>
 
 #ifndef __ASSEMBLY__
 #include <uk/config.h>
@@ -60,13 +61,13 @@
 #endif
 
 /* We must make sure that ECTX is aligned, so we make use of some padding,
- * whose size is equal to what we need to add to UKARCH_ECTX_SIZE
- * to make it aligned with UKARCH_ECTX_ALIGN
+ * whose size is equal to what we need to add to UK_LCPU_ECTX_SIZE
+ * to make it aligned with UK_LCPU_ECTX_ALIGN
  */
-#define UKARCH_EXECENV_PAD_SIZE					\
-	(ALIGN_UP(UKARCH_ECTX_SIZE,				\
-		 UKARCH_ECTX_ALIGN) -				\
-	 UKARCH_ECTX_SIZE)
+#define UKARCH_EXECENV_PAD_SIZE						\
+	(ALIGN_UP(UK_LCPU_ECTX_SIZE,				\
+		  UK_LCPU_ECTX_ALIGN) -				\
+	 UK_LCPU_ECTX_SIZE)
 
 /* If we make sure that the in-memory structure's end address is aligned to
  * the ECTX alignment, then subtracting from that end address a value that is
@@ -74,18 +75,18 @@
  * is also ECTX aligned.
  */
 #define UKARCH_EXECENV_END_ALIGN				\
-	UKARCH_ECTX_ALIGN
+	UK_LCPU_ECTX_ALIGN
 #define UKARCH_EXECENV_SIZE					\
 	(UKARCH_EXECENV_PAD_SIZE +				\
-	 UKARCH_ECTX_SIZE +					\
-	 UKARCH_SYSCTX_SIZE +					\
-	 __REGS_SIZEOF)
+	 UK_LCPU_ECTX_SIZE +					\
+	 UK_LCPU_SYSCTX_SIZE +					\
+	 UK_LCPU_REGS_SIZE)
 
 #define UKARCH_EXECENV_OFFSETOF_REGS				0x0
 #define UKARCH_EXECENV_OFFSETOF_SYSCTX				\
-	(UKARCH_EXECENV_OFFSETOF_REGS +	__REGS_SIZEOF)
+	(UKARCH_EXECENV_OFFSETOF_REGS +	UK_LCPU_REGS_SIZE)
 #define UKARCH_EXECENV_OFFSETOF_ECTX				\
-	(UKARCH_EXECENV_OFFSETOF_SYSCTX + UKARCH_SYSCTX_SIZE)
+	(UKARCH_EXECENV_OFFSETOF_SYSCTX + UK_LCPU_SYSCTX_SIZE)
 
 /**
  * Size of the current frame pointer Auxiliary Stack Pointer Control Block:
@@ -101,12 +102,12 @@
 /**
  * Size of the Auxiliary Stack Pointer Control Block
  * - sizeof(__uptr) for the frame pointer field
- * - sizeof(struct ukarch_sysctx) for the field representing the current
+ * - sizeof(struct uk_lcpu_sysctx) for the field representing the current
  * thread's Kernel system context
  */
 #define UKARCH_AUXSPCB_SIZE					\
 	(ALIGN_UP(UKARCH_AUXSPCB_CURR_FP_SIZE +			\
-		  UKARCH_SYSCTX_SIZE, UKARCH_AUXSP_ALIGN))
+		  UK_LCPU_SYSCTX_SIZE, UKARCH_AUXSP_ALIGN))
 
 /**
  * Size of the padding required to ensure the size of the Auxiliary Stack
@@ -115,7 +116,7 @@
  */
 #define UKARCH_AUXSPCB_PAD					\
 	(UKARCH_AUXSPCB_SIZE -					\
-	 (UKARCH_AUXSPCB_CURR_FP_SIZE + UKARCH_SYSCTX_SIZE))
+	 (UKARCH_AUXSPCB_CURR_FP_SIZE + UK_LCPU_SYSCTX_SIZE))
 
 /**
  * Offset to current frame pointer field.
@@ -137,18 +138,18 @@ struct ukarch_ctx {
 
 struct ukarch_execenv {
 	/* General purpose/flags registers */
-	struct __regs regs;
+	__u8 regs[UK_LCPU_REGS_SIZE];
 	/* System registers (e.g. TLS pointer) */
-	struct ukarch_sysctx sysctx;
+	__u8 sysctx[UK_LCPU_SYSCTX_SIZE];
 	/* Extended context (e.g. SIMD etc.) */
-	__u8 ectx[UKARCH_ECTX_SIZE];
+	__u8 ectx[UK_LCPU_ECTX_SIZE];
 	/* Padding for end alignment */
 	__u8 pad[UKARCH_EXECENV_PAD_SIZE];
 };
 
 UK_CTASSERT(sizeof(struct ukarch_execenv) == UKARCH_EXECENV_SIZE);
-UK_CTASSERT(IS_ALIGNED(UKARCH_EXECENV_PAD_SIZE + UKARCH_ECTX_SIZE,
-		       UKARCH_ECTX_ALIGN));
+UK_CTASSERT(IS_ALIGNED(UKARCH_EXECENV_PAD_SIZE + UK_LCPU_ECTX_SIZE,
+		       UK_LCPU_ECTX_ALIGN));
 UK_CTASSERT(__offsetof(struct ukarch_execenv, regs) ==
 	    UKARCH_EXECENV_OFFSETOF_REGS);
 UK_CTASSERT(__offsetof(struct ukarch_execenv, sysctx) ==
@@ -195,7 +196,7 @@ struct ukarch_auxspcb {
 	/* Current safe frame pointer inside the auxiliary stack area */
 	__uptr curr_fp;
 	/* Unikraft system registers (e.g. TLS pointer) */
-	struct ukarch_sysctx uksysctx;
+	__u8 uksysctx[UK_LCPU_SYSCTX_SIZE];
 	/* Padding for end alignment, the auxiliary stack area begins after */
 	__u8 pad[UKARCH_AUXSPCB_PAD];
 };
@@ -389,7 +390,7 @@ typedef void (*ukarch_ehtrampo_entry)(struct ukarch_execenv *execenv, long arg);
  *   The argument `entry` callback will receive
  */
 void ukarch_ctx_init_ehtrampo(struct ukarch_ctx *ctx,
-			      struct __regs *r,
+			      struct uk_lcpu_regs *r,
 			      __uptr sp,
 			      ukarch_ehtrampo_entry entry, long arg);
 
@@ -455,7 +456,7 @@ static inline void ukarch_auxspcb_set_uktlsp(struct ukarch_auxspcb *auxspcb,
 {
 	UK_ASSERT(auxspcb);
 	UK_ASSERT(IS_ALIGNED((__uptr)auxspcb, UKARCH_AUXSP_ALIGN));
-	ukarch_sysctx_set_tlsp(&auxspcb->uksysctx, uktlsp);
+	uk_lcpu_sysctx_set(&auxspcb->uksysctx, TLSP, uktlsp);
 }
 
 /**
@@ -472,7 +473,7 @@ static inline __uptr ukarch_auxspcb_get_uktlsp(struct ukarch_auxspcb *auxspcb)
 {
 	UK_ASSERT(auxspcb);
 	UK_ASSERT(IS_ALIGNED((__uptr)auxspcb, UKARCH_AUXSP_ALIGN));
-	return ukarch_sysctx_get_tlsp(&auxspcb->uksysctx);
+	return uk_lcpu_sysctx_get(&auxspcb->uksysctx, TLSP);
 }
 
 /**
@@ -515,61 +516,6 @@ static inline __uptr ukarch_auxspcb_get_curr_fp(struct ukarch_auxspcb *auxspcb)
 }
 
 /**
- * State of extended context, like additional CPU registers and units
- * (e.g., floating point, vector registers)
- * Note: The layout is architecture specific. The helpers `ukarch_ectx_size()`
- *       and `ukarch_ectx_align()` provide constraints needed for allocating
- *       memory `struct ukarch_ectx`.
- */
-struct ukarch_ectx;
-
-/**
- * Size needed to allocate memory to store an extended context state
- */
-__sz ukarch_ectx_size(void);
-
-/**
- * Alignment requirement for allocated memory to store an
- * extended context state
- */
-__sz ukarch_ectx_align(void);
-
-/**
- * Perform the minimum necessary to ensure the memory at `state`
- * is appropriate for passing to `ukarch_ectx_save()`.
- *
- * @param state
- *   Reference to extended context
- */
-void ukarch_ectx_sanitize(struct ukarch_ectx *state);
-
-/**
- * Initializes an extended context so that it can be loaded
- * into a logical CPU with `ukarch_ectx_load()`.
- *
- * @param state
- *   Reference to extended context to initialize
- */
-void ukarch_ectx_init(struct ukarch_ectx *state);
-
-/**
- * Stores the extended context of the currently executing CPU to `state`.
- * Such an extended context can be restored with `ukarch_ectx_load()`.
- *
- * @param state
- *   Reference to extended context to save to
- */
-void ukarch_ectx_store(struct ukarch_ectx *state);
-
-/**
- * Restores a given extended context on the currently executing CPU.
- *
- * @param state
- *   Reference to extended context to restore
- */
-void ukarch_ectx_load(struct ukarch_ectx *state);
-
-/**
  * Loads a given execution environment on the currently executing CPU.
  *
  * NOTE: This function does not return, it overwrites the entire current
@@ -579,15 +525,6 @@ void ukarch_ectx_load(struct ukarch_ectx *state);
  *   Reference to execution environment to load
  */
 void ukarch_execenv_load(long state) __noreturn;
-
-/**
- * Compare the given extended context with the state of the currently executing
- * CPU. If the state is different, crash the kernel.
- *
- * @param state
- *   Reference to extended context to compare to
- */
-void ukarch_ectx_assert_equal(struct ukarch_ectx *state);
 
 #endif /* !__ASSEMBLY__ */
 #endif /* __UKARCH_CTX_H__ */

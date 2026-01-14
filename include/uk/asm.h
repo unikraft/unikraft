@@ -48,7 +48,7 @@
 #ifndef ENTRY_ALIGNED
 #define ENTRY_ALIGNED(_name, _align)					\
 	".global " STRINGIFY(_name) "\n\t"				\
-	".align " STRINGIFY(_align) "\n\t";				\
+	".align " STRINGIFY(_align) "\n\t"				\
 	"" STRINGIFY(_name) ":\n\t"
 #endif
 

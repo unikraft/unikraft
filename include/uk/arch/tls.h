@@ -37,6 +37,7 @@
 #define __UKARCH_TLS_H__
 
 #include <uk/arch/types.h>
+#include <uk/lcpu.h>
 
 /*
  * As default, no or only a minimum TCB is reserved with these TLS allocation. A
@@ -75,12 +76,12 @@ __sz ukarch_tls_tcb_size(void);
 
 /**
  * Returns the TLS pointer (tlsp) that is used to activate
- * the TLS memory `tls_area` with `ukplat_tlsp_set()`
+ * the TLS memory `tls_area` with `uk_lcpu_tlsp_set()`
  *
  * @param tls_area
  *  TLS area to activate
  * @return
- *  TLS pointer that can be used with `ukplat_tlsp_set()`
+ *  TLS pointer that can be used with `uk_lcpu_tlsp_set()`
  */
 __uptr ukarch_tls_tlsp(void *tls_area);
 
@@ -116,6 +117,62 @@ __sz ukarch_tls_tcb_size(void);
  *  TLS area to initialize
  */
 void ukarch_tls_area_init(void *tls_area);
+
+/**
+ * Helper for setting the thread local storage register
+ * to a given base address of a TLS area
+ *
+ * @param tls_area Base pointer of the TLS area to set. Please note that
+ *                 it has to be of size `ukarch_tls_area_size()`
+ */
+static inline void ukarch_tls_set(void *tls_area)
+{
+#if CONFIG_LIBUKDEBUG
+	UK_ASSERT(tls_area);
+	UK_ASSERT(IS_ALIGNED((__sz)tls_area, ukarch_tls_area_align()));
+#endif /* CONFIG_LIBUKDEBUG */
+
+	uk_lcpu_tlsp_set(ukarch_tls_tlsp(tls_area));
+}
+
+typedef int (*ukarch_tlsp_exec_fn)(void *);
+
+/**
+ * Executes a function with a different TLS pointer activated.
+ * This wrapper function will apply a given TLS pointer before executing
+ * a given function. After the execution, the original TLS pointer is
+ * restored.
+ * NOTE: This function is declared as `__noinline`  so that we keep
+ *       a dedicated function context to load and store the TLS pointer
+ *       register of the CPU. No TLS variable is accessed within this
+ *       function wrapper.
+ *
+ * @param tlsp
+ *   TLS pointer to set for the execution of `fn()`
+ * @param fn
+ *   Function to execute
+ * @param argp
+ *   Argument pointer that will be handed over to `fn`
+ * @return
+ *   The return value from `fn()`
+ */
+static __noinline __maybe_unused int
+ukarch_tlsp_exec(__uptr tlsp, ukarch_tlsp_exec_fn fn, void *argp)
+{
+	__uptr orig_tlsp;
+	int ret;
+
+#if CONFIG_LIBUKDEBUG
+	UK_ASSERT(fn);
+#endif /* CONFIG_LIBUKDEBUG */
+
+	orig_tlsp = uk_lcpu_tlsp_get();
+	__barrier();
+	uk_lcpu_tlsp_set(tlsp);
+	ret = (*fn)(argp);
+	uk_lcpu_tlsp_set(orig_tlsp);
+	return ret;
+}
 
 #if CONFIG_UKARCH_TLS_HAVE_TCB
 /**
