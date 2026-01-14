@@ -11,7 +11,7 @@ BEGIN {
 	print "\nlong __used uk_syscall6_do_e(struct ukarch_execenv *execenv)"
 	print "{"
 	print "\tlong ret;"
-	print "\n\tswitch (execenv->regs.__syscall_rsyscall) {"
+	print "\n\tswitch (_UK_EXECENV_REGS_GET(execenv, __syscall_rsyscall)) {"
 }
 
 /[a-zA-Z0-9]+-[0-9]+/{
@@ -27,9 +27,9 @@ BEGIN {
 	printf "#else /* !HAVE_uk_syscall_e_%s */\n", name;
 	printf "\t\tret = %s(\n\t\t\t\t\t", uk_syscall_do;
 	for (i = 0; i < args_nr - 1; i++)
-		printf("execenv->regs.__syscall_rarg%d, ", i)
+		printf("_UK_EXECENV_REGS_GET(execenv, __syscall_rarg%d), ", i)
 	if (args_nr > 0)
-		printf("execenv->regs.__syscall_rarg%d", args_nr - 1)
+		printf("_UK_EXECENV_REGS_GET(execenv, __syscall_rarg%d)", args_nr - 1)
 	printf(");\n")
 	printf "\n#endif /* !HAVE_uk_syscall_e_%s */\n\n", name;
 	printf "\t\tbreak;\n"
@@ -38,7 +38,7 @@ BEGIN {
 
 END {
 	printf "\tdefault:\n"
-	printf "\t\tuk_pr_debug(\"syscall \\\"%%s\\\" is not available\\n\", uk_syscall_name(execenv->regs.__syscall_rsyscall));\n"
+	printf "\t\tuk_pr_debug(\"syscall \\\"%%s\\\" is not available\\n\", uk_syscall_name(_UK_EXECENV_REGS_GET(execenv, __syscall_rsyscall)));\n"
 	printf "\t\tret = -ENOSYS;\n"
 	printf "\t}\n"
 	printf "\treturn ret;\n"

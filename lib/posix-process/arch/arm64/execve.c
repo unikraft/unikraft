@@ -35,5 +35,5 @@ void execve_arch_execenv_init(struct ukarch_execenv *execenv_new,
 	/* Also copy the current sysctx to avoid ending up with undefined
 	 * values that trigger alignment errors.
 	 */
-	ukarch_sysctx_store((struct ukarch_sysctx *)&execenv_new->sysctx);
+	uk_lcpu_sysctx_store(execenv_new->sysctx);
 }

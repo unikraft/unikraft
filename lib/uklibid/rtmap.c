@@ -4,7 +4,7 @@
  * You may not use this file except in compliance with the License.
  */
 #include <uk/libid.h>
-#include <uk/arch/lcpu.h>
+#include <uk/lcpu.h>
 #include <uk/assert.h>
 #if CONFIG_HAVE_LIBC || CONFIG_LIBNOLIBC
 #include <string.h>

@@ -78,11 +78,9 @@
 #if CONFIG_LIBUKBOOT_INITSCHEDCOOP
 #include <uk/schedcoop.h>
 #endif /* CONFIG_LIBUKBOOT_INITSCHEDCOOP */
-#include <uk/arch/lcpu.h>
+#include <uk/lcpu.h>
 #include <uk/plat/bootstrap.h>
-#include <uk/plat/common/lcpu.h>
 #include <uk/plat/memory.h>
-#include <uk/plat/lcpu.h>
 #include <uk/plat/time.h>
 #include <uk/essentials.h>
 #include <uk/print.h>
@@ -92,16 +90,11 @@
 #include <uk/sp.h>
 #endif
 #include <uk/arch/tls.h>
-#include <uk/plat/tls.h>
 #if CONFIG_LIBUKBOOT_MAINTHREAD
 #include "shutdown_req.h"
 #endif /* CONFIG_LIBUKBOOT_MAINTHREAD */
 #include <uk/errptr.h>
 #include "banner.h"
-
-#if !CONFIG_LIBUKBOOT_INITSCHED
-#include <uk/plat/common/lcpu.h>
-#endif /* !CONFIG_LIBUKBOOT_INITSCHED */
 
 #if CONFIG_LIBUKINTCTLR
 #include <uk/intctlr.h>
@@ -331,7 +324,7 @@ void uk_boot_entry(void)
 	ukarch_tls_area_init(tls);
 	/* Activate TLS */
 	uktlsp = ukarch_tls_tlsp(tls);
-	ukplat_tlsp_set(uktlsp);
+	uk_lcpu_tlsp_set(uktlsp);
 
 	/* Allocate auxiliary stack for this execution context */
 	auxstack = uk_memalign(auxsa,
@@ -345,7 +338,7 @@ void uk_boot_entry(void)
 	auxspcb = ukarch_auxsp_get_cb(auxsp);
 	UK_ASSERT(auxspcb);
 	ukarch_auxspcb_set_uktlsp(auxspcb, uktlsp);
-	ukplat_lcpu_set_auxsp(auxsp);
+	uk_lcpu_set_auxsp(auxsp);
 #endif /* CONFIG_LIBUKBOOT_INITALLOC */
 
 #if CONFIG_LIBUKINTCTLR
@@ -388,7 +381,7 @@ void uk_boot_entry(void)
 #endif /* CONFIG_LIBUKBOOT_MAINTHREAD */
 
 	/* Enable interrupts before starting the application */
-	ukplat_lcpu_enable_irq();
+	uk_lcpu_enable_irq();
 
 	/**
 	 * Run init table

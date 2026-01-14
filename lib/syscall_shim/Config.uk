@@ -2,6 +2,7 @@ menuconfig LIBSYSCALL_SHIM
 	bool "syscall-shim: Syscall shim layer"
 	default n
 	select LIBUKSTREAMBUF
+	select LIBUKLCPU
 
 if LIBSYSCALL_SHIM
 	# Hidden configuration option that can be set by libc's in order to

@@ -88,7 +88,7 @@ void ukplat_syscall_handler(struct uk_syscall_ctx *usc)
 	 * registers are those of Unikraft and not of the application.
 	 */
 	auxspcb = ukarch_auxsp_get_cb(usc->auxsp);
-	ukarch_sysctx_load(&auxspcb->uksysctx);
+	uk_lcpu_sysctx_load((struct uk_lcpu_sysctx *)auxspcb->uksysctx);
 
 #if CONFIG_LIBSYSCALL_SHIM_HANDLER_ULTLS
 	t = uk_thread_current();
@@ -103,7 +103,8 @@ void ukplat_syscall_handler(struct uk_syscall_ctx *usc)
 				  UK_SYSCALL_ENTER_CTX_BINARY_SYSCALL);
 	uk_syscall_entertab_run(&enter_ctx);
 
-	execenv->regs.__syscall_rret0 = uk_syscall6_do_e(execenv);
+	_UK_EXECENV_REGS_SET(execenv, __syscall_rret0,
+			     uk_syscall6_do_e(execenv));
 
 	uk_syscall_exit_ctx_init(&exit_ctx,
 				 execenv, uk_syscall_nested_depth,
@@ -112,7 +113,7 @@ void ukplat_syscall_handler(struct uk_syscall_ctx *usc)
 	uk_syscall_nested_depth--;
 
 #if CONFIG_LIBSYSCALL_SHIM_HANDLER_ULTLS
-	t->tlsp = ukarch_sysctx_get_tlsp(&execenv->sysctx);
+	t->tlsp = uk_lcpu_sysctx_get(execenv->sysctx, TLSP);
 #endif /* CONFIG_LIBSYSCALL_SHIM_HANDLER_ULTLS */
 }
 
@@ -165,14 +166,14 @@ static void binary_syscall_strace(struct uk_syscall_exit_ctx *exit_ctx)
 #else /* !CONFIG_LIBSYSCALL_SHIM_STRACE_ANSI_COLOR */
 		     UK_PRSYSCALL_FMTF_NEWLINE,
 #endif /* !CONFIG_LIBSYSCALL_SHIM_STRACE_ANSI_COLOR */
-		     execenv->regs.__syscall_rsyscall,
-		     execenv->regs.__syscall_rret0,
-		     execenv->regs.__syscall_rarg0,
-		     execenv->regs.__syscall_rarg1,
-		     execenv->regs.__syscall_rarg2,
-		     execenv->regs.__syscall_rarg3,
-		     execenv->regs.__syscall_rarg4,
-		     execenv->regs.__syscall_rarg5);
+		     _UK_EXECENV_REGS_GET(execenv, __syscall_rsyscall),
+		     _UK_EXECENV_REGS_GET(execenv, __syscall_rret0),
+		     _UK_EXECENV_REGS_GET(execenv, __syscall_rarg0),
+		     _UK_EXECENV_REGS_GET(execenv, __syscall_rarg1),
+		     _UK_EXECENV_REGS_GET(execenv, __syscall_rarg2),
+		     _UK_EXECENV_REGS_GET(execenv, __syscall_rarg3),
+		     _UK_EXECENV_REGS_GET(execenv, __syscall_rarg4),
+		     _UK_EXECENV_REGS_GET(execenv, __syscall_rarg5));
 	uk_printk(UK_PRINT_RAW, "%s", prsyscallbuf);
 }
 

@@ -7,36 +7,40 @@
 #include "../../vmem.h"
 
 #include <uk/assert.h>
-#include <uk/arch/traps.h>
 #include <uk/arch/types.h>
+#include <uk/event.h>
 #include <uk/print.h>
 #include <uk/config.h>
+#include <uk/lcpu.h>
 #include <string.h>
 
 static int vmem_arch_pagefault(void *data)
 {
-	struct ukarch_trap_ctx *ctx = (struct ukarch_trap_ctx *)data;
-	__vaddr_t vaddr = (__vaddr_t)ctx->fault_address;
+	struct uk_lcpu_except_err_ctx *ctx = data;
+	__vaddr_t vaddr = (__vaddr_t)uk_lcpu_except_err_ctx_get_fault_addr(ctx);
 	const char *faultstr[] __maybe_unused = {
 		"read", "write", "exec"
 	};
 	unsigned int faulttype;
 	struct uk_vas *vas;
-	int rc;
+	int rc, error_code;
 
-	if (ctx->error_code & UK_ARCH_PF_EC_WR)
+	error_code = uk_lcpu_x86_64_except_err_ctx_get_error_code(ctx);
+	if (error_code & UK_ARCH_PF_EC_WR)
 		faulttype = UK_VMA_FAULT_WRITE;
-	else if (ctx->error_code & UK_ARCH_PF_EC_ID)
+	else if (error_code & UK_ARCH_PF_EC_ID)
 		faulttype = UK_VMA_FAULT_EXEC;
 	else
 		faulttype = UK_VMA_FAULT_READ;
 
-	if (!(ctx->error_code & UK_ARCH_PF_EC_P))
+	if (!(error_code & UK_ARCH_PF_EC_P))
 		faulttype |= UK_VMA_FAULT_NONPRESENT;
-	else if (ctx->error_code & UK_ARCH_PF_EC_RSVD)
+	else if (error_code & UK_ARCH_PF_EC_RSVD)
 		faulttype |= UK_VMA_FAULT_MISCONFIG;
 
-	rc = vmem_pagefault(vaddr, faulttype, ctx->regs);
+	rc = vmem_pagefault(vaddr, faulttype,
+			    (struct uk_lcpu_regs *)
+			    uk_lcpu_except_err_ctx_get_regs(ctx));
 	if (rc < 0) {
 		vas = uk_vas_get_active();
 		if (unlikely(vas && !(vas->flags & UK_VAS_FLAG_NO_PAGING)))
@@ -44,13 +48,15 @@ static int vmem_arch_pagefault(void *data)
 				    __PRIvaddr " (ec: 0x%x): %s (%d).\n",
 				    faultstr[faulttype &
 					    UK_VMA_FAULT_ACCESSTYPE],
-				    vaddr, ctx->error_code, strerror(-rc), -rc);
-		ctx->handler_err = rc;
+				    vaddr,
+				    error_code,
+				    strerror(-rc), -rc);
+		uk_lcpu_except_err_ctx_set_handler_err(ctx, rc);
 		return UK_EVENT_NOT_HANDLED;
 	}
 
 	return UK_EVENT_HANDLED;
 }
 
-UK_EVENT_HANDLER_PRIO(UKARCH_TRAP_PAGE_FAULT, vmem_arch_pagefault,
+UK_EVENT_HANDLER_PRIO(UK_LCPU_EXCEPT_EVENT_ERR_PAGE_FAULT, vmem_arch_pagefault,
 		      CONFIG_LIBUKVMEM_PAGEFAULT_HANDLER_PRIO);

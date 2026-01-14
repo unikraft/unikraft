@@ -37,8 +37,7 @@
 #include <stddef.h>
 #include <uk/plat/time.h>
 #include <string.h>
-#include <uk/arch/lcpu.h>
-#include <uk/plat/lcpu.h>
+#include <uk/lcpu.h>
 
 /* There is no justification of the limit of 80 symbols. But there
  * must be a limit anyways. Just number from the coding standard is
@@ -262,7 +261,7 @@ static inline void __uk_trace_finalize_buff(char *new_buff_pos, void *cookie)
 		       __VA_ARGS__);					\
 	static inline void trace_name(__UK_TRACE_ARGS_MAP(n, __VA_ARGS__)) \
 	{								\
-		unsigned long flags = ukplat_lcpu_save_irqf();		\
+		unsigned long flags = uk_lcpu_save_irqf();		\
 		size_t free __maybe_unused;				\
 		char *buff = __uk_trace_get_buff(&free);		\
 		if (buff) {						\
@@ -270,7 +269,7 @@ static inline void __uk_trace_finalize_buff(char *new_buff_pos, void *cookie)
 			__uk_trace_finalize_buff(			\
 				buff, &regdata_name);			\
 		}							\
-		ukplat_lcpu_restore_irqf(flags);			\
+		uk_lcpu_restore_irqf(flags);			\
 	}
 #else
 #define ____UK_TRACEPOINT(n, regdata_name, trace_name, fmt, ...)	\

@@ -1,5 +1,6 @@
 menuconfig LIBUKNOFAULT
 	bool "uknofault: Fault-safe memory access functions"
+	select LIBUKLCPU
 	default n
 	help
 		Provides functions for probing memory addresses and

@@ -31,11 +31,9 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <uk/alloc.h>
-#include <uk/arch/lcpu.h>
+#include <uk/lcpu.h>
 #include <uk/arch/time.h>
 #include <uk/arch/ctx.h>
-#include <uk/plat/lcpu.h>
-#include <uk/plat/tls.h>
 #include <uk/wait_types.h>
 #include <uk/list.h>
 #include <uk/prio.h>
@@ -57,7 +55,7 @@ typedef void (*uk_thread_fn2_t)(void *, void *) __noreturn;
 
 struct uk_thread {
 	struct ukarch_ctx    ctx;	/**< Architecture context */
-	struct ukarch_ectx *ectx;	/**< Extended context (FPU, VPU, ...) */
+	struct uk_lcpu_ectx *ectx;	/**< Extended context (FPU, VPU, ...) */
 	uintptr_t           tlsp;	/**< Current active TLS pointer */
 	__uptr            uktlsp;	/**< Unikraft TLS pointer */
 	__uptr		   auxsp;	/**< Unikraft Auxiliary Stack Pointer */
@@ -96,12 +94,12 @@ UK_TAILQ_HEAD(uk_thread_list, struct uk_thread);
 	uk_sched_thread_exit()
 
 /* managed by sched.c */
-extern UKPLAT_PER_LCPU_DEFINE(struct uk_thread *, __uk_sched_thread_current);
+extern UK_PER_LCPU_DEFINE(struct uk_thread *, __uk_sched_thread_current);
 
 static inline
 struct uk_thread *uk_thread_current(void)
 {
-	return ukplat_per_lcpu_current(__uk_sched_thread_current);
+	return uk_per_lcpu_current(__uk_sched_thread_current);
 }
 
 /**
@@ -251,7 +249,7 @@ int uk_thread_init_bare(struct uk_thread *t,
 			uintptr_t auxsp,
 			uintptr_t tlsp,
 			bool is_uktls,
-			struct ukarch_ectx *ectx,
+			struct uk_lcpu_ectx *ectx,
 			const char *name,
 			void *priv,
 			uk_thread_dtor_t dtor);
@@ -300,7 +298,7 @@ int uk_thread_init_bare_fn0(struct uk_thread *t,
 			    uintptr_t auxsp,
 			    uintptr_t tlsp,
 			    bool is_uktls,
-			    struct ukarch_ectx *ectx,
+			    struct uk_lcpu_ectx *ectx,
 			    const char *name,
 			    void *priv,
 			    uk_thread_dtor_t dtor);
@@ -316,7 +314,7 @@ int uk_thread_init_bare_fn1(struct uk_thread *t,
 			    uintptr_t auxsp,
 			    uintptr_t tlsp,
 			    bool is_uktls,
-			    struct ukarch_ectx *ectx,
+			    struct uk_lcpu_ectx *ectx,
 			    const char *name,
 			    void *priv,
 			    uk_thread_dtor_t dtor);
@@ -332,7 +330,7 @@ int uk_thread_init_bare_fn2(struct uk_thread *t,
 			    uintptr_t auxsp,
 			    uintptr_t tlsp,
 			    bool is_uktls,
-			    struct ukarch_ectx *ectx,
+			    struct uk_lcpu_ectx *ectx,
 			    const char *name,
 			    void *priv,
 			    uk_thread_dtor_t dtor);
@@ -389,7 +387,7 @@ int uk_thread_init_fn0(struct uk_thread *t,
 		       size_t auxstack_len,
 		       struct uk_alloc *a_uktls,
 		       bool custom_ectx,
-		       struct ukarch_ectx *ectx,
+		       struct uk_lcpu_ectx *ectx,
 		       const char *name,
 		       void *priv,
 		       uk_thread_dtor_t dtor);
@@ -407,7 +405,7 @@ int uk_thread_init_fn1(struct uk_thread *t,
 		       size_t auxstack_len,
 		       struct uk_alloc *a_uktls,
 		       bool custom_ectx,
-		       struct ukarch_ectx *ectx,
+		       struct uk_lcpu_ectx *ectx,
 		       const char *name,
 		       void *priv,
 		       uk_thread_dtor_t dtor);
@@ -425,7 +423,7 @@ int uk_thread_init_fn2(struct uk_thread *t,
 		       size_t auxstack_len,
 		       struct uk_alloc *a_uktls,
 		       bool custom_ectx,
-		       struct ukarch_ectx *ectx,
+		       struct uk_lcpu_ectx *ectx,
 		       const char *name,
 		       void *priv,
 		       uk_thread_dtor_t dtor);
@@ -699,7 +697,7 @@ void uk_thread_set_wakeup(struct uk_thread *t, __snsec deadline)
  */
 #define uk_thread_uktls_var(thread, variable)				\
 	(*({								\
-		__uptr _curr_tlsp = ukplat_tlsp_get();			\
+		__uptr _curr_tlsp = uk_lcpu_tlsp_get();			\
 		__sptr _offset;						\
 		typeof(variable) *_ref;					\
 									\

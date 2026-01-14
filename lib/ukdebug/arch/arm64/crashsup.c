@@ -4,7 +4,6 @@
  * You may not use this file except in compliance with the License.
  */
 
-#include <uk/arch/traps.h>
 #include <uk/crash.h>
 #include <uk/essentials.h>
 
@@ -12,7 +11,7 @@
 
 extern __bool _uk_crash_explicit;
 
-void uk_crash_populate_descr(struct ukarch_trap_ctx *ctx,
+void uk_crash_populate_descr(struct uk_lcpu_except_err_ctx *ctx,
 			     struct uk_crash_descr *descr)
 {
 	if (_uk_crash_explicit) {

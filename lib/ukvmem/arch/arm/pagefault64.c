@@ -7,7 +7,6 @@
 #include "../../vmem.h"
 
 #include <uk/assert.h>
-#include <uk/arch/traps.h>
 #include <uk/arch/types.h>
 #include <uk/config.h>
 #include <uk/print.h>
@@ -16,7 +15,7 @@
 
 static int vmem_arch_pagefault(void *data)
 {
-	struct ukarch_trap_ctx *ctx = (struct ukarch_trap_ctx *)data;
+	struct uk_lcpu_except_err_ctx *ctx = data;
 	__vaddr_t vaddr = (__vaddr_t)ctx->far;
 	const char *faultstr[] __maybe_unused = {
 		"read", "write", "exec"

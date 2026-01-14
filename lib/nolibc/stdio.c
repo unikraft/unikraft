@@ -66,7 +66,7 @@
 #include <sys/stat.h>
 
 #include <uk/essentials.h>
-#include <uk/arch/lcpu.h>
+#include <uk/lcpu.h>
 
 #if CONFIG_LIBUKCONSOLE
 #include <uk/console.h>

@@ -27,7 +27,8 @@
  * @return
  *   0 on success, a negative error code otherwise
  */
-int vmem_pagefault(__vaddr_t vaddr, unsigned int type, struct __regs *regs);
+int vmem_pagefault(__vaddr_t vaddr, unsigned int type,
+		   struct uk_lcpu_regs *regs);
 
 /**
  * Computes the number of pages depending on the VMA's configured page size.

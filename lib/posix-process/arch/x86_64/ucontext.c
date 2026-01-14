@@ -7,6 +7,7 @@
 #define _GNU_SOURCE
 #include <signal.h>
 
+#include <uk/arch.h>
 #include <uk/syscall.h>
 
 void pprocess_signal_arch_set_ucontext(struct ukarch_execenv *execenv,
@@ -15,23 +16,40 @@ void pprocess_signal_arch_set_ucontext(struct ukarch_execenv *execenv,
 	UK_ASSERT(execenv);
 	UK_ASSERT(ucontext);
 
-	ucontext->uc_mcontext.gregs[REG_R8] = execenv->regs.r8;
-	ucontext->uc_mcontext.gregs[REG_R9] = execenv->regs.r9;
-	ucontext->uc_mcontext.gregs[REG_R10] = execenv->regs.r10;
-	ucontext->uc_mcontext.gregs[REG_R11] = execenv->regs.r11;
-	ucontext->uc_mcontext.gregs[REG_R12] = execenv->regs.r12;
-	ucontext->uc_mcontext.gregs[REG_R13] = execenv->regs.r13;
-	ucontext->uc_mcontext.gregs[REG_R14] = execenv->regs.r14;
-	ucontext->uc_mcontext.gregs[REG_R15] = execenv->regs.r15;
-	ucontext->uc_mcontext.gregs[REG_RDI] = execenv->regs.rdi;
-	ucontext->uc_mcontext.gregs[REG_RSI] = execenv->regs.rsi;
-	ucontext->uc_mcontext.gregs[REG_RBP] = execenv->regs.rbp;
-	ucontext->uc_mcontext.gregs[REG_RBX] = execenv->regs.rbx;
-	ucontext->uc_mcontext.gregs[REG_RDX] = execenv->regs.rdx;
-	ucontext->uc_mcontext.gregs[REG_RAX] = execenv->regs.rax;
-	ucontext->uc_mcontext.gregs[REG_RCX] = execenv->regs.rcx;
-	ucontext->uc_mcontext.gregs[REG_RSP] = execenv->regs.rsp;
-	ucontext->uc_mcontext.gregs[REG_RIP] = execenv->regs.rip;
+	ucontext->uc_mcontext.gregs[REG_R8] = uk_lcpu_regs_get(execenv->regs,
+							       R8);
+	ucontext->uc_mcontext.gregs[REG_R9] = uk_lcpu_regs_get(execenv->regs,
+							       R9);
+	ucontext->uc_mcontext.gregs[REG_R10] = uk_lcpu_regs_get(execenv->regs,
+								R10);
+	ucontext->uc_mcontext.gregs[REG_R11] = uk_lcpu_regs_get(execenv->regs,
+								R11);
+	ucontext->uc_mcontext.gregs[REG_R12] = uk_lcpu_regs_get(execenv->regs,
+								R12);
+	ucontext->uc_mcontext.gregs[REG_R13] = uk_lcpu_regs_get(execenv->regs,
+								R13);
+	ucontext->uc_mcontext.gregs[REG_R14] = uk_lcpu_regs_get(execenv->regs,
+								R14);
+	ucontext->uc_mcontext.gregs[REG_R15] = uk_lcpu_regs_get(execenv->regs,
+								R15);
+	ucontext->uc_mcontext.gregs[REG_RDI] = uk_lcpu_regs_get(execenv->regs,
+								RDI);
+	ucontext->uc_mcontext.gregs[REG_RSI] = uk_lcpu_regs_get(execenv->regs,
+								RSI);
+	ucontext->uc_mcontext.gregs[REG_RBP] = uk_lcpu_regs_get(execenv->regs,
+								RBP);
+	ucontext->uc_mcontext.gregs[REG_RBX] = uk_lcpu_regs_get(execenv->regs,
+								RBX);
+	ucontext->uc_mcontext.gregs[REG_RDX] = uk_lcpu_regs_get(execenv->regs,
+								RDX);
+	ucontext->uc_mcontext.gregs[REG_RAX] = uk_lcpu_regs_get(execenv->regs,
+								RAX);
+	ucontext->uc_mcontext.gregs[REG_RCX] = uk_lcpu_regs_get(execenv->regs,
+								RCX);
+	ucontext->uc_mcontext.gregs[REG_RSP] = uk_lcpu_regs_get(execenv->regs,
+								RSP);
+	ucontext->uc_mcontext.gregs[REG_RIP] = uk_lcpu_regs_get(execenv->regs,
+								RIP);
 
 	/* TODO Populate the rest of the context */
 }
@@ -42,23 +60,40 @@ void pprocess_signal_arch_get_ucontext(ucontext_t *ucontext,
 	UK_ASSERT(ucontext);
 	UK_ASSERT(execenv);
 
-	execenv->regs.r8 = ucontext->uc_mcontext.gregs[REG_R8];
-	execenv->regs.r9 = ucontext->uc_mcontext.gregs[REG_R9];
-	execenv->regs.r10 = ucontext->uc_mcontext.gregs[REG_R10];
-	execenv->regs.r11 = ucontext->uc_mcontext.gregs[REG_R11];
-	execenv->regs.r12 = ucontext->uc_mcontext.gregs[REG_R12];
-	execenv->regs.r13 = ucontext->uc_mcontext.gregs[REG_R13];
-	execenv->regs.r14 = ucontext->uc_mcontext.gregs[REG_R14];
-	execenv->regs.r15 = ucontext->uc_mcontext.gregs[REG_R15];
-	execenv->regs.rdi = ucontext->uc_mcontext.gregs[REG_RDI];
-	execenv->regs.rsi = ucontext->uc_mcontext.gregs[REG_RSI];
-	execenv->regs.rbp = ucontext->uc_mcontext.gregs[REG_RBP];
-	execenv->regs.rbx = ucontext->uc_mcontext.gregs[REG_RBX];
-	execenv->regs.rdx = ucontext->uc_mcontext.gregs[REG_RDX];
-	execenv->regs.rax = ucontext->uc_mcontext.gregs[REG_RAX];
-	execenv->regs.rcx = ucontext->uc_mcontext.gregs[REG_RCX];
-	execenv->regs.rsp = ucontext->uc_mcontext.gregs[REG_RSP];
-	execenv->regs.rip = ucontext->uc_mcontext.gregs[REG_RIP];
+	uk_lcpu_regs_set(execenv->regs, R8,
+			 ucontext->uc_mcontext.gregs[REG_R8]);
+	uk_lcpu_regs_set(execenv->regs, R9,
+			 ucontext->uc_mcontext.gregs[REG_R9]);
+	uk_lcpu_regs_set(execenv->regs, R10,
+			 ucontext->uc_mcontext.gregs[REG_R10]);
+	uk_lcpu_regs_set(execenv->regs, R11,
+			 ucontext->uc_mcontext.gregs[REG_R11]);
+	uk_lcpu_regs_set(execenv->regs, R12,
+			 ucontext->uc_mcontext.gregs[REG_R12]);
+	uk_lcpu_regs_set(execenv->regs, R13,
+			 ucontext->uc_mcontext.gregs[REG_R13]);
+	uk_lcpu_regs_set(execenv->regs, R14,
+			 ucontext->uc_mcontext.gregs[REG_R14]);
+	uk_lcpu_regs_set(execenv->regs, R15,
+			 ucontext->uc_mcontext.gregs[REG_R15]);
+	uk_lcpu_regs_set(execenv->regs, RDI,
+			 ucontext->uc_mcontext.gregs[REG_RDI]);
+	uk_lcpu_regs_set(execenv->regs, RSI,
+			 ucontext->uc_mcontext.gregs[REG_RSI]);
+	uk_lcpu_regs_set(execenv->regs, RBP,
+			 ucontext->uc_mcontext.gregs[REG_RBP]);
+	uk_lcpu_regs_set(execenv->regs, RBX,
+			 ucontext->uc_mcontext.gregs[REG_RBX]);
+	uk_lcpu_regs_set(execenv->regs, RDX,
+			 ucontext->uc_mcontext.gregs[REG_RDX]);
+	uk_lcpu_regs_set(execenv->regs, RAX,
+			 ucontext->uc_mcontext.gregs[REG_RAX]);
+	uk_lcpu_regs_set(execenv->regs, RCX,
+			 ucontext->uc_mcontext.gregs[REG_RCX]);
+	uk_lcpu_regs_set(execenv->regs, RSP,
+			 ucontext->uc_mcontext.gregs[REG_RSP]);
+	uk_lcpu_regs_set(execenv->regs, RIP,
+			 ucontext->uc_mcontext.gregs[REG_RIP]);
 
 	/* TODO Populate the rest of the context */
 }

@@ -29,7 +29,7 @@
 #include <uk/alloc.h>
 #include <uk/atomic.h>
 #include <uk/bitops/bitmap.h>
-#include <uk/plat/lcpu.h>
+#include <uk/lcpu.h>
 #include <uk/plat/time.h>
 #include <uk/intctlr.h>
 #include <uk/intctlr/limits.h>
@@ -39,9 +39,6 @@
 #include <uk/print.h>
 #include <errno.h>
 #include <uk/bitops.h>
-#if CONFIG_LIBUKINTCTLR_ISR_ECTX_ASSERTIONS
-#include <uk/arch/ctx.h>
-#endif /* CONFIG_LIBUKINTCTLR_ISR_ECTX_ASSERTIONS */
 
 #if !defined(UK_INTCTLR_MAX_IRQ) ||					\
 	!defined(UK_INTCTLR_ALLOCABLE_IRQ_COUNT) ||			\
@@ -58,8 +55,6 @@
 #define LAST_ALLOCABLE_IRQ		UK_INTCTLR_LAST_ALLOCABLE_IRQ
 
 struct uk_intctlr_desc *uk_intctlr;
-
-UK_EVENT(UK_INTCTLR_EVENT_IRQ);
 
 UK_TRACEPOINT(trace_uk_intctlr_unhandled_irq, "Unhandled irq=%lu\n",
 	      unsigned long);
@@ -93,17 +88,17 @@ int uk_intctlr_irq_register(unsigned int irq,
 	UK_ASSERT(func);
 	UK_ASSERT(irq <= MAX_IRQ);
 
-	flags = ukplat_lcpu_save_irqf();
+	flags = uk_lcpu_save_irqf();
 	h = allocate_handler(irq);
 	if (!h) {
-		ukplat_lcpu_restore_irqf(flags);
+		uk_lcpu_restore_irqf(flags);
 		return -ENOMEM;
 	}
 
 	h->func = func;
 	h->arg = arg;
 
-	ukplat_lcpu_restore_irqf(flags);
+	uk_lcpu_restore_irqf(flags);
 
 	uk_intctlr->ops->unmask_irq(irq);
 
@@ -121,7 +116,7 @@ int uk_intctlr_irq_unregister(unsigned int irq,
 	UK_ASSERT(func);
 	UK_ASSERT(irq <= MAX_IRQ);
 
-	flags = ukplat_lcpu_save_irqf();
+	flags = uk_lcpu_save_irqf();
 
 	count = MAX_HANDLERS_PER_IRQ;
 	for (i = 0; i < count; i++) {
@@ -137,7 +132,7 @@ recheck:
 		}
 	}
 
-	ukplat_lcpu_restore_irqf(flags);
+	uk_lcpu_restore_irqf(flags);
 
 	/* If `h` is set, then there was at least one instance found */
 	if (unlikely(!h)) {
@@ -154,34 +149,14 @@ recheck:
  */
 extern unsigned long sched_have_pending_events;
 
-void uk_intctlr_irq_handle(struct __regs *regs, unsigned int irq)
+void uk_intctlr_irq_handle(struct uk_lcpu_except_irq_ctx *ctx)
 {
 	struct irq_handler *h;
+	unsigned long irq;
 	int i;
-	int rc;
-	struct uk_intctlr_event_irq_data ctx;
-#if CONFIG_LIBUKINTCTLR_ISR_ECTX_ASSERTIONS
-	__sz ectx_align = ukarch_ectx_align();
-	__u8 ectxbuf[ukarch_ectx_size() + ectx_align];
-	struct ukarch_ectx *ectx = (struct ukarch_ectx *)
-		ALIGN_UP((__uptr) ectxbuf, ectx_align);
 
-	ukarch_ectx_init(ectx);
-#endif /* CONFIG_LIBUKINTCTLR_ISR_ECTX_ASSERTIONS */
-
+	irq = uk_lcpu_except_irq_ctx_get_irq(ctx);
 	UK_ASSERT(irq <= MAX_IRQ);
-
-	ctx.regs = regs;
-	ctx.irq = irq;
-	rc = uk_raise_event(UK_INTCTLR_EVENT_IRQ, &ctx);
-	if (unlikely(rc < 0))
-		UK_CRASH("IRQ event handler returned error: %d\n", rc);
-	if (rc == UK_EVENT_HANDLED) {
-		/* Skip all normal handlers if an event handler handled the
-		 * event
-		 */
-		goto exit;
-	}
 
 	for (i = 0; i < MAX_HANDLERS_PER_IRQ; i++) {
 		if (irq_handlers[irq][i].func == NULL)
@@ -201,7 +176,7 @@ void uk_intctlr_irq_handle(struct __regs *regs, unsigned int irq)
 			uk_or_relax(&sched_have_pending_events, 1);
 
 		if (h->func(h->arg) == 1)
-			goto exit;
+			return;
 	}
 	/*
 	 * Acknowledge interrupts even in the case when there was no handler for
@@ -210,13 +185,6 @@ void uk_intctlr_irq_handle(struct __regs *regs, unsigned int irq)
 	 * interrupt line that would then stay disabled.
 	 */
 	trace_uk_intctlr_unhandled_irq(irq);
-
-exit:
-#if CONFIG_LIBUKINTCTLR_ISR_ECTX_ASSERTIONS
-	ukarch_ectx_assert_equal(ectx);
-#endif /* CONFIG_LIBUKINTCTLR_ISR_ECTX_ASSERTIONS */
-
-	return;
 }
 
 void uk_intctlr_irq_mask(unsigned int irq)
@@ -298,7 +266,7 @@ int uk_intctlr_irq_free(unsigned int *irqs, __sz count)
 int uk_intctlr_init(struct uk_alloc *a __unused)
 {
 	UK_ASSERT(uk_intctlr);
-	UK_ASSERT(ukplat_lcpu_irqs_disabled());
+	UK_ASSERT(uk_lcpu_irqs_disabled());
 
 	/* Nothing for now */
 	return 0;

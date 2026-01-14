@@ -102,100 +102,142 @@ typedef long uk_syscall_arg_t;
 #define UK_ARG_MAP14(m, type, arg, ...) m(type, arg), UK_ARG_MAP12(m, __VA_ARGS__)
 #define UK_ARG_MAPx(nr_args, ...) UK_CONCAT(UK_ARG_MAP, nr_args)(__VA_ARGS__)
 
+#define _UK_EXECENV_REGS_GET(_execenv, _offset)				\
+	uk_lcpu_regs_get((_execenv)->regs,\
+			     _offset)
+#define _UK_EXECENV_REGS_SET(_execenv, _offset, _val)			\
+	uk_lcpu_regs_set((_execenv)->regs,\
+			     _offset, (_val))
 #define UK_EXECENV_CALLMAP0_0(...)
 #define UK_EXECENV_CALLMAP2_2(m, type, arg)				\
-	, (type)execenv->regs.__syscall_rarg0
+	, (type)_UK_EXECENV_REGS_GET(execenv, __syscall_rarg0)
 
 #define UK_EXECENV_CALLMAP2_4(m, type, arg)				\
-	, (type)execenv->regs.__syscall_rarg1
+	, (type)_UK_EXECENV_REGS_GET(execenv, __syscall_rarg1)
 #define UK_EXECENV_CALLMAP4_4(m, type, arg, ...)			\
-	, (type)execenv->regs.__syscall_rarg0 UK_EXECENV_CALLMAP2_4(m, __VA_ARGS__)
+	, (type)_UK_EXECENV_REGS_GET(execenv, __syscall_rarg0)		\
+	UK_EXECENV_CALLMAP2_4(m, __VA_ARGS__)
 
 #define UK_EXECENV_CALLMAP2_6(m, type, arg)				\
-	, (type)execenv->regs.__syscall_rarg2
+	, (type)_UK_EXECENV_REGS_GET(execenv, __syscall_rarg2)
 #define UK_EXECENV_CALLMAP4_6(m, type, arg, ...)			\
-	, (type)execenv->regs.__syscall_rarg1 UK_EXECENV_CALLMAP2_6(m, __VA_ARGS__)
+	, (type)_UK_EXECENV_REGS_GET(execenv, __syscall_rarg1)		\
+	UK_EXECENV_CALLMAP2_6(m, __VA_ARGS__)
 #define UK_EXECENV_CALLMAP6_6(m, type, arg, ...)			\
-	, (type)execenv->regs.__syscall_rarg0 UK_EXECENV_CALLMAP4_6(m, __VA_ARGS__)
+	, (type)_UK_EXECENV_REGS_GET(execenv, __syscall_rarg0)		\
+	UK_EXECENV_CALLMAP4_6(m, __VA_ARGS__)
 
 #define UK_EXECENV_CALLMAP2_8(m, type, arg)				\
-	, (type)execenv->regs.__syscall_rarg3
+	, (type)_UK_EXECENV_REGS_GET(execenv, __syscall_rarg3)
 #define UK_EXECENV_CALLMAP4_8(m, type, arg, ...)			\
-	, (type)execenv->regs.__syscall_rarg2 UK_EXECENV_CALLMAP2_8(m, __VA_ARGS__)
+	, (type)_UK_EXECENV_REGS_GET(execenv, __syscall_rarg2)		\
+	UK_EXECENV_CALLMAP2_8(m, __VA_ARGS__)
 #define UK_EXECENV_CALLMAP6_8(m, type, arg, ...)			\
-	, (type)execenv->regs.__syscall_rarg1 UK_EXECENV_CALLMAP4_8(m, __VA_ARGS__)
+	, (type)_UK_EXECENV_REGS_GET(execenv, __syscall_rarg1)		\
+	UK_EXECENV_CALLMAP4_8(m, __VA_ARGS__)
 #define UK_EXECENV_CALLMAP8_8(m, type, arg, ...)			\
-	, (type)execenv->regs.__syscall_rarg0 UK_EXECENV_CALLMAP6_8(m, __VA_ARGS__)
+	, (type)_UK_EXECENV_REGS_GET(execenv, __syscall_rarg0)		\
+	UK_EXECENV_CALLMAP6_8(m, __VA_ARGS__)
 
 #define UK_EXECENV_CALLMAP2_10(m, type, arg)				\
-	, (type)execenv->regs.__syscall_rarg4
+	, (type)_UK_EXECENV_REGS_GET(execenv, __syscall_rarg4)
 #define UK_EXECENV_CALLMAP4_10(m, type, arg, ...)			\
-	, (type)execenv->regs.__syscall_rarg3 UK_EXECENV_CALLMAP2_10(m,	__VA_ARGS__)
+	, (type)_UK_EXECENV_REGS_GET(execenv, __syscall_rarg3)		\
+	UK_EXECENV_CALLMAP2_10(m,	__VA_ARGS__)
 #define UK_EXECENV_CALLMAP6_10(m, type, arg, ...)			\
-	, (type)execenv->regs.__syscall_rarg2 UK_EXECENV_CALLMAP4_10(m,	__VA_ARGS__)
+	, (type)_UK_EXECENV_REGS_GET(execenv, __syscall_rarg2)		\
+	UK_EXECENV_CALLMAP4_10(m,	__VA_ARGS__)
 #define UK_EXECENV_CALLMAP8_10(m, type, arg, ...)			\
-	, (type)execenv->regs.__syscall_rarg1 UK_EXECENV_CALLMAP6_10(m,	__VA_ARGS__)
+	, (type)_UK_EXECENV_REGS_GET(execenv, __syscall_rarg1)		\
+	UK_EXECENV_CALLMAP6_10(m,	__VA_ARGS__)
 #define UK_EXECENV_CALLMAP10_10(m, type, arg, ...)			\
-	, (type)execenv->regs.__syscall_rarg0 UK_EXECENV_CALLMAP8_10(m,	__VA_ARGS__)
+	, (type)_UK_EXECENV_REGS_GET(execenv, __syscall_rarg0)		\
+	UK_EXECENV_CALLMAP8_10(m,	__VA_ARGS__)
 
 #define UK_EXECENV_CALLMAP2_12(m, type, arg)				\
-	, (type)execenv->regs.__syscall_rarg5
+	, (type)_UK_EXECENV_REGS_GET(execenv, __syscall_rarg5)
 #define UK_EXECENV_CALLMAP4_12(m, type, arg, ...)			\
-	, (type)execenv->regs.__syscall_rarg4 UK_EXECENV_CALLMAP2_12(m,	__VA_ARGS__)
+	, (type)_UK_EXECENV_REGS_GET(execenv, __syscall_rarg4)		\
+	UK_EXECENV_CALLMAP2_12(m,	__VA_ARGS__)
 #define UK_EXECENV_CALLMAP6_12(m, type, arg, ...)			\
-	, (type)execenv->regs.__syscall_rarg3 UK_EXECENV_CALLMAP4_12(m,	__VA_ARGS__)
+	, (type)_UK_EXECENV_REGS_GET(execenv, __syscall_rarg3)		\
+	UK_EXECENV_CALLMAP4_12(m,	__VA_ARGS__)
 #define UK_EXECENV_CALLMAP8_12(m, type, arg, ...)			\
-	, (type)execenv->regs.__syscall_rarg2 UK_EXECENV_CALLMAP6_12(m,	__VA_ARGS__)
+	, (type)_UK_EXECENV_REGS_GET(execenv, __syscall_rarg2)		\
+	UK_EXECENV_CALLMAP6_12(m,	__VA_ARGS__)
 #define UK_EXECENV_CALLMAP10_12(m, type, arg, ...)			\
-	, (type)execenv->regs.__syscall_rarg1 UK_EXECENV_CALLMAP8_12(m,	__VA_ARGS__)
+	, (type)_UK_EXECENV_REGS_GET(execenv, __syscall_rarg1)		\
+	UK_EXECENV_CALLMAP8_12(m,	__VA_ARGS__)
 #define UK_EXECENV_CALLMAP12_12(m, type, arg, ...)			\
-	, (type)execenv->regs.__syscall_rarg0 UK_EXECENV_CALLMAP10_12(m, __VA_ARGS__)
+	, (type)_UK_EXECENV_REGS_GET(execenv, __syscall_rarg0)		\
+	UK_EXECENV_CALLMAP10_12(m, __VA_ARGS__)
 #define UK_EXECENV_CALLMAPx(nr_args, ...)				\
 	execenv UK_CONCAT(UK_CONCAT(UK_EXECENV_CALLMAP, nr_args),	\
 			  _##nr_args)(__VA_ARGS__)
 
 #define UK_EXECENV_EMAP0_0(...)
-#define UK_EXECENV_EMAP2_2(m, type, arg) , (long)execenv->regs.__syscall_rarg0
+#define UK_EXECENV_EMAP2_2(m, type, arg)				\
+	, (long)_UK_EXECENV_REGS_GET(execenv, __syscall_rarg0)
 
-#define UK_EXECENV_EMAP2_4(m, type, arg) , (long)execenv->regs.__syscall_rarg1
+#define UK_EXECENV_EMAP2_4(m, type, arg)				\
+	, (long)_UK_EXECENV_REGS_GET(execenv, __syscall_rarg1)
 #define UK_EXECENV_EMAP4_4(m, type, arg, ...)				\
-	, (long)execenv->regs.__syscall_rarg0 UK_EXECENV_EMAP2_4(m, __VA_ARGS__)
+	, (long)_UK_EXECENV_REGS_GET(execenv, __syscall_rarg0)		\
+	UK_EXECENV_EMAP2_4(m, __VA_ARGS__)
 
-#define UK_EXECENV_EMAP2_6(m, type, arg) , (long)execenv->regs.__syscall_rarg2
+#define UK_EXECENV_EMAP2_6(m, type, arg)				\
+	, (long)_UK_EXECENV_REGS_GET(execenv, __syscall_rarg2)
 #define UK_EXECENV_EMAP4_6(m, type, arg, ...)				\
-	, (long)execenv->regs.__syscall_rarg1 UK_EXECENV_EMAP2_6(m, __VA_ARGS__)
+	, (long)_UK_EXECENV_REGS_GET(execenv, __syscall_rarg1)		\
+	UK_EXECENV_EMAP2_6(m, __VA_ARGS__)
 #define UK_EXECENV_EMAP6_6(m, type, arg, ...)				\
-	, (long)execenv->regs.__syscall_rarg0 UK_EXECENV_EMAP4_6(m, __VA_ARGS__)
+	, (long)_UK_EXECENV_REGS_GET(execenv, __syscall_rarg0)		\
+	UK_EXECENV_EMAP4_6(m, __VA_ARGS__)
 
-#define UK_EXECENV_EMAP2_8(m, type, arg) , (long)execenv->regs.__syscall_rarg3
+#define UK_EXECENV_EMAP2_8(m, type, arg)				\
+	, (long)_UK_EXECENV_REGS_GET(execenv, __syscall_rarg3)
 #define UK_EXECENV_EMAP4_8(m, type, arg, ...)				\
-	, (long)execenv->regs.__syscall_rarg2 UK_EXECENV_EMAP2_8(m, __VA_ARGS__)
+	, (long)_UK_EXECENV_REGS_GET(execenv, __syscall_rarg2)		\
+	UK_EXECENV_EMAP2_8(m, __VA_ARGS__)
 #define UK_EXECENV_EMAP6_8(m, type, arg, ...)				\
-	, (long)execenv->regs.__syscall_rarg1 UK_EXECENV_EMAP4_8(m, __VA_ARGS__)
+	, (long)_UK_EXECENV_REGS_GET(execenv, __syscall_rarg1)		\
+	UK_EXECENV_EMAP4_8(m, __VA_ARGS__)
 #define UK_EXECENV_EMAP8_8(m, type, arg, ...)				\
-	, (long)execenv->regs.__syscall_rarg0 UK_EXECENV_EMAP6_8(m, __VA_ARGS__)
+	, (long)_UK_EXECENV_REGS_GET(execenv, __syscall_rarg0)		\
+	UK_EXECENV_EMAP6_8(m, __VA_ARGS__)
 
-#define UK_EXECENV_EMAP2_10(m, type, arg) , (long)execenv->regs.__syscall_rarg4
+#define UK_EXECENV_EMAP2_10(m, type, arg)				\
+	, (long)_UK_EXECENV_REGS_GET(execenv, __syscall_rarg4)
 #define UK_EXECENV_EMAP4_10(m, type, arg, ...)				\
-	, (long)execenv->regs.__syscall_rarg3 UK_EXECENV_EMAP2_10(m, __VA_ARGS__)
+	, (long)_UK_EXECENV_REGS_GET(execenv, __syscall_rarg3)		\
+	UK_EXECENV_EMAP2_10(m, __VA_ARGS__)
 #define UK_EXECENV_EMAP6_10(m, type, arg, ...)				\
-	, (long)execenv->regs.__syscall_rarg2 UK_EXECENV_EMAP4_10(m, __VA_ARGS__)
+	, (long)_UK_EXECENV_REGS_GET(execenv, __syscall_rarg2)		\
+	UK_EXECENV_EMAP4_10(m, __VA_ARGS__)
 #define UK_EXECENV_EMAP8_10(m, type, arg, ...)				\
-	, (long)execenv->regs.__syscall_rarg1 UK_EXECENV_EMAP6_10(m, __VA_ARGS__)
+	, (long)_UK_EXECENV_REGS_GET(execenv, __syscall_rarg1)		\
+	UK_EXECENV_EMAP6_10(m, __VA_ARGS__)
 #define UK_EXECENV_EMAP10_10(m, type, arg, ...)				\
-	, (long)execenv->regs.__syscall_rarg0 UK_EXECENV_EMAP8_10(m, __VA_ARGS__)
+	, (long)_UK_EXECENV_REGS_GET(execenv, __syscall_rarg0)		\
+	UK_EXECENV_EMAP8_10(m, __VA_ARGS__)
 
-#define UK_EXECENV_EMAP2_12(m, type, arg) , (long)execenv->regs.__syscall_rarg5
+#define UK_EXECENV_EMAP2_12(m, type, arg)				\
+	, (long)_UK_EXECENV_REGS_GET(execenv, __syscall_rarg5)
 #define UK_EXECENV_EMAP4_12(m, type, arg, ...)				\
-	, (long)execenv->regs.__syscall_rarg4 UK_EXECENV_EMAP2_12(m, __VA_ARGS__)
+	, (long)_UK_EXECENV_REGS_GET(execenv, __syscall_rarg4)		\
+	UK_EXECENV_EMAP2_12(m, __VA_ARGS__)
 #define UK_EXECENV_EMAP6_12(m, type, arg, ...)				\
-	, (long)execenv->regs.__syscall_rarg3 UK_EXECENV_EMAP4_12(m, __VA_ARGS__)
+	, (long)_UK_EXECENV_REGS_GET(execenv, __syscall_rarg3)		\
+	UK_EXECENV_EMAP4_12(m, __VA_ARGS__)
 #define UK_EXECENV_EMAP8_12(m, type, arg, ...)				\
-	, (long)execenv->regs.__syscall_rarg2 UK_EXECENV_EMAP6_12(m, __VA_ARGS__)
+	, (long)_UK_EXECENV_REGS_GET(execenv, __syscall_rarg2)		\
+	UK_EXECENV_EMAP6_12(m, __VA_ARGS__)
 #define UK_EXECENV_EMAP10_12(m, type, arg, ...)				\
-	, (long)execenv->regs.__syscall_rarg1 UK_EXECENV_EMAP8_12(m, __VA_ARGS__)
+	, (long)_UK_EXECENV_REGS_GET(execenv, __syscall_rarg1)		\
+	UK_EXECENV_EMAP8_12(m, __VA_ARGS__)
 #define UK_EXECENV_EMAP12_12(m, type, arg, ...)				\
-	, (long)execenv->regs.__syscall_rarg0 UK_EXECENV_EMAP10_12(m, __VA_ARGS__)
+	, (long)_UK_EXECENV_REGS_GET(execenv, __syscall_rarg0)		\
+	UK_EXECENV_EMAP10_12(m, __VA_ARGS__)
 #define UK_EXECENV_EMAPx(execenv, nr_args, ...)				\
 	(long)execenv UK_CONCAT(UK_CONCAT(UK_EXECENV_EMAP, nr_args),	\
 		      _##nr_args)(__VA_ARGS__)

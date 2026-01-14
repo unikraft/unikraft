@@ -17,23 +17,23 @@ UK_LLSYSCALL_R_E_DEFINE(long, arch_prctl, long, code, long, addr, long, arg2)
 	switch (code) {
 	case ARCH_SET_GS:
 		uk_pr_debug("arch_prctl option SET_GS(%p)\n", (void *)addr);
-		ukarch_sysctx_set_gsbase(&execenv->sysctx, (__uptr)addr);
+		uk_lcpu_sysctx_set(execenv->sysctx, GSBASE, (__uptr)addr);
 		break;
 	case ARCH_SET_FS:
 		uk_pr_debug("arch_prctl option SET_FS(%p)\n", (void *)addr);
-		ukarch_sysctx_set_tlsp(&execenv->sysctx, (__uptr)addr);
+		uk_lcpu_sysctx_set(execenv->sysctx, FSBASE, (__uptr)addr);
 		break;
 	case ARCH_GET_GS:
 		uk_pr_debug("arch_prctl option GET_GS(%p)\n", (void *)addr);
 		if (unlikely(!addr))
 			return -EFAULT;
-		*((long *)addr) = ukarch_sysctx_get_gsbase(&execenv->sysctx);
+		*((long *)addr) = uk_lcpu_sysctx_get(execenv->sysctx, GSBASE);
 		break;
 	case ARCH_GET_FS:
 		uk_pr_debug("arch_prctl option GET_FS(%p)\n", (void *)addr);
 		if (unlikely(!addr))
 			return -EFAULT;
-		*((long *)addr) = ukarch_sysctx_get_tlsp(&execenv->sysctx);
+		*((long *)addr) = uk_lcpu_sysctx_get(execenv->sysctx, FSBASE);
 		break;
 	default:
 		uk_pr_debug("arch_prctl option code 0x%lx ignored\n", code);

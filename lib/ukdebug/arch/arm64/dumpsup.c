@@ -5,7 +5,7 @@
  * You may not use this file except in compliance with the License.
  */
 
-#include <uk/arch/lcpu.h>
+#include <uk/lcpu.h>
 #include <uk/essentials.h>
 
 #if CONFIG_LIBUKNOFAULT
@@ -14,7 +14,7 @@
 
 #include "../../crashdump.h"
 
-void cdmp_arch_print_registers(struct __regs *regs)
+void cdmp_arch_print_registers(struct uk_lcpu_regs *regs)
 {
 	crash_printk("Registers:\n");
 
@@ -31,7 +31,7 @@ void cdmp_arch_print_registers(struct __regs *regs)
 }
 
 #if CONFIG_LIBUKDEBUG_CRASH_PRINT_STACK
-void cdmp_arch_print_stack(struct __regs *regs)
+void cdmp_arch_print_stack(struct uk_lcpu_regs *regs)
 {
 	/* Nothing special to be done. Just call the generic version */
 	cdmp_gen_print_stack(regs->sp);
@@ -39,7 +39,7 @@ void cdmp_arch_print_stack(struct __regs *regs)
 #endif /* CONFIG_LIBUKDEBUG_CRASH_PRINT_STACK */
 
 #if CONFIG_LIBUKDEBUG_CRASH_PRINT_CALL_TRACE && !__OMIT_FRAMEPOINTER__
-void cdmp_arch_print_call_trace(struct __regs *regs)
+void cdmp_arch_print_call_trace(struct uk_lcpu_regs *regs)
 {
 	__u64 fp = regs->x[29];
 	__u64 *frame;

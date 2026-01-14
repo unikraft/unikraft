@@ -6,6 +6,7 @@ menuconfig LIBUKBOOT
 	select HAVE_BOOTENTRY
 	imply LIBUKBOOT_MAINTHREAD if HAVE_SHUTDOWN_DISPATCHER
 	imply LIBUKBOOT_SHUTDOWNREQ_HANDLER if HAVE_SHUTDOWN_DISPATCHER
+	select LIBUKLCPU
 	default y
 
 	# FIXME: binary buddy allocator is hard-coded for now

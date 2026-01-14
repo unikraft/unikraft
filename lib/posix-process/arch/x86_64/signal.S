@@ -5,9 +5,8 @@
  */
 
 #include <uk/asm.h>
-#include <uk/arch/lcpu.h>
+#include <uk/lcpu.h>
 #include <uk/arch/ctx.h>
-#include <uk/plat/common/lcpu.h>
 
 #include "../../signal/signal.h"
 
@@ -33,15 +32,15 @@ ENTRY(pprocess_signal_jmp_handler)
 	/*───────────────────────────────────────────────────────────────────*
 	 * Save uk sysctx                                                    *
 	 *───────────────────────────────────────────────────────────────────*/
-	subq	$(UKARCH_SYSCTX_SIZE), %rsp /* allocate space for struct */
+	subq	$(UK_LCPU_SYSCTX_SIZE), %rsp /* allocate space for struct */
 	andq	$~0xf, %rsp		    /* align rsp */
 	movq	%rsp, %rdi		    /* prepare args */
-	call	ukarch_sysctx_store	    /* save uk sysctx */
+	call	UK_LCPU_SYSCTX_STORE_FNSYM	    /* save uk sysctx */
 
 	/*───────────────────────────────────────────────────────────────────*
 	 * Align auxspcb->curr_fp.
 	 *───────────────────────────────────────────────────────────────────*/
-	movq	%gs:LCPU_AUXSP_OFFSET, %r10	/* get auxpcb */
+	movq	%gs:UK_LCPU_AUXSP_OFFSET, %r10	/* get auxpcb */
 	subq	$(UKARCH_AUXSPCB_SIZE - UKARCH_AUXSPCB_OFFSETOF_CURR_FP), %r10
 	pushq	(%r10)				/* save curr_fp */
 	pushq	%r10				/* also save its addr */
@@ -59,7 +58,7 @@ ENTRY(pprocess_signal_jmp_handler)
 	 * Switch to the application's sysctx                                *
 	 *───────────────────────────────────────────────────────────────────*/
 	leaq	UKARCH_EXECENV_OFFSETOF_SYSCTX(%r13), %rdi  /* &ee->sysctx in rdi */
-	call	ukarch_sysctx_load			    /* load app sysctx */
+	call	UK_LCPU_SYSCTX_LOAD_FNSYM		/* load app sysctx */
 
 	/*───────────────────────────────────────────────────────────────────*
 	 * Call signal handler                                               *
@@ -84,7 +83,7 @@ ENTRY(pprocess_signal_jmp_handler)
 	 * Restore uk sysctx                                                 *
 	 *───────────────────────────────────────────────────────────────────*/
 	movq	%rsp, %rdi		    /* prepare args */
-	call	ukarch_sysctx_load	    /* restore saved sysctx */
+	call	UK_LCPU_SYSCTX_LOAD_FNSYM	    /* restore saved sysctx */
 
 	movq	%rbp, %rsp  /* restore pre-aligned rsp */
 	popq	%r13

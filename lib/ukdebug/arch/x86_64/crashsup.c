@@ -6,14 +6,14 @@
 
 #include <uk/crash.h>
 #include <uk/essentials.h>
-#include <uk/plat/lcpu.h>
+#include <uk/lcpu.h>
 #include <x86/traps.h>
 
 #include "../../crashdump.h"
 
 extern __bool _uk_crash_explicit;
 
-void uk_crash_populate_descr(struct ukarch_trap_ctx *ctx,
+void uk_crash_populate_descr(struct uk_lcpu_except_err_ctx *ctx,
 			     struct uk_crash_descr *descr)
 {
 	if (_uk_crash_explicit) {
@@ -22,17 +22,18 @@ void uk_crash_populate_descr(struct ukarch_trap_ctx *ctx,
 		return;
 	}
 
-	if (ctx->trapnr == TRAP_page_fault) {
+	if (uk_lcpu_x86_64_except_err_ctx_get_trapnr(ctx) ==
+		UK_ARCH_TRAPNUM_PAGE_FAULT) {
 		descr->reason = UK_CRASH_REASON_PAGE_FAULT;
-		descr->uk_err = ctx->handler_err;
-		descr->arg1 = ctx->fault_address;
-		descr->arg2 = ctx->error_code;
+		descr->uk_err = uk_lcpu_except_err_ctx_get_handler_err(ctx);
+		descr->arg1 = uk_lcpu_except_err_ctx_get_fault_addr(ctx);
+		descr->arg2 = uk_lcpu_x86_64_except_err_ctx_get_error_code(ctx);
 		return;
 	}
 
 	descr->reason = UK_CRASH_REASON_UNHANDLED_TRAP;
 	descr->uk_err = 0;
-	descr->arg1 = ctx->trapnr;
-	descr->arg2 = (__u64)ctx->str;
-	descr->arg3 = ctx->error_code;
+	descr->arg1 = uk_lcpu_x86_64_except_err_ctx_get_trapnr(ctx);
+	descr->arg2 = (__u64)uk_lcpu_except_err_ctx_get_str(ctx);
+	descr->arg3 = uk_lcpu_x86_64_except_err_ctx_get_error_code(ctx);
 }

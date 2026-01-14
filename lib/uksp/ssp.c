@@ -31,7 +31,7 @@
  */
 
 #include <uk/arch/limits.h>
-#include <uk/arch/lcpu.h>
+#include <uk/lcpu.h>
 #include <uk/assert.h>
 #include <uk/config.h>
 #include <uk/ctors.h>

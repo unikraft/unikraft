@@ -102,21 +102,21 @@ void uk_sched_thread_switch(struct uk_thread *next)
 {
 	struct uk_thread *prev;
 
-	prev = ukplat_per_lcpu_current(__uk_sched_thread_current);
+	prev = uk_per_lcpu_current(__uk_sched_thread_current);
 
 	UK_ASSERT(prev);
 
-	ukplat_per_lcpu_current(__uk_sched_thread_current) = next;
+	uk_per_lcpu_current(__uk_sched_thread_current) = next;
 
-	prev->tlsp = ukplat_tlsp_get();
+	prev->tlsp = uk_lcpu_tlsp_get();
 
 	/* Load next TLS and extended registers before context switch.
 	 * This avoids requiring special initialization code for newly
 	 * created threads to do the loading.
 	 */
-	ukplat_tlsp_set(next->tlsp);
+	uk_lcpu_tlsp_set(next->tlsp);
 
-	ukplat_lcpu_set_auxsp(next->auxsp);
+	uk_lcpu_set_auxsp(next->auxsp);
 
 	/**
 	 * NOTE: There is also prev->ectx/next->ectx! Since we only have

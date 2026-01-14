@@ -10,6 +10,7 @@
 #include <uk/event.h>
 #include <uk/config.h>
 #include <uk/paging.h>
+#include <uk/lcpu.h>
 
 #include "arch/maccess.h"
 
@@ -44,27 +45,32 @@ typedef int nf_paging_state_t;
 
 /* Must be a library global symbol so that the linker can resolve it */
 int __used nf_mf_handler(const struct nf_excpttab_entry *e,
-			 struct ukarch_trap_ctx *ctx)
+			 struct uk_lcpu_except_err_ctx *ctx)
 {
+	struct uk_lcpu_regs *regs;
+
 	/* Just continue execution at the fault label */
-	nf_regs_ip(ctx->regs) = nf_excpttab_get_cont_ip(e);
+	regs = uk_lcpu_except_err_ctx_get_regs(ctx);
+	uk_lcpu_regs_set(regs, PC, nf_excpttab_get_cont_ip(e));
 
 	return UK_EVENT_HANDLED;
 }
 
 static int nf_mem_fault_handler(void *data)
 {
-	struct ukarch_trap_ctx *ctx = (struct ukarch_trap_ctx *)data;
+	struct uk_lcpu_except_err_ctx *ctx = data;
 
-	return nf_handle_trap(nf_regs_ip(ctx->regs), ctx);
+	return nf_handle_trap(nf_regs_ip(uk_lcpu_except_err_ctx_get_regs(ctx)),
+			      ctx);
 }
 
-UK_EVENT_HANDLER_PRIO(UKARCH_TRAP_PAGE_FAULT, nf_mem_fault_handler,
+UK_EVENT_HANDLER_PRIO(UK_LCPU_EXCEPT_EVENT_ERR_PAGE_FAULT, nf_mem_fault_handler,
 		      CONFIG_LIBUKNOFAULT_FAULT_PRIO);
-UK_EVENT_HANDLER_PRIO(UKARCH_TRAP_BUS_ERROR,  nf_mem_fault_handler,
+UK_EVENT_HANDLER_PRIO(UK_LCPU_EXCEPT_EVENT_ERR_BUS_ERROR,  nf_mem_fault_handler,
 		      CONFIG_LIBUKNOFAULT_FAULT_PRIO);
 #ifdef CONFIG_ARCH_X86_64
-UK_EVENT_HANDLER_PRIO(UKARCH_TRAP_X86_GP,     nf_mem_fault_handler,
+UK_EVENT_HANDLER_PRIO(UK_LCPU_X86_64_EXCEPT_EVENT_ERR_GP_FAULT,
+		      nf_mem_fault_handler,
 		      CONFIG_LIBUKNOFAULT_FAULT_PRIO);
 #endif /* CONFIG_ARCH_X86_64 */
 

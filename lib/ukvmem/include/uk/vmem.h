@@ -189,7 +189,7 @@ struct uk_vm_fault {
 	const unsigned int level;
 
 	/** Trap frame */
-	struct __regs *regs;
+	struct uk_lcpu_regs *regs;
 #endif /* CONFIG_LIBUKPAGING */
 };
 

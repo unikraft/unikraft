@@ -39,7 +39,7 @@
 #include <uk/print.h>
 #include <uk/config.h>
 #include <uk/assert.h>
-#include <uk/plat/lcpu.h>
+#include <uk/lcpu.h>
 #include <uk/atomic.h>
 #include <uk/essentials.h>
 #include <uk/preempt.h>

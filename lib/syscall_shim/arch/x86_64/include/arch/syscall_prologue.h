@@ -46,9 +46,9 @@
 		"/* Auxiliary stack is already ECTX aligned */\n\t"	\
 		"/* Make room for `struct UKARCH_EXECENV` */\n\t"	\
 		"subq	$(" STRINGIFY(UKARCH_EXECENV_SIZE -		\
-				     __REGS_SIZEOF)" ), %rsp\n\t"	\
+				     UK_LCPU_REGS_SIZE)" ), %rsp\n\t"\
 		"/* Now build stack frame beginning with 5 pointers\n\t"\
-		" * in the classical iretq/`struct __regs` format\n\t"	\
+		" * in the classical iretq/`struct uk_lcpu_regs` format\n\t"\
 		" */\n\t"						\
 		"/* Push stack segment, GDT data segment selector:\n\t"	\
 		" * [15: 3]: Selector Index - second GDT entry\n\t"	\
@@ -87,7 +87,7 @@
 		" */\n\t"						\
 		"movq	(%r11), %r11\n\t"				\
 		"pushq	%r11\n\t"					\
-		"/* Now just push the rest of `struct __regs` */\n\t"	\
+		"/* Now just push the rest of `struct uk_lcpu_regs` */\n\t"\
 		"pushq	%rax\n\t"					\
 		"pushq	%rdi\n\t"					\
 		"pushq	%rsi\n\t"					\
@@ -104,20 +104,22 @@
 		"pushq	%r13\n\t"					\
 		"pushq	%r14\n\t"					\
 		"pushq	%r15\n\t"					\
-		"subq	$(" STRINGIFY(__REGS_PAD_SIZE) "), %rsp\n\t"	\
+		"subq	$(" STRINGIFY(UK_LCPU_X86_64_REGS_OFFSETOF_R15)	\
+			"), %rsp\n\t"					\
 		"/* ECTX at slot w.r.t. `struct UKARCH_EXECENV` */\n\t" \
 		"movq	%rsp, %rdi\n\t"					\
-		"addq	$(" STRINGIFY(__REGS_SIZEOF +			\
-				     UKARCH_SYSCTX_SIZE) "), %rdi\n\t"	\
-		"call	ukarch_ectx_store\n\t"				\
+		"addq	$(" STRINGIFY(UK_LCPU_REGS_SIZE +		\
+				     UK_LCPU_SYSCTX_SIZE) "), %rdi\n\t"\
+		"call	" STRINGIFY(UK_LCPU_ECTX_STORE_FNSYM) "\n\t"	\
 		"/* SYSCTX at slot w.r.t. `struct UKARCH_EXECENV` */\n\t"\
 		"movq	%rsp, %rdi\n\t"					\
-		"addq	$(" STRINGIFY(__REGS_SIZEOF) "), %rdi\n\t"	\
-		"call	ukarch_sysctx_store\n\t"			\
+		"addq	$(" STRINGIFY(UK_LCPU_REGS_SIZE) "), %rdi\n\t"	\
+		"call	" STRINGIFY(UK_LCPU_SYSCTX_STORE_FNSYM) "\n\t"	\
 		"movq	%rsp, %rdi\n\t"					\
 		"sti\n\t"						\
 		"call	" STRINGIFY(fname) "\n\t"			\
-		"addq	$(" STRINGIFY(__REGS_PAD_SIZE) "), %rsp\n\t"	\
+		"addq	$(" STRINGIFY(UK_LCPU_X86_64_REGS_OFFSETOF_R15)	\
+			"), %rsp\n\t"					\
 		"/* Only restore callee preserved regs (ABI) */\n\t"	\
 		"popq	%r15\n\t"					\
 		"popq	%r14\n\t"					\

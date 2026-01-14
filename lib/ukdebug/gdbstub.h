@@ -9,11 +9,11 @@
 #define __UKDEBUG_GDBSTUB_H__
 
 #include <uk/config.h>
-#include <uk/arch/lcpu.h>
+#include <uk/lcpu.h>
 
 #define GDB_DBG_CONT    0x0001	/* Continue execution */
 #define GDB_DBG_STEP    0x0002	/* Single-step one instruction */
 
-int gdb_dbg_trap(int errnr, struct __regs *regs);
+int gdb_dbg_trap(int errnr, struct uk_lcpu_regs *regs);
 
 #endif /* __UKDEBUG_GDBSTUB_H__ */

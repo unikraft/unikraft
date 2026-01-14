@@ -13,26 +13,32 @@
 #include <uk/arch.h>
 #include <uk/assert.h>
 #include <uk/bitops.h>
+#include <uk/event.h>
 #include <uk/isr/string.h>
-#include <uk/plat/lcpu.h>
+#include <uk/lcpu.h>
 
 /* We get here via traps raised by the platform
  * TODO: Once the crash screen PR is merged, crashes can land us here
  * too, if the "enter debugger on crash" feature is enabled.
  */
-static int gdb_arch_dbg_trap(int errnr, struct __regs *regs)
+static int gdb_arch_dbg_trap(int errnr, struct uk_lcpu_regs *regs)
 {
+	__u64 eflags;
 	int r;
 
+	eflags =  uk_lcpu_regs_get(regs, RFLAGS);
+
 	/* Unset trap flag, i.e., continue */
-	regs->eflags &= ~UK_ARCH_RFLAGS_TF;
+	eflags &= ~UK_ARCH_RFLAGS_TF;
 
 	r = gdb_dbg_trap(errnr, regs);
 	if (r < 0) {
 		return r;
 	} else if (r == GDB_DBG_STEP) { /* Single step */
-		regs->eflags |= UK_ARCH_RFLAGS_TF;
+		eflags |= UK_ARCH_RFLAGS_TF;
 	}
+
+	uk_lcpu_regs_set(regs, RFLAGS, eflags);
 
 	return 0;
 }
@@ -40,48 +46,50 @@ static int gdb_arch_dbg_trap(int errnr, struct __regs *regs)
 static int gdb_arch_debug_handler(void *data)
 {
 	int r;
-	struct ukarch_trap_ctx *ctx = (struct ukarch_trap_ctx *)data;
+	struct uk_lcpu_except_err_ctx *ctx = data;
 
-	if ((r = gdb_arch_dbg_trap(5 /* SIGTRAP */, ctx->regs)) < 0)
+	if ((r = gdb_arch_dbg_trap(5 /* SIGTRAP */,
+				   (struct uk_lcpu_regs *)
+				   uk_lcpu_except_err_ctx_get(ctx, REGS))) < 0)
 		return r;
 	else
 		return UK_EVENT_HANDLED;
 }
 
-UK_EVENT_HANDLER(UKARCH_TRAP_DEBUG, gdb_arch_debug_handler);
+UK_EVENT_HANDLER(UK_LCPU_EXCEPT_EVENT_DEBUG, gdb_arch_debug_handler);
 
-/* This table maps struct __regs to the gdb register file */
+/* This table maps struct uk_lcpu_regs to the gdb register file */
 static struct {
 	unsigned int offset;
 	unsigned int length;
 } gdb_register_map[] = {
-	{__REGS_OFFSETOF_RAX, 8},
-	{__REGS_OFFSETOF_RBX, 8},
-	{__REGS_OFFSETOF_RCX, 8},
-	{__REGS_OFFSETOF_RDX, 8},
-	{__REGS_OFFSETOF_RSI, 8},
-	{__REGS_OFFSETOF_RDI, 8},
-	{__REGS_OFFSETOF_RBP, 8},
-	{__REGS_OFFSETOF_RSP, 8},
-	{__REGS_OFFSETOF_R8, 8},
-	{__REGS_OFFSETOF_R9, 8},
-	{__REGS_OFFSETOF_R10, 8},
-	{__REGS_OFFSETOF_R11, 8},
-	{__REGS_OFFSETOF_R12, 8},
-	{__REGS_OFFSETOF_R13, 8},
-	{__REGS_OFFSETOF_R14, 8},
-	{__REGS_OFFSETOF_R15, 8},
+	{UK_LCPU_X86_64_REGS_OFFSETOF_RAX, 8},
+	{UK_LCPU_X86_64_REGS_OFFSETOF_RBX, 8},
+	{UK_LCPU_X86_64_REGS_OFFSETOF_RCX, 8},
+	{UK_LCPU_X86_64_REGS_OFFSETOF_RDX, 8},
+	{UK_LCPU_X86_64_REGS_OFFSETOF_RSI, 8},
+	{UK_LCPU_X86_64_REGS_OFFSETOF_RDI, 8},
+	{UK_LCPU_X86_64_REGS_OFFSETOF_RBP, 8},
+	{UK_LCPU_X86_64_REGS_OFFSETOF_RSP, 8},
+	{UK_LCPU_X86_64_REGS_OFFSETOF_R8, 8},
+	{UK_LCPU_X86_64_REGS_OFFSETOF_R9, 8},
+	{UK_LCPU_X86_64_REGS_OFFSETOF_R10, 8},
+	{UK_LCPU_X86_64_REGS_OFFSETOF_R11, 8},
+	{UK_LCPU_X86_64_REGS_OFFSETOF_R12, 8},
+	{UK_LCPU_X86_64_REGS_OFFSETOF_R13, 8},
+	{UK_LCPU_X86_64_REGS_OFFSETOF_R14, 8},
+	{UK_LCPU_X86_64_REGS_OFFSETOF_R15, 8},
 
-	{__REGS_OFFSETOF_RIP, 8},
-	{__REGS_OFFSETOF_EFLAGS, 4},
+	{UK_LCPU_X86_64_REGS_OFFSETOF_RIP, 8},
+	{UK_LCPU_X86_64_REGS_OFFSETOF_RFLAGS, 4},
 
-	{__REGS_OFFSETOF_CS, 4},
-	{__REGS_OFFSETOF_SS, 4}
+	{UK_LCPU_X86_64_REGS_OFFSETOF_CS, 4},
+	{UK_LCPU_X86_64_REGS_OFFSETOF_SS, 4}
 };
 
 #define GDB_REGISTER_MAP_COUNT ARRAY_SIZE(gdb_register_map)
 
-__ssz gdb_arch_read_register(int regnr, struct __regs *regs,
+__ssz gdb_arch_read_register(int regnr, struct uk_lcpu_regs *regs,
 			     void *buf, __sz buf_len __maybe_unused)
 {
 	if (unlikely(regnr < 0))
@@ -136,7 +144,7 @@ __ssz gdb_arch_read_register(int regnr, struct __regs *regs,
 	return -EINVAL;
 }
 
-__ssz gdb_arch_write_register(int regnr, struct __regs *regs,
+__ssz gdb_arch_write_register(int regnr, struct uk_lcpu_regs *regs,
 			      void *buf, __sz buf_len)
 {
 	if (unlikely(regnr < 0))

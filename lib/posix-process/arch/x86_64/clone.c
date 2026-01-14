@@ -5,15 +5,16 @@
  */
 
 #include <string.h>
-#include <uk/plat/common/cpu.h>
 #include <uk/process.h>
 #include <uk/arch/ctx.h>
+#include <uk/lcpu.h>
 
 void clone_setup_child_ctx(struct ukarch_execenv *pexecenv,
 			   struct uk_thread *child, __uptr sp)
 {
 	struct ukarch_execenv *cexecenv;
 	struct ukarch_auxspcb *auxspcb;
+	__u64 gsbase, fsbase;
 	__uptr auxsp_pos;
 
 	UK_ASSERT(pexecenv);
@@ -40,19 +41,22 @@ void clone_setup_child_ctx(struct ukarch_execenv *pexecenv,
 	*cexecenv = *pexecenv;
 
 	/* Child must see %rax as 0 */
-	cexecenv->regs.rax = 0x0;
+	uk_lcpu_regs_set(cexecenv->regs, RAX, 0x0);
 
 	/* Use new stack pointer */
-	cexecenv->regs.rsp = sp;
+	uk_lcpu_regs_set(cexecenv->regs, RSP, sp);
 
 	/* Use parent's userland gsbase */
-	cexecenv->sysctx.gsbase = pexecenv->sysctx.gsbase;
+	gsbase = uk_lcpu_sysctx_get(pexecenv->sysctx, GSBASE);
+	uk_lcpu_sysctx_set(cexecenv->sysctx, GSBASE, gsbase);
 
 	/* Use parent's fsbase if clone did not have SETTLS */
 	if (!child->tlsp)
-		cexecenv->sysctx.fsbase = pexecenv->sysctx.fsbase;
+		fsbase = uk_lcpu_sysctx_get(pexecenv->sysctx, FSBASE);
 	else
-		cexecenv->sysctx.fsbase = child->tlsp;
+		fsbase = child->tlsp;
+
+	uk_lcpu_sysctx_set(cexecenv->sysctx, FSBASE, fsbase);
 
 	ukarch_ctx_init_entry1(&child->ctx,
 			       auxsp_pos,

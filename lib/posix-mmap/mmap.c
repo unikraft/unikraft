@@ -13,7 +13,7 @@
 #include <uk/syscall.h>
 #include <uk/essentials.h>
 #include <uk/arch/limits.h>
-#include <uk/arch/lcpu.h>
+#include <uk/lcpu.h>
 #include <uk/vmem.h>
 
 #if CONFIG_LIBPOSIX_FDTAB

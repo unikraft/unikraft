@@ -8,12 +8,11 @@
 #include <stdarg.h>
 #include <stddef.h>
 
-#include <uk/arch/traps.h>
 #include <uk/config.h>
 #include <uk/crash.h>
 #include <uk/essentials.h>
 #include <uk/event.h>
-#include <uk/plat/lcpu.h>
+#include <uk/lcpu.h>
 #include <uk/plat/bootstrap.h>
 #include <uk/plat/time.h>
 #include <uk/preempt.h>
@@ -82,20 +81,21 @@ __noreturn static void crash_shutdown(void)
 
 UK_EVENT(UK_CRASH_EVENT);
 
-__noreturn void _uk_crash(struct __regs *regs, struct uk_crash_descr *descr)
+__noreturn void _uk_crash(struct uk_lcpu_regs *regs,
+			  struct uk_crash_descr *descr)
 {
 	struct uk_crash_event_param param;
 #if HAVE_SMP
 	static __s32 crash_cpu = -1;
-	int cpu_id = ukplat_lcpu_id();
+	int cpu_id = uk_lcpu_id();
 #endif /* HAVE_SMP */
 
 	UK_ASSERT(regs);
 	UK_ASSERT(descr);
 
-	ukplat_lcpu_disable_irq();
+	uk_lcpu_disable_irq();
 	uk_preempt_disable();
-	ukarch_push_nested_exceptions();
+	uk_lcpu_except_push_nested();
 
 #if HAVE_SMP
 	#warning The crash code does not support multicore systems
@@ -106,7 +106,7 @@ __noreturn void _uk_crash(struct __regs *regs, struct uk_crash_descr *descr)
 		 * Freeze CPU or wait until the crash_cpu initiates a freeze
 		 * (e.g., through IPI). For now, just busy wait.
 		 */
-		ukplat_lcpu_halt();
+		uk_lcpu_halt();
 	}
 #endif /* HAVE_SMP */
 
@@ -134,20 +134,21 @@ __noreturn void _uk_crash(struct __regs *regs, struct uk_crash_descr *descr)
 static int uk_crash_handler(void *data)
 {
 	struct uk_crash_descr descr;
-	struct ukarch_trap_ctx *ctx;
+	struct uk_lcpu_except_err_ctx *ctx;
 
-	ctx = (struct ukarch_trap_ctx *)data;
+	ctx = data;
 	UK_ASSERT(ctx);
 
-	ukplat_lcpu_disable_irq();
+	uk_lcpu_disable_irq();
 	uk_preempt_disable();
 
 	/* Fill-in arch-specific event param from ctx */
 	uk_crash_populate_descr(ctx, &descr);
 
-	_uk_crash(ctx->regs, &descr);
+	_uk_crash(uk_lcpu_except_err_ctx_get_regs(ctx),
+		  &descr);
 	UK_BUG(); /* noreturn */
 }
 
-UK_EVENT_HANDLER_PRIO(UK_EVENT_UNHANDLED_EXCEPTION, uk_crash_handler,
+UK_EVENT_HANDLER_PRIO(UK_LCPU_EXCEPT_EVENT_UNHANDLED, uk_crash_handler,
 		      UK_PRIO_LATEST);

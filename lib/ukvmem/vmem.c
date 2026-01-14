@@ -1009,7 +1009,7 @@ struct mapx_pagefault_ctx {
 	/** Type of the fault */
 	unsigned int type;
 	/** Trap frame */
-	struct __regs *regs;
+	struct uk_lcpu_regs *regs;
 	/** VMA in which the fault happens */
 	struct uk_vma *vma;
 };
@@ -1050,7 +1050,8 @@ static int vmem_mapx_pagefault(struct uk_pagetable *pt __unused,
 	return 0;
 }
 
-int vmem_pagefault(__vaddr_t vaddr, unsigned int type, struct __regs *regs)
+int vmem_pagefault(__vaddr_t vaddr, unsigned int type,
+		   struct uk_lcpu_regs *regs)
 {
 	const unsigned int demand_lvl =
 		UK_PAGING_PAGE_SHIFT_Lx(CONFIG_LIBUKVMEM_DEMAND_PAGE_IN_SIZE);

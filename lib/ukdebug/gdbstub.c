@@ -7,7 +7,7 @@
 
 #include "gdbstub.h"
 #include <gdbsup.h>
-#include <uk/plat/lcpu.h>
+#include <uk/lcpu.h>
 
 #include <uk/assert.h>
 #include <uk/essentials.h>
@@ -28,7 +28,7 @@
 #include <stddef.h>
 
 struct gdb_excpt_ctx {
-	struct __regs *regs;
+	struct uk_lcpu_regs *regs;
 	int errnr;
 };
 
@@ -716,7 +716,7 @@ static int gdb_handle_step_cont(char *buf, __sz buf_len,
 			return 0;
 		}
 
-		ukarch_regs_set_pc(addr, g->regs);
+		uk_lcpu_regs_set(g->regs, PC, addr);
 	}
 
 	return 1;
@@ -745,7 +745,7 @@ static int gdb_handle_step_cont_sig(char *buf, __sz buf_len,
 			return 0;
 		}
 
-		ukarch_regs_set_pc(addr, g->regs);
+		uk_lcpu_regs_set(g->regs, PC, addr);
 	}
 
 	return 1;
@@ -1121,9 +1121,9 @@ static __ssz gdb_virt_out(struct uk_console *dev __unused, const char *str,
 		 * This shouldn't happen, but it's better to be safe than
 		 * sorry on this.
 		 */
-		irqs = ukplat_lcpu_save_irqf();
+		irqs = uk_lcpu_save_irqf();
 		gdb_send_message_packet(str, len);
-		ukplat_lcpu_restore_irqf(irqs);
+		uk_lcpu_restore_irqf(irqs);
 	}
 
 	return len;
@@ -1133,7 +1133,7 @@ static struct uk_console_ops gdb_virt_ops = { .out = gdb_virt_out };
 
 static struct uk_console gdb_virt_console;
 
-int gdb_dbg_trap(int errnr, struct __regs *regs)
+int gdb_dbg_trap(int errnr, struct uk_lcpu_regs *regs)
 {
 	struct gdb_excpt_ctx g = {regs, errnr};
 	static int nest_cnt;
@@ -1155,18 +1155,18 @@ int gdb_dbg_trap(int errnr, struct __regs *regs)
 	 * in the debugger code itself or if we set a breakpoint in code
 	 * called by the debugger.
 	 */
-#ifdef UKPLAT_LCPU_MULTICORE
+#ifdef LIBUKLCPU_MULTICORE
 #warning The GDB stub does not support multicore systems
 #endif
 
-	irqs = ukplat_lcpu_save_irqf();
+	irqs = uk_lcpu_save_irqf();
 	if (nest_cnt > 0) {
-		ukplat_lcpu_restore_irqf(irqs);
+		uk_lcpu_restore_irqf(irqs);
 		return GDB_DBG_CONT;
 	}
 
 	if (!gdb_backing_console) {
-		ukplat_lcpu_restore_irqf(irqs);
+		uk_lcpu_restore_irqf(irqs);
 		return -ENODEV;
 	}
 
@@ -1174,7 +1174,7 @@ int gdb_dbg_trap(int errnr, struct __regs *regs)
 	r = gdb_main_loop(&g);
 	nest_cnt--;
 
-	ukplat_lcpu_restore_irqf(irqs);
+	uk_lcpu_restore_irqf(irqs);
 
 	return r;
 }

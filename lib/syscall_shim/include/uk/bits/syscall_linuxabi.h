@@ -1,7 +1,7 @@
 #ifndef __LIBSYSCALL_SHIM_SYSCALL_LINUXABI_H__
 #define __LIBSYSCALL_SHIM_SYSCALL_LINUXABI_H__
 
-#include <uk/arch/lcpu.h>
+#include <uk/lcpu.h>
 
 /*
  * Mappings of `struct __reg` register fields
@@ -14,17 +14,17 @@
  */
 
 #if (defined __X86_64__)
-#define __syscall_rip		rcx
-#define __syscall_rsyscall	orig_rax
-#define __syscall_rarg0		rdi
-#define __syscall_rarg1		rsi
-#define __syscall_rarg2		rdx
-#define __syscall_rarg3		r10
-#define __syscall_rarg4		r8
-#define __syscall_rarg5		r9
+#define __syscall_rip		RCX
+#define __syscall_rsyscall	ORIG_RAX
+#define __syscall_rarg0		RDI
+#define __syscall_rarg1		RSI
+#define __syscall_rarg2		RDX
+#define __syscall_rarg3		R10
+#define __syscall_rarg4		R8
+#define __syscall_rarg5		R9
 
-#define __syscall_rret0		rax
-#define __syscall_rret1		rdx
+#define __syscall_rret0		RAX
+#define __syscall_rret1		RDX
 
 #elif (defined __ARM_64__)
 #define __syscall_rip		elr_el1

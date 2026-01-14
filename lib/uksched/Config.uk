@@ -5,6 +5,7 @@ menuconfig LIBUKSCHED
 	select LIBUKDEBUG
 	select LIBUKALLOC
 	select HAVE_SCHED
+	select LIBUKLCPU
 
 if LIBUKSCHED
 

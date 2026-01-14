@@ -39,14 +39,14 @@
 #include <uk/plat/config.h>
 #include <uk/plat/time.h>
 #include <uk/alloc.h>
-#include <uk/plat/lcpu.h>
+#include <uk/lcpu.h>
 #include <uk/sched.h>
 #include <uk/syscall.h>
 #include <uk/wait.h>
 
 struct uk_sched *uk_sched_head;
 
-UKPLAT_PER_LCPU_DEFINE(struct uk_thread *, __uk_sched_thread_current);
+UK_PER_LCPU_DEFINE(struct uk_thread *, __uk_sched_thread_current);
 
 int uk_sched_register(struct uk_sched *s)
 {
@@ -215,8 +215,8 @@ int uk_sched_start(struct uk_sched *s)
 	 * NOTE: We assume that if we have a TLS pointer, it points to
 	 *       an TLS that is derived from the Unikraft TLS template.
 	 */
-	tlsp = ukplat_tlsp_get();
-	auxsp = ukplat_lcpu_get_auxsp();
+	tlsp = uk_lcpu_tlsp_get();
+	auxsp = uk_lcpu_get_auxsp();
 	main_thread = uk_thread_create_bare(s->a,
 					    0x0, 0x0, auxsp,
 					    tlsp, !(!tlsp), false,
@@ -234,7 +234,7 @@ int uk_sched_start(struct uk_sched *s)
 	uk_thread_set_runnable(main_thread);
 
 	/* Set main_thread as current scheduled thread */
-	ukplat_per_lcpu_current(__uk_sched_thread_current) = main_thread;
+	uk_per_lcpu_current(__uk_sched_thread_current) = main_thread;
 
 	/* Add main to the scheduler's thread list */
 	UK_TAILQ_INSERT_TAIL(&s->thread_list, main_thread, thread_list);
@@ -254,7 +254,7 @@ int uk_sched_start(struct uk_sched *s)
 	return 0;
 
 err_unset_thread_current:
-	ukplat_per_lcpu_current(__uk_sched_thread_current) = NULL;
+	uk_per_lcpu_current(__uk_sched_thread_current) = NULL;
 	uk_thread_release(main_thread);
 err_out:
 	return ret;
@@ -362,7 +362,7 @@ int uk_sched_thread_add(struct uk_sched *s, struct uk_thread *t)
 	UK_ASSERT(t);
 	UK_ASSERT(!t->sched);
 
-	flags = ukplat_lcpu_save_irqf();
+	flags = uk_lcpu_save_irqf();
 
 	rc = s->thread_add(s, t);
 	if (rc < 0)
@@ -371,7 +371,7 @@ int uk_sched_thread_add(struct uk_sched *s, struct uk_thread *t)
 	t->sched = s;
 	UK_TAILQ_INSERT_TAIL(&s->thread_list, t, thread_list);
 out:
-	ukplat_lcpu_restore_irqf(flags);
+	uk_lcpu_restore_irqf(flags);
 	return rc;
 }
 
@@ -383,12 +383,12 @@ int uk_sched_thread_remove(struct uk_thread *t)
 	UK_ASSERT(t);
 	UK_ASSERT(t->sched);
 
-	flags = ukplat_lcpu_save_irqf();
+	flags = uk_lcpu_save_irqf();
 	s = t->sched;
 	s->thread_remove(s, t);
 	t->sched = NULL;
 	UK_TAILQ_REMOVE(&s->thread_list, t, thread_list);
-	ukplat_lcpu_restore_irqf(flags);
+	uk_lcpu_restore_irqf(flags);
 	return 0;
 }
 

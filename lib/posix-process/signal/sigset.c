@@ -7,7 +7,7 @@
 #include <errno.h>
 #include <signal.h>
 
-#include <uk/arch/lcpu.h> /* unlikely */
+#include <uk/lcpu.h> /* unlikely */
 
 #include "sigset.h"
 

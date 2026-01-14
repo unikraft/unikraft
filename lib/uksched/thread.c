@@ -36,7 +36,6 @@
 #include <errno.h>
 #include <uk/plat/config.h>
 #include <uk/plat/time.h>
-#include <uk/plat/tls.h>
 #include <uk/thread.h>
 #include <uk/tcb_impl.h>
 #include <uk/sched.h>
@@ -146,7 +145,7 @@ static int _uk_thread_call_inittab(struct uk_thread *child)
 			    child, child->name ? child->name : "<unnamed>",
 			    *itr->init);
 		init_args.init = itr->init;
-		ret = ukplat_tlsp_exec(child->uktlsp, _inittab_call_init,
+		ret = ukarch_tlsp_exec(child->uktlsp, _inittab_call_init,
 				       &init_args);
 		if (ret < 0)
 			goto err;
@@ -163,7 +162,7 @@ err:
 			     || (itr->flags & child->flags) != itr->flags))
 			continue;
 		term_args.term = itr->term;
-		ukplat_tlsp_exec(child->uktlsp, _inittab_call_term, &term_args);
+		ukarch_tlsp_exec(child->uktlsp, _inittab_call_term, &term_args);
 	}
 out:
 	return ret;
@@ -212,7 +211,7 @@ static int _uk_thread_call_termtab(struct uk_thread *child)
 			    ? child->name : "<unnamed>",
 			    *itr->term);
 		term_args.term = itr->term;
-		ukplat_tlsp_exec(child->uktlsp, _inittab_call_term, &term_args);
+		ukarch_tlsp_exec(child->uktlsp, _inittab_call_term, &term_args);
 	}
 
 	return ret;
@@ -232,7 +231,7 @@ static void _uk_thread_struct_init(struct uk_thread *t,
 				   uintptr_t auxsp,
 				   uintptr_t tlsp,
 				   bool is_uktls,
-				   struct ukarch_ectx *ectx,
+				   struct uk_lcpu_ectx *ectx,
 				   const char *name,
 				   void *priv,
 				   uk_thread_dtor_t dtor)
@@ -262,14 +261,14 @@ static void _uk_thread_struct_init(struct uk_thread *t,
 		t->uktlsp = tlsp;
 	}
 	if (ectx) {
-		ukarch_ectx_init(t->ectx);
+		uk_lcpu_ectx_init(t->ectx);
 		t->flags |= UK_THREADF_ECTX;
 	}
 
 	if (t->flags & UK_THREADF_UKTLS && t->flags & UK_THREADF_AUXSP) {
 		auxspcb = ukarch_auxsp_get_cb(auxsp);
 		UK_ASSERT(auxspcb);
-		ukarch_sysctx_set_tlsp(&auxspcb->uksysctx, t->uktlsp);
+		uk_lcpu_sysctx_set(auxspcb->uksysctx, TLSP, t->uktlsp);
 	}
 
 	uk_pr_debug("uk_thread %p (%s): ctx:%p, ectx:%p, tlsp:%p\n",
@@ -283,7 +282,7 @@ int uk_thread_init_bare(struct uk_thread *t,
 			uintptr_t auxsp,
 			uintptr_t tlsp,
 			bool is_uktls,
-			struct ukarch_ectx *ectx,
+			struct uk_lcpu_ectx *ectx,
 			const char *name,
 			void *priv,
 			uk_thread_dtor_t dtor)
@@ -307,7 +306,7 @@ int uk_thread_init_bare_fn0(struct uk_thread *t,
 			    uintptr_t auxsp,
 			    uintptr_t tlsp,
 			    bool is_uktls,
-			    struct ukarch_ectx *ectx,
+			    struct uk_lcpu_ectx *ectx,
 			    const char *name,
 			    void *priv,
 			    uk_thread_dtor_t dtor)
@@ -333,7 +332,7 @@ int uk_thread_init_bare_fn1(struct uk_thread *t,
 			    uintptr_t auxsp,
 			    uintptr_t tlsp,
 			    bool is_uktls,
-			    struct ukarch_ectx *ectx,
+			    struct uk_lcpu_ectx *ectx,
 			    const char *name,
 			    void *priv,
 			    uk_thread_dtor_t dtor)
@@ -360,7 +359,7 @@ int uk_thread_init_bare_fn2(struct uk_thread *t,
 			    uintptr_t auxsp,
 			    uintptr_t tlsp,
 			    bool is_uktls,
-			    struct ukarch_ectx *ectx,
+			    struct uk_lcpu_ectx *ectx,
 			    const char *name,
 			    void *priv,
 			    uk_thread_dtor_t dtor)
@@ -388,7 +387,7 @@ static int _uk_thread_struct_init_alloc(struct uk_thread *t,
 					size_t auxstack_len,
 					struct uk_alloc *a_uktls,
 					bool custom_ectx,
-					struct ukarch_ectx *ectx,
+					struct uk_lcpu_ectx *ectx,
 					const char *name,
 					void *priv,
 					uk_thread_dtor_t dtor)
@@ -422,8 +421,8 @@ static int _uk_thread_struct_init_alloc(struct uk_thread *t,
 			tls = uk_memalign(a_uktls,
 					  ukarch_tls_area_align(),
 					  ukarch_tls_area_size()
-					  + ukarch_ectx_size()
-					  + ukarch_ectx_align());
+					  + UK_LCPU_ECTX_SIZE
+					  + UK_LCPU_ECTX_ALIGN);
 			if (!tls) {
 				rc = -ENOMEM;
 				goto err_free_stack;
@@ -432,9 +431,9 @@ static int _uk_thread_struct_init_alloc(struct uk_thread *t,
 			/* When custom_ectx is not set, we ignore user's
 			 * ectx argument and overwrite it...
 			 */
-			ectx = (struct ukarch_ectx *) ALIGN_UP(
-				(uintptr_t) tls + ukarch_tls_area_size(),
-				ukarch_ectx_align());
+			ectx = (struct uk_lcpu_ectx *)ALIGN_UP(
+					(uintptr_t)tls + ukarch_tls_area_size(),
+					UK_LCPU_ECTX_ALIGN);
 		} else {
 			tls = uk_memalign(a_uktls, ukarch_tls_area_align(),
 					  ukarch_tls_area_size());
@@ -530,7 +529,7 @@ int uk_thread_init_fn0(struct uk_thread *t,
 		       size_t auxstack_len,
 		       struct uk_alloc *a_uktls,
 		       bool custom_ectx,
-		       struct ukarch_ectx *ectx,
+		       struct uk_lcpu_ectx *ectx,
 		       const char *name,
 		       void *priv,
 		       uk_thread_dtor_t dtor)
@@ -574,7 +573,7 @@ int uk_thread_init_fn1(struct uk_thread *t,
 		       size_t auxstack_len,
 		       struct uk_alloc *a_uktls,
 		       bool custom_ectx,
-		       struct ukarch_ectx *ectx,
+		       struct uk_lcpu_ectx *ectx,
 		       const char *name,
 		       void *priv,
 		       uk_thread_dtor_t dtor)
@@ -618,7 +617,7 @@ int uk_thread_init_fn2(struct uk_thread *t,
 		       size_t auxstack_len,
 		       struct uk_alloc *a_uktls,
 		       bool custom_ectx,
-		       struct ukarch_ectx *ectx,
+		       struct uk_lcpu_ectx *ectx,
 		       const char *name,
 		       void *priv,
 		       uk_thread_dtor_t dtor)
@@ -672,16 +671,16 @@ struct uk_thread *uk_thread_create_bare(struct uk_alloc *a,
 	 *       struct uk_thread within the same allocation
 	 */
 	if (!no_ectx)
-		alloc_size += ukarch_ectx_size() + ukarch_ectx_align();
+		alloc_size += UK_LCPU_ECTX_SIZE + UK_LCPU_ECTX_ALIGN;
 
 	t = uk_malloc(a, alloc_size);
 	if (!t)
 		return NULL;
 
 	uk_thread_init_bare(t, ip, sp, auxsp, tlsp, is_uktls,
-			    (struct ukarch_ectx *) ALIGN_UP((uintptr_t) t
+			    (struct uk_lcpu_ectx *)ALIGN_UP((uintptr_t)t
 							    + sizeof(*t),
-							   ukarch_ectx_align()),
+							    UK_LCPU_ECTX_ALIGN),
 			    name, priv, dtor);
 	t->_mem.t_a = a; /* Save allocator reference for releasing */
 
@@ -704,7 +703,7 @@ struct uk_thread *uk_thread_create_container(struct uk_alloc *a,
 {
 	struct uk_thread *t;
 	size_t t_size;
-	struct ukarch_ectx *ectx = NULL;
+	struct uk_lcpu_ectx *ectx = NULL;
 	int ret;
 
 	/* NOTE: We place space for extended context after
@@ -713,16 +712,16 @@ struct uk_thread *uk_thread_create_container(struct uk_alloc *a,
 	 */
 	t_size = sizeof(*t);
 	if (!no_ectx && !a_uktls)
-		t_size += ukarch_ectx_size() + ukarch_ectx_align();
+		t_size += UK_LCPU_ECTX_SIZE + UK_LCPU_ECTX_ALIGN;
 
 	t = uk_malloc(a, t_size);
 	if (!t)
 		goto err_out;
 
 	if (!no_ectx && !a_uktls)
-		ectx = (struct ukarch_ectx *) ALIGN_UP((uintptr_t) t
+		ectx = (struct uk_lcpu_ectx *)ALIGN_UP((uintptr_t)t
 						       + sizeof(*t),
-						       ukarch_ectx_align());
+						       UK_LCPU_ECTX_ALIGN);
 
 	stack_len = (!!stack_len) ? stack_len : STACK_SIZE;
 	auxstack_len = (!!auxstack_len) ? auxstack_len : AUXSTACK_SIZE;
@@ -777,7 +776,7 @@ struct uk_thread *uk_thread_create_container2(struct uk_alloc *a,
 {
 	struct uk_thread *t;
 	size_t t_size;
-	struct ukarch_ectx *ectx = NULL;
+	struct uk_lcpu_ectx *ectx = NULL;
 	void *auxstack;
 	__uptr auxsp = 0x0;
 	int ret;
@@ -788,16 +787,16 @@ struct uk_thread *uk_thread_create_container2(struct uk_alloc *a,
 	 */
 	t_size = sizeof(*t);
 	if (!no_ectx)
-		t_size += ukarch_ectx_size() + ukarch_ectx_align();
+		t_size += UK_LCPU_ECTX_SIZE + UK_LCPU_ECTX_ALIGN;
 
 	t = uk_malloc(a, t_size);
 	if (!t)
 		goto err_out;
 
 	if (!no_ectx)
-		ectx = (struct ukarch_ectx *) ALIGN_UP((uintptr_t) t
+		ectx = (struct uk_lcpu_ectx *)ALIGN_UP((uintptr_t)t
 						       + sizeof(*t),
-						       ukarch_ectx_align());
+						       UK_LCPU_ECTX_ALIGN);
 
 	/* Allocate auxiliary stack */
 	auxstack_len = (!!auxstack_len) ? auxstack_len : AUXSTACK_SIZE;
@@ -1043,14 +1042,14 @@ void uk_thread_block_until(struct uk_thread *thread, __snsec until)
 
 	UK_ASSERT(thread);
 
-	flags = ukplat_lcpu_save_irqf();
+	flags = uk_lcpu_save_irqf();
 	thread->wakeup_time = until;
 	if (uk_thread_is_runnable(thread)) {
 		uk_thread_set_blocked(thread);
 		if (thread->sched)
 			uk_sched_thread_blocked(thread);
 	}
-	ukplat_lcpu_restore_irqf(flags);
+	uk_lcpu_restore_irqf(flags);
 }
 
 void uk_thread_block_timeout(struct uk_thread *thread, __nsec nsec)
@@ -1073,12 +1072,12 @@ void uk_thread_wake(struct uk_thread *thread)
 {
 	unsigned long flags;
 
-	flags = ukplat_lcpu_save_irqf();
+	flags = uk_lcpu_save_irqf();
 	if (!uk_thread_is_runnable(thread)) {
 		uk_thread_set_runnable(thread);
 		if (thread->sched)
 			uk_sched_thread_woken(thread);
 	}
 	thread->wakeup_time = 0LL;
-	ukplat_lcpu_restore_irqf(flags);
+	uk_lcpu_restore_irqf(flags);
 }

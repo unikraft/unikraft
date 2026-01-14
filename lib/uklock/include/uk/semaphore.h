@@ -31,7 +31,7 @@
 #include <uk/spinlock.h>
 #include <uk/print.h>
 #include <uk/assert.h>
-#include <uk/plat/lcpu.h>
+#include <uk/lcpu.h>
 #include <uk/thread.h>
 #include <uk/wait.h>
 #include <uk/wait_types.h>
@@ -82,17 +82,17 @@ static inline long uk_semaphore_down_all(struct uk_semaphore *s)
 
 	for (;;) {
 		uk_waitq_wait_event(&s->wait, s->count > 0);
-		irqf = ukplat_lcpu_save_irqf();
+		irqf = uk_lcpu_save_irqf();
 		if (s->count > 0)
 			break;
-		ukplat_lcpu_restore_irqf(irqf);
+		uk_lcpu_restore_irqf(irqf);
 	}
 	count = s->count;
 	s->count = 0;
 #ifdef UK_SEMAPHORE_DEBUG
 	uk_pr_debug("Decreased semaphore %p to %ld\n", s, s->count);
 #endif
-	ukplat_lcpu_restore_irqf(irqf);
+	uk_lcpu_restore_irqf(irqf);
 
 	return count;
 }

@@ -6,6 +6,7 @@ config LIBUKINTCTLR
 	depends on HAVE_INTCTLR
 	select LIBUKATOMIC
 	select LIBUKBITOPS
+	select LIBUKLCPU
 
 if LIBUKINTCTLR
 

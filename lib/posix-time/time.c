@@ -45,7 +45,7 @@
 #if CONFIG_HAVE_SCHED
 #include <uk/sched.h>
 #else
-#include <uk/plat/lcpu.h>
+#include <uk/lcpu.h>
 #endif
 #include <uk/essentials.h>
 
@@ -58,10 +58,10 @@ static void __spin_wait(__nsec nsec)
 	__nsec until = ukplat_monotonic_clock() + nsec;
 	unsigned long flags;
 
-	flags = ukplat_lcpu_save_irqf();
+	flags = uk_lcpu_save_irqf();
 	while (until > ukplat_monotonic_clock())
-		ukplat_lcpu_halt_irq_until(until);
-	ukplat_lcpu_restore_irqf(flags);
+		uk_lcpu_halt_irq_until(until);
+	uk_lcpu_restore_irqf(flags);
 }
 #endif
 

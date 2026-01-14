@@ -9,7 +9,7 @@
 #define __UK_CRASH_H__
 
 #include <uk/plat/bootstrap.h>
-#include <uk/arch/lcpu.h>
+#include <uk/lcpu.h>
 #include <uk/essentials.h>
 
 #ifdef __cplusplus
@@ -108,7 +108,7 @@ struct uk_crash_descr {
 
 struct uk_crash_event_param {
 	/** Optional register state at the crash location */
-	struct __regs *regs;
+	struct uk_lcpu_regs *regs;
 	/** Optional explicit crash description */
 	struct uk_crash_descr *descr;
 };
@@ -116,7 +116,7 @@ struct uk_crash_event_param {
 /**
  * Internal, use UK_CRASH_EX() instead
  */
-void _uk_crash(struct __regs *regs, struct uk_crash_descr *descr);
+void _uk_crash(struct uk_lcpu_regs *regs, struct uk_crash_descr *descr);
 
 #ifdef __cplusplus
 }

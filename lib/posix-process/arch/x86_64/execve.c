@@ -4,6 +4,7 @@
  * You may not use this file except in compliance with the License.
  */
 
+#include <uk/arch.h>
 #include <uk/arch/ctx.h>
 #include <uk/essentials.h>
 
@@ -17,25 +18,26 @@ void execve_arch_execenv_init(struct ukarch_execenv *execenv_new,
 	UK_ASSERT(sp);
 	UK_ASSERT(IS_ALIGNED(sp, UKARCH_SP_ALIGN));
 
-	execenv_new->regs.rip = ip;
-	execenv_new->regs.rsp = sp;
+	uk_lcpu_regs_set(execenv_new->regs, RIP, ip);
+	uk_lcpu_regs_set(execenv_new->regs, RSP, sp);
 
 	/* Prepare for iretq
 	 * FIXME re-arch: use GDT macros once moved out of plat/common
 	 */
-	execenv_new->regs.eflags = execenv->regs.eflags;
+	uk_lcpu_regs_set(execenv_new->regs, RFLAGS,
+			 uk_lcpu_regs_get(execenv->regs, RFLAGS));
 
-	/* UK_ARCH_GDT_DESC_OFFSET(UK_ARCH_GDT_DESC_CODE) */
-	execenv_new->regs.cs = 8;
-	/* UK_ARCH_GDT_DESC_OFFSET(UK_ARCH_GDT_DESC_DATA) */
-	execenv_new->regs.ss = 16;
+	uk_lcpu_regs_set(execenv_new->regs, CS,
+			 UK_ARCH_GDT_DESC_OFFSET(UK_ARCH_GDT_DESC_CODE));
+	uk_lcpu_regs_set(execenv_new->regs, SS,
+			 UK_ARCH_GDT_DESC_OFFSET(UK_ARCH_GDT_DESC_DATA));
 
 	/* Copy current ectx to inerhit platform-initialized regs like mxcsr */
-	ukarch_ectx_sanitize((struct ukarch_ectx *)&execenv_new->ectx);
-	ukarch_ectx_store((struct ukarch_ectx *)&execenv_new->ectx);
+	uk_lcpu_ectx_sanitize((struct uk_lcpu_ectx *)execenv_new->ectx);
+	uk_lcpu_ectx_store((struct uk_lcpu_ectx *)execenv_new->ectx);
 
 	/* Also copy the current sysregs to avoid ending up with undefined
 	 * values that trigger alignment errors.
 	 */
-	ukarch_sysctx_store((struct ukarch_sysctx *)&execenv_new->sysctx);
+	uk_lcpu_sysctx_store((struct uk_lcpu_sysctx *)execenv_new->sysctx);
 }

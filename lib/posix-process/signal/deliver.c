@@ -103,7 +103,7 @@ static void handle_self(struct uk_signal *sig, const struct kern_sigaction *ks,
 	UK_ASSERT(execenv);
 
 	/* We expect to be operating on the aux stack */
-	UK_ASSERT(SP_IN_AUXSP(uk_arch_read_sp(), ukplat_lcpu_get_auxsp()));
+	UK_ASSERT(SP_IN_AUXSP(uk_arch_read_sp(), uk_lcpu_get_auxsp()));
 
 	this_process = uk_pprocess_current();
 	UK_ASSERT(this_process);
@@ -130,7 +130,7 @@ static void handle_self(struct uk_signal *sig, const struct kern_sigaction *ks,
 
 		ulsp = ukarch_gen_sp(altstack->ss_sp, altstack->ss_size);
 	} else {
-		ulsp = ALIGN_DOWN(ukarch_regs_get_sp(&execenv->regs),
+		ulsp = ALIGN_DOWN(uk_lcpu_regs_get(execenv->regs, SP),
 				  UKARCH_SP_ALIGN);
 		uk_pr_debug("Using the application stack @ 0x%lx\n", ulsp);
 	}
@@ -380,7 +380,7 @@ void sys_error_handler(struct ukarch_execenv *ee __unused, long arg)
 	struct uk_signal sig = {0};
 
 	/* Now we can enable IRQs */
-	ukplat_lcpu_enable_irq();
+	uk_lcpu_enable_irq();
 
 	/* Get arg */
 	error = (struct sys_error_desc *)arg;
@@ -388,7 +388,7 @@ void sys_error_handler(struct ukarch_execenv *ee __unused, long arg)
 
 	/* Switch to uk sysregs */
 	auxspcb = ukarch_auxsp_get_cb(error->auxsp);
-	ukarch_sysctx_load(&auxspcb->uksysctx);
+	uk_lcpu_sysctx_load((struct uk_lcpu_sysctx *)auxspcb->uksysctx);
 
 	/* Derive current process and thread */
 	pproc = uk_pprocess_current();

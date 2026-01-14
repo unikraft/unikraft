@@ -99,7 +99,7 @@ uk_lib_initcall(cl_flags_handled_set, 0);
 static void pprocess_clear_clone_tls(struct uk_thread *child __maybe_unused)
 {
 	UK_ASSERT(child);
-	UK_ASSERT(ukplat_tlsp_get() == child->uktlsp);
+	UK_ASSERT(uk_lcpu_tlsp_get() == child->uktlsp);
 
 	if (!cl_status.is_cloned)
 		return;

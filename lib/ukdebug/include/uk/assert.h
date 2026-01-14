@@ -36,7 +36,7 @@
 #ifndef __UKDEBUG_ASSERT_H__
 #define __UKDEBUG_ASSERT_H__
 
-#include <uk/arch/lcpu.h>
+#include <uk/lcpu.h>
 #include <uk/arch/crash.h>
 #include <uk/config.h>
 #include <uk/crash.h>

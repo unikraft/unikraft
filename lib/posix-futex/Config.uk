@@ -4,6 +4,7 @@ menuconfig LIBPOSIX_FUTEX
 	select LIBUKSCHED
 	select LIBUKLOCK
 	select LIBUKDEBUG
+	select LIBUKLCPU
 	default n
 	help
 		Linux-compatible futex calls

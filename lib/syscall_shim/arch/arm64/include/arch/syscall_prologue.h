@@ -29,7 +29,7 @@
  * Additionally, we leave IRQ's unmasked as, normally, when a SVC call would
  * happen in userspace, IRQ's would be enabled.
  */
-#define UK_SYSCALL_PROLOGUE_SPSR_EL1_SVC64_DEFAULT_VALUE		\
+#define UK_SYSCALL_PROLOGUE_SPSR_EL1_SVC64_VAL				\
 	((0b1 << 0) /* M[0] must be 1 for non-EL0 state */ |		\
 	 (0b0 << 1) /* M[1] must be 0 for AArch64 state */ |		\
 	 (0b01 << 2) /* M[3:2] (EL) must be 0b01 for EL1 */ |		\
@@ -58,7 +58,7 @@
 		" * indexed stack switch.\n\t"				\
 		" */\n\t"						\
 		"msr	tpidrro_el0, x0\n\t"				\
-		"/* Use `struct lcpu` pointer from TPIDR_EL1 */\n\t"	\
+		"/* Use `struct uk_lcpu` pointer from TPIDR_EL1 */\n\t"	\
 		"mrs	x0, tpidr_el1\n\t"				\
 		" /* Switch to per-CPU auxiliary stack */\n\t"		\
 		"ldr	x0, [x0, #" STRINGIFY(LCPU_AUXSP_OFFSET) "]\n\t"\
@@ -72,11 +72,11 @@
 		"add	sp, sp, x0\n\t"					\
 		"sub	x0, sp, x0\n\t"					\
 		"sub	sp, sp, x0\n\t"					\
-		"/* Now store old sp w.r.t. `struct __regs` */\n\t"	\
+		"/* Now store old sp w.r.t. `struct uk_lcpu_regs` */\n\t"\
 		"str	x0, [sp, #" STRINGIFY(__SP_OFFSET) "]\n\t"	\
 		"/* Restore x0 from scratch register TPIDRRO_EL0 */\n\t"\
 		"mrs	x0, tpidrro_el0\n\t"				\
-		"/* Now just store the rest of `struct __regs` */\n\t"	\
+		"/* Now just store the rest of `struct uk_lcpu_regs` */\n\t"\
 		"stp	x0, x1, [sp, #16 * 0]\n\t"			\
 		"stp	x2, x3, [sp, #16 * 1]\n\t"			\
 		"stp	x4, x5, [sp, #16 * 2]\n\t"			\
@@ -120,7 +120,7 @@
 		" * following a SVC.\n\t"				\
 		" */\n\t"						\
 		"mov	x22, #"						\
-			STRINGIFY(UK_SYSCALL_PROLOGUE_SPSR_EL1_SVC64_DEFAULT_VALUE) "\n\t"\
+		STRINGIFY(UK_SYSCALL_PROLOGUE_SPSR_EL1_SVC64_VAL) "\n\t"\
 		"/* Same for esr_el1, make it look like a SVC\n\t"	\
 		" * happened.\n\t"					\
 		" */\n\t"						\
@@ -131,13 +131,13 @@
 		"stp	x22, x23, [sp, #16 * 16]\n\t"			\
 		"/* ECTX at slot w.r.t. `struct ukarch_execenv` */\n\t"	\
 		"mov	x0, sp\n\t"					\
-		"add	x0, x0, #(" STRINGIFY(__REGS_SIZEOF +		\
-				     UKARCH_SYSCTX_SIZE) ")\n\t"	\
-		"bl	ukarch_ectx_store\n\t"				\
+		"add	x0, x0, #(" STRINGIFY(UK_LCPU_REGS_SIZE +	\
+				     UK_LCPU_SYSCTX_SIZE) ")\n\t"	\
+		"bl	uk_lcpu_ectx_store\n\t"				\
 		"/* SYSCTX at slot w.r.t. `struct ukarch_execenv` */\n\t"\
 		"mov	x0, sp\n\t"					\
-		"add	x0, x0, #" STRINGIFY(__REGS_SIZEOF) "\n\t"	\
-		"bl	ukarch_sysctx_store\n\t"			\
+		"add	x0, x0, #" STRINGIFY(UK_LCPU_REGS_SIZE) "\n\t"	\
+		"bl	uk_lcpu_sysctx_store\n\t"			\
 		"mov	x0, sp\n\t"					\
 		"msr	daifclr, #2\n\t"				\
 		"bl	" STRINGIFY(fname) "\n\t"			\

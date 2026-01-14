@@ -14,7 +14,7 @@
 #define __UK_SCHED_WAIT_H__
 
 #include <uk/essentials.h>
-#include <uk/plat/lcpu.h>
+#include <uk/lcpu.h>
 #include <uk/plat/time.h>
 #include <uk/sched.h>
 #include <uk/thread.h>

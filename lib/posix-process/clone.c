@@ -198,7 +198,9 @@ int uk_clone(struct clone_args *cl_args, size_t cl_args_len,
 		uk_pr_debug(" child_tid: %p\n", (void *)cl_args->child_tid);
 	uk_pr_debug(" stack: %p\n", (void *)stack);
 	uk_pr_debug(" tls: %p\n", (void *)tls);
-	uk_pr_debug(" <return>: %p\n", (void *)execenv->regs.rip);
+	uk_pr_debug(" <return>: %p\n",
+		    (void *)uk_lcpu_regs_get(execenv->regs,
+						 PC));
 	uk_pr_debug(")\n");
 #endif /* UK_DEBUG */
 
@@ -232,13 +234,13 @@ int uk_clone(struct clone_args *cl_args, size_t cl_args_len,
 	 */
 	if (flags & CLONE_VM) {
 		if (!stack && !stack_size) {
-			stack = ukarch_regs_get_sp(&execenv->regs);
+			stack = uk_lcpu_regs_get(execenv->regs, SP);
 			uk_pr_debug("Using parent's sp @ 0x%lx\n",
 				    stack);
 		}
 
 		if (!tls) {
-			tls = ukarch_sysctx_get_tlsp(&execenv->sysctx);
+			tls = uk_lcpu_sysctx_get(execenv->sysctx, TLSP);
 			uk_pr_debug("Using parent's tls @ 0x%lx\n",
 				    tls);
 		}
@@ -246,7 +248,7 @@ int uk_clone(struct clone_args *cl_args, size_t cl_args_len,
 
 	if ((flags & CLONE_SETTLS)
 #if CONFIG_LIBSYSCALL_SHIM_HANDLER_ULTLS
-	    && (ukarch_sysctx_get_tlsp(&execenv->sysctx) == 0x0)
+	    && (uk_lcpu_sysctx_get(execenv->sysctx, TLSP) == 0x0)
 #endif /* CONFIG_LIBSYSCALL_SHIM_HANDLER_ULTLS */
 	) {
 		/* The caller already created a TLS for the child (for instance
@@ -273,7 +275,7 @@ int uk_clone(struct clone_args *cl_args, size_t cl_args_len,
 		 * places TLS variables and uses them effectively as TCB.
 		 */
 #if CONFIG_LIBSYSCALL_SHIM_HANDLER_ULTLS
-		if (ukarch_sysctx_get_tlsp(&execenv->sysctx) != 0x0) {
+		if (uk_lcpu_sysctx_get(execenv->sysctx, TLSP) != 0x0) {
 			uk_pr_debug("Allocating an Unikraft TLS for the new child, parent called from context with custom TLS\n");
 		} else
 #endif /* CONFIG_LIBSYSCALL_SHIM_HANDLER_ULTLS */

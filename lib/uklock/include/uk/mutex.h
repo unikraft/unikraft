@@ -39,7 +39,7 @@
 
 #if CONFIG_LIBUKLOCK_MUTEX
 #include <uk/assert.h>
-#include <uk/plat/lcpu.h>
+#include <uk/lcpu.h>
 #include <uk/thread.h>
 #include <uk/wait.h>
 #include <uk/wait_types.h>
