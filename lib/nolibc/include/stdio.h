@@ -97,6 +97,8 @@ int puts(const char *s);
 #if CONFIG_HAVE_VFS
 void clearerr(FILE *stream);
 int rename(const char *oldpath, const char *newpath);
+int renameat(int oldfd, const char *oldname,
+	     int newfd, const char *newname, unsigned int flags);
 int feof(FILE *stream);
 int ferror(FILE *stream);
 int fseek(FILE *stream, long offset, int whence);
@@ -106,6 +108,11 @@ FILE *fdopen(int fd, const char *mode);
 size_t fread(void *ptr, size_t size, size_t nmemb, FILE *stream);
 size_t fwrite(const void *ptr, size_t size, size_t nmemb, FILE *stream);
 #endif /* CONFIG_HAVE_VFS */
+
+#if CONFIG_LIBPOSIX_PROCESS
+FILE *popen(const char *command, const char *type);
+FILE *pclose(FILE *stream);
+#endif /* CONFIG_LIBPOSIX_PROCESS */
 
 #ifdef __STDIO_H_DEFINED_va_list
 #undef va_list
