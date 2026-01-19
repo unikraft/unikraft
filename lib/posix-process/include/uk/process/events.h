@@ -240,7 +240,7 @@ typedef void (*posix_process_ptexit_handler_fn)(void *event_data);
  * @param prio	    Call order priority for this handler
  */
 #define POSIX_PROCESS_PTEXIT_HANDLER_PRIO(handler_fn, prio)		    \
-	UK_EVENT_HANDLER_PRIO(POSIX_PROCESS_PT_EXIT_EVENT,		    \
+	UK_EVENT_HANDLER_PRIO(POSIX_PROCESS_PTEXIT_EVENT,		    \
 			      handler_fn, prio)
 
 /**
