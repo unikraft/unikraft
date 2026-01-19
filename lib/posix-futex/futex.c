@@ -398,15 +398,22 @@ UK_LLSYSCALL_R_DEFINE(pid_t, set_tid_address, pid_t *, tid_ref)
 	return self_tid;
 }
 
-static void thread_exit_handler(struct uk_thread *child)
+static int pthread_exit_handler(void *arg)
 {
+	struct posix_process_ptexit_event_data *event_data;
 	struct uk_list_head *itr, *tmp;
+	struct uk_thread *child;
 	struct uk_futex *f;
+
+	UK_ASSERT(arg);
+
+	event_data = (struct posix_process_ptexit_event_data *)arg;
+	child = event_data->thread;
 
 	/* Clear child TID at the stored reference */
 	if (child_tid_clear_ref != NULL) {
-		*((pid_t *) child_tid_clear_ref) = 0;
-		futex_wake((uint32_t *) child_tid_clear_ref, 0);
+		*((pid_t *)child_tid_clear_ref) = 0;
+		futex_wake((uint32_t *)child_tid_clear_ref, 0);
 	}
 
 	/* Clear this thread's entries from the list */
@@ -419,8 +426,10 @@ static void thread_exit_handler(struct uk_thread *child)
 		}
 	}
 	uk_spin_unlock(&futex_list_lock);
+
+	return 0;
 }
 
-UK_THREAD_INIT_PRIO(0x0, thread_exit_handler, UK_PRIO_EARLIEST);
+POSIX_PROCESS_PTEXIT_HANDLER_PRIO(pthread_exit_handler, UK_PRIO_EARLIEST);
 
 #endif /* CONFIG_LIBPOSIX_PROCESS_MULTITHREADING */
