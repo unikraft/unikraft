@@ -102,19 +102,29 @@ static int futex_wait(uint32_t *uaddr, uint32_t val, const __nsec *timeout)
 	struct uk_thread *current = uk_thread_current();
 	struct uk_futex f = {.uaddr = uaddr, .thread = current};
 
+	/*
+	 * Acquire the lock BEFORE checking the futex value to ensure atomicity
+	 * between the value check and adding to the wait list. This prevents a
+	 * race where:
+	 *   1. Waiter checks value (outside lock) - condition met
+	 *   2. Waker changes value and calls futex_wake (finds no waiters)
+	 *   3. Waiter adds itself to list (too late - wake already happened)
+	 *   4. Waiter blocks forever (lost wakeup)
+	 */
+	irqf = ukplat_lcpu_save_irqf();
+	uk_spin_lock(&futex_list_lock);
+
 	if (uk_load_n(uaddr) != val) {
+		uk_spin_unlock(&futex_list_lock);
+		ukplat_lcpu_restore_irqf(irqf);
 		uk_pr_debug("FUTEX_WAIT: Condition not met (*uaddr != %"PRIu32", uaddr: %p)\n",
 			    val, uaddr);
 		return -EAGAIN;
 	}
 
-	/* Futex word _does_ contain expected val */
+	/* Futex word _does_ contain expected val - enqueue while holding lock */
 	uk_pr_debug("FUTEX_WAIT: Condition met (*uaddr == %"PRIu32", uaddr: %p)\n",
 			val, uaddr);
-
-	/* Enqueue thread to wait list */
-	irqf = ukplat_lcpu_save_irqf();
-	uk_spin_lock(&futex_list_lock);
 	uk_list_add_tail(&f.list_node, &futex_list);
 	uk_spin_unlock(&futex_list_lock);
 	ukplat_lcpu_restore_irqf(irqf);
