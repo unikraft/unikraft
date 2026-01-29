@@ -37,6 +37,7 @@
 #define __UKARCH_TLS_H__
 
 #include <uk/arch/types.h>
+#include <uk/assert.h>
 #include <uk/lcpu.h>
 
 /*
@@ -127,10 +128,8 @@ void ukarch_tls_area_init(void *tls_area);
  */
 static inline void ukarch_tls_set(void *tls_area)
 {
-#if CONFIG_LIBUKDEBUG
 	UK_ASSERT(tls_area);
 	UK_ASSERT(IS_ALIGNED((__sz)tls_area, ukarch_tls_area_align()));
-#endif /* CONFIG_LIBUKDEBUG */
 
 	uk_lcpu_tlsp_set(ukarch_tls_tlsp(tls_area));
 }
@@ -162,9 +161,7 @@ ukarch_tlsp_exec(__uptr tlsp, ukarch_tlsp_exec_fn fn, void *argp)
 	__uptr orig_tlsp;
 	int ret;
 
-#if CONFIG_LIBUKDEBUG
 	UK_ASSERT(fn);
-#endif /* CONFIG_LIBUKDEBUG */
 
 	orig_tlsp = uk_lcpu_tlsp_get();
 	__barrier();
