@@ -10,7 +10,49 @@
 #include <uk/lcpu.h>
 
 #if CONFIG_LIBUKINTCTLR_APIC
-#include <uk/intctlr/apic.h>
+#include <uk/arch.h>
+
+static inline int x2apic_enable(void)
+{
+	__u32 eax, ebx, ecx, edx;
+
+	/* Check for x2APIC support */
+	uk_arch_cpuid(1, 0, &eax, &ebx, &ecx, &edx);
+	if (!(ecx & UK_ARCH_CPUID1_ECX_X2APIC))
+		return -ENOTSUP;
+
+	/* Check if APIC is active */
+	uk_arch_rdmsr(UK_ARCH_APIC_MSR_BASE, &eax, &edx);
+	if (!(eax & UK_ARCH_APIC_BASE_EN))
+		return -ENOTSUP;
+
+	/* Switch to x2APIC mode */
+	eax |= UK_ARCH_APIC_BASE_EXTD;
+	uk_arch_wrmsr(UK_ARCH_APIC_MSR_BASE, eax, edx);
+
+	/* Set APIC software enable flag if necessary */
+	uk_arch_rdmsr(UK_ARCH_APIC_MSR_SVR, &eax, &edx);
+	if ((eax & UK_ARCH_APIC_SVR_EN) == 0) {
+		eax |= UK_ARCH_APIC_SVR_EN;
+		uk_arch_wrmsr(UK_ARCH_APIC_MSR_SVR, eax, edx);
+	}
+
+	/*
+	 * TODO: Configure spurious interrupt vector number
+	 * After power-up or reset this is 0xff, which might not be
+	 * configured in the trap table
+	 */
+
+	return 0;
+}
+
+static inline void x2apic_ack_interrupt(void)
+{
+	uk_arch_wrmsr(UK_ARCH_APIC_MSR_EOI, 0, 0);
+}
+
+#define apic_ack_interrupt	x2apic_ack_interrupt
+#define apic_enable		x2apic_enable
 #endif /* CONFIG_LIBUKINTCTLR_APIC */
 
 #include "pic.h"

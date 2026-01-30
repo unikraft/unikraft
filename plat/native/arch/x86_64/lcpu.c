@@ -14,7 +14,7 @@
 
 #include <uk/arch/ctx.h>
 #include <uk/ctors.h>
-#include <uk/intctlr/apic.h>
+#include <uk/arch.h>
 #include <uk/lcpu/core.h>
 #include <uk/plat/common/acpi.h>
 #include <uk/plat/common/memory.h>
@@ -120,6 +120,88 @@ UK_CTOR_PRIO(init_fsgsbasefns, 0);
 #if CONFIG_LIBUKPLAT_NATIVE_LCPU
 void uk_plat_native_traps_init(struct uk_lcpu *this_lcpu);
 void uk_plat_native_traps_table_init(void);
+
+#if CONFIG_HAVE_SMP
+static inline int x2apic_enable(void)
+{
+	__u32 eax, ebx, ecx, edx;
+
+	/* Check for x2APIC support */
+	uk_arch_cpuid(1, 0, &eax, &ebx, &ecx, &edx);
+	if (!(ecx & UK_ARCH_CPUID1_ECX_X2APIC))
+		return -ENOTSUP;
+
+	/* Check if APIC is active */
+	uk_arch_rdmsr(UK_ARCH_APIC_MSR_BASE, &eax, &edx);
+	if (!(eax & UK_ARCH_APIC_BASE_EN))
+		return -ENOTSUP;
+
+	/* Switch to x2APIC mode */
+	eax |= UK_ARCH_APIC_BASE_EXTD;
+	uk_arch_wrmsr(UK_ARCH_APIC_MSR_BASE, eax, edx);
+
+	/* Set APIC software enable flag if necessary */
+	uk_arch_rdmsr(UK_ARCH_APIC_MSR_SVR, &eax, &edx);
+	if ((eax & UK_ARCH_APIC_SVR_EN) == 0) {
+		eax |= UK_ARCH_APIC_SVR_EN;
+		uk_arch_wrmsr(UK_ARCH_APIC_MSR_SVR, eax, edx);
+	}
+
+	/*
+	 * TODO: Configure spurious interrupt vector number
+	 * After power-up or reset this is 0xff, which might not be
+	 * configured in the trap table
+	 */
+
+	return 0;
+}
+
+static inline void x2apic_send_ipi(int irqno, int dest)
+{
+	__u32 eax;
+
+	UK_ASSERT(((32 + irqno) & 0xff) == (32 + irqno));
+
+	eax = UK_ARCH_APIC_ICR_TRIGGER_LEVEL | UK_ARCH_APIC_ICR_LEVEL_ASSERT |
+	      UK_ARCH_APIC_ICR_DESTMODE_PHYSICAL |
+	      UK_ARCH_APIC_ICR_DMODE_FIXED | (32 + irqno);
+
+	uk_arch_wrmsr(UK_ARCH_APIC_MSR_ICR, eax, dest);
+}
+
+static inline void x2apic_send_sipi(__vaddr_t addr, int dest)
+{
+	__u32 eax;
+
+	UK_ASSERT((addr &
+		   (UK_ARCH_APIC_ICR_VECTOR_MASK << __PAGE_SHIFT)) == addr);
+
+	eax = UK_ARCH_APIC_ICR_TRIGGER_LEVEL | UK_ARCH_APIC_ICR_LEVEL_ASSERT |
+	      UK_ARCH_APIC_ICR_DESTMODE_PHYSICAL | UK_ARCH_APIC_ICR_DMODE_SUP |
+	      (addr >> __PAGE_SHIFT);
+
+	uk_arch_wrmsr(UK_ARCH_APIC_MSR_ICR, eax, dest);
+}
+
+static inline void x2apic_send_iipi(int dest)
+{
+	__u32 eax;
+
+	eax = UK_ARCH_APIC_ICR_TRIGGER_LEVEL | UK_ARCH_APIC_ICR_LEVEL_ASSERT |
+	      UK_ARCH_APIC_ICR_DESTMODE_PHYSICAL | UK_ARCH_APIC_ICR_DMODE_INIT;
+
+	uk_arch_wrmsr(UK_ARCH_APIC_MSR_ICR, eax, dest);
+}
+
+/* Deassert only supported on Pentium and P6 familiy processors */
+#define x2apic_send_iipi_deassert() {}
+
+/* We only support x2APIC at the moment */
+#define apic_send_ipi		x2apic_send_ipi
+#define apic_send_sipi		x2apic_send_sipi
+#define apic_send_iipi		x2apic_send_iipi
+#define apic_send_iipi_deassert x2apic_send_iipi_deassert
+#endif /* CONFIG_HAVE_SMP */
 
 int uk_plat_native_lcpu_init(struct uk_lcpu *this_lcpu)
 {

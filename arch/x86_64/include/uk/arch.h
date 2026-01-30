@@ -1,5 +1,9 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
-/* Copyright (c) 2025, Unikraft GmbH and The Unikraft Authors.
+/* Copyright (c) 2022, Karlsruhe Institute of Technology (KIT)
+ *                     All rights reserved.
+ * Copyright (c) 2022, University POLITEHNICA of Bucharest.
+ *                     All rights reserved.
+ * Copyright (c) 2025, Unikraft GmbH and The Unikraft Authors.
  * Licensed under the BSD-3-Clause License (the "License").
  * You may not use this file except in compliance with the License.
  */
@@ -371,6 +375,133 @@
 #define UK_ARCH_TRAPNUM_VIRT_ERROR		20
 /** Security exception */
 #define UK_ARCH_TRAPNUM_SECURITY_ERROR		21
+
+/* APIC MSR registers */
+/** APIC Base MSR address */
+#define UK_ARCH_APIC_MSR_BASE			0x01b
+
+/* The following MSRs are only accessible in x2APIC mode */
+/** APIC ID register */
+#define UK_ARCH_APIC_MSR_ID			0x802
+/** APIC version register */
+#define UK_ARCH_APIC_MSR_VER			0x803
+/** Task Priority Register */
+#define UK_ARCH_APIC_MSR_TPR			0x808
+/** Processor Priority Register */
+#define UK_ARCH_APIC_MSR_PPR			0x80a
+/** End Of Interrupt register */
+#define UK_ARCH_APIC_MSR_EOI			0x80b
+/** Logical Destination Register */
+#define UK_ARCH_APIC_MSR_LDR			0x80d
+/** Spurious Interrupt Vector Register */
+#define UK_ARCH_APIC_MSR_SVR			0x80f
+/** In-Service Register (8 registers, x = 0-7) */
+#define UK_ARCH_APIC_MSR_ISR(x)			(0x810 + (x))
+/** Trigger Mode Register (8 registers, x = 0-7) */
+#define UK_ARCH_APIC_MSR_TMR(x)			(0x818 + (x))
+/** Interrupt Request Register (8 registers, x = 0-7) */
+#define UK_ARCH_APIC_MSR_IRR(x)			(0x820 + (x))
+/** Error Status Register */
+#define UK_ARCH_APIC_MSR_ESR			0x828
+/** LVT Corrected Machine Check Interrupt register */
+#define UK_ARCH_APIC_MSR_LVT_CMCI		0x82f
+/** Interrupt Command Register */
+#define UK_ARCH_APIC_MSR_ICR			0x830
+/** LVT Timer register */
+#define UK_ARCH_APIC_MSR_LVT_TIMER		0x832
+/** LVT Thermal Sensor register */
+#define UK_ARCH_APIC_MSR_LVT_THERMAL		0x833
+/** LVT Performance Monitoring register */
+#define UK_ARCH_APIC_MSR_LVT_PERF		0x834
+/** LVT LINT0 register */
+#define UK_ARCH_APIC_MSR_LVT_LINT0		0x835
+/** LVT LINT1 register */
+#define UK_ARCH_APIC_MSR_LVT_LINT1		0x836
+/** LVT Error register */
+#define UK_ARCH_APIC_MSR_LVT_ERROR		0x837
+/** Timer Initial Count register */
+#define UK_ARCH_APIC_MSR_TIMER_IC		0x838
+/** Timer Current Count register */
+#define UK_ARCH_APIC_MSR_TIMER_CC		0x839
+/** Timer Divide Configuration Register */
+#define UK_ARCH_APIC_MSR_TIMER_DCR		0x83e
+/** Self IPI register */
+#define UK_ARCH_APIC_MSR_SELF_IPI		0x83f
+
+/* APIC BASE register */
+/** Bootstrap Processor flag */
+#define UK_ARCH_APIC_BASE_BSP			(1 << 8)
+/** Enable x2APIC mode */
+#define UK_ARCH_APIC_BASE_EXTD			(1 << 10)
+/** APIC Global Enable */
+#define UK_ARCH_APIC_BASE_EN			(1 << 11)
+/** APIC Base address shift (bits 12-35) */
+#define UK_ARCH_APIC_BASE_ADDR_SHIFT		12
+/** APIC Base address mask */
+#define UK_ARCH_APIC_BASE_ADDR_MASK		0x0000000ffffff000UL
+
+/* APIC spurious interrupt vector register (SVR) */
+/** APIC Software Enable/Disable */
+#define UK_ARCH_APIC_SVR_EN			(1 << 8)
+/** Spurious vector mask (bits 0-7) */
+#define UK_ARCH_APIC_SVR_VECTOR_MASK		0x00000000000000ffUL
+/** Suppress EOI broadcast */
+#define UK_ARCH_APIC_SVR_EOI_BROADCAST		(1 << 12)
+
+/* APIC error status registers (ESR) */
+/** Send checksum error (Pentium and P6 only) */
+#define UK_ARCH_APIC_ESR_SEND_CHECKSUM		(1 << 0)
+/** Receive checksum error (Pentium and P6 only) */
+#define UK_ARCH_APIC_ESR_RECV_CHECKSUM		(1 << 1)
+/** Send accept error (Pentium and P6 only) */
+#define UK_ARCH_APIC_ESR_SEND_ACCEPT		(1 << 2)
+/** Receive accept error (Pentium and P6 only) */
+#define UK_ARCH_APIC_ESR_RECV_ACCEPT		(1 << 3)
+/** Redirectable IPI error */
+#define UK_ARCH_APIC_ESR_REDIRECTABLE_IPI	(1 << 4)
+/** Send illegal vector error */
+#define UK_ARCH_APIC_ESR_SEND_ILLEGAL_VECTOR	(1 << 5)
+/** Receive illegal vector error */
+#define UK_ARCH_APIC_ESR_RECV_ILLEGAL_VECTOR	(1 << 6)
+/** Illegal register address error */
+#define UK_ARCH_APIC_ESR_ILLEGAL_REGISTER	(1 << 7)
+
+/* APIC interrupt command register (ICR) */
+/** Interrupt vector mask (bits 0-7) */
+#define UK_ARCH_APIC_ICR_VECTOR_MASK		0x000000ff
+
+/** Delivery mode: Fixed */
+#define UK_ARCH_APIC_ICR_DMODE_FIXED		(0 << 8)
+/** Delivery mode: System Management Interrupt */
+#define UK_ARCH_APIC_ICR_DMODE_SMI		(2 << 8)
+/** Delivery mode: Non-Maskable Interrupt */
+#define UK_ARCH_APIC_ICR_DMODE_NMI		(4 << 8)
+/** Delivery mode: INIT */
+#define UK_ARCH_APIC_ICR_DMODE_INIT		(5 << 8)
+/** Delivery mode: Start-Up */
+#define UK_ARCH_APIC_ICR_DMODE_SUP		(6 << 8)
+
+/** Destination mode: Physical */
+#define UK_ARCH_APIC_ICR_DESTMODE_PHYSICAL	0
+/** Destination mode: Logical */
+#define UK_ARCH_APIC_ICR_DESTMODE_LOGICAL	(1 << 11)
+/** Level: De-assert */
+#define UK_ARCH_APIC_ICR_LEVEL_DEASSERT		0
+/** Level: Assert */
+#define UK_ARCH_APIC_ICR_LEVEL_ASSERT		(1 << 14)
+/** Trigger mode: Edge */
+#define UK_ARCH_APIC_ICR_TRIGGER_EDGE		0
+/** Trigger mode: Level */
+#define UK_ARCH_APIC_ICR_TRIGGER_LEVEL		(1 << 15)
+
+/** Destination shorthand: No shorthand */
+#define UK_ARCH_APIC_ICR_DSTSH_NO		(0 << 18)
+/** Destination shorthand: Self */
+#define UK_ARCH_APIC_ICR_DSTSH_SELF		(1 << 18)
+/** Destination shorthand: All including self */
+#define UK_ARCH_APIC_ICR_DSTSH_ALL_INCL_SELF	(2 << 18)
+/** Destination shorthand: All excluding self */
+#define UK_ARCH_APIC_ICR_DSTSH_ALL_EXCL_SELF	(3 << 18)
 
 #if !__ASSEMBLY__
 #include <uk/essentials.h>
