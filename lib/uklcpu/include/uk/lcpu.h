@@ -21,6 +21,7 @@
 #include <uk/lcpu/auxsp.h>
 #include <uk/lcpu/regs.h>
 #include <uk/lcpu/sysctx.h>
+#include <uk/lcpu/pm.h>
 
 #if !__ASSEMBLY__
 #include <uk/essentials.h>
@@ -28,8 +29,6 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-void __noreturn uk_lcpu_halt(void);
 
 /**
  * Return 1 if the given UK_LCPU is online, 0 otherwise
@@ -47,17 +46,6 @@ static inline int uk_lcpu_state_is_busy(int state)
 {
 	return (state >= UK_LCPU_STATE_BUSY0);
 }
-
-/**
- * Halts the current logical CPU. Execution is resumed when an interrupt/signal
- * arrives or the specified deadline expires
- *
- * NOTE: This must be called with IRQ's disabled. On return, IRQ's are not
- *        re-enabled.
- *
- * @param until deadline in nanoseconds
- */
-void uk_lcpu_halt_irq_until(__nsec until);
 
 /**
  * Initialize a logical CPU. The function must be executed on the CPU
@@ -124,39 +112,6 @@ void __weak __noreturn uk_lcpu_entry_default(struct uk_lcpu *this_lcpu);
  * @return 0 on success, -errno otherwise
  */
 int uk_lcpu_fn_enqueue(struct uk_lcpu *lcpu, const struct uk_lcpu_func *fn);
-
-/**
- * Starts multiple logical CPUs and assigns them the given stacks. The logical
- * CPUs execute the entry functions if supplied or enter a low-power wait state
- * otherwise. CPUs that have already been started are ignored.
- *
- * @param lcpuidx array with the indices of the logical CPUs that are to be
- *   started. CPUs are started in the order specified in the array. Can be NULL
- *   to include all logical CPUs except the one executing the function, in which
- *   case CPUs are started in sequential order according to their CPU index
- * @param[inout] num if lcpuidx is not NULL, provides [IN] the number of
- *   elements in lcpuidx, and [OUT] the number of successfully started CPUs in
- *   sequential order of lcpuidx. If the call succeeds, input and output values
- *   are equal. Must be NULL if lcpuidx is NULL
- * @param sp array of stack pointers, one for each logical CPU to start. If
- *   lcpuidx is NULL, must be uk_lcpu_count() - 1 stack pointers. The
- *   stacks may be specifically prepared to contain arguments for the entry
- *   function (e.g., cdecl calling convention). The platform may use the
- *   following stack space to execute initialization routines
- * @param entry array of entry functions, one for each logical CPU to start.
- *   Can be NULL, otherwise if lcpuidx is NULL, must contain
- *   uk_lcpu_count() - 1 function pointers. Provided functions must not
- *   return. If the parameter or individual function pointers are NULL the
- *   respective logical CPUs enter a low-power wait state after startup
- * @param flags (architecture-dependent) flags that specify how to start the
- *   CPUs (see UK_LCPU_SFLG_* flags if available)
- *
- * @return 0 on success, an errno-type error value otherwise
- */
-int uk_lcpu_start(const __u32 lcpuidx[],
-		  unsigned int *num, void *sp[],
-		  __noreturn const void (*entry[])(void *),
-		  unsigned long flags);
 
 /**
  * Waits for the specified logical CPUs to enter idle state, or until the
@@ -241,14 +196,8 @@ static inline __u32 uk_lcpu_idx(void)
 	return uk_pal_lcpu_idx();
 }
 
-static inline void uk_lcpu_halt_irq(void)
-{
-	uk_pal_halt_irq();
-}
-
 #ifdef __cplusplus
 }
 #endif
 #endif /* !__ASSEMBLY__ */
-
 #endif /* __UK_LCPU_H__*/

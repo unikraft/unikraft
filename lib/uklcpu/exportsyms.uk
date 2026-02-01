@@ -33,3 +33,4 @@ uk_lcpu_ectx_sanitize
 uk_lcpu_ectx_store
 uk_lcpu_except_push_nested
 uk_lcpu_except_pop_nested
+uk_lcpu_pm_ops_register

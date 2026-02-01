@@ -183,38 +183,6 @@ ukplat_memregion_list_insert_legacy_hi_mem(struct ukplat_memregion_list *list)
 
 	return 0;
 }
-
-#if defined(CONFIG_HAVE_SMP)
-extern void *x86_start16_begin[];
-extern void *x86_start16_end[];
-extern __uptr x86_start16_addr; /* target address */
-
-static inline int
-ukplat_memregion_alloc_sipi_vect(void)
-{
-#define X86_VIDEO_MEM_START	0xA0000UL
-#define X86_VIDEO_MEM_LEN	0x20000UL
-	__sz len;
-
-	len = (__sz)((__uptr)x86_start16_end - (__uptr)x86_start16_begin);
-	len = UK_PAGING_PAGE_ALIGN_UP(len);
-	x86_start16_addr = (__uptr)ukplat_memregion_alloc(len,
-							  UKPLAT_MEMRT_RESERVED,
-							  UKPLAT_MEMRF_READ  |
-							  UKPLAT_MEMRF_WRITE);
-	if (unlikely(!x86_start16_addr ||
-		     x86_start16_addr >= X86_VIDEO_MEM_START))
-		return -ENOMEM;
-
-	return 0;
-}
-#else
-static inline int
-ukplat_memregion_alloc_sipi_vect(void)
-{
-	return 0;
-}
-#endif
 #endif
 
 /**

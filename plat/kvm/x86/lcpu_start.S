@@ -49,9 +49,10 @@
 #define START16_PLACEHOLDER	0x1516	/* IS16 */
 #define START32_PLACEHOLDER	0x1532	/* IS32 */
 
+/* TODO: Move this to plat native driver */
 .section .data.boot.16
-.globl x86_start16_addr
-x86_start16_addr:
+.globl uk_plat_native_x86_64_start16_addr
+uk_plat_native_x86_64_start16_addr:
 	.quad	START16_PLACEHOLDER
 
 /* Implement dedicated start16 macro's whose only use-case is this file to cope

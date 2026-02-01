@@ -16,6 +16,7 @@
 #include <uk/ctors.h>
 #include <uk/arch.h>
 #include <uk/lcpu/core.h>
+#include <uk/lcpu/pm.h>
 #include <uk/plat/common/acpi.h>
 #include <uk/plat/common/memory.h>
 #include <uk/asm.h>
@@ -197,21 +198,28 @@ static inline void x2apic_send_iipi(int dest)
 #define x2apic_send_iipi_deassert() {}
 
 /* We only support x2APIC at the moment */
+#define apic_enable		x2apic_enable
 #define apic_send_ipi		x2apic_send_ipi
 #define apic_send_sipi		x2apic_send_sipi
 #define apic_send_iipi		x2apic_send_iipi
 #define apic_send_iipi_deassert x2apic_send_iipi_deassert
 #endif /* CONFIG_HAVE_SMP */
 
+static int plat_native_lcpu_pm_ops_register(void);
+
 int uk_plat_native_lcpu_init(struct uk_lcpu *this_lcpu)
 {
-#if CONFIG_HAVE_SMP
 	int rc;
 
+#if CONFIG_HAVE_SMP
 	rc = apic_enable();
 	if (unlikely(rc))
 		return rc;
 #endif /* CONFIG_HAVE_SMP */
+
+	rc = plat_native_lcpu_pm_ops_register();
+	if (unlikely(rc))
+		return rc;
 
 	wrgsbasefn((__uptr)this_lcpu);
 	wrkgsbasefn((__uptr)this_lcpu);
@@ -230,9 +238,28 @@ int uk_plat_native_lcpu_init(struct uk_lcpu *this_lcpu)
  * corresponding boot code somewhere in the first 1 MiB. We copy the trampoline
  * code to the target address during MP initialization.
  */
-extern __vaddr_t x86_start16_addr; /* target address */
 extern void *x86_start16_begin[];
 extern void *x86_start16_end[];
+extern __vaddr_t uk_plat_native_x86_64_start16_addr; /* target address */
+
+static inline int memregion_alloc_sipi_vect(void)
+{
+#define X86_VIDEO_MEM_START	0xA0000UL
+#define X86_VIDEO_MEM_LEN	0x20000UL
+	__sz len;
+
+	len = (__sz)((__uptr)x86_start16_end - (__uptr)x86_start16_begin);
+	len = UK_PAGING_PAGE_ALIGN_UP(len);
+	uk_plat_native_x86_64_start16_addr = (__uptr)ukplat_memregion_alloc(len,
+							  UKPLAT_MEMRT_RESERVED,
+							  UKPLAT_MEMRF_READ  |
+							  UKPLAT_MEMRF_WRITE);
+	if (unlikely(!uk_plat_native_x86_64_start16_addr ||
+		     uk_plat_native_x86_64_start16_addr >= X86_VIDEO_MEM_START))
+		return -ENOMEM;
+
+	return 0;
+}
 
 #define UK_ARCH_START16_SIZE						\
 	((__uptr)x86_start16_end - (__uptr)x86_start16_begin)
@@ -297,7 +324,7 @@ static void start16_reloc_mp_init(void)
 	__sz i;
 
 	for (i = 0; i < ARRAY_SIZE(x86_start16_relocs); i++)
-		apply_start16_reloc((__u64)x86_start16_addr,
+		apply_start16_reloc((__u64)uk_plat_native_x86_64_start16_addr,
 				    x86_start16_relocs[i].r_mem_off,
 				    x86_start16_relocs[i].r_addr,
 				    x86_start16_relocs[i].r_sz);
@@ -305,9 +332,10 @@ static void start16_reloc_mp_init(void)
 	/* Unlike the other entries, lcpu_start32 must stay the same
 	 * as it is not part of the start16 section.
 	 */
-	apply_start16_reloc((__u64)x86_start16_addr,
+	apply_start16_reloc((__u64)uk_plat_native_x86_64_start16_addr,
 			    START16_MOV_OFF(lcpu_start32, 4),
-			    (__u64)lcpu_start32 - (__u64)x86_start16_addr, 4);
+			    (__u64)lcpu_start32 -
+			    (__u64)uk_plat_native_x86_64_start16_addr, 4);
 }
 
 int uk_plat_native_lcpu_mp_init(void *arg __unused)
@@ -376,30 +404,27 @@ int uk_plat_native_lcpu_mp_init(void *arg __unused)
 	UK_ASSERT(bsp_found);
 
 	/* Allocate an mrd for the SIPI vector */
-	rc = ukplat_memregion_alloc_sipi_vect();
+	rc = memregion_alloc_sipi_vect();
 	if (unlikely(rc)) {
 		uk_pr_err("Could not allocate mrd for the SIPI vector(%d)", rc);
 		return rc;
 	}
 
 	/* Copy AP startup code to target address in first 1MiB */
-	UK_ASSERT(x86_start16_addr < 0x100000);
-	memcpy((void *)x86_start16_addr, &x86_start16_begin,
+	UK_ASSERT(uk_plat_native_x86_64_start16_addr < 0x100000);
+	memcpy((void *)uk_plat_native_x86_64_start16_addr, &x86_start16_begin,
 	       UK_ARCH_START16_SIZE);
 
 	start16_reloc_mp_init();
 
 	uk_pr_debug("Copied AP 16-bit boot code to 0x%"__PRIvaddr"\n",
-		    x86_start16_addr);
+		    uk_plat_native_x86_64_start16_addr);
 
 	return 0;
 }
 
-int uk_plat_native_lcpu_start(struct uk_lcpu *lcpu,
-			      unsigned long flags __unused)
+static int plat_native_lcpu_start(struct uk_lcpu *lcpu)
 {
-	UK_ASSERT(lcpu->state == UK_LCPU_STATE_INIT);
-
 	/* Send INIT IPI */
 	apic_send_iipi(lcpu->id);
 
@@ -409,12 +434,12 @@ int uk_plat_native_lcpu_start(struct uk_lcpu *lcpu,
 	return 0;
 }
 
-int uk_plat_native_lcpu_post_start(const __u32 lcpuidx[],
-				   unsigned int *num)
+#if CONFIG_HAVE_CPU_MULTI_PHASE_STARTUP
+static int plat_native_lcpu_post_start(const __u32 lcpuidx[], unsigned int *num)
 {
 	__u64 this_cpu_id = uk_lcpu_id();
-	struct uk_lcpu *lcpu;
 	unsigned int i, n, j;
+	struct uk_lcpu *lcpu;
 
 	/* wait 10 msec (according to Intel manual 8.4.4.1) */
 	mdelay(10);
@@ -425,7 +450,8 @@ int uk_plat_native_lcpu_post_start(const __u32 lcpuidx[],
 
 		for (j = 0; j < 2; j++) {
 			/* Send STARTUP IPI */
-			apic_send_sipi(x86_start16_addr, lcpu->id);
+			apic_send_sipi(uk_plat_native_x86_64_start16_addr,
+				       lcpu->id);
 
 			/* wait 200 usec (according to Intel manual 8.4.4.1) */
 			udelay(200);
@@ -434,32 +460,56 @@ int uk_plat_native_lcpu_post_start(const __u32 lcpuidx[],
 
 	return 0;
 }
+#endif /* CONFIG_HAVE_CPU_MULTI_PHASE_STARTUP */
 
-int uk_plat_native_lcpu_run(struct uk_lcpu *lcpu, const struct uk_lcpu_func *fn,
-			    unsigned long flags __unused)
+int uk_plat_native_send_ipi(__u64 id, unsigned long irq)
 {
-	int rc;
-
-	UK_ASSERT(lcpu->id != uk_lcpu_id());
-
-	rc = uk_lcpu_fn_enqueue(lcpu, fn);
-	if (unlikely(rc))
-		return rc;
-
-	apic_send_ipi(*uk_lcpu_run_irqv, lcpu->id);
-
-	return 0;
-}
-
-int uk_plat_native_lcpu_wakeup(struct uk_lcpu *lcpu)
-{
-	UK_ASSERT(lcpu->id != uk_lcpu_id());
-
-	apic_send_ipi(*uk_lcpu_wakeup_irqv, lcpu->id);
-
+	apic_send_ipi(irq, id);
 	return 0;
 }
 #endif /* CONFIG_HAVE_SMP */
+
+static void plat_native_lcpu_halt(void)
+{
+	uk_arch_halt();
+}
+
+static void plat_native_lcpu_halt_irq(void)
+{
+	/*
+	 * We have to be careful when enabling interrupts before entering a
+	 * halt state. If we want to wait for an interrupt (e.g., a timer)
+	 * the interrupt may fire in the short window between sti and hlt and
+	 * we are going to halt forever. As sti only enables interrupts after
+	 * the following instruction, we can avoid the race condition by
+	 * ensuring that hlt immediately follows sti. There must be no
+	 * instruction in between.
+	 */
+	asm volatile (
+		"sti\n\t"
+		"hlt\n\t"
+		"cli\n\t"
+		:
+		:
+		: "memory"
+	);
+}
+
+static const struct uk_lcpu_pm_ops plat_native_pm_ops = {
+#if CONFIG_HAVE_SMP
+	.start = plat_native_lcpu_start,
+#if CONFIG_HAVE_CPU_MULTI_PHASE_STARTUP
+	.post_start = plat_native_lcpu_post_start,
+#endif /* CONFIG_HAVE_CPU_MULTI_PHASE_STARTUP */
+#endif /* CONFIG_HAVE_SMP */
+	.halt = plat_native_lcpu_halt,
+	.halt_irq = plat_native_lcpu_halt_irq,
+};
+
+static int plat_native_lcpu_pm_ops_register(void)
+{
+	return uk_lcpu_pm_ops_register(&plat_native_pm_ops);
+}
 #endif /* CONFIG_LIBUKPLAT_NATIVE_LCPU */
 
 #if CONFIG_LIBUKPLAT_NATIVE_SYSCTX

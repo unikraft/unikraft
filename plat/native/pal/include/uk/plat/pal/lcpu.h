@@ -25,51 +25,20 @@ static inline __u32 uk_pal_lcpu_idx(void)
 	return uk_plat_native_lcpu_idx();
 }
 
-static inline void uk_pal_halt(void)
-{
-	uk_plat_native_halt();
-}
-
-static inline void uk_pal_halt_irq(void)
-{
-	uk_plat_native_halt_irq();
-}
-
 static inline int uk_pal_lcpu_init(struct uk_lcpu *this_lcpu)
 {
 	return uk_plat_native_lcpu_init(this_lcpu);
 }
 
 #if CONFIG_HAVE_SMP
-static inline int uk_pal_lcpu_wakeup(struct uk_lcpu *lcpu)
-{
-	return uk_plat_native_lcpu_wakeup(lcpu);
-}
-
-static inline int uk_pal_lcpu_run(struct uk_lcpu *lcpu,
-				  const struct uk_lcpu_func *fn,
-				  unsigned long flags)
-{
-	return uk_plat_native_lcpu_run(lcpu, fn, flags);
-}
-
-#if CONFIG_HAVE_CPU_MULTI_PHASE_STARTUP
-static inline int uk_pal_lcpu_post_start(const __u32 lcpuidx[],
-					 unsigned int *num)
-{
-	return uk_plat_native_lcpu_post_start(lcpuidx, num);
-}
-#endif /* CONFIG_HAVE_CPU_MULTI_PHASE_STARTUP */
-
-static inline int uk_pal_lcpu_start(struct uk_lcpu *lcpu,
-				    unsigned long flags)
-{
-	return uk_plat_native_lcpu_start(lcpu, flags);
-}
-
-static inline int uk_pal_mp_init(void *arg)
+static inline int uk_pal_lcpu_mp_init(void *arg)
 {
 	return uk_plat_native_lcpu_mp_init(arg);
+}
+
+static inline int uk_pal_send_ipi(__u64 id, unsigned long irq)
+{
+	return uk_plat_native_send_ipi(id, irq);
 }
 #endif /* CONFIG_HAVE_SMP */
 

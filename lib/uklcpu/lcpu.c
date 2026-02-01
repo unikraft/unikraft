@@ -34,6 +34,17 @@
  */
 UK_PER_LCPU_DEFINE(struct uk_lcpu, uk_lcpus);
 
+static const struct uk_lcpu_pm_ops *pm_ops;
+
+int uk_lcpu_pm_ops_register(const struct uk_lcpu_pm_ops *ops)
+{
+	if (unlikely(!ops))
+		return -EINVAL;
+
+	pm_ops = ops;
+	return 0;
+}
+
 /**
  * Number of allocated logical CPUs in the system.
  * Must be [1, CONFIG_UKPLAT_CPU_MAXCOUNT) after boot
@@ -140,7 +151,10 @@ static void __noreturn lcpu_halt(struct uk_lcpu *this_cpu, int error_code)
 		/* Although we should not be able to recover via regular
 		 * interrupts, we might receive NMIs so loop to be safe.
 		 */
-		uk_lcpu_halt();
+		if (!pm_ops || !pm_ops->halt)
+			uk_arch_spinwait();
+		else
+			pm_ops->halt();
 	}
 
 	__builtin_unreachable();
@@ -149,6 +163,18 @@ static void __noreturn lcpu_halt(struct uk_lcpu *this_cpu, int error_code)
 void __noreturn uk_lcpu_halt(void)
 {
 	lcpu_halt(uk_lcpu_get_current(), 0);
+}
+
+void uk_lcpu_halt_irq(void)
+{
+	UK_ASSERT(uk_lcpu_irqs_disabled());
+
+	if (unlikely(!pm_ops || !pm_ops->halt_irq)) {
+		uk_pal_enable_irq();
+		uk_arch_spinwait();
+	} else {
+		pm_ops->halt_irq();
+	}
 }
 
 void uk_lcpu_halt_irq_until(__nsec until)
@@ -333,6 +359,14 @@ int uk_lcpu_start(const __u32 lcpuidx[], unsigned int *num,
 	UK_ASSERT(((lcpuidx) && (num)) || ((!lcpuidx) && (!num)));
 	UK_ASSERT(sp);
 
+	if (unlikely(!pm_ops || !pm_ops->start))
+		return -ENODEV;
+
+#if CONFIG_HAVE_CPU_MULTI_PHASE_STARTUP
+	if (unlikely(!pm_ops->post_start))
+		return -ENODEV;
+#endif /* CONFIG_HAVE_CPU_MULTI_PHASE_STARTUP */
+
 	uk_lcpu_lcpuidx_list_foreach(lcpuidx, num, n, i, lcpu) {
 		if (lcpu->id == this_cpu_id) {
 			/* If the caller did not supply an index array, we
@@ -384,7 +418,7 @@ retry:
 		 */
 		uk_arch_wmb();
 
-		rc = uk_pal_lcpu_start(lcpu, flags);
+		rc = pm_ops->start(lcpu);
 		if (unlikely(rc)) {
 			lcpu->state = UK_LCPU_STATE_HALTED;
 			lcpu->error_code = rc;
@@ -404,7 +438,7 @@ retry:
 	 * started CPUs. So if there has been an error, we won't touch
 	 * any CPUs not started.
 	 */
-	rc2 = uk_pal_lcpu_post_start(lcpuidx, &i);
+	rc2 = pm_ops->post_start(lcpuidx, &i);
 	if (unlikely(rc2)) {
 		if (num) {
 			UK_ASSERT(i <= *num);
@@ -472,7 +506,11 @@ int uk_lcpu_run(const __u32 lcpuidx[], unsigned int *num,
 		 * the function and trigger its execution
 		 */
 		while (1) {
-			rc = uk_pal_lcpu_run(lcpu, fn, flags);
+			rc = uk_lcpu_fn_enqueue(lcpu, fn);
+			if (unlikely(rc))
+				return rc;
+
+			rc = uk_pal_send_ipi(lcpu->id, *uk_lcpu_run_irqv);
 			if (unlikely(rc)) {
 				/* Retry if we could not enqueue the function
 				 * and it is ok to block
@@ -558,7 +596,7 @@ int uk_lcpu_wakeup(const __u32 lcpuidx[], unsigned int *num)
 		if (!uk_lcpu_state_is_online(lcpu->state))
 			continue;
 
-		rc = uk_pal_lcpu_wakeup(lcpu);
+		rc = uk_pal_send_ipi(lcpu->id, *uk_lcpu_wakeup_irqv);
 		if (unlikely(rc))
 			return rc;
 	}

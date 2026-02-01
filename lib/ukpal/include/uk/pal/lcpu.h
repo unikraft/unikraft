@@ -42,60 +42,14 @@ int uk_pal_lcpu_init(struct uk_lcpu *this_lcpu);
 int uk_pal_lcpu_mp_init(void *arg);
 
 /**
- * Start a logical CPU.
- * Brings the CPU out of reset and begins execution.
+ * Send an Interprocessor Interrupt.
  *
- * @param lcpu   LCPU to start
- * @param flags  Platform-specific startup flags
+ * @param id The CPU ID to send the IPI to
+ * @param irq The IRQ to send to the CPU
  * @return 0 on success, negative errno on failure
  */
-int uk_pal_lcpu_start(struct uk_lcpu *lcpu, unsigned long flags);
-
-#if CONFIG_HAVE_CPU_MULTI_PHASE_STARTUP
-/**
- * Finalize LCPU startup.
- * Performs post-start operations and synchronization.
- *
- * @param lcpuidx  Array of LCPU indices (NULL for all)
- * @param num      [IN] Number of indices, [OUT] number processed
- * @return 0 on success, negative errno on failure
- */
-int uk_pal_lcpu_post_start(const __u32 lcpuidx[], unsigned int *num);
-#endif /* CONFIG_HAVE_CPU_MULTI_PHASE_STARTUP */
-
-/**
- * Execute a function on a remote CPU.
- * Sends an inter-processor request to run the function.
- *
- * @param lcpu   Target LCPU
- * @param fn     Function to execute
- * @param flags  Execution flags
- * @return 0 on success, negative errno on failure
- */
-int uk_pal_lcpu_run(struct uk_lcpu *lcpu, const struct uk_lcpu_func *fn,
-		    unsigned long flags);
-
-/**
- * Wake up a halted CPU.
- * Resumes execution of a halted processor.
- *
- * @param lcpu  LCPU to wake
- * @return 0 on success, negative errno on failure
- */
-int uk_pal_lcpu_wakeup(struct uk_lcpu *lcpu);
+int uk_pal_send_ipi(__u64 id, unsigned long irq);
 #endif /* CONFIG_HAVE_SMP */
-
-/**
- * Halt the current CPU.
- * Stops execution until interrupted or reset.
- */
-void uk_pal_halt(void);
-
-/**
- * Halt the current CPU and wait for an interrupt.
- * Atomically enables interrupts and halts. Disables interrupts on wake.
- */
-void uk_pal_halt_irq(void);
 
 /**
  * Get logical CPU hardware identifier.
