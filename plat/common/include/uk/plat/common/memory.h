@@ -192,6 +192,8 @@ extern __uptr x86_start16_addr; /* target address */
 static inline int
 ukplat_memregion_alloc_sipi_vect(void)
 {
+#define X86_VIDEO_MEM_START	0xA0000UL
+#define X86_VIDEO_MEM_LEN	0x20000UL
 	__sz len;
 
 	len = (__sz)((__uptr)x86_start16_end - (__uptr)x86_start16_begin);
