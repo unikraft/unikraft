@@ -25,7 +25,7 @@
 
 #include <uk/arch/x86_64.h>
 #include <uk/arch/limits.h>
-#include <uk/arch/lcpu.h>
+#include <uk/lcpu.h>
 #include <x86/traps.h>
 #include <uk/config.h>
 #include <xen/xen.h>
@@ -214,44 +214,44 @@ ENTRY(ASM_TRAP_SYM(\trapname))
 .endm
 
 .macro RESTORE_ALL
-	movq __REGS_OFFSETOF_R15(%rsp), %r15
-	movq __REGS_OFFSETOF_R14(%rsp), %r14
-	movq __REGS_OFFSETOF_R13(%rsp), %r13
-	movq __REGS_OFFSETOF_R12(%rsp), %r12
-	movq __REGS_OFFSETOF_RBP(%rsp), %rbp
-	movq __REGS_OFFSETOF_RBX(%rsp), %rbx
-	movq __REGS_OFFSETOF_R11(%rsp), %r11
-	movq __REGS_OFFSETOF_R10(%rsp), %r10
-	movq __REGS_OFFSETOF_R9(%rsp),  %r9
-	movq __REGS_OFFSETOF_R8(%rsp),  %r8
-	movq __REGS_OFFSETOF_RAX(%rsp), %rax
-	movq __REGS_OFFSETOF_RCX(%rsp), %rcx
-	movq __REGS_OFFSETOF_RDX(%rsp), %rdx
-	movq __REGS_OFFSETOF_RSI(%rsp), %rsi
-	movq __REGS_OFFSETOF_RDI(%rsp), %rdi
-	addq $__REGS_OFFSETOF_RIP,%rsp
+	movq UK_LCPU_X86_64_REGS_OFFSETOF_R15(%rsp), %r15
+	movq UK_LCPU_X86_64_REGS_OFFSETOF_R14(%rsp), %r14
+	movq UK_LCPU_X86_64_REGS_OFFSETOF_R13(%rsp), %r13
+	movq UK_LCPU_X86_64_REGS_OFFSETOF_R12(%rsp), %r12
+	movq UK_LCPU_X86_64_REGS_OFFSETOF_RBP(%rsp), %rbp
+	movq UK_LCPU_X86_64_REGS_OFFSETOF_RBX(%rsp), %rbx
+	movq UK_LCPU_X86_64_REGS_OFFSETOF_R11(%rsp), %r11
+	movq UK_LCPU_X86_64_REGS_OFFSETOF_R10(%rsp), %r10
+	movq UK_LCPU_X86_64_REGS_OFFSETOF_R9(%rsp),  %r9
+	movq UK_LCPU_X86_64_REGS_OFFSETOF_R8(%rsp),  %r8
+	movq UK_LCPU_X86_64_REGS_OFFSETOF_RAX(%rsp), %rax
+	movq UK_LCPU_X86_64_REGS_OFFSETOF_RCX(%rsp), %rcx
+	movq UK_LCPU_X86_64_REGS_OFFSETOF_RDX(%rsp), %rdx
+	movq UK_LCPU_X86_64_REGS_OFFSETOF_RSI(%rsp), %rsi
+	movq UK_LCPU_X86_64_REGS_OFFSETOF_RDI(%rsp), %rdi
+	addq $UK_LCPU_X86_64_REGS_OFFSETOF_RIP,%rsp
 .endm
 
 .macro SAVE_ALL
 	/* rdi slot contains rax, oldrax contains error code */
 	cld
-	subq $__REGS_OFFSETOF_RDI, %rsp
-	movq %rsi, __REGS_OFFSETOF_RSI(%rsp)
-	movq __REGS_OFFSETOF_RDI(%rsp), %rsi    /* load rax from rdi slot */
-	movq %rdx, __REGS_OFFSETOF_RDX(%rsp)
-	movq %rcx, __REGS_OFFSETOF_RCX(%rsp)
-	movq %rsi, __REGS_OFFSETOF_RAX(%rsp)    /* store rax */
-	movq %r8,  __REGS_OFFSETOF_R8(%rsp)
-	movq %r9,  __REGS_OFFSETOF_R9(%rsp)
-	movq %r10, __REGS_OFFSETOF_R10(%rsp)
-	movq %r11, __REGS_OFFSETOF_R11(%rsp)
-	movq %rbx, __REGS_OFFSETOF_RBX(%rsp)
-	movq %rbp, __REGS_OFFSETOF_RBP(%rsp)
-	movq %r12, __REGS_OFFSETOF_R12(%rsp)
-	movq %r13, __REGS_OFFSETOF_R13(%rsp)
-	movq %r14, __REGS_OFFSETOF_R14(%rsp)
-	movq %r15, __REGS_OFFSETOF_R15(%rsp)
-	movq %rdi, __REGS_OFFSETOF_RDI(%rsp)    /* put rdi into the slot */
+	subq $UK_LCPU_X86_64_REGS_OFFSETOF_RDI, %rsp
+	movq %rsi, UK_LCPU_X86_64_REGS_OFFSETOF_RSI(%rsp)
+	movq UK_LCPU_X86_64_REGS_OFFSETOF_RDI(%rsp), %rsi    /* load rax from rdi slot */
+	movq %rdx, UK_LCPU_X86_64_REGS_OFFSETOF_RDX(%rsp)
+	movq %rcx, UK_LCPU_X86_64_REGS_OFFSETOF_RCX(%rsp)
+	movq %rsi, UK_LCPU_X86_64_REGS_OFFSETOF_RAX(%rsp)    /* store rax */
+	movq %r8,  UK_LCPU_X86_64_REGS_OFFSETOF_R8(%rsp)
+	movq %r9,  UK_LCPU_X86_64_REGS_OFFSETOF_R9(%rsp)
+	movq %r10, UK_LCPU_X86_64_REGS_OFFSETOF_R10(%rsp)
+	movq %r11, UK_LCPU_X86_64_REGS_OFFSETOF_R11(%rsp)
+	movq %rbx, UK_LCPU_X86_64_REGS_OFFSETOF_RBX(%rsp)
+	movq %rbp, UK_LCPU_X86_64_REGS_OFFSETOF_RBP(%rsp)
+	movq %r12, UK_LCPU_X86_64_REGS_OFFSETOF_R12(%rsp)
+	movq %r13, UK_LCPU_X86_64_REGS_OFFSETOF_R13(%rsp)
+	movq %r14, UK_LCPU_X86_64_REGS_OFFSETOF_R14(%rsp)
+	movq %r15, UK_LCPU_X86_64_REGS_OFFSETOF_R15(%rsp)
+	movq %rdi, UK_LCPU_X86_64_REGS_OFFSETOF_RDI(%rsp)    /* put rdi into the slot */
 .endm
 
 .macro HYPERVISOR_IRET
@@ -282,8 +282,8 @@ error_entry:
 	SAVE_ALL
 
 	movq %rsp,%rdi
-	movq __REGS_OFFSETOF_ORIG_RAX(%rsp),%rsi	# get error code
-	movq $-1,__REGS_OFFSETOF_ORIG_RAX(%rsp)
+	movq UK_LCPU_X86_64_REGS_OFFSETOF_ORIG_RAX(%rsp),%rsi        # get error code
+	movq $-1,UK_LCPU_X86_64_REGS_OFFSETOF_ORIG_RAX(%rsp)
 	call *%rax
 	jmp error_exit
 
@@ -299,7 +299,7 @@ hypervisor_callback2:
 	movq %rdi, %rsp
 
 	/* check against event re-entrant */
-	movq __REGS_OFFSETOF_RIP(%rsp),%rax
+	movq UK_LCPU_X86_64_REGS_OFFSETOF_RIP(%rsp),%rax
 	leaq scrit(%rip),%r9
 	cmpq %r9,%rax
 	jb 11f
@@ -316,7 +316,7 @@ hypervisor_callback2:
 	decl %gs:0
 
 error_exit:
-	movl __REGS_OFFSETOF_EFLAGS(%rsp), %eax
+	movl UK_LCPU_X86_64_REGS_OFFSETOF_RFLAGS(%rsp), %eax
 	shr $9, %eax			# EAX[0] == IRET_RFLAGS.IF
 	XEN_GET_VCPU_INFO(%rsi)
 	andb evtchn_upcall_mask(%rsi),%al
@@ -362,11 +362,11 @@ hypervisor_prologue:
 
 critical_region_fixup:
 	# Set up source and destination region pointers
-	leaq __REGS_OFFSETOF_RIP(%rsp),%rsi   # esi points at end of src region
+	leaq UK_LCPU_X86_64_REGS_OFFSETOF_RIP(%rsp),%rsi   # esi points at end of src region
 	# Acquire interrupted rsp which was saved-on-stack. This points to
 	# the end of dst region. Note that it is not necessarily current rsp
 	# plus 0xb0, because the second interrupt might align the stack frame.
-	movq __REGS_OFFSETOF_RSP(%rsp),%rdi   # edi points at end of dst region
+	movq UK_LCPU_X86_64_REGS_OFFSETOF_RSP(%rsp),%rdi   # edi points at end of dst region
 
 	leaq restore_end(%rip),%r9
 	cmpq %r9,%rax
@@ -375,11 +375,11 @@ critical_region_fixup:
 	# If interrupted rip is before restore_end
 	# then rax hasn't been restored yet
 	movq (%rdi),%rax
-	movq %rax, __REGS_OFFSETOF_RAX(%rsp)  # save rax
+	movq %rax, UK_LCPU_X86_64_REGS_OFFSETOF_RAX(%rsp)  # save rax
 	addq $RSP_OFFSET,%rdi
 
 	# Set up the copy
-13:	movq $__REGS_OFFSETOF_RIP,%rcx
+13:	movq $UK_LCPU_X86_64_REGS_OFFSETOF_RIP,%rcx
 	shr  $3,%rcx          # convert bytes into count of 64-bit entities
 15:	subq $8,%rsi          # pre-decrementing copy loop
 	subq $8,%rdi
@@ -387,7 +387,7 @@ critical_region_fixup:
 	movq %rax,(%rdi)
 	loop 15b
 16:	movq %rdi,%rsp        # final rdi is top of merged stack
-	andb $KERNEL_CS_MASK,__REGS_OFFSETOF_CS(%rsp)  # CS might have changed
+	andb $KERNEL_CS_MASK,UK_LCPU_X86_64_REGS_OFFSETOF_CS(%rsp)  # CS might have changed
 	jmp  11b
 #endif
 

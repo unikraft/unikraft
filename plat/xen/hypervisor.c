@@ -39,7 +39,7 @@
 
 #include <xen/memory.h>
 #include <xen/hvm/hvm_op.h>
-#include <uk/arch/lcpu.h>
+#include <uk/lcpu.h>
 #include <uk/atomic.h>
 #include <uk/bitops/bitscan.h>
 
@@ -48,7 +48,7 @@
 
 int in_callback;
 
-void do_hypervisor_callback(struct __regs *regs)
+void do_hypervisor_callback(struct uk_lcpu_regs *regs)
 {
 	unsigned long l1, l2, l1i, l2i;
 	unsigned int port;

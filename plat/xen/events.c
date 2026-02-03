@@ -42,6 +42,7 @@
 #include <uk/assert.h>
 #include <uk/bitops/bitmap.h>
 #include <uk/arch/util.h>
+#include <uk/lcpu.h>
 
 #define NR_EVS 1024
 
@@ -55,12 +56,12 @@ typedef struct _ev_action_t {
 } ev_action_t;
 
 struct uk_event_irq_data {
-	struct __regs *regs;
+	struct uk_lcpu_regs *regs;
 	unsigned long irq;
 };
 
 static ev_action_t ev_actions[NR_EVS];
-static void default_handler(evtchn_port_t port, struct __regs *regs,
+static void default_handler(evtchn_port_t port, struct uk_lcpu_regs *regs,
 			    void *data);
 
 static unsigned long bound_ports[NR_EVS/(8*sizeof(unsigned long))];
@@ -91,7 +92,7 @@ void unbind_all_ports(void)
 /*
  * Demux events to different handlers.
  */
-int do_event(evtchn_port_t port, struct __regs *regs)
+int do_event(evtchn_port_t port, struct uk_lcpu_regs *regs)
 {
 	ev_action_t *action;
 	int rc;
@@ -229,7 +230,7 @@ void suspend_events(void)
 }
 #endif
 
-static void default_handler(evtchn_port_t port, struct __regs *regs __unused,
+static void default_handler(evtchn_port_t port, struct uk_lcpu_regs *regs __unused,
 			    void *ignore __unused)
 {
 	uk_pr_info("[Port %d] - event received\n", port);
@@ -337,7 +338,7 @@ inline void unmask_evtchn(evtchn_port_t port)
 #ifdef XEN_HAVE_PV_UPCALL_MASK
 		if (!vcpu_info->evtchn_upcall_mask)
 #endif
-			ukplat_lcpu_irqs_handle_pending();
+			uk_lcpu_irqs_handle_pending();
 	}
 }
 
@@ -352,7 +353,7 @@ struct uk_alloc;
 
 int ukplat_irq_init(struct uk_alloc *a __unused)
 {
-	UK_ASSERT(ukplat_lcpu_irqs_disabled());
+	UK_ASSERT(uk_lcpu_irqs_disabled());
 
 	/* Nothing for now */
 	return 0;

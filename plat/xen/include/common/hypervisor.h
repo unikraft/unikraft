@@ -48,10 +48,9 @@
 #else
 #error "Unsupported architecture"
 #endif
-#include <uk/arch/lcpu.h>
-#include <uk/plat/lcpu.h>
+#include <uk/lcpu.h>
 
-void do_hypervisor_callback(struct __regs *regs);
+void do_hypervisor_callback(struct uk_lcpu_regs *regs);
 
 extern int in_callback;
 

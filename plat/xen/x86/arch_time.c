@@ -199,13 +199,13 @@ void time_block_until(__snsec until)
 
 	if ((__snsec) ukplat_monotonic_clock() < until) {
 		HYPERVISOR_set_timer_op(until);
-		ukplat_lcpu_halt_irq();
+		uk_lcpu_halt_irq();
 		HYPERVISOR_set_timer_op(0);
 	}
 }
 
 static void timer_handler(evtchn_port_t ev __unused,
-		struct __regs *regs __unused, void *ign __unused)
+		struct uk_lcpu_regs *regs __unused, void *ign __unused)
 {
 	__nsec until = ukplat_monotonic_clock() + UKPLAT_TIME_TICK_NSEC;
 
