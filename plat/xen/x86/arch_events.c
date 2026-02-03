@@ -30,6 +30,7 @@
 #include <stdint.h>
 #include <x86/cpu.h>
 #include <uk/arch/ctx.h>
+#include <uk/arch/util.h>
 #include <uk/plat/config.h>
 #include <uk/essentials.h>
 
@@ -47,7 +48,7 @@ void arch_init_events(void)
 #if defined(__x86_64__)
 	asm volatile("movl %0,%%fs ; movl %0,%%gs" :: "r" (0));
 	/* 0xc0000101 is MSR_GS_BASE */
-	wrmsrl(0xc0000101, (uint64_t) &cpu0_pda);
+	uk_arch_x86_64_wrmsrl(0xc0000101, (uint64_t) &cpu0_pda);
 	cpu0_pda.irqcount = -1;
 	cpu0_pda.irqstackptr =
 			(void *) ((unsigned long) irqstack + STACK_SIZE);
@@ -61,6 +62,6 @@ void arch_unbind_ports(void)
 void arch_fini_events(void)
 {
 #if defined(__x86_64__)
-	wrmsrl(0xc0000101, 0); /* 0xc0000101 is MSR_GS_BASE */
+	uk_arch_x86_64_wrmsrl(0xc0000101, 0); /* 0xc0000101 is MSR_GS_BASE */
 #endif
 }

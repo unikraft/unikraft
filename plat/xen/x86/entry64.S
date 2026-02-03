@@ -23,7 +23,7 @@
  */
 /* Taken from Mini-OS */
 
-#include <uk/arch/types.h>
+#include <uk/arch/x86_64.h>
 #include <uk/arch/limits.h>
 #include <uk/arch/lcpu.h>
 #include <x86/traps.h>
@@ -81,12 +81,12 @@ _libxenplat_start:
 	movq %cr4, %rdi
 	/* FPU and SSE are part of base x86-64, so no need to check for their
 	 * availability before enabling and initializing. */
-	andl $(~(X86_CR0_EM | X86_CR0_TS)), %esi
-	orl $(X86_CR0_MP | X86_CR0_NE), %esi
+	andl $(~(UK_ARCH_X86_64_CR0_EM | UK_ARCH_X86_64_CR0_TS)), %esi
+	orl $(UK_ARCH_X86_64_CR0_MP | UK_ARCH_X86_64_CR0_NE), %esi
 	movq %rsi, %cr0
 	fninit
 #if __SSE__
-	orl $(X86_CR4_OSFXSR | X86_CR4_OSXMMEXCPT), %edi
+	orl $(UK_ARCH_X86_64_CR4_OSFXSR | UK_ARCH_X86_64_CR4_OSXMMEXCPT), %edi
 	movq %rdi, %cr4
 
 	leaq mxcsr_ptr(%rip),%r9
@@ -100,18 +100,18 @@ _libxenplat_start:
 	/* ecx and edx now contain capability information, so we can now
 	 * enable capabilities based on the indicated features */
 	/* note: OSXSAVE needs to be enabled before AVX and PKU */
-	testl $(X86_CPUID1_ECX_XSAVE), %ecx
+	testl $(UK_ARCH_X86_64_CPUID1_ECX_XSAVE), %ecx
 	jz noxsave
-	orl $(X86_CR4_OSXSAVE), %edi
+	orl $(UK_ARCH_X86_64_CR4_OSXSAVE), %edi
 	movq %rdi, %cr4
 #if __AVX__
 	/* now enable AVX. This needs to be last checking cpuid features from
 	 * the eax=1 cpuid call, because it clobbers ecx */
-	testl $(X86_CPUID1_ECX_AVX), %ecx
+	testl $(UK_ARCH_X86_64_CPUID1_ECX_AVX), %ecx
 	jz noavx
 	xorl %ecx, %ecx
 	xgetbv
-	orl $(X86_XCR0_SSE | X86_XCR0_AVX), %eax
+	orl $(UK_ARCH_X86_64_XCR0_SSE | UK_ARCH_X86_64_XCR0_AVX), %eax
 	xsetbv
 noavx:
 #endif /* __AVX__ */
@@ -124,25 +124,25 @@ noxsave:
 	cpuid
 	/* ebx, ecx, edx now contain extended capabilities information. */
 	/* check for and enable FS/GSBASE */
-	testl $(X86_CPUID7_EBX_FSGSBASE), %ebx
+	testl $(UK_ARCH_X86_64_CPUID7_EBX_FSGSBASE), %ebx
 	jz nofsgsbase
-	orl $(X86_CR4_FSGSBASE), %edi
+	orl $(UK_ARCH_X86_64_CR4_FSGSBASE), %edi
 	movq %rdi, %cr4
 nofsgsbase:
 #if CONFIG_HAVE_X86PKU
 	/* check for Memory Protection Keys (PKU) */
-	testl $(X86_CPUID7_ECX_PKU), %ecx
+	testl $(UK_ARCH_X86_64_CPUID7_ECX_PKU), %ecx
 	jz nopku
 	/* only enable PKU if we support XSAVE */
-	testl $(X86_CR4_OSXSAVE), %edi
+	testl $(UK_ARCH_X86_64_CR4_OSXSAVE), %edi
 	jz nopku
 	/* PKU is supported, enable it via CR4 */
-	orl $(X86_CR4_PKE), %edi
+	orl $(UK_ARCH_X86_64_CR4_PKE), %edi
 	movq %rdi, %cr4
 	/* also enable XSAVE for the PKRU */
 	xorl %ecx, %ecx
 	xgetbv
-	orl $(X86_XCR0_PKRU), %eax
+	orl $(UK_ARCH_X86_64_XCR0_PKRU), %eax
 	xsetbv
 nopku:
 #endif /* CONFIG_HAVE_X86PKU */

@@ -41,6 +41,7 @@
 #include <uk/event.h>
 #include <uk/assert.h>
 #include <uk/bitops/bitmap.h>
+#include <uk/arch/util.h>
 
 #define NR_EVS 1024
 
@@ -129,7 +130,7 @@ evtchn_port_t bind_evtchn(evtchn_port_t port, evtchn_handler_t handler,
 			   port);
 
 	ev_actions[port].data = data;
-	wmb();
+	uk_arch_wmb();
 	ev_actions[port].handler = handler;
 	__uk_set_bit(port, bound_ports);
 
@@ -147,7 +148,7 @@ void unbind_evtchn(evtchn_port_t port)
 	clear_evtchn(port);
 
 	ev_actions[port].handler = default_handler;
-	wmb();
+	uk_arch_wmb();
 	ev_actions[port].data = NULL;
 	__uk_clear_bit(port, bound_ports);
 

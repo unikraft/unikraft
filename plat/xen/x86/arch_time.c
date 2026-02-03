@@ -43,6 +43,7 @@
 #include <common/events.h>
 #include <xen-x86/irq.h>
 #include <uk/assert.h>
+#include <uk/arch/util.h>
 
 /************************************************************************
  * Time functions
@@ -118,7 +119,7 @@ static unsigned long get_nsec_offset(void)
 {
 	uint64_t now, delta;
 
-	now = rdtsc();
+	now = uk_arch_x86_64_rdtsc();
 	delta = now - shadow.tsc_timestamp;
 
 	return scale_delta(delta, shadow.tsc_to_nsec_mul, shadow.tsc_shift);
