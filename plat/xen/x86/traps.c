@@ -30,6 +30,7 @@
 #include <uk/pm.h>
 #include <uk/pcpuvar.h>
 #include <uk/print.h>
+#include <uk/plat/xen/auxsp.h>
 
 #include <common/hypervisor.h>
 #include <xen-x86/smp.h>
