@@ -37,6 +37,8 @@
  */
 #include <string.h>
 #include <libfdt.h>
+#include <uk/arch/arm64.h>
+#include <uk/arch/util.h>
 #include <uk/config.h>
 #include <uk/essentials.h>
 #include <uk/print.h>
@@ -67,9 +69,9 @@
 	((void *)(gdev.rdist_mem_addr + (r) +			\
 	lcpu_get_current()->idx * GICR_STRIDE))
 
-#define GIC_AFF_TO_ROUTER(aff, mode)				\
-	((((__u64)(aff) << 8) & MPIDR_AFF3_MASK) | ((aff) & 0xffffff) | \
-	 ((__u64)(mode) << 31))
+#define GIC_AFF_TO_ROUTER(aff, mode)					\
+	((((__u64)(aff) << 8) & UK_ARCH_ARM64_MPIDR_EL1_AFF3_MASK) |	\
+	 ((aff) & 0xffffff) | ((__u64)(mode) << 31))
 
 #ifdef CONFIG_HAVE_SMP
 __spinlock gicv3_dist_lock;
@@ -154,12 +156,12 @@ static void wait_for_rwp(__u64 offset)
 static __u32 get_cpu_affinity(void)
 {
 	__u64 aff;
-	__u64 mpidr = SYSREG_READ64(MPIDR_EL1);
+	__u64 mpidr = UK_ARCH_ARM64_SYSREG_READ64(MPIDR_EL1);
 
-	aff = ((mpidr & MPIDR_AFF3_MASK) >> 8) |
-		(mpidr & MPIDR_AFF2_MASK) |
-		(mpidr & MPIDR_AFF1_MASK) |
-		(mpidr & MPIDR_AFF0_MASK);
+	aff = ((mpidr & UK_ARCH_ARM64_MPIDR_EL1_AFF3_MASK) >> 8) |
+		(mpidr & UK_ARCH_ARM64_MPIDR_EL1_AFF2_MASK) |
+		(mpidr & UK_ARCH_ARM64_MPIDR_EL1_AFF1_MASK) |
+		(mpidr & UK_ARCH_ARM64_MPIDR_EL1_AFF0_MASK);
 
 	return (__u32)aff;
 }
@@ -251,14 +253,14 @@ static void gicv3_sgi_gen(__u8 sgintid, __u32 cpuid)
 	sgi_register |= (sgintid << 24);
 
 	/* Set affinity fields and optional range selector */
-	sgi_register |= (extended_cpuid & MPIDR_AFF3_MASK) << 48;
-	sgi_register |= (extended_cpuid & MPIDR_AFF2_MASK) << 32;
-	sgi_register |= (extended_cpuid & MPIDR_AFF1_MASK) << 16;
+	sgi_register |= (extended_cpuid & UK_ARCH_ARM64_MPIDR_EL1_AFF3_MASK) << 48;
+	sgi_register |= (extended_cpuid & UK_ARCH_ARM64_MPIDR_EL1_AFF2_MASK) << 32;
+	sgi_register |= (extended_cpuid & UK_ARCH_ARM64_MPIDR_EL1_AFF1_MASK) << 16;
 	/**
 	 ** For affinity 0, we need to find which group of 16 values is
 	 ** represented by the TargetList field in ICC_SGI1R_EL1.
 	 **/
-	aff0 = extended_cpuid & MPIDR_AFF0_MASK;
+	aff0 = extended_cpuid & UK_ARCH_ARM64_MPIDR_EL1_AFF0_MASK;
 	if (aff0 >= 16) {
 		control_register_rss = SYSREG_READ64(ICC_CTLR_EL1) & (1 << 18);
 		type_register_rss =  read_gicd32(GICD_TYPER)  & (1 << 26);
