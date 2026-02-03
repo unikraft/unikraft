@@ -32,8 +32,8 @@
  *
  * $FreeBSD$
  */
+
 #include <uk/asm/lcpu.h>
-#include <uk/lcpu.h>
 #include <uk/arch/limits.h>
 #include <uk/asm.h>
 #include <uk/reloc.h>

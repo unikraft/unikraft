@@ -31,10 +31,9 @@
 #include <uk/assert.h>
 #include <uk/boot.h>
 #include <uk/intctlr.h>
-#include <arm/cpu.h>
-#include <arm/arm64/cpu.h>
 #include <arm/smccc.h>
 #include <uk/arch/limits.h>
+#include <uk/arch/util.h>
 
 #if CONFIG_ENFORCE_W_XOR_X && CONFIG_LIBUKPAGING
 #include <uk/plat/common/w_xor_x.h>
@@ -174,14 +173,13 @@ void __no_pauth _ukplat_entry(void)
 		UK_CRASH("Could not initialize the IRQ controller: %d\n", rc);
 
 	/* Initialize logical boot CPU */
-	rc = lcpu_init(lcpu_get_bsp());
+	rc = uk_lcpu_init(uk_lcpu_get_bsp());
 	if (unlikely(rc))
 		UK_CRASH("Failed to initialize bootstrapping CPU: %d\n", rc);
 
 #ifdef CONFIG_HAVE_SMP
-	rc = uk_lcpu_mp_init(CONFIG_UKPLAT_LCPU_RUN_IRQ,
-			     CONFIG_UKPLAT_LCPU_WAKEUP_IRQ,
-			     (void *)bi->dtb);
+	rc = uk_lcpu_mp_init(CONFIG_LIBUKLCPU_RUN_IRQ,
+			     CONFIG_LIBUKLCPU_WAKEUP_IRQ);
 	if (unlikely(rc))
 		UK_CRASH("SMP initialization failed: %d.\n", rc);
 #endif /* CONFIG_HAVE_SMP */
@@ -195,6 +193,6 @@ void __no_pauth _ukplat_entry(void)
 	 */
 	uk_pr_info("Switch from bootstrap stack to stack @%p\n", bstack);
 
-	lcpu_arch_jump_to((__u64)bstack, (__u64)uk_boot_entry);
+	uk_arch_arm64_jump_to((__u64)bstack, (__u64)uk_boot_entry);
 	uk_lcpu_halt();
 }

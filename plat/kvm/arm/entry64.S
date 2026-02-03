@@ -29,8 +29,8 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+
 #include <uk/asm/lcpu.h>
-#include <uk/lcpu.h>
 #include <uk/arch/limits.h>
 #include <uk/asm.h>
 #include <uk/plat/common/sections.h>
@@ -128,6 +128,10 @@ ENTRY(_libkvmplat_entry)
 
 	/* Enable the mmu */
 	bl start_mmu
+
+	/* Set TPIDR_EL1 for BSP (idx=0): base + 0 * size = base */
+	ur_addr	x1, _uk_pcpuvar_base
+	msr	tpidr_el1, x1
 
 	/* Jump to early init */
 #if defined(CONFIG_KVM_BOOT_PROTO_LXBOOT)

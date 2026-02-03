@@ -1,43 +1,26 @@
 /* SPDX-License-Identifier: ISC */
-/*-
- *
- * Copyright (c) 2014 Andrew Turner, All rights reserved.
+/* Copyright (c) 2014 Andrew Turner, All rights reserved.
  * Copyright (c) 2018 Arm Ltd., All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- *
- * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
- * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
- * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
- * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
- * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
- * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
- * SUCH DAMAGE.
- *
+ * Copyright (c) 2025, Unikraft GmbH and The Unikraft Authors.
+ * Licensed under the ISC License (the "License").
+ * You may not use this file except in compliance with the License.
  */
+
 #include <uk/arch/ctx.h>
 #include <uk/asm.h>
 #include <uk/asm/lcpu.h>
-#include <uk/lcpu.h>
 #include <uk/plat/config.h>
+#include <uk/plat/native/except.h>
+#include <uk/pcpuvar.h>
 #include <uk/reloc.h>
 
 #define TYPE_CRIT				0
 #define TYPE_TRAP				1
 #define TYPE_IRQ				2
 
-.extern ukarch_except_switch_stack
+.extern uk_plat_native_except_switch_stack
+.extern uk_plat_native_except_stack_base
+.extern _uk_pcpuvar_base
 
 .macro EXCHANGE_SP_WITH_X0
 	add sp, sp, x0	// new_sp = sp + x0
@@ -46,61 +29,68 @@
 .endm
 
 .macro ALIGN_STACK
-	// First, exchange the SP with x0
+	/* First, exchange the SP with x0 */
 	EXCHANGE_SP_WITH_X0
 
-	// Check whether the stack is alignment
+	/* Check whether the stack is aligned */
 	tst x0, #0xf
-	// If yes, save and go out. If not, align the stack
+	/* If yes, save and go out. If not, align the stack */
 	b.eq 0f
 
-	// Start to align the stack.
+	/* Start to align the stack. */
 
-	// We will use the x1 as temporary, save x1 to stack temporary
+	/* We will use the x1 as temporary, save x1 to stack temporary */
 	str x1, [x0]
 
-	// Align down sp to 16-byte, save old sp to aligned_sp[__SP_OFFSET]
+	/* Align down sp to 16-byte, save old sp to
+	 * aligned sp[UK_PLAT_NATIVE_ARM64_REGS_OFFSETOF_SP]
+	 */
 	bic x1, x0, #0xf
-	str x0, [x1, #__SP_OFFSET]
+	str x0, [x1, #UK_PLAT_NATIVE_ARM64_REGS_OFFSETOF_SP]
 
-	// Restore x1 before x0 is overridden
+	/* Restore x1 before x0 is overridden */
 	ldr x1, [x0]
 
-	// Save aligned_sp to x0
+	/* Save aligned_sp to x0 */
 	bic x0, x0, #0xf
 	b 1f
 0:
-	str x0, [x0, #__SP_OFFSET]
+	str x0, [x0, #UK_PLAT_NATIVE_ARM64_REGS_OFFSETOF_SP]
 1:
-	// Change back the SP from x0
+	/* Change back the SP from x0 */
 	EXCHANGE_SP_WITH_X0
 .endm
 
 .macro SAVE_REGS, except_type
-	/* Use TPIDRRO_EL0 as scratch register. It is fine to do so because
-	 * it will always hold a value the application can't modify and we will
-	 * always be able to restore it to its desired known value anytime we
-	 * want. Thus, temporarily store x0.
+	/* Use TPIDRRO_EL0 and SP_EL0 to save x0 and x1, as we can't
+	 * assume that there is space for temporary register storage
+	 * in the application's stack.
+	 * TPIDRRO_EL0 contains the application's TLS pointer, which is
+	 * set by the kernel, and thus we can restore on exception
+	 * return.
+	 * SP_EL0 is only accessible in EL1, so we are sure that the
+	 * application does not rely on it in any way.
 	 */
 	msr     tpidrro_el0, x0
+	msr     sp_el0, x1
 
-	ur_ldr	x0, ukarch_except_switch_stack
-	cbz	x0, 0f
+	uk_pcpuvar_arm64_ldr	x0, UK_PLAT_NATIVE_EXCEPT_SWITCH_STACK_SYM, x1
+	cbz			x0, 0f
 	EXCHANGE_SP_WITH_X0
 	b	1f
 0:
 	/* Fetch `lcpu_except_stack` of LCPU:
-	 *  CPU_EXCEPT_STACK_SIZE  CPU_EXCEPT_STACK_SIZE  CPU_EXCEPT_STACK_SIZE
-	 *<--------------------><---------------------><-------------------->
-	 *|=================================================================|
-	 *|                     |                     |			    |
-	 *|	crit stack      |       trap stack    |        IRQ stack    |
-	 *|                     |                     |                     |
-	 *|=================================================================|
+	 * CPU_EXCEPT_STACK_SIZE  CPU_EXCEPT_STACK_SIZE  CPU_EXCEPT_STACK_SIZE
+	 *<---------------------><---------------------><--------------------->
+	 *|===================================================================|
+	 *|                     |                      |                      |
+	 *|	crit stack      |       trap stack     |        IRQ stack     |
+	 *|                     |                      |                      |
+	 *|===================================================================|
 	 * ^
-	 * SP_EL0/lcpu_except_stack
+	 * EXCEPT_STACK_BASE_SYM
 	 */
-	mrs     x0, sp_el0
+	uk_pcpuvar_arm64_ldr	x0, UK_PLAT_NATIVE_EXCEPT_STACK_BASE_SYM, x1
 
 	/* Make it so that SP contains SP_EL0 and x0 contains old SP */
 	EXCHANGE_SP_WITH_X0
@@ -133,10 +123,9 @@
 	/* If we are in a system call trap then switch to auxiliary stack
 	 * from the current lcpu pointer
 	 */
-	mrs	x0, tpidr_el1
-	ldr	x0, [x0, #LCPU_AUXSP_OFFSET]
-	sub	x0, x0, #UKARCH_AUXSPCB_SIZE
-	ldr	x0, [x0, #UKARCH_AUXSPCB_OFFSETOF_CURR_FP]
+	uk_pcpuvar_arm64_ldr	x0, UK_PLAT_NATIVE_AUXSP_SYM, x1
+	sub			x0, x0, #UKARCH_AUXSPCB_SIZE
+	ldr			x0, [x0, #UKARCH_AUXSPCB_OFFSETOF_CURR_FP]
 
 	/**
 	 * Current stack pointer now points to the current frame pointer
@@ -163,10 +152,10 @@
 	 *         8 bytes| |pushed auxsp | |             |
 	 *                v |-------------| v             |
 	 *                ^ |  struct     | ^             |
-	 *                | |  __regs     | |UK_LCPU_REGS_SIZE|
+	 *                | |   regs      | | REGS_SIZE   |
 	 *                | |-------------| v             |
 	 *                | |  struct     | ^             |uk_syscall_ctx
-	 *      struct    | |ukarch_sysctx| |SYSCTX_SIZE  |
+	 *      struct    | |  sysctx     | |SYSCTX_SIZE  |
 	 *  ukarch_execenv| |-------------| v             |
 	 *                | |             | ^             |
 	 *                | |  struct     | |             |
@@ -197,17 +186,17 @@
 
 	/* Restore old SP we stored before system call check */
 	ldr	x0, [x0, #-16]
-	str	x0, [sp, #__SP_OFFSET]  /* Store old SP in auxiliary stack */
-	mrs	x0, tpidr_el1
-	ldr	x0, [x0, #LCPU_AUXSP_OFFSET]
+	str	x0, [sp, #UK_PLAT_NATIVE_ARM64_REGS_OFFSETOF_SP]  /* Store old SP in auxiliary stack */
+	uk_pcpuvar_arm64_ldr	x0, UK_PLAT_NATIVE_AUXSP_SYM, x1
 	str	x0, [sp, #UKARCH_EXECENV_SIZE]
 	b	3f
 .endif
 2:
-	sub	sp, sp, #__TRAP_STACK_SIZE
+	sub	sp, sp, #UK_PLAT_NATIVE_REGS_SIZE
 3:
-	/* Restore x0 */
+	/* Restore x0, x1 */
 	mrs     x0, tpidrro_el0
+	mrs     x1, sp_el0
 
 	/* Save general purpose registers */
 	stp	x0, x1, [sp, #16 * 0]
@@ -267,7 +256,7 @@
 	ldp	x0, x1, [sp, #16 * 0]
 
 	/* Restore stack pointer for exception from EL1 */
-	ldr	x18, [sp, #__SP_OFFSET]
+	ldr	x18, [sp, #UK_PLAT_NATIVE_ARM64_REGS_OFFSETOF_SP]
 	mov	x19, sp
 	mov	sp, x18
 
@@ -287,7 +276,7 @@ el1_sync:
 	SAVE_REGS TYPE_TRAP
 	mov x0, sp
 	mrs x1, far_el1
-	bl trap_el1_sync
+	bl uk_plat_native_except_err_handler
 	RESTORE_REGS
 
 .align 6
@@ -295,7 +284,7 @@ el1_irq:
 	SAVE_REGS TYPE_IRQ
 	msr daifclr, #4 /* Unmask SError */
 	mov x0, sp
-	bl trap_el1_irq
+	bl uk_plat_native_except_irq_handler
 	RESTORE_REGS
 
 /* Bad Abort numbers */
@@ -304,16 +293,16 @@ el1_irq:
 #define BAD_FIQ   2
 #define BAD_ERROR 3
 
-#define el_invalid(name, reason, el)	\
-.align 6;				\
-name##_invalid:				\
-	SAVE_REGS TYPE_CRIT;		\
-	mov x0, sp;			\
-	mov x1, el;			\
-	mov x2, #(reason);		\
-	mrs x3, far_el1;		\
-	b   invalid_trap_handler;	\
-ENDPROC(name##_invalid);		\
+#define el_invalid(name, reason, el)		\
+.align 6;					\
+name##_invalid:					\
+	SAVE_REGS TYPE_CRIT;			\
+	mov x0, sp;				\
+	mov x1, el;				\
+	mov x2, #(reason);			\
+	mrs x3, far_el1;			\
+	b   uk_plat_native_except_inv_handler;	\
+ENDPROC(name##_invalid);			\
 
 el_invalid(el1_sync, BAD_SYNC, 1);
 el_invalid(el0_sync, BAD_SYNC, 0);
