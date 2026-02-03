@@ -27,31 +27,11 @@
  * Arch-specific events functions
  * Ported from Mini-OS
  */
-#include <stdint.h>
-#include <uk/arch/ctx.h>
-#include <uk/arch/util.h>
-#include <uk/plat/config.h>
-#include <uk/essentials.h>
 
-#if defined(__x86_64__)
-char irqstack[CPU_EXCEPT_STACK_SIZE] __align(UKARCH_SP_ALIGN);
-
-static struct pda {
-	int irqcount;       /* offset 0 (used in x86_64.S) */
-	char *irqstackptr;  /*        8 */
-} cpu0_pda;
-#endif
+/* Stubbed for x86 until common code is ported to not require these funcs */
 
 void arch_init_events(void)
 {
-#if defined(__x86_64__)
-	asm volatile("movl %0,%%fs ; movl %0,%%gs" :: "r" (0));
-	/* 0xc0000101 is MSR_GS_BASE */
-	uk_arch_x86_64_wrmsrl(0xc0000101, (uint64_t) &cpu0_pda);
-	cpu0_pda.irqcount = -1;
-	cpu0_pda.irqstackptr =
-			(void *) ((unsigned long) irqstack + STACK_SIZE);
-#endif
 }
 
 void arch_unbind_ports(void)
@@ -60,7 +40,4 @@ void arch_unbind_ports(void)
 
 void arch_fini_events(void)
 {
-#if defined(__x86_64__)
-	uk_arch_x86_64_wrmsrl(0xc0000101, 0); /* 0xc0000101 is MSR_GS_BASE */
-#endif
 }

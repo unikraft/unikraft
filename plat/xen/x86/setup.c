@@ -100,11 +100,6 @@ shared_info_t *HYPERVISOR_shared_info;
  */
 char _libxenplat_bootstack[2*__STACK_SIZE];
 
-static inline void _init_traps(void)
-{
-	traps_lcpu_init(NULL);
-}
-
 static inline void _init_shared_info(void)
 {
 	int ret;
@@ -182,6 +177,24 @@ static int _init_mem(struct ukplat_bootinfo *const bi)
 	return 0;
 }
 
+static void _init_segbase(void)
+{
+	int r;
+
+	r = HYPERVISOR_set_segment_base(SEGBASE_FS, 0);
+	if (unlikely(r))
+		goto err;
+	r = HYPERVISOR_set_segment_base(SEGBASE_GS_USER, 0);
+	if (unlikely(r))
+		goto err;
+	r = HYPERVISOR_set_segment_base(SEGBASE_GS_KERNEL, 0);
+	if (unlikely(r))
+		goto err;
+	return;
+err:
+	UK_CRASH("Error initializing segment registers: %d\n", r);
+}
+
 static void _libxenplat_x86bootinfo_setup(struct ukplat_bootinfo *bi)
 {
 	const char bl[] = "Xen";
@@ -204,11 +217,14 @@ void _libxenplat_x86entry(void *start_info)
 {
 	struct ukplat_bootinfo *bi;
 
+	_init_segbase();
+
 	bi = ukplat_bootinfo_get();
 	if (unlikely(!bi))
 		UK_CRASH("Failed to get bootinfo\n");
 
-	_init_traps();
+	xen_traps_init();
+
 	HYPERVISOR_start_info = (start_info_t *)start_info;
 
 	_init_shared_info(); /* remaps shared info */

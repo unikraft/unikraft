@@ -26,12 +26,13 @@
 #include <uk/arch/x86_64.h>
 #include <uk/arch/limits.h>
 #include <uk/lcpu.h>
-#include <x86/traps.h>
+#include <xen-x86/traps.h>
 #include <uk/config.h>
 #include <xen/xen.h>
 #include <xen/elfnote.h>
 #include <uk/asm.h>
 #include <uk/reloc.h>
+#include <uk/pcpuvar.h>
 
 #define ELFNOTE(name, type, desc)           \
     .pushsection .note.name               ; \
@@ -148,7 +149,8 @@ nopku:
 #endif /* CONFIG_HAVE_X86PKU */
 	/* Done setting up CPU capabilities, hand over to C entry point. */
 	movq %r8, %rdi /* pass pointer to start_info page to C entry */
-	call _libxenplat_x86entry
+	call _libxenplat_x86entry /* should not return */
+	ud2 /* trap in case it does */
 
 .type mxcsr_ptr, @object
 mxcsr_ptr:
@@ -185,32 +187,22 @@ KERNEL_CS_MASK = 0xfc
 .macro SAVE_PARAVIRT
 #ifdef XEN_PARAVIRT
 	pop %rcx
-	pop %r11 /* rsp points to the error code */
+	pop %r11 /* rsp now points to the error code */
 #endif
 .endm
 
-.macro zeroentry sym
-	SAVE_PARAVIRT
-	pushq $0	/* push error code/oldrax */
-	pushq %rax	/* push real oldrax to the rdi slot */
-	leaq  \sym(%rip),%rax
-	jmp error_entry
-.endm
+#define TRAP_ENTRY(name, has_ec) \
+	_TRAP_ENTRY name, UK_ARCH_X86_64_TRAPNUM_##name, has_ec
 
-.macro errorentry sym
-	SAVE_PARAVIRT
-	pushq %rax
-	leaq  \sym(%rip),%rax
-	jmp error_entry
-.endm
-
-.macro TRAP_ENTRY trapname, has_ec
+.macro _TRAP_ENTRY trapname, trapnum, has_ec
 ENTRY(ASM_TRAP_SYM(\trapname))
-.if \has_ec
-	errorentry do_\trapname
-.else
-	zeroentry  do_\trapname
+	SAVE_PARAVIRT
+.if !\has_ec
+	pushq	$0 /* push fake error code on stack */
 .endif
+	pushq	%rax /* push old rax */
+	movq	$\trapnum, %rax
+	jmp error_entry
 .endm
 
 .macro RESTORE_ALL
@@ -281,10 +273,10 @@ ENTRY(ASM_TRAP_SYM(\trapname))
 error_entry:
 	SAVE_ALL
 
-	movq %rsp,%rdi
-	movq UK_LCPU_X86_64_REGS_OFFSETOF_ORIG_RAX(%rsp),%rsi        # get error code
-	movq $-1,UK_LCPU_X86_64_REGS_OFFSETOF_ORIG_RAX(%rsp)
-	call *%rax
+	movq	%rax, %rdi /* Load trap number */
+	movq	%rsp, %rsi /* Load regs ptr */
+	movq UK_LCPU_X86_64_REGS_OFFSETOF_ORIG_RAX(%rsp),%rdx /* Load error code */
+	call uk_plat_xen_except_err_handler
 	jmp error_exit
 
 
@@ -292,8 +284,15 @@ error_entry:
 /*
  * Xen event (virtual interrupt) entry point.
  */
-ENTRY(ASM_TRAP_SYM(hypervisor_callback))
-	zeroentry hypervisor_callback2
+ENTRY(ASM_TRAP_SYM(HYPERVISOR_CALLBACK))
+	SAVE_PARAVIRT
+	pushq	$0	/* push fake error code */
+	pushq	%rax	/* push real oldrax to the rdi slot */
+	SAVE_ALL
+	movq	%rsp, %rdi /* Load regs ptr */
+	movq	UK_LCPU_X86_64_REGS_OFFSETOF_ORIG_RAX(%rsp), %rsi /* Load err */
+	call	hypervisor_callback2
+	jmp error_exit
 
 hypervisor_callback2:
 	movq %rdi, %rsp
@@ -307,13 +306,17 @@ hypervisor_callback2:
 	cmpq %r9,%rax
 	jb  critical_region_fixup
 
-11:	movq %gs:8,%rax
-	incl %gs:0
-	cmovzq %rax,%rsp
-	pushq %rdi
+11:
+	/* Switch stack iff we're not in nested exception AND auxsp is set */
+	xor %eax, %eax
+	incl UK_PCPUVAR_X86_64_GSREL(xen_irqcount)
+	cmovzq UK_PCPUVAR_X86_64_GSREL(uk_plat_xen_auxsp), %rax
+	test %rax, %rax
+	cmovnzq %rax, %rsp
+	mov %rdi, %rbx
 	call do_hypervisor_callback
-	popq %rsp
-	decl %gs:0
+	mov %rbx, %rsp
+	decl UK_PCPUVAR_X86_64_GSREL(xen_irqcount)
 
 error_exit:
 	movl UK_LCPU_X86_64_REGS_OFFSETOF_RFLAGS(%rsp), %eax
@@ -350,7 +353,7 @@ ecrit:  /**** END OF CRITICAL REGION ****/
 hypervisor_prologue:
 	pushq %r11
 	pushq %rcx
-	jmp ASM_TRAP_SYM(hypervisor_callback)
+	jmp ASM_TRAP_SYM(HYPERVISOR_CALLBACK)
 
 # [How we do the fixup]. We want to merge the current stack frame with the
 # just-interrupted frame. How we do this depends on where in the critical
@@ -399,27 +402,28 @@ ENTRY(asm_failsafe_callback)
         iretq
 
 
-TRAP_ENTRY divide_error,        0
-TRAP_ENTRY debug,               0
+TRAP_ENTRY(DIVIDE_ERROR,        0)
+TRAP_ENTRY(DEBUG,               0)
 /* no NMI */
-TRAP_ENTRY int3,                0
-TRAP_ENTRY overflow,            0
-TRAP_ENTRY bounds,              0
-TRAP_ENTRY invalid_op,          0
-TRAP_ENTRY no_device,           0
+TRAP_ENTRY(INT3,                0)
+TRAP_ENTRY(OVERFLOW,            0)
+TRAP_ENTRY(BOUNDS,              0)
+TRAP_ENTRY(INVALID_OP,          0)
+TRAP_ENTRY(NO_DEVICE,           0)
 /* no Double Fault */
-TRAP_ENTRY coproc_seg_overrun,  0
-TRAP_ENTRY invalid_tss,         1
-TRAP_ENTRY no_segment,          1
-TRAP_ENTRY stack_error,         1 /* runs on exception stack */
-TRAP_ENTRY gp_fault,            1
-TRAP_ENTRY page_fault,          1
-TRAP_ENTRY spurious_int,        1
-TRAP_ENTRY coproc_error,        0
-TRAP_ENTRY alignment_check,     1
+TRAP_ENTRY(COPROC_SEG_OVERRUN,  0)
+TRAP_ENTRY(INVALID_TSS,         1)
+TRAP_ENTRY(NO_SEGMENT,          1)
+TRAP_ENTRY(STACK_ERROR,         1) /* runs on exception stack */
+TRAP_ENTRY(GP_FAULT,            1)
+TRAP_ENTRY(PAGE_FAULT,          1)
+TRAP_ENTRY(SPURIOUS_INT,        1)
+TRAP_ENTRY(COPROC_ERROR,        0)
+TRAP_ENTRY(ALIGNMENT_CHECK,     1)
 /* no Machine Check */
-TRAP_ENTRY simd_error,          0
+TRAP_ENTRY(SIMD_ERROR,          0)
 /* no Virtualization Exception */
+TRAP_ENTRY(SECURITY_ERROR,      0)
 
 /*
  * We do not want to unmap anything.

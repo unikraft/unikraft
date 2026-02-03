@@ -35,20 +35,65 @@
 #ifndef _TRAPS_H_
 #define _TRAPS_H_
 
+#if !__ASSEMBLY__
 #include <stdint.h>
-#include <x86/traps.h>
+#endif /* !__ASSEMBLY__ */
+
+#include <uk/arch.h>
 
 #include <xen/xen.h>
 
-#define TRAP_coproc_seg_overrun  9
-#define TRAP_spurious_int        15
-#define TRAP_xen_callback        32
+/* Xen-specific traps; using the UK_ARCH_ prefix to be compatible with macros */
+#define UK_ARCH_X86_64_TRAPNUM_COPROC_SEG_OVERRUN 9
+#define UK_ARCH_X86_64_TRAPNUM_SPURIOUS_INT       15
+#define UK_ARCH_X86_64_TRAPNUM_XEN_CALLBACK       32
 
-/* Assembler stubs */
-DECLARE_ASM_TRAP(coproc_seg_overrun);
-DECLARE_ASM_TRAP(spurious_int);
-DECLARE_ASM_TRAP(hypervisor_callback);
+#define ASM_TRAP_SYM(trapname)   asm_trap_##trapname
+
+#if !__ASSEMBLY__
+
+#define DECLARE_ASM_TRAP(trapname) \
+	void ASM_TRAP_SYM(trapname)(void)
+
+/* Assembler stubs for x86 traps supported in Xen */
+DECLARE_ASM_TRAP(DIVIDE_ERROR);
+DECLARE_ASM_TRAP(DEBUG);
+/* no NMI */
+DECLARE_ASM_TRAP(INT3);
+DECLARE_ASM_TRAP(OVERFLOW);
+DECLARE_ASM_TRAP(BOUNDS);
+DECLARE_ASM_TRAP(INVALID_OP);
+DECLARE_ASM_TRAP(NO_DEVICE);
+/* no double-fault */
+DECLARE_ASM_TRAP(INVALID_TSS);
+DECLARE_ASM_TRAP(NO_SEGMENT);
+DECLARE_ASM_TRAP(STACK_ERROR);
+DECLARE_ASM_TRAP(GP_FAULT);
+DECLARE_ASM_TRAP(PAGE_FAULT);
+DECLARE_ASM_TRAP(COPROC_ERROR);
+DECLARE_ASM_TRAP(ALIGNMENT_CHECK);
+/* no machine check */
+DECLARE_ASM_TRAP(SIMD_ERROR);
+/* no virtualization exception */
+DECLARE_ASM_TRAP(SECURITY_ERROR);
+
+/* Assembler stubs for Xen-specific traps */
+DECLARE_ASM_TRAP(COPROC_SEG_OVERRUN);
+DECLARE_ASM_TRAP(SPURIOUS_INT);
+DECLARE_ASM_TRAP(HYPERVISOR_CALLBACK);
+
+/* Trap init routine; to be called at startup */
+void xen_traps_init(void);
+
+/* Generic trap handler */
+void uk_plat_xen_except_err_handler(unsigned int num,
+				    struct uk_lcpu_regs *regs,
+				    unsigned long errcode);
+
+/* Failsafe trap handler that pops the stack and returns */
 void asm_failsafe_callback(void);
+
+#endif /* !__ASSEMBLY__ */
 
 #define __KERNEL_CS     FLAT_KERNEL_CS
 #define __KERNEL_DS     FLAT_KERNEL_DS
