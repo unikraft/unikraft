@@ -30,6 +30,7 @@
  */
 
 #include <uk/essentials.h>
+#include <uk/lcpu.h>
 
 #ifndef __UKARCH_CTX_H__
 #error Do not include this header directly
@@ -39,8 +40,8 @@
 #define UKARCH_SP_ALIGN		16
 #define UKARCH_SP_ALIGN_MASK	(UKARCH_SP_ALIGN - 1)
 
-/* Auxiliary stack pointer needs to be aligned to UKARCH_ECTX_ALIGN */
-#define UKARCH_AUXSP_ALIGN	UKARCH_ECTX_ALIGN
+/* Auxiliary stack pointer needs to be aligned to UK_LCPU_ECTX_ALIGN */
+#define UKARCH_AUXSP_ALIGN	UK_LCPU_ECTX_ALIGN
 #define UKARCH_AUXSP_ALIGN_MASK	(UKARCH_AUXSP_ALIGN - 1)
 
 #if !__ASSEMBLY__

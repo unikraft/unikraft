@@ -5,8 +5,8 @@
  */
 
 #include <uk/arch/ctx.h>
-#include <uk/arch/lcpu.h>
 #include <uk/asm.h>
+#include <uk/lcpu.h>
 
 /**
  * Loads a given execution environment on the currently executing CPU.
@@ -31,11 +31,12 @@ ENTRY(ukarch_execenv_load)
 
 	/**
 	 * Load execenv's stored ECTX which resides at offset:
-	 * sizeof(struct __regs) + sizeof(struct ukarch_sysctx) from beginning
-	 * of execenv.
+	 * sizeof(struct uk_lcpu_regs) + sizeof(struct uk_lcpu_sysctx)
+	 * from the beginning of execenv.
 	 */
-	add	x0, x0, #(__REGS_SIZEOF + UKARCH_SYSCTX_SIZE)
-	bl	ukarch_ectx_load
+	add	x0, x0, #(UK_LCPU_REGS_SIZE + UK_LCPU_SYSCTX_SIZE)
+	bl	UK_LCPU_ECTX_LOAD_FNSYM
+
 	/**
 	 * As stated previously, after function calls, x19 preserved value of
 	 * execenv pointer so restore that into %rdi.
@@ -44,10 +45,10 @@ ENTRY(ukarch_execenv_load)
 
 	/**
 	 * Load execenv's stored system context which resides at offset:
-	 * sizeof(struct __regs) from beginning of execenv.
+	 * sizeof(struct uk_lcpu_regs) from beginning of execenv.
 	 */
-	add	x0, x0, #(__REGS_SIZEOF)
-	bl	ukarch_sysctx_load
+	add	x0, x0, #(UK_LCPU_REGS_SIZE)
+	bl	UK_LCPU_SYSCTX_LOAD_FNSYM
 
 	/**
 	 * Load execenv's stored general purpose registers which resides at
@@ -82,7 +83,7 @@ ENTRY(ukarch_execenv_load)
 	ldp	x0, x1, [sp, #16 * 0]
 
 	/* Restore stack pointer */
-	ldr	x18, [sp, #__SP_OFFSET]
+	ldr	x18, [sp, #UK_LCPU_REGS_OFFSETOF_SP]
 	mov	x19, sp
 	mov	sp, x18
 
