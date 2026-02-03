@@ -11,6 +11,7 @@
  */
 
 #include <uk/essentials.h>
+#include <uk/arch.h>
 #include <uk/assert.h>
 #include <uk/atomic.h>
 #if CONFIG_HAVE_SMP

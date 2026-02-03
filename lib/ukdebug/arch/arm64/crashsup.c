@@ -6,6 +6,7 @@
 
 #include <uk/crash.h>
 #include <uk/essentials.h>
+#include <uk/lcpu.h>
 
 #include "../../crashdump.h"
 
@@ -20,17 +21,18 @@ void uk_crash_populate_descr(struct uk_lcpu_except_err_ctx *ctx,
 		return;
 	}
 
-	if (ctx->eid == ARM64_EXCEPTION_PAGE_FAULT) {
+	if (uk_lcpu_arm64_except_err_ctx_get_eid(ctx) ==
+	    UK_LCPU_ARM64_EXCEPT_ID_PAGE_FAULT) {
 		descr->reason = UK_CRASH_REASON_PAGE_FAULT;
-		descr->uk_err = ctx->handler_err;
-		descr->arg1 = ctx->far;
-		descr->arg2 = ctx->esr;
+		descr->uk_err = uk_lcpu_except_err_ctx_get_handler_err(ctx);
+		descr->arg1 = uk_lcpu_except_err_ctx_get_fault_addr(ctx);
+		descr->arg2 = uk_lcpu_arm64_except_err_ctx_get_esr(ctx);
 		return;
 	}
 
 	descr->reason = UK_CRASH_REASON_UNHANDLED_TRAP;
 	descr->uk_err = 0;
-	descr->arg1 = ctx->eid;
-	descr->arg2 = (__u64)ctx->str;
-	descr->arg3 = ctx->esr;
+	descr->arg1 = uk_lcpu_arm64_except_err_ctx_get_eid(ctx);
+	descr->arg2 = (__u64)uk_lcpu_except_err_ctx_get_str(ctx);
+	descr->arg3 = uk_lcpu_arm64_except_err_ctx_get_esr(ctx);
 }

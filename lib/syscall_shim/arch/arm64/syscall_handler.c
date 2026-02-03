@@ -17,14 +17,14 @@ static int arm64_syscall_adapter(void *data)
 	ctx = (struct uk_lcpu_except_err_ctx *)data;
 	UK_ASSERT(ctx);
 
-	execenv = (struct ukarch_execenv *)ctx->regs;
+	execenv = (struct ukarch_execenv *)uk_lcpu_except_err_ctx_get_regs(ctx);
 
 	/* Save extended register state */
 	uk_lcpu_ectx_sanitize((struct uk_lcpu_ectx *)&execenv->ectx);
 	uk_lcpu_ectx_store((struct uk_lcpu_ectx *)&execenv->ectx);
 
 	/* Save system context state */
-	uk_lcpu_sysctx_store(&execenv->sysctx);
+	uk_lcpu_sysctx_store((struct uk_lcpu_sysctx *)&execenv->sysctx);
 
 	ukplat_syscall_handler((struct uk_syscall_ctx *)execenv);
 

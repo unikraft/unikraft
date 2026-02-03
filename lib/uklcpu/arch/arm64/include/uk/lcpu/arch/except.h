@@ -29,7 +29,6 @@ extern "C" {
 #endif
 
 struct uk_lcpu_except_err_ctx;
-struct uk_pal_except_err_ctx;
 
 __isr static inline int
 uk_lcpu_arm64_except_err_ctx_get_eid(const struct uk_lcpu_except_err_ctx *ctx)

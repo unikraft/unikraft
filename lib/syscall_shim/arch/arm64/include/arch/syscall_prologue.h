@@ -8,20 +8,11 @@
 #error Do not include this header directly
 #endif
 
-/* NOTE:
- * syscall.h is going to be included by many C-source files that may not
- * include headers from uk/plat/common and this is going to result in
- * lots of build errors.
- * TODO: Plat re-architecting will help with this, but for now, simply
- * re-define this macro to not waste time on this trivial matter.
- */
-#ifndef LCPU_AUXSP_OFFSET
-#define LCPU_AUXSP_OFFSET		0x20
-#endif /* !LCPU_AUXSP_OFFSET */
-
 #if !__ASSEMBLY__
 
 #include <uk/essentials.h>
+#include <uk/lcpu.h>
+#include <uk/pcpuvar.h>
 
 /**
  * Define a default value for SPSR_EL1, since we are not actually taking an
@@ -58,10 +49,9 @@
 		" * indexed stack switch.\n\t"				\
 		" */\n\t"						\
 		"msr	tpidrro_el0, x0\n\t"				\
-		"/* Use `struct uk_lcpu` pointer from TPIDR_EL1 */\n\t"	\
-		"mrs	x0, tpidr_el1\n\t"				\
+		"msr	sp_el0, x1\n\t"					\
 		" /* Switch to per-CPU auxiliary stack */\n\t"		\
-		"ldr	x0, [x0, #" STRINGIFY(LCPU_AUXSP_OFFSET) "]\n\t"\
+		uk_pcpuvar_arm64_ldr("x0", UK_LCPU_AUXSP_SYM, "x1") "\n\t"\
 		"sub	x0, x0, #" STRINGIFY(UKARCH_AUXSPCB_SIZE) "\n\t"\
 		"ldr	x0, [x0, #"					\
 			STRINGIFY(UKARCH_AUXSPCB_OFFSETOF_CURR_FP) "]\n\t"\
@@ -73,9 +63,10 @@
 		"sub	x0, sp, x0\n\t"					\
 		"sub	sp, sp, x0\n\t"					\
 		"/* Now store old sp w.r.t. `struct uk_lcpu_regs` */\n\t"\
-		"str	x0, [sp, #" STRINGIFY(__SP_OFFSET) "]\n\t"	\
-		"/* Restore x0 from scratch register TPIDRRO_EL0 */\n\t"\
+		"str	x0, [sp, #" STRINGIFY(UK_LCPU_REGS_OFFSETOF_SP) "]\n\t"\
+		"/* Restore x0, x1 from scratch registers */\n\t"\
 		"mrs	x0, tpidrro_el0\n\t"				\
+		"mrs	x1, sp_el0\n\t"				\
 		"/* Now just store the rest of `struct uk_lcpu_regs` */\n\t"\
 		"stp	x0, x1, [sp, #16 * 0]\n\t"			\
 		"stp	x2, x3, [sp, #16 * 1]\n\t"			\
@@ -133,11 +124,11 @@
 		"mov	x0, sp\n\t"					\
 		"add	x0, x0, #(" STRINGIFY(UK_LCPU_REGS_SIZE +	\
 				     UK_LCPU_SYSCTX_SIZE) ")\n\t"	\
-		"bl	uk_lcpu_ectx_store\n\t"				\
+		"bl	" STRINGIFY(UK_LCPU_ECTX_STORE_FNSYM) "\n\t"	\
 		"/* SYSCTX at slot w.r.t. `struct ukarch_execenv` */\n\t"\
 		"mov	x0, sp\n\t"					\
 		"add	x0, x0, #" STRINGIFY(UK_LCPU_REGS_SIZE) "\n\t"	\
-		"bl	uk_lcpu_sysctx_store\n\t"			\
+		"bl	" STRINGIFY(UK_LCPU_SYSCTX_STORE_FNSYM) "\n\t"	\
 		"mov	x0, sp\n\t"					\
 		"msr	daifclr, #2\n\t"				\
 		"bl	" STRINGIFY(fname) "\n\t"			\
@@ -150,7 +141,7 @@
 		"ldp	x20, x21, [sp, #16 * 10]\t\n"			\
 		"ldp	x18, x19, [sp, #16 * 9]\t\n"			\
 		"/* Restore sp from where it was stored */\n\t"		\
-		"ldr	x9, [sp, #" STRINGIFY(__SP_OFFSET) "]\n\t"	\
+		"ldr	x9, [sp, #" STRINGIFY(UK_LCPU_REGS_OFFSETOF_SP) "]\n\t"\
 		"mov	sp, x9\n\t"					\
 		"ret\n\t"						\
 	);

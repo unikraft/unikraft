@@ -36,15 +36,15 @@ ENTRY(pprocess_signal_jmp_handler)
 	sub sp, sp, #UK_LCPU_SYSCTX_SIZE  /* reserve space for ukarch sysctx */
 	and sp, sp, #~0xf                         /* mare sure we're aligned */
 	mov x0, sp                                /* prepare args */
-	bl	uk_lcpu_sysctx_store		/* save uk sysctx */
+	bl	UK_LCPU_SYSCTX_STORE_FNSYM	/* save uk sysctx */
 
 	/*───────────────────────────────────────────────────────────────────*
 	 * Align auxspcb->curr_fp.
 	 *───────────────────────────────────────────────────────────────────*/
-	mrs	x10, tpidr_el1			/* get auxspcb */
-	add	x10, x10, #(LCPU_AUXSP_OFFSET - (UKARCH_AUXSPCB_SIZE - UKARCH_AUXSPCB_OFFSETOF_CURR_FP))
-	ldr	x11, [x10]			/* save curr_fp and its addr */
-	stp	x11, x10, [sp, #-16]!
+	uk_pcpuvar_arm64_ldr	x10, UK_LCPU_AUXSP_SYM, x11 /* get auxspcb */
+	add			x10, x10, #(UKARCH_AUXSPCB_OFFSETOF_CURR_FP - UKARCH_AUXSPCB_SIZE)
+	ldr			x11, [x10]	/* save curr_fp and its addr */
+	stp			x11, x10, [sp, #-16]!
 
 	/* Save uk sp *before* we align auxsp for nested calls.
 	 * We will be restoring the saved value upon handler return.
@@ -59,7 +59,7 @@ ENTRY(pprocess_signal_jmp_handler)
 	 * Switch to the application's sysctx                                *
 	 *───────────────────────────────────────────────────────────────────*/
 	add	x0, x20, #UKARCH_EXECENV_OFFSETOF_SYSCTX
-	bl	uk_lcpu_sysctx_load			/* load app sysctx */
+	bl	UK_LCPU_SYSCTX_LOAD_FNSYM		/* load app sysctx */
 
 	/*───────────────────────────────────────────────────────────────────*
 	 * Call signal handler                                               *
@@ -84,7 +84,7 @@ ENTRY(pprocess_signal_jmp_handler)
 	 * Restore uk sysctx                                                 *
 	 *───────────────────────────────────────────────────────────────────*/
 	mov	x0, sp				/* prepare args */
-	bl	uk_lcpu_sysctx_load		/* restore saved sysctx */
+	bl	UK_LCPU_SYSCTX_LOAD_FNSYM	/* restore saved sysctx */
 
 	mov	sp, x29				/* restore pre-aligned sp */
 	ldp	x23, x24, [sp], #16

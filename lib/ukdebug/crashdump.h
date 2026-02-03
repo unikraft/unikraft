@@ -9,6 +9,7 @@
 #define __UKDEBUG_INTERNAL_CRASHDUMP_H__
 
 #include <uk/lcpu.h>
+#include <uk/print.h>
 #include <uk/crash.h>
 
 #define crash_printk(fmt, ...)						\

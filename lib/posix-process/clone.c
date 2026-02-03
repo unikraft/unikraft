@@ -40,6 +40,7 @@
 #include <sys/prctl.h>
 #include <sys/resource.h>
 #include <uk/arch/ctx.h>
+#include <uk/lcpu.h>
 #include <uk/plat/config.h>
 #include <uk/process.h>
 #include <uk/print.h>

@@ -109,7 +109,7 @@ static int gdb_arch_debug_handler(void *data)
 	return UK_EVENT_HANDLED;
 }
 
-UK_EVENT_HANDLER(UKARCH_TRAP_DEBUG, gdb_arch_debug_handler);
+UK_EVENT_HANDLER(UK_LCPU_EXCEPT_EVENT_DEBUG, gdb_arch_debug_handler);
 
 /* This table maps struct uk_lcpu_regs to the gdb register file */
 static struct {

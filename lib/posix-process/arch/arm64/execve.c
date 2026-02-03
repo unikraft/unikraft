@@ -6,6 +6,7 @@
 
 #include <uk/arch/ctx.h>
 #include <uk/essentials.h>
+#include <uk/lcpu.h>
 
 void execve_arch_execenv_init(struct ukarch_execenv *execenv_new,
 			      struct ukarch_execenv *execenv,
@@ -17,16 +18,18 @@ void execve_arch_execenv_init(struct ukarch_execenv *execenv_new,
 	UK_ASSERT(sp);
 	UK_ASSERT(IS_ALIGNED(sp, UKARCH_SP_ALIGN));
 
-	execenv_new->regs.lr = ip;
-	execenv_new->regs.sp = sp;
+	uk_lcpu_regs_set(execenv_new->regs, LR, ip);
+	uk_lcpu_regs_set(execenv_new->regs, SP, sp);
 
 	/* Copy SPSR to preserve the application's state at
 	 * syscall time.
 	 */
-	execenv_new->regs.spsr_el1 = execenv->regs.spsr_el1;
+	uk_lcpu_regs_set(execenv_new->regs, SPSR_EL1,
+			 uk_lcpu_regs_get(execenv->regs, SPSR_EL1));
 
 	/* Copy ESR to make sure we restore a sane value */
-	execenv_new->regs.esr_el1 = execenv->regs.esr_el1;
+	uk_lcpu_regs_set(execenv_new->regs, ESR_EL1,
+			 uk_lcpu_regs_get(execenv->regs, ESR_EL1));
 
 	/* Leave gpregs and ectx uninitialized for the new
 	 * execution context.
@@ -35,5 +38,5 @@ void execve_arch_execenv_init(struct ukarch_execenv *execenv_new,
 	/* Also copy the current sysctx to avoid ending up with undefined
 	 * values that trigger alignment errors.
 	 */
-	uk_lcpu_sysctx_store(execenv_new->sysctx);
+	uk_lcpu_sysctx_store((struct uk_lcpu_sysctx *)execenv_new->sysctx);
 }

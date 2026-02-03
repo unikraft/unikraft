@@ -8,6 +8,7 @@
 #define __UKNOFAULT_ARCH_MACCESS_H__
 
 #include "excpttab.h"
+#include <uk/lcpu.h>
 
 #define nf_do_probe_r(addr, isuffix, reg, cont_label)			\
 	__asm__ goto(							\
@@ -63,6 +64,6 @@
 		}							\
 	} while (0)
 
-#define nf_regs_ip(regs) ((regs)->elr_el1)
+#define nf_regs_ip(regs) (uk_lcpu_regs_get(regs, ELR_EL1))
 
 #endif /* __UKNOFAULT_ARCH_MACCESS_H__ */
