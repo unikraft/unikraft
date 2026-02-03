@@ -9,6 +9,7 @@
 #define UK_PLAT_COMMON_ARM64_TIME_H
 
 #include <uk/arch/util.h>
+#include <uk/lcpu.h>
 
 #define	get_el0(x)	UK_ARCH_ARM64_SYSREG_READ64(x ##_el0)
 #define	get_el1(x)	UK_ARCH_ARM64_SYSREG_READ64(x ##_el1)

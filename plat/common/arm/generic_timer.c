@@ -36,7 +36,6 @@
 #include <uk/plat/time.h>
 #include <uk/lcpu.h>
 #include <uk/bitops.h>
-#include <uk/plat/common/cpu.h>
 #include <arm/time.h>
 
 static __u64 boot_ticks;

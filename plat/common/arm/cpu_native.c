@@ -30,13 +30,12 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <uk/arch/util.h>
-#include <uk/config.h>
-#include <uk/plat/common/cpu.h>
-#include <uk/plat/common/irq.h>
+#include <arm/arm64/cpu.h>
 #include <arm/psci.h>
-#include <uk/assert.h>
 #include <arm/smccc.h>
+
+#include <uk/config.h>
+#include <uk/assert.h>
 #include <uk/asm/lcpu.h>
 #include <uk/lcpu.h>
 
@@ -61,7 +60,7 @@ void reset(void)
 	 */
 	if (!smccc_psci_call) {
 		uk_pr_crit("Couldn't reset system, HALT!\n");
-		__CPU_HALT();
+		uk_lcpu_halt();
 	}
 
 	smccc_arguments.a0 = PSCI_FNID_SYSTEM_RESET;
@@ -79,7 +78,7 @@ void system_off(enum ukplat_gstate request __unused)
 	 */
 	if (!smccc_psci_call) {
 		uk_pr_crit("Couldn't shutdown system, HALT!\n");
-		__CPU_HALT();
+		uk_lcpu_halt();
 	}
 
 	smccc_arguments.a0 = PSCI_FNID_SYSTEM_OFF;

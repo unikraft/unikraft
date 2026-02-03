@@ -83,8 +83,10 @@ ENDPROC(asm_ctx_start)
  * This function will switch to the next thread context
  */
 ENTRY(asm_ctx_switch)
-	/* Save callee-saved registers to prevctx's stack */
-	sub x2, sp, #__CALLEE_SAVED_SIZE
+	/* Save callee-saved registers, FP,
+	 * and LR, to prev thread's stack.
+	 */
+	sub x2, sp, #96
 	stp x19, x20, [x2, #16 * 0]
 	stp x21, x22, [x2, #16 * 1]
 	stp x23, x24, [x2, #16 * 2]
@@ -116,6 +118,6 @@ restore_point:
 	ldp x27, x28, [x2, #16 * 4]
 	ldp x29, x30, [x2, #16 * 5]
 
-	add sp, x2, #__CALLEE_SAVED_SIZE
+	add sp, x2, #96
 	ret
 ENDPROC(asm_ctx_switch)

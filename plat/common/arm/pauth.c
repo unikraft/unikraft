@@ -4,7 +4,6 @@
  * You may not use this file except in compliance with the License.
  */
 
-#include <arm/arm64/cpu.h>
 #include <arm/arm64/pauth.h>
 
 #include <errno.h>

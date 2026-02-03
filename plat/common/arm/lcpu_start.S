@@ -37,16 +37,21 @@
  #include <uk/reloc.h>
 
 .text
-/* void _lcpu_start(lcpu *cpu) */
+/*
+ * Secondary CPU entry point.
+ *
+ * Entered with MMU off. x0 holds the CPU index, passed via PSCI
+ * CPU_ON context_id (a3).
+ */
 ENTRY(lcpu_start)
-	/* save x0 */
-	mov	x9, x0
-
 	/* Disable interrupts */
 	msr	daifset, #2
 
 	/* Set the context id */
 	msr	contextidr_el1, xzr
+
+	/* Preserve CPU index across start_mmu (x19 is not clobbered) */
+	mov	x19, x0
 
 	/* Setup exception vector table address before enable MMU */
 	ur_addr	x29, vector_table
@@ -55,14 +60,19 @@ ENTRY(lcpu_start)
 	/* Enable the mmu */
 	bl	start_mmu
 
-	/* restore x0 */
-	mov	x0, x9
+	/* Set TPIDR_EL1 = _uk_pcpuvar_base + idx * _uk_pcpuvar_tmpl_size */
+	uk_pcpuvar_arm64_tpidrval	x0, x19
+	adrp	x1, _uk_pcpuvar_base
+	add	x1, x1, #:lo12:_uk_pcpuvar_base
+	add	x0, x0, x1
+	msr	tpidr_el1, x0
 
 	/* Load the stack pointer */
-	ldr	x9, [x0, #LCPU_STACKP_OFFSET]
-	mov	sp, x9
+	uk_pcpuvar_arm64_ldr	x0, UK_LCPU_SSTACKP_SYM, x1
+	mov	sp, x0
 
 	/* Load the entry address and jump to it */
-	ldr	x9, [x0, #LCPU_ENTRY_OFFSET]
-	br	x9
+	uk_pcpuvar_arm64_ldr	x0, UK_LCPU_SARG_SYM, x1
+	uk_pcpuvar_arm64_ldr	x1, UK_LCPU_SENTRY_SYM, x2
+	br	x1
 END(lcpu_start)

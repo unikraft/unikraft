@@ -30,16 +30,16 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <uk/arch/util.h>
 #include <stdlib.h>
 #include <libfdt.h>
+
+#include <uk/arch/util.h>
 #include <uk/ofw/fdt.h>
 #include <uk/assert.h>
 #include <uk/plat/time.h>
 #include <uk/asm/lcpu.h>
 #include <uk/lcpu.h>
 #include <uk/atomic.h>
-#include <uk/plat/common/cpu.h>
 #include <uk/plat/common/sections.h>
 #include <uk/plat/common/bootinfo.h>
 #include <uk/intctlr.h>

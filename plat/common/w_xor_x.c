@@ -13,7 +13,6 @@
 #include <uk/print.h>
 
 #ifdef CONFIG_ARCH_ARM_64
-#include <arm/arm64/cpu.h>
 #include <uk/arch/util.h>
 #endif /* CONFIG_ARCH_ARM_64 */
 
