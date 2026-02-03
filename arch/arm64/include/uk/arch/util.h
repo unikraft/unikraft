@@ -118,6 +118,71 @@ void uk_arch_arm64_ioreg_write64(const volatile __u64 *address,
 	__asm__ __volatile__("str %0, [%1]" : : "rZ"(value), "r"(address));
 }
 
+/*
+ * Instruction Synchronization Barrier flushes the pipeline in the
+ * processor, so that all instructions following the ISB are fetched
+ * from cache or memory, after the instruction has been completed.
+ */
+static inline void uk_arch_arm64_isb(void)
+{
+	__asm__ __volatile__("isb" ::: "memory");
+}
+
+/*
+ * Options for DMB and DSB:
+ *	oshld	Outer Shareable, load
+ *	oshst	Outer Shareable, store
+ *	osh	Outer Shareable, all
+ *	nshld	Non-shareable, load
+ *	nshst	Non-shareable, store
+ *	nsh	Non-shareable, all
+ *	ishld	Inner Shareable, load
+ *	ishst	Inner Shareable, store
+ *	ish	Inner Shareable, all
+ *	ld	Full system, load
+ *	st	Full system, store
+ *	sy	Full system, all
+ */
+#define uk_arch_arm64_dmb(opt)						\
+		__asm__ __volatile__ ("dmb " #opt ::: "memory")
+
+#define uk_arch_arm64_dsb(opt)						\
+		__asm__ __volatile__ ("dsb " #opt ::: "memory")
+
+static inline
+void uk_arch_arm64_mb(void)
+{
+	uk_arch_arm64_dsb(sy);
+}
+
+static inline
+void uk_arch_arm64_rmb(void)
+{
+	uk_arch_arm64_dsb(ld);
+}
+
+static inline
+void uk_arch_arm64_wmb(void)
+{
+	uk_arch_arm64_dsb(st);
+}
+
+static inline
+__u64 uk_arch_arm64_read_sp(void)
+{
+	__u64 sp;
+
+	__asm__ __volatile__ ("mov %0, sp" : "=&r"(sp));
+
+	return sp;
+}
+
+static inline
+void uk_arch_arm64_spinwait(void)
+{
+	/* Intelligent busy wait not supported on arm64. */
+}
+
 #endif /* !__ASSEMBLY__ */
 
 #ifdef __cplusplus

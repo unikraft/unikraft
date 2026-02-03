@@ -276,57 +276,5 @@ struct __callee_saved_regs {
 
 UK_CTASSERT(sizeof(struct __callee_saved_regs) == __CALLEE_SAVED_SIZE);
 
-/*
- * Instruction Synchronization Barrier flushes the pipeline in the
- * processor, so that all instructions following the ISB are fetched
- * from cache or memory, after the instruction has been completed.
- */
-#define isb()   __asm__ __volatile("isb" ::: "memory")
-
-/*
- * Options for DMB and DSB:
- *	oshld	Outer Shareable, load
- *	oshst	Outer Shareable, store
- *	osh	Outer Shareable, all
- *	nshld	Non-shareable, load
- *	nshst	Non-shareable, store
- *	nsh	Non-shareable, all
- *	ishld	Inner Shareable, load
- *	ishst	Inner Shareable, store
- *	ish	Inner Shareable, all
- *	ld	Full system, load
- *	st	Full system, store
- *	sy	Full system, all
- */
-#define dmb(opt)    __asm__ __volatile("dmb " #opt ::: "memory")
-#define dsb(opt)    __asm__ __volatile("dsb " #opt ::: "memory")
-
-/* We probably only need "dmb" here, but we'll start by being paranoid. */
-#ifndef mb
-#define mb()    dsb(sy) /* Full system memory barrier all */
-#endif
-
-#ifndef rmb
-#define rmb()   dsb(ld) /* Full system memory barrier load */
-#endif
-
-#ifndef wmb
-#define wmb()   dsb(st) /* Full system memory barrier store */
-#endif
-
-static inline unsigned long ukarch_read_sp(void)
-{
-	unsigned long sp;
-
-	__asm__ __volatile("mov %0, sp": "=&r"(sp));
-
-	return sp;
-}
-
-static inline void ukarch_spinwait(void)
-{
-	/* Intelligent busy wait not supported on arm64. */
-}
-
 #endif /* !__ASSEMBLY__ */
 #endif /* __UK_ASM_LCPU_H__ */
