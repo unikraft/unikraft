@@ -33,16 +33,21 @@
  * Inspired from the FreeBSD.
  * Commit-id: a89e7a10d501
  */
-#include <uk/config.h>
+
 #include <string.h>
-#include <uk/print.h>
+
+#include <uk/arch/util.h>
+#include <uk/atomic.h>
+#include <uk/config.h>
 #include <uk/errptr.h>
 #include <uk/paging.h>
+#include <uk/print.h>
 #include <uk/sglist.h>
-#include <uk/atomic.h>
+
 #include <virtio/virtio_ring.h>
 #include <virtio/virtqueue.h>
 #include <virtio/virtio_bus.h>
+
 #ifdef CONFIG_LIBUKVMEM
 #include <uk/falloc.h>
 #include <uk/vmem.h>

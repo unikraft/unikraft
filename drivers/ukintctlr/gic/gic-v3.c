@@ -8,26 +8,29 @@
 
 #include <string.h>
 #include <libfdt.h>
+
 #include <uk/arch/arm64.h>
 #include <uk/arch/util.h>
-#include <uk/config.h>
-#include <uk/essentials.h>
-#include <uk/print.h>
+#include <uk/asm.h>
 #include <uk/assert.h>
 #include <uk/bitops.h>
-#include <uk/asm.h>
-#include <uk/lcpu.h>
-#if CONFIG_LIBUKACPI
-#include <uk/acpi.h>
-#endif /* CONFIG_LIBUKACPI */
-#include <uk/plat/common/bootinfo.h>
-#include <uk/plat/spinlock.h>
-#include <arm/cpu.h>
+#include <uk/config.h>
+#include <uk/essentials.h>
+#include <uk/event.h>
 #include <uk/intctlr.h>
 #include <uk/intctlr/gic.h>
 #include <uk/intctlr/gic-v3.h>
 #include <uk/intctlr/limits.h>
+#include <uk/lcpu.h>
 #include <uk/ofw/fdt.h>
+#include <uk/pcpuvar.h>
+#include <uk/plat/common/bootinfo.h>
+#include <uk/plat/spinlock.h>
+#include <uk/print.h>
+
+#if CONFIG_LIBUKACPI
+#include <uk/acpi.h>
+#endif /* CONFIG_LIBUKACPI */
 
 #if CONFIG_LIBUKPAGING
 #include <uk/bus/platform.h>
@@ -38,7 +41,7 @@
 
 #define GIC_RDIST_REG(gdev, r)					\
 	((void *)(gdev.rdist_mem_addr + (r) +			\
-	lcpu_get_current()->idx * GICR_STRIDE))
+	uk_pcpuvar_current_get(uk_pcpuvar_cpu_idx) * GICR_STRIDE))
 
 #define GIC_AFF_TO_ROUTER(aff, mode)					\
 	((((__u64)(aff) << 8) & UK_ARCH_ARM64_MPIDR_EL1_AFF3_MASK) |	\
@@ -409,6 +412,7 @@ static void gicv3_init_redist(void)
 	/* Enable system register access */
 	val  = UK_ARCH_ARM64_SYSREG_READ32(ICC_SRE_EL1);
 	val |= 0x7;
+
 	UK_ARCH_ARM64_SYSREG_WRITE32(ICC_SRE_EL1, val);
 	uk_arch_arm64_isb();
 
@@ -485,7 +489,7 @@ static void gicv3_init_dist(void)
 	uk_pr_info("GICv3 distributor initialized.\n");
 }
 
-static void gicv3_handle_irq(struct __regs *regs)
+static void gicv3_handle_irq(struct uk_lcpu_regs *regs)
 {
 	__u32 stat, irq;
 

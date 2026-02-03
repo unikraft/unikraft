@@ -53,7 +53,6 @@
 #include <string.h>
 #include <uk/errptr.h>
 #include <uk/print.h>
-#include <uk/plat/common/cpu.h>
 #include <uk/bus/pci.h>
 #include <libfdt_env.h>
 #include <uk/intctlr/gic.h>

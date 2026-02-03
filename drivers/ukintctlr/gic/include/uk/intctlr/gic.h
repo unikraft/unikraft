@@ -85,7 +85,7 @@ struct _gic_operations {
 	/** Set IRQ affinity (or "target" for GICv2) */
 	void (*set_irq_affinity)(__u32 irq, __u32 affinity);
 	/** Handle IRQ */
-	void (*handle_irq)(struct __regs *regs);
+	void (*handle_irq)(struct uk_lcpu_regs *regs);
 	/** Send a SGI to the specifiec core */
 	void (*gic_sgi_gen)(__u8 sgintid, __u32 cpuid);
 };

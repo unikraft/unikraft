@@ -38,7 +38,6 @@
 #include <uk/ofw/fdt.h>
 #include <uk/intctlr.h>
 #include <uk/print.h>
-#include <arm/cpu.h>
 #include <uk/rtc.h>
 #include <uk/pl031.h>
 #include <uk/bus/platform.h>

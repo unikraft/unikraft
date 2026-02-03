@@ -37,7 +37,6 @@
 #include <uk/arch/util.h>
 #include <uk/alloc.h>
 #include <uk/print.h>
-#include <uk/plat/common/cpu.h>
 #include <uk/plat/common/bootinfo.h>
 #include <libfdt_env.h>
 #include <uk/ofw/fdt.h>

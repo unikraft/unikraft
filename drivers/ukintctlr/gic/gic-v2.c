@@ -5,26 +5,29 @@
  * You may not use this file except in compliance with the License.
  */
 
-#include <string.h>
 #include <libfdt.h>
-#include <uk/essentials.h>
-#include <uk/print.h>
-#include <uk/assert.h>
-#include <uk/arch/util.h>
-#include <uk/bitops.h>
-#include <uk/asm.h>
+#include <string.h>
+
 #include <uk/arch/limits.h>
-#include <uk/lcpu.h>
-#if CONFIG_LIBUKACPI
-#include <uk/acpi.h>
-#endif /* CONFIG_LIBUKACPI */
-#include <uk/plat/common/bootinfo.h>
-#include <uk/plat/spinlock.h>
-#include <arm/cpu.h>
+#include <uk/arch/util.h>
+#include <uk/asm.h>
+#include <uk/assert.h>
+#include <uk/bitops.h>
+#include <uk/essentials.h>
+#include <uk/event.h>
 #include <uk/intctlr.h>
 #include <uk/intctlr/gic-v2.h>
 #include <uk/intctlr/limits.h>
+#include <uk/lcpu.h>
 #include <uk/ofw/fdt.h>
+#include <uk/pcpuvar.h>
+#include <uk/plat/common/bootinfo.h>
+#include <uk/plat/spinlock.h>
+#include <uk/print.h>
+
+#if CONFIG_LIBUKACPI
+#include <uk/acpi.h>
+#endif /* CONFIG_LIBUKACPI */
 
 #if CONFIG_LIBUKPAGING
 #include <uk/bus/platform.h>
@@ -184,9 +187,9 @@ void gicv2_sgi_gen_to_list(__u32 sgintid, __u8 targetlist)
 {
 	unsigned long irqf;
 
-	irqf = ukplat_lcpu_save_irqf();
+	irqf = uk_lcpu_save_irqf();
 	gicv2_sgi_gen(sgintid, GICD_SGI_FILTER_TO_LIST, targetlist);
-	ukplat_lcpu_restore_irqf(irqf);
+	uk_lcpu_restore_irqf(irqf);
 }
 
 /**
@@ -205,9 +208,9 @@ void gicv2_sgi_gen_to_others(__u32 sgintid)
 {
 	unsigned long irqf;
 
-	irqf = ukplat_lcpu_save_irqf();
+	irqf = uk_lcpu_save_irqf();
 	gicv2_sgi_gen(sgintid, GICD_SGI_FILTER_TO_OTHERS, 0);
-	ukplat_lcpu_restore_irqf(irqf);
+	uk_lcpu_restore_irqf(irqf);
 }
 
 /**
@@ -343,7 +346,7 @@ EXIT_UNLOCK:
 	dist_unlock(gicv2_drv);
 }
 
-static void gicv2_handle_irq(struct __regs *regs)
+static void gicv2_handle_irq(struct uk_lcpu_regs *regs)
 {
 	__u32 stat, irq;
 
@@ -355,7 +358,7 @@ static void gicv2_handle_irq(struct __regs *regs)
 		uk_pr_debug("EL1 IRQ#%"__PRIu32" caught\n", irq);
 #else /* !CONFIG_HAVE_SMP */
 		uk_pr_debug("Core %"__PRIu64": EL1 IRQ#%"__PRIu32" caught\n",
-			    ukplat_lcpu_id(), irq);
+			    uk_pcpuvar_current_get(uk_pcpuvar_cpu_id), irq);
 #endif /* CONFIG_HAVE_SMP */
 
 		/* Ensure interrupt processing starts only after ACK */
