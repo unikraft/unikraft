@@ -108,6 +108,7 @@ config KVM_VMM_QEMU
 	imply LIBUKINTCTLR_GICV2 if ARCH_ARM_64
 	imply LIBUKRTC_PL031
 	imply LIBVGACONS if ARCH_X86_64
+	imply KVM_VMM_QEMU_ISA_DEBUG_EXIT if ARCH_X86_64
 	select HAVE_IBMPC if ARCH_X86_64
 	select HAVE_PCI
 	select HAVE_MMIO
@@ -131,3 +132,9 @@ config KVM_VMM_FIRECRACKER
 
 endchoice
 endif
+
+config KVM_VMM_QEMU_ISA_DEBUG_EXIT
+	bool "Use QEMU isa-debug-exit device for shutdown"
+	depends on LIBUKPM
+	depends on KVM_VMM_QEMU
+	depends on ARCH_X86_64
