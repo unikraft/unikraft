@@ -1,0 +1,7 @@
+$(eval $(call addlib_s,libukpm,$(CONFIG_LIBUKPM)))
+
+ASINCLUDES-y  += -I$(LIBUKPM_BASE)/include
+CINCLUDES-y   += -I$(LIBUKPM_BASE)/include
+CXXINCLUDES-y += -I$(LIBUKPM_BASE)/include
+
+LIBUKPM_SRCS-$(CONFIG_LIBUKPM) += $(LIBUKPM_BASE)/pm.c
