@@ -8,6 +8,7 @@
 #include <uk/paging.h>
 #include <uk/libid.h>
 #include <uk/plat/common/bootinfo.h>
+#include <uk/isr/string.h>
 
 extern struct ukplat_memregion_desc bpt_unmap_mrd;
 static uk_efi_paddr_t uk_efi_alloc_max_paddr;
@@ -612,8 +613,8 @@ static void uk_efi_setup_bootinfo(void)
 	if (unlikely(!bi))
 		UK_EFI_CRASH("Failed to get bootinfo\n");
 
-	memcpy(bi->bootloader, bl, sizeof(bl));
-	memcpy(bi->bootprotocol, bp, sizeof(bp));
+	memcpy_isr(bi->bootloader, bl, sizeof(bl));
+	memcpy_isr(bi->bootprotocol, bp, sizeof(bp));
 	uk_efi_setup_bootinfo_cmdl(bi);
 	uk_efi_setup_bootinfo_initrd(bi);
 	uk_efi_setup_bootinfo_dtb(bi);
