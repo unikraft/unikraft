@@ -9,6 +9,7 @@
 #include <uk/init.h>
 #include <uk/intctlr.h>
 #include <x86/delay.h>
+#include <uk/pm.h>
 
 #include "ps2.h"
 
@@ -17,8 +18,6 @@
 
 static __u8 lctrl_pressed;
 static __u8 lalt_pressed;
-
-UK_EVENT(UKPLAT_SHUTDOWN_EVENT);
 
 static int kbd_ps2_irq_handler(void *arg __unused)
 {
@@ -45,7 +44,7 @@ static int kbd_ps2_irq_handler(void *arg __unused)
 		if (!(lctrl_pressed && lalt_pressed))
 			break;
 
-		uk_raise_event(UKPLAT_SHUTDOWN_EVENT, (void *)UKPLAT_HALT);
+		uk_pm_raise_shutdown_event(UK_PM_SHUTDOWN_OP_SYSHALT);
 
 		break;
 	}
