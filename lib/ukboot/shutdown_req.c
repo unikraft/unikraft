@@ -4,6 +4,7 @@
  * You may not use this file except in compliance with the License.
  */
 #include <uk/atomic.h>
+#include <uk/pm.h>
 #if !__INTERRUPTSAFE__
 #include <uk/boot.h>
 #else /* __INTERRUPTSAFE__ */
@@ -18,19 +19,19 @@ struct uk_boot_shutdown_ctl shutdown_ctl;
 #endif /* !__INTERRUPTSAFE__ */
 
 #if !__INTERRUPTSAFE__
-int uk_boot_shutdown_req(enum ukplat_gstate target)
+int uk_boot_shutdown_req(enum uk_pm_shutdown_op target)
 #else /* __INTERRUPTSAFE__ */
-int uk_boot_shutdown_req_isr(enum ukplat_gstate target)
+int uk_boot_shutdown_req_isr(enum uk_pm_shutdown_op target)
 #endif /* __INTERRUPTSAFE__ */
 {
 	unsigned long already_requested;
 
 	switch (target) {
-	case UKPLAT_HALT:
+	case UK_PM_SHUTDOWN_OP_SYSHALT:
 		__fallthrough;
-	case UKPLAT_RESTART:
+	case UK_PM_SHUTDOWN_OP_SYSRESTART:
 		__fallthrough;
-	case UKPLAT_CRASH:
+	case UK_PM_SHUTDOWN_OP_SYSCRASH:
 		break;
 	default:
 		/* not a normal shutdown request */
@@ -59,14 +60,15 @@ int uk_boot_shutdown_req_isr(enum ukplat_gstate target)
 #if __INTERRUPTSAFE__ && CONFIG_LIBUKBOOT_SHUTDOWNREQ_HANDLER
 static int shutdown_req_handler(void *data)
 {
-	enum ukplat_gstate request = (enum ukplat_gstate)data;
+	enum uk_pm_shutdown_op target = (enum uk_pm_shutdown_op)data;
 	int rc;
 
-	rc = uk_boot_shutdown_req_isr(request);
+	rc = uk_boot_shutdown_req_isr(target);
 	if (unlikely(rc < 0))
 		return UK_EVENT_NOT_HANDLED;
 	return UK_EVENT_HANDLED_CONT;
 }
-UK_EVENT_HANDLER(UKPLAT_SHUTDOWN_EVENT, shutdown_req_handler);
+
+UK_EVENT_HANDLER(UK_PM_EVENT_SHUTDOWN_REQ, shutdown_req_handler);
 
 #endif /* CONFIG_LIBUKBOOT_SHUTDOWNREQ_HANDLER && __INTERRUPTSAFE__ */

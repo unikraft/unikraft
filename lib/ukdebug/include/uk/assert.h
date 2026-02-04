@@ -41,7 +41,6 @@
 #include <uk/config.h>
 #include <uk/crash.h>
 #include <uk/essentials.h>
-#include <uk/plat/bootstrap.h>
 #include <uk/print.h>
 
 #ifdef __cplusplus

@@ -13,7 +13,7 @@
 #include <uk/essentials.h>
 #include <uk/event.h>
 #include <uk/lcpu.h>
-#include <uk/plat/bootstrap.h>
+#include <uk/pm.h>
 #include <uk/plat/time.h>
 #include <uk/preempt.h>
 
@@ -73,9 +73,10 @@ __noreturn static void crash_shutdown(void)
 		while (until > ukplat_monotonic_clock())
 			; /* do nothing */
 	}
-	ukplat_restart();
+
+	uk_pm_sysrestart();
 #else /* !CONFIG_LIBUKDEBUG_CRASH_ACTION_REBOOT */
-	ukplat_crash();
+	uk_pm_syscrash();
 #endif /* !CONFIG_LIBUKDEBUG_CRASH_ACTION_REBOOT */
 }
 

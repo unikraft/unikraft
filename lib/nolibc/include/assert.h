@@ -49,9 +49,9 @@ extern "C" {
 #define assert(x) UK_ASSERT(x)
 
 #else
-#include <uk/plat/bootstrap.h>
-#include <uk/lcpu.h>
 #include <uk/essentials.h>
+#include <uk/pm.h>
+
 #include <stdio.h>
 
 #define assert(x)							\
@@ -61,7 +61,7 @@ extern "C" {
 				"Assertion failed: %s, file %s, line %u\n", \
 				STRINGIFY(x),				\
 				__FILE__, __LINE__);			\
-			ukplat_terminate(UKPLAT_CRASH);			\
+			uk_pm_syscrash();				\
 		}							\
 	} while (0)
 

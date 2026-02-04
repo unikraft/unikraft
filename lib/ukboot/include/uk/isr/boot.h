@@ -8,7 +8,6 @@
 
 #include <uk/config.h>
 #include <errno.h>
-#include <uk/plat/bootstrap.h>
 
 #if !__ASSEMBLY__
 #ifdef __cplusplus
@@ -21,9 +20,9 @@ extern "C" {
  *
  * @param target
  *   The action that shall be performed after shutdown:
- *   - `UKPLAT_HALT`: Terminate/Halt/Power-off
- *   - `UKPLAT_RESTART`: Restart/Reboot
- *   - `UKPLAT_CRASH`: Indicate a crash
+ *   - `UK_PM_SHUTDOWN_OP_SYSHALT`: Terminate/Halt/Power-off
+ *   - `UK_PM_SHUTDOWN_OP_SYSRESTART`: Restart/Reboot
+ *   - `UK_PM_SHUTDOWN_OP_SYSCRASH`: Indicate a crash
  * @returns
  *   - (0): Success, shutdown is requested.
  *   - (1): A shutdown is already in progress, note that `request` is
@@ -32,7 +31,7 @@ extern "C" {
  *   - (-EINVAL): Unsupported shutdown `target`.
  */
 #if CONFIG_LIBUKBOOT_MAINTHREAD
-int uk_boot_shutdown_req_isr(enum ukplat_gstate target);
+int uk_boot_shutdown_req_isr(enum uk_pm_shutdown_op target);
 #else /* !CONFIG_LIBUKBOOT_MAINTHREAD */
 #define uk_boot_shutdown_req_isr(target) \
 	({ -ENOTSUP; })

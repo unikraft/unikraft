@@ -79,7 +79,7 @@
 #include <uk/schedcoop.h>
 #endif /* CONFIG_LIBUKBOOT_INITSCHEDCOOP */
 #include <uk/lcpu.h>
-#include <uk/plat/bootstrap.h>
+#include <uk/pm.h>
 #include <uk/plat/memory.h>
 #include <uk/plat/time.h>
 #include <uk/essentials.h>
@@ -240,8 +240,10 @@ extern char **environ;
 void uk_boot_entry(void)
 {
 	struct uk_init_ctx ictx = { 0 };
-	/* NOTE: Default target is crash for failed initialization (inittab) */
-	struct uk_term_ctx tctx = { .target = UKPLAT_CRASH };
+	struct uk_term_ctx tctx = {
+		.exit_code = 0,
+		.target = UK_PM_SHUTDOWN_OP_SYSCRASH,
+	};
 	int rc = 0;
 #if CONFIG_LIBUKALLOC
 	struct uk_alloc *a = NULL, *sa = NULL, *auxsa = NULL;
@@ -413,8 +415,7 @@ void uk_boot_entry(void)
 
 #if !CONFIG_LIBUKBOOT_MAINTHREAD
 	tctx.exit_code = do_main(ictx.cmdline.argc, ictx.cmdline.argv);
-	tctx.target = UKPLAT_HALT;
-
+	tctx.target = UK_PM_SHUTDOWN_OP_SYSHALT;
 #else /* CONFIG_LIBUKBOOT_MAINTHREAD */
 	/* Unblock main thread (will execute main()) */
 	uk_semaphore_up(&main_sema);
@@ -426,7 +427,7 @@ void uk_boot_entry(void)
 #endif /* CONFIG_LIBUKBOOT_MAINTHREAD */
 
 exit:
-	uk_pr_info("Halting system (%d)\n", tctx.target);
+	uk_pr_info("Shutting down system (%d)\n", tctx.target);
 
 	/**
 	 * Call termination functions from init table in reverse order
@@ -448,7 +449,7 @@ exit:
 
 	uk_pr_debug("Unikraft terminates with exit status %d (target: %d)\n",
 		    tctx.exit_code, tctx.target);
-	ukplat_terminate(tctx.target); /* does not return */
+	uk_pm_shutdown(tctx.target); /* does not return */
 }
 
 int do_main(int argc, char *argv[])
@@ -539,7 +540,7 @@ static __noreturn void main_thread(void *a0, void *a1)
 	 *       we already request a shutdown here in order to go down
 	 *       as earlier as possible.
 	 */
-	uk_boot_shutdown_req(UKPLAT_HALT);
+	uk_boot_shutdown_req(UK_PM_SHUTDOWN_OP_SYSHALT);
 #endif /* !LIBUKBOOT_MAINTHREAD_NOHALT */
 	/* Terminate "main" thread */
 	uk_thread_exit();
@@ -553,7 +554,7 @@ static void main_thread_dtor(struct uk_thread *m __unused)
 	 *       without returning to the caller of `main()` (for example
 	 *       via `uk_thread_exit()`).
 	 */
-	uk_boot_shutdown_req(UKPLAT_HALT);
+	uk_boot_shutdown_req(UK_PM_SHUTDOWN_OP_SYSHALT);
 #endif /* !LIBUKBOOT_MAINTHREAD_NOHALT */
 }
 #endif /* CONFIG_LIBUKBOOT_MAINTHREAD */

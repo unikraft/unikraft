@@ -8,7 +8,6 @@
 #ifndef __UK_CRASH_H__
 #define __UK_CRASH_H__
 
-#include <uk/plat/bootstrap.h>
 #include <uk/lcpu.h>
 #include <uk/essentials.h>
 

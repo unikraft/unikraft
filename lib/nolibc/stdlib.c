@@ -57,7 +57,7 @@
 #include <limits.h>
 #include <ctype.h>
 #include <uk/print.h>
-#include <uk/plat/bootstrap.h>
+#include <uk/pm.h>
 
 #define __DECONST(type, var) ((type)(uintptr_t)(const void *)(var))
 
@@ -483,13 +483,13 @@ long atol(const char *s)
 void abort(void)
 {
 	uk_pr_crit("Abnormal termination!\n");
-	ukplat_crash();
+	uk_pm_syscrash();
 }
 
 #ifndef CONFIG_LIBPOSIX_PROCESS
 void exit(int status)
 {
 	uk_pr_info("exit called with status %d, halting system\n", status);
-	ukplat_terminate(status);
+	uk_pm_syshalt();
 }
 #endif /* !CONFIG_LIBPOSIX_PROCESS */

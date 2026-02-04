@@ -5,7 +5,7 @@
  */
 
 #include <stddef.h>
-#include <uk/plat/bootstrap.h>
+#include <uk/pm.h>
 #include <uk/plat/common/sections.h>
 #include <uk/plat/memory.h>
 #include <uk/reloc.h>
@@ -46,7 +46,7 @@ static inline unsigned long get_rt_addr(unsigned long sym)
 }
 #endif
 
-#define uk_reloc_crash(s)				ukplat_halt()
+#define uk_reloc_crash(s)				uk_pm_syscrash()
 
 static inline struct uk_reloc_hdr *get_uk_reloc_hdr()
 {
