@@ -346,9 +346,13 @@ EXIT_UNLOCK:
 	dist_unlock(gicv2_drv);
 }
 
-static void gicv2_handle_irq(struct uk_lcpu_regs *regs)
+static int gicv2_handle_irq(void *data)
 {
+	struct uk_lcpu_except_irq_ctx *ctx;
 	__u32 stat, irq;
+
+	ctx = data;
+	UK_ASSERT(ctx);
 
 	do {
 		stat = gicv2_ack_irq();
@@ -365,7 +369,8 @@ static void gicv2_handle_irq(struct uk_lcpu_regs *regs)
 		uk_arch_arm64_isb();
 
 		if (irq <= GIC_MAX_IRQ) {
-			uk_intctlr_irq_handle(regs, irq);
+			uk_lcpu_except_irq_ctx_set_irq(ctx, irq);
+			uk_intctlr_irq_handle(ctx);
 			gicv2_eoi_irq(stat);
 			continue;
 		}
@@ -376,7 +381,11 @@ static void gicv2_handle_irq(struct uk_lcpu_regs *regs)
 
 		break;
 	} while (1);
+
+	return UK_EVENT_HANDLED;
 }
+
+UK_EVENT_HANDLER(UK_LCPU_EXCEPT_EVENT_IRQ, gicv2_handle_irq);
 
 static void gicv2_init_dist(void)
 {
@@ -493,7 +502,6 @@ static void gicv2_set_ops(void)
 		.set_irq_trigger   = gicv2_set_irq_trigger,
 		.set_irq_prio      = gicv2_set_irq_prio,
 		.set_irq_affinity  = gicv2_set_irq_target,
-		.handle_irq        = gicv2_handle_irq,
 		.gic_sgi_gen       = gicv2_sgi_gen_to_cpu,
 	};
 
