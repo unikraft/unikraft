@@ -60,7 +60,7 @@ static inline struct uk_reloc_hdr *get_uk_reloc_hdr()
 	return ur_hdr;
 }
 
-void __used do_uk_reloc(__paddr_t r_paddr, __vaddr_t r_vaddr)
+__isr __used void do_uk_reloc(__paddr_t r_paddr, __vaddr_t r_vaddr)
 {
 	unsigned long bkp_lt_baddr;
 	struct uk_reloc_hdr *ur_hdr;
@@ -109,7 +109,7 @@ void __used do_uk_reloc(__paddr_t r_paddr, __vaddr_t r_vaddr)
  *	BE FOLLOWED BY A CALL TO A COALESCING/SORTING METHOD.
  *	ONLY USE THIS IF YOU KNOW WHAT YOU ARE DOING!
  */
-void do_uk_reloc_kmrds(__paddr_t r_paddr, __vaddr_t r_vaddr)
+__isr void do_uk_reloc_kmrds(__paddr_t r_paddr, __vaddr_t r_vaddr)
 {
 	struct ukplat_memregion_desc *mrdp;
 
