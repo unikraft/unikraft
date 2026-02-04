@@ -4,3 +4,14 @@ menuconfig LIBUKEFI
 	help
 		Drivers for booting in a EFI environment and consuming EFI
 		runtime services.
+
+if LIBUKEFI
+
+config LIBUKEFI_RS_PM
+	bool "EFI runtime services power management driver"
+	select HAVE_REBOOT
+	help
+		Use EFI runtime serices for OS runtime power management. This
+		does not support suspending a system.
+
+endif

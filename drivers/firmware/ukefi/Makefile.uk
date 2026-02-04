@@ -3,3 +3,8 @@ $(eval $(call addlib_s,libukefi,$(CONFIG_LIBUKEFI)))
 ASINCLUDES-$(CONFIG_LIBUKEFI) += -I$(LIBUKEFI_BASE)/include
 CINCLUDES-$(CONFIG_LIBUKEFI) += -I$(LIBUKEFI_BASE)/include
 CXXINCLUDES-$(CONFIG_LIBUKEFI) += -I$(LIBUKEFI_BASE)/include
+
+# TODO Remove as soon as plat dependencies go away
+LIBUKEFI_CINCLUDES-y += -I$(UK_PLAT_COMMON_BASE)/include
+
+LIBUKEFI_SRCS-$(CONFIG_LIBUKEFI_RS_PM) += $(LIBUKEFI_BASE)/pm.c

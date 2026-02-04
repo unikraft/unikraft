@@ -58,7 +58,6 @@ config KVM_BOOT_PROTO_EFI_STUB
 	depends on OPTIMIZE_PIE
 	select UKPLAT_ACPI
 	select LIBUKEFI
-	select HAVE_REBOOT
 	help
 		Make Unikraft bootable by UEFI firmware
 
