@@ -183,6 +183,27 @@ void uk_arch_arm64_spinwait(void)
 	/* Intelligent busy wait not supported on arm64. */
 }
 
+static inline
+void __noreturn uk_arch_arm64_jump_to(__u64 sp, __u64 entry)
+{
+	__asm__ __volatile__ (
+			"mov	x29, xzr\n" /* reset frame pointer */
+			"mov	x30, xzr\n" /* reset link register */
+			"mov	sp, %0\n"   /* set the sp  */
+			"br	%1\n"       /* branch to the entry func */
+			:
+			: "r"(sp), "r"(entry)
+			: /* sp not needed */);
+
+	__builtin_unreachable();
+}
+
+static inline
+void uk_arch_arm64_halt(void)
+{
+	__asm__ __volatile__ ("wfi");
+}
+
 #endif /* !__ASSEMBLY__ */
 
 #ifdef __cplusplus
