@@ -20,6 +20,7 @@
 #define PS2_CMD_WRITE_CFG			0x60
 #define PS2_CMD_DIS_KBD				0xAD
 #define PS2_CMD_EN_KBD				0xAE
+#define PS2_CMD_CPU_RESET			0xFE
 
 #define PS2_CFG_REG_EN_KBD_IRQ			UK_BIT(0)
 #define PS2_CFG_REG_DIS_KBD_CLK			UK_BIT(4)

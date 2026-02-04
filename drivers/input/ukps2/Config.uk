@@ -13,4 +13,8 @@ config LIBUKPS2_KBD
 	bool "PS/2 Keyboard driver"
 	select HAVE_SHUTDOWN_DISPATCHER
 
+config LIBUKPS2_SYSRESET
+	bool "PS/2 System reset driver"
+	depends on HAVE_IBMPC_PS2
+
 endif
