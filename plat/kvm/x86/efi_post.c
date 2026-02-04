@@ -7,6 +7,7 @@
 #include <uk/paging.h>
 #include <uk/plat/common/bootinfo.h>
 #include <uk/lcpu.h>
+#include <uk/pm.h>
 
 /* Slave Controller Edge/Level Triggered Register */
 #define PIC2_ELCR2					0x4D1
@@ -79,7 +80,7 @@ void __noreturn uk_efi_jmp_to_kern()
 	struct ukplat_bootinfo *bi = ukplat_bootinfo_get();
 
 	if (unlikely(!bi))
-		ukplat_crash();
+		uk_pm_syscrash();
 
 	uk_efi_boot_startup_args.entry_fn = &_ukplat_entry;
 	uk_efi_boot_startup_args.bootstack = uk_efi_bootstack + __PAGE_SIZE;

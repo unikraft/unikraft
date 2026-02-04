@@ -8,14 +8,14 @@
 #include <uk/arch/limits.h>
 #include <uk/arch/types.h>
 #include <uk/paging.h>
-#include <uk/plat/bootstrap.h>
+#include <uk/pm.h>
 #include <uk/plat/common/bootinfo.h>
 #include <uk/lcpu.h>
 #include <uk/plat/common/memory.h>
 #include <uk/plat/common/sections.h>
 #include <kvm-x86/lxboot.h>
 
-#define lxboot_crash(rc, msg, ...) ukplat_crash()
+#define lxboot_crash(rc, msg, ...) uk_pm_syscrash()
 
 void _ukplat_entry(struct uk_lcpu *lcpu, struct ukplat_bootinfo *bi);
 

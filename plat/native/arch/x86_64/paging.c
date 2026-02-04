@@ -17,8 +17,6 @@
 #include <uk/plat/native/paging.h>
 #include <uk/plat/native/page.h>
 
-#include <x86/cpu.h>
-
 int uk_plat_native_paging_init(void)
 {
 	__u32 eax, ebx, ecx, edx;

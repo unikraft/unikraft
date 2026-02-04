@@ -37,6 +37,7 @@
 #include <uk/print.h>
 #include <uk/assert.h>
 #include <x86/traps.h>
+#include <uk/pm.h>
 
 /*
  * CPUs should get dedicated IRQ and exception stacks. We use the interrupt
@@ -317,7 +318,7 @@ trap_halt:
 	 * but as we can't control that, we place halt outside
 	 * the above conditional.
 	 */
-	uk_arch_halt();
+	uk_pm_syscrash();
 }
 
 UK_EVENT(UK_PLAT_NATIVE_EXCEPT_EVENT_IRQ);

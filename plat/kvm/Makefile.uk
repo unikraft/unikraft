@@ -35,7 +35,6 @@ endif
 ##
 ## Architecture library definitions for x86_64
 ##
-LIBKVMPLAT_SRCS-$(CONFIG_ARCH_X86_64) += $(UK_PLAT_COMMON_BASE)/x86/cpu_native.c|common
 ifeq ($(CONFIG_HAVE_SYSCALL),y)
 LIBKVMPLAT_SRCS-$(CONFIG_ARCH_X86_64) += $(UK_PLAT_COMMON_BASE)/x86/syscall.S|common
 endif
@@ -94,7 +93,6 @@ LIBKVMPLAT_SRCS-$(CONFIG_ARCH_ARM_64) += $(LIBKVMPLAT_BASE)/arm/exceptions.S|isr
 LIBKVMPLAT_SRCS-$(CONFIG_ARCH_ARM_64) += $(LIBKVMPLAT_BASE)/arm/pagetable64.S|isr
 LIBKVMPLAT_SRCS-$(CONFIG_ARCH_ARM_64) += $(LIBKVMPLAT_BASE)/arm/setup.c
 
-LIBKVMPLAT_SRCS-y                          += $(LIBKVMPLAT_BASE)/shutdown.c
 
 LIBKVMPLAT_SRCS-$(CONFIG_KVM_VMM_QEMU_ISA_DEBUG_EXIT) += $(LIBKVMPLAT_BASE)/x86/qemu.c|x86
 

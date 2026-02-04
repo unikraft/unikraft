@@ -74,9 +74,8 @@
 #include <uk/boot.h>
 #include <uk/plat/config.h>
 #include <uk/plat/console.h>
-#include <uk/plat/bootstrap.h>
+#include <uk/pm.h>
 #include <uk/plat/common/bootinfo.h>
-#include <x86/cpu.h>
 #include <x86/traps.h>
 
 #include <xen/xen.h>

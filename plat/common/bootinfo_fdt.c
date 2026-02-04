@@ -7,9 +7,10 @@
 #include <uk/essentials.h>
 #include <uk/plat/common/bootinfo.h>
 #include <uk/plat/common/sections.h>
+#include <uk/pm.h>
 #include <libfdt.h>
 
-#define ukplat_bootinfo_crash(s)		ukplat_crash()
+#define ukplat_bootinfo_crash(s)		uk_pm_syscrash()
 
 static void fdt_bootinfo_mem_mrd(struct ukplat_bootinfo *bi, void *fdtp)
 {

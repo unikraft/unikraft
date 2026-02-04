@@ -34,7 +34,7 @@
 #include <xen/hvm/params.h>
 #include <common/events.h>
 #include <libfdt.h>
-#include <uk/plat/bootstrap.h>
+#include <uk/pm.h>
 #include <uk/plat/memory.h>
 #include <uk/config.h>
 #include <uk/assert.h>
@@ -225,5 +225,5 @@ void _libxenplat_armpanic(int *saved_regs) __noreturn;
 void _libxenplat_armpanic(int *saved_regs __unused)
 {
 	/* TODO: dump registers */
-	ukplat_crash();
+	uk_pm_syscrash();
 }

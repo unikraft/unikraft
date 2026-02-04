@@ -8,7 +8,7 @@
 #include <uk/arch/limits.h>
 #include <uk/arch/types.h>
 #include <uk/paging.h>
-#include <uk/plat/bootstrap.h>
+#include <uk/pm.h>
 #include <uk/plat/common/bootinfo.h>
 #include <uk/lcpu.h>
 #include <uk/plat/common/memory.h>
@@ -19,7 +19,7 @@
 #include <errno.h>
 #include <string.h>
 
-#define multiboot_crash(msg, rc)	ukplat_crash()
+#define multiboot_crash(msg, rc)	uk_pm_syscrash()
 
 void _ukplat_entry(struct uk_lcpu *lcpu, struct ukplat_bootinfo *bi);
 
