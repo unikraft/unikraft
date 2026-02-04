@@ -1,18 +1,25 @@
-#ifndef __PLAT_CMN_EFI_H__
-#define __PLAT_CMN_EFI_H__
+/* SPDX-License-Identifier: BSD-3-Clause */
+/* Copyright (c) 2023, Unikraft GmbH and The Unikraft Authors.
+ * Licensed under the BSD-3-Clause License (the "License").
+ * You may not use this file except in compliance with the License.
+ */
 
-#include <stdbool.h>
+#ifndef __UK_EFI_H__
+#define __UK_EFI_H__
+
 #include <uk/arch/limits.h>
 #include <uk/arch/types.h>
 #include <uk/bitops/bitcount.h>
 #include <uk/essentials.h>
 
-#if defined(__X86_64__)
+/* On x86_64, UEFI uses Microsoft ABI calling convention */
+#if CONFIG_ARCH_X86_64
 #define __uk_efi_api __attribute__((ms_abi))
-#else
+#else /* !CONFIG_ARCH_X86_64 */
 #define __uk_efi_api
-#endif
+#endif /* !CONFIG_ARCH_X86_64 */
 
+/* UEFI status codes */
 #define UK_EFI_SUCCESS			0
 #define UK_EFI_UNSUPPORTED						\
 	(3  | (1ULL << ((__SIZEOF_LONG__ << 3) - 1)))
@@ -29,6 +36,7 @@ typedef void *uk_efi_event_t;
 typedef void *uk_efi_hndl_t;
 typedef __u64 uk_efi_tpl_t;
 
+/* UEFI GUID structure */
 struct uk_efi_guid {
 	__u32 b0_3;
 	__u16 b4_5;
@@ -37,9 +45,10 @@ struct uk_efi_guid {
 } __align(8);
 
 enum uk_efi_if_type {
-	EFI_NATIVE_INTERFACE
+	EFI_NATIVE_INTERFACE,
 };
 
+/* UEFI variable attribute flags */
 #define UK_EFI_VARIABLE_NON_VOLATILE				0x00000001
 #define UK_EFI_VARIABLE_BOOTSERVICE_ACCESS			0x00000002
 #define UK_EFI_VARIABLE_RUNTIME_ACCESS				0x00000004
@@ -49,10 +58,12 @@ enum uk_efi_if_type {
 #define UK_EFI_VARIABLE_APPEND_WRITE				0x00000040
 #define UK_EFI_VARIABLE_ENHANCED_AUTHENTICATED_ACCESS		0x00000080
 
+/* UEFI page size is 4KB */
 #define UK_EFI_PAGE_SHIFT		12
 #define UK_EFI_PAGE_SIZE		(1UL << UK_EFI_PAGE_SHIFT)
 #define UK_EFI_PAGES_MAX		(__U64_MAX >> UK_EFI_PAGE_SHIFT)
 
+/* UEFI memory attribute flags */
 #define UK_EFI_MEMORY_UC		0x0000000000000001
 #define UK_EFI_MEMORY_WC		0x0000000000000002
 #define UK_EFI_MEMORY_WT		0x0000000000000004
@@ -69,6 +80,8 @@ enum uk_efi_if_type {
 #define UK_EFI_MEMORY_RUNTIME		0x8000000000000000
 #define UK_EFI_MEMORY_ISA_VALID		0x4000000000000000
 #define UK_EFI_MEMORY_ISA_MASK		0x0FFFF00000000000
+
+/* UEFI memory types */
 enum uk_efi_mem_type {
 	UK_EFI_RESERVED_MEMORY_TYPE,
 	UK_EFI_LOADER_CODE,
@@ -86,51 +99,58 @@ enum uk_efi_mem_type {
 	UK_EFI_PAL_CODE,
 	UK_EFI_PERSISTENT_MEMORY,
 	UK_EFI_UNACCEPTED_MEMORY_TYPE,
-	UK_EFI_MAX_MEMORY_TYPE
+	UK_EFI_MAX_MEMORY_TYPE,
 };
 
+/* Memory allocation type */
 enum uk_efi_alloc_type {
 	UK_EFI_ALLOCATE_ANY_PAGES,
 	UK_EFI_ALLOCATE_MAX_ADDRESS,
 	UK_EFI_ALLOCATE_ADDRESS,
-	UK_EFI_MAX_ALLOCATION_TYPE
+	UK_EFI_MAX_ALLOCATION_TYPE,
 };
 
+/* Timer delay type */
 enum uk_efi_timer_delay {
 	UK_EFI_TIMER_CANCEL,
 	UK_EFI_TIMER_PERIODIC,
-	UK_EFI_TIMER_RELATIVE
+	UK_EFI_TIMER_RELATIVE,
 };
 
+/* Protocol search type */
 enum uk_efi_locate_search_type {
 	UK_EFI_ALL_HANDLES,
 	UK_EFI_BY_REGISTER_NOTIFY,
-	UK_EFI_BY_PROTOCOL
+	UK_EFI_BY_PROTOCOL,
 };
 
+/* System reset type */
 enum uk_efi_reset_type {
 	UK_EFI_RESET_COLD,
 	UK_EFI_RESET_WARM,
 	UK_EFI_RESET_SHUTDOWN,
-	UK_EFI_RESET_PLATFORM_SPECIFIC
+	UK_EFI_RESET_PLATFORM_SPECIFIC,
 };
 
+/* Graphics pixel format */
 enum uk_efi_graphics_pixel_format {
 	UK_EFI_PIXEL_RED_GREEN_BLUE_RESERVED_8BIT_PER_COLOR,
 	UK_EFI_PIXEL_BLUE_GREEN_RED_RESERVED_8BIT_PER_COLOR,
 	UK_EFI_PIXEL_BIT_MASK,
 	UK_EFI_PIXEL_BLT_ONLY,
-	UK_EFI_PIXEL_FORMAT_MASK
+	UK_EFI_PIXEL_FORMAT_MASK,
 };
 
+/* Graphics BLT operation */
 enum uk_efi_graphics_output_blt_operation {
 	UK_EFI_BLT_VIDEO_FILL,
 	UK_EFI_BLT_VIDEO_TO_BLT_BUFFER,
 	UK_EFI_BLT_BUFFER_TO_VIDEO,
 	UK_EFI_BLT_VIDEO_TO_VIDEO,
-	UK_EFI_GRAPHICS_OUTPUT_BLT_OPERATION_MAX
+	UK_EFI_GRAPHICS_OUTPUT_BLT_OPERATION_MAX,
 };
 
+/* Memory descriptor */
 struct uk_efi_mem_desc {
 	__u32 type;
 	__u32 pad;
@@ -140,12 +160,14 @@ struct uk_efi_mem_desc {
 	__u64 attribute;
 } ;
 
+/* Device path protocol */
 struct uk_efi_dev_path_proto {
 	__u8 type;
 	__u8 subtype;
 	__u16 len;
 };
 
+/* Open protocol information entry */
 struct uk_efi_open_proto_info_entry {
 	uk_efi_hndl_t agent_handle;
 	uk_efi_hndl_t controller_handle;
@@ -153,6 +175,7 @@ struct uk_efi_open_proto_info_entry {
 	__u32 open_count;
 };
 
+/* UEFI table header */
 struct uk_efi_tbl_hdr {
 	__u64 signature;
 	__u32 revision;
@@ -161,6 +184,7 @@ struct uk_efi_tbl_hdr {
 	__u32 reserved;
 };
 
+/* Boot Services Table */
 struct uk_efi_boot_services {
 	struct uk_efi_tbl_hdr hdr;
 	uk_efi_tpl_t
@@ -245,7 +269,7 @@ struct uk_efi_boot_services {
 	(__uk_efi_api *install_configuration_table)(struct uk_efi_guid *guid,
 						    void *tbl);
 	uk_efi_status_t
-	(__uk_efi_api *load_image)(bool boot_policy,
+	(__uk_efi_api *load_image)(__bool boot_policy,
 				   uk_efi_hndl_t parent_img_hndl,
 				   struct uk_efi_dev_path_proto *file_path,
 				   void *src_buf,
@@ -278,7 +302,7 @@ struct uk_efi_boot_services {
 	(__uk_efi_api *connect_controller)(uk_efi_hndl_t ctlr_hndl,
 					   uk_efi_hndl_t *drv_img_hndl,
 					   struct uk_efi_dev_path_proto *rem_dev_path,
-					   bool recursive);
+					   __bool recursive);
 	uk_efi_status_t
 	(__uk_efi_api *disconnect_controller)(uk_efi_hndl_t ctlr_hndl,
 					      uk_efi_hndl_t drv_img_hndl,
@@ -345,12 +369,14 @@ struct uk_efi_boot_services {
 					uk_efi_event_t *event);
 };
 
+/* Time capabilities */
 struct uk_efi_time_caps {
 	__u32 resolution;
 	__u32 accuracy;
-	bool sets_to_zero;
+	__bool sets_to_zero;
 };
 
+/* Time structure */
 struct uk_efi_time {
 	__u16 year;
 	__u8 month;
@@ -365,6 +391,7 @@ struct uk_efi_time {
 	__u8 pad2;
 };
 
+/* Capsule header */
 struct uk_efi_capsule_hdr {
 	struct uk_efi_guid capsule_guid;
 	__u32 header_size;
@@ -372,6 +399,12 @@ struct uk_efi_capsule_hdr {
 	__u32 capsule_image_size;
 };
 
+/**
+ * GUID used for MemoryOverwriteRequestControl UEFI variable defined in
+ * TCG Platform Reset Attack Mitigation Specification 1.00. Therefore,
+ * not namespaced under UK_EFI_*.
+ * See http://trustedcomputinggroup.org for the latest specification
+ */
 #define MEMORY_ONLY_RESET_CONTROL_GUID					\
 	(&(struct uk_efi_guid){						\
 		.b0_3 = 0xe20939be,					\
@@ -380,6 +413,8 @@ struct uk_efi_capsule_hdr {
 		.b8_15 = {0xa1, 0x50, 0x89, 0x7f,			\
 			  0x85, 0xd4, 0x98, 0x29},			\
 	})
+
+/* Runtime Services Table */
 struct uk_efi_runtime_services {
 	struct uk_efi_tbl_hdr hdr;
 	uk_efi_status_t
@@ -388,11 +423,11 @@ struct uk_efi_runtime_services {
 	uk_efi_status_t
 	(__uk_efi_api *set_time)(struct uk_efi_time *time);
 	uk_efi_status_t
-	(__uk_efi_api *get_wakeup_time)(bool *enabled,
-					bool *pending,
+	(__uk_efi_api *get_wakeup_time)(__bool *enabled,
+					__bool *pending,
 					struct uk_efi_time *time);
 	uk_efi_status_t
-	(__uk_efi_api *set_wakeup_time)(bool enabled,
+	(__uk_efi_api *set_wakeup_time)(__bool enabled,
 					struct uk_efi_time *time);
 	uk_efi_status_t
 	(__uk_efi_api *set_virtual_address_map)(uk_efi_uintn_t mem_map_sz,
@@ -440,15 +475,17 @@ struct uk_efi_runtime_services {
 						   enum uk_efi_reset_type *rst_type);
 };
 
+/* Input key */
 struct uk_efi_input_key {
 	__u16 scan_code;
 	__s16 unicode_char;
 };
 
+/* Simple Text Input Protocol */
 struct uk_efi_simple_txt_in_proto {
 	uk_efi_status_t
 	(__uk_efi_api *reset)(struct uk_efi_simple_txt_in_proto *this,
-			      bool xverif);
+			      __bool xverif);
 	uk_efi_status_t
 	(__uk_efi_api *read_key_stroke)(struct uk_efi_simple_txt_in_proto *this,
 					struct uk_efi_input_key *key);
@@ -456,19 +493,21 @@ struct uk_efi_simple_txt_in_proto {
 	uk_efi_event_t wait_for_key;
 };
 
+/* Simple Text Output mode */
 struct uk_efi_simple_out_mode {
 	__s32 max_mode;
 	__s32 mode;
 	__s32 attribute;
 	__s32 cursor_column;
 	__s32 cursor_row;
-	bool cursor_visible;
+	__bool cursor_visible;
 };
 
+/* Simple Text Output Protocol */
 struct uk_efi_simple_txt_out_proto {
 	uk_efi_status_t
 	(__uk_efi_api *reset)(struct uk_efi_simple_txt_out_proto *this,
-			      bool xverif);
+			      __bool xverif);
 	uk_efi_status_t
 	(__uk_efi_api *output_string)(struct uk_efi_simple_txt_out_proto *this,
 				      __s16 *str);
@@ -494,7 +533,7 @@ struct uk_efi_simple_txt_out_proto {
 					    uk_efi_uintn_t row);
 	uk_efi_status_t
 	(__uk_efi_api *enable_cursor)(struct uk_efi_simple_txt_out_proto *this,
-				      bool visible);
+				      __bool visible);
 
 	struct uk_efi_simple_out_mode *mode;
 };
@@ -508,6 +547,7 @@ struct uk_efi_simple_txt_out_proto {
 			  0xdc, 0x46, 0x12, 0x20},			\
 	})
 
+/* Memory Attributes Table */
 struct uk_efi_mem_attr_tbl {
 	__u32 version;
 	__u32 number_of_entries;
@@ -532,11 +572,14 @@ struct uk_efi_mem_attr_tbl {
 		.b8_15 = {0xbc, 0x22, 0x00, 0x80,			\
 			  0xc7, 0x3c, 0x88, 0x81},			\
 	})
+
+/* Configuration table entry */
 struct uk_efi_cfg_tbl {
 	struct uk_efi_guid vendor_guid;
 	void *vendor_table;
 };
 
+/* System Table */
 struct uk_efi_sys_tbl {
 	struct uk_efi_tbl_hdr hdr;
 	__s16 *firmware_vendor;
@@ -561,6 +604,8 @@ struct uk_efi_sys_tbl {
 		.b8_15 = {0x8E, 0x3F, 0x00, 0xA0,			\
 			  0xC9, 0x69, 0x72, 0x3B},			\
 	})
+
+/* Loaded Image Protocol */
 struct uk_efi_ld_img_hndl {
 	__u32 revision;
 	uk_efi_hndl_t parent_handle;
@@ -585,6 +630,8 @@ struct uk_efi_ld_img_hndl {
 		.b8_15 = {0x8e, 0x39, 0x00, 0xa0,			\
 			  0xc9, 0x69, 0x72, 0x3b},			\
 	})
+
+/* File Info */
 struct uk_efi_file_info_id {
 	__u64 size;
 	__u64 file_size;
@@ -604,9 +651,11 @@ struct uk_efi_file_info_id {
 		.b8_15 = {0x8e, 0x39, 0x00, 0xa0,			\
 			  0xc9, 0x69, 0x72, 0x3b},			\
 	})
+
+/* File System Info */
 struct uk_efi_file_system_info_id {
 	__u64 size;
-	bool read_only;
+	__bool read_only;
 	__u64 volume_size;
 	__u64 free_space;
 	__u32 block_size;
@@ -621,10 +670,13 @@ struct uk_efi_file_system_info_id {
 		.b8_15 = {0x9a, 0x35, 0x00, 0x90,			\
 			  0x27, 0x3f, 0xc1, 0x4d},			\
 	})
+
+/* File System Volume Label */
 struct uk_efi_file_system_volume_label_id {
 	__s16 volume_label[0];
 };
 
+/* File I/O token */
 struct uk_efi_file_io_token {
 	uk_efi_event_t event;
 	uk_efi_status_t status;
@@ -632,10 +684,12 @@ struct uk_efi_file_io_token {
 	void *buffer;
 };
 
+/* File open modes */
 #define UK_EFI_FILE_MODE_READ				0x0000000000000001
 #define UK_EFI_FILE_MODE_WRITE				0x0000000000000002
 #define UK_EFI_FILE_MODE_CREATE				0x8000000000000000
 
+/* File attributes */
 #define UK_EFI_FILE_READ_ONLY				0x0000000000000001
 #define UK_EFI_FILE_HIDDEN				0x0000000000000002
 #define UK_EFI_FILE_SYSTEM				0x0000000000000004
@@ -643,6 +697,8 @@ struct uk_efi_file_io_token {
 #define UK_EFI_FILE_DIRECTORY				0x0000000000000010
 #define UK_EFI_FILE_ARCHIVE				0x0000000000000020
 #define UK_EFI_FILE_VALID_ATTR				0x0000000000000037
+
+/* File Protocol */
 struct uk_efi_file_proto {
 	__u64 revision;
 	uk_efi_status_t
@@ -708,6 +764,8 @@ struct uk_efi_file_proto {
 		.b8_15 = {0x8e, 0x39, 0x00, 0xa0,			\
 			  0xc9, 0x69, 0x72, 0x3b},			\
 	})
+
+/* Simple File System Protocol */
 struct uk_efi_simple_fs_proto {
 	__u64 revision;
 	uk_efi_status_t
@@ -715,4 +773,4 @@ struct uk_efi_simple_fs_proto {
 				    struct uk_efi_file_proto **root);
 };
 
-#endif /* __PLAT_CMN_EFI_H__ */
+#endif /*  __UK_EFI_H__ */

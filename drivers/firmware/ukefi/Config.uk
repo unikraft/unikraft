@@ -1,0 +1,6 @@
+menuconfig LIBUKEFI
+	bool "EFI OS runtime drivers"
+	depends on (ARCH_X86_64 || ARCH_ARM_64)
+	help
+		Drivers for booting in a EFI environment and consuming EFI
+		runtime services.

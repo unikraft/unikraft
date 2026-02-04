@@ -37,7 +37,9 @@
 #include <uk/plat/common/acpi.h>
 #include <string.h>
 #include <errno.h>
-#include <kvm/efi.h>
+#if CONFIG_LIBUKEFI
+#include <uk/efi.h>
+#endif /* CONFIG_LIBUKEFI */
 #include <uk/plat/common/bootinfo.h>
 
 #define RSDP10_LEN		20
@@ -143,6 +145,7 @@ static void acpi_list_tables(void)
 }
 #endif /* UK_DEBUG */
 
+#if CONFIG_LIBUKEFI
 static struct acpi_rsdp *acpi_get_efi_st_rsdp(void)
 {
 	struct ukplat_bootinfo *bi = ukplat_bootinfo_get();
@@ -177,6 +180,7 @@ static struct acpi_rsdp *acpi_get_efi_st_rsdp(void)
 
 	return rsdp;
 }
+#endif /* CONFIG_LIBUKEFI */
 
 #if defined(__X86_64__)
 static struct acpi_rsdp *acpi_get_bios_rom_rsdp(void)
@@ -196,11 +200,13 @@ static struct acpi_rsdp *acpi_get_bios_rom_rsdp(void)
 
 static struct acpi_rsdp *acpi_get_rsdp(void)
 {
-	struct acpi_rsdp *rsdp;
+	struct acpi_rsdp *rsdp __maybe_unused;
 
+#if CONFIG_LIBUKEFI
 	rsdp = acpi_get_efi_st_rsdp();
 	if (rsdp)
 		return rsdp;
+#endif /* CONFIG_LIBUKEFI */
 
 #if defined(__X86_64__)
 	return acpi_get_bios_rom_rsdp();

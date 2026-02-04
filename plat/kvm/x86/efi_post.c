@@ -3,7 +3,8 @@
  * Licensed under the BSD-3-Clause License (the "License").
  * You may not use this file except in compliance with the License.
  */
-#include <kvm/efi.h>
+#include <uk/efi.h>
+#include <uk/paging.h>
 #include <uk/plat/common/bootinfo.h>
 #include <uk/lcpu.h>
 
