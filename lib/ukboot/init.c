@@ -20,6 +20,8 @@
 #include <uk/process.h>
 #include <uk/sched.h>
 
+#include <uk/pm.h>
+
 #include "init.h"
 
 #if CONFIG_LIBUKBOOT_GRACEFUL_SHUTDOWN
@@ -179,7 +181,8 @@ static __noreturn void init_mainlike(void *argc_arg, void *argv_arg)
 
 	r = do_main(argc, argv);
 	/* INIT main should never return; it should call exit() when done */
-	UK_CRASH("INIT main returned %d\n", r);
+	uk_pr_debug("INIT main returned %d\n", r);
+	uk_pm_syshalt();
 }
 
 int do_init(int argc, char *argv[])
