@@ -40,7 +40,7 @@
 #include <uk/plat/common/_time.h>
 #include <common/hypervisor.h>
 #include <common/events.h>
-#include <xen-x86/irq.h>
+#include <uk/plat/xen/except.h>
 #include <uk/assert.h>
 #include <uk/arch/util.h>
 
@@ -194,7 +194,7 @@ __nsec ukplat_wall_clock(void)
 
 void time_block_until(__snsec until)
 {
-	UK_ASSERT(irqs_disabled());
+	UK_ASSERT(uk_plat_xen_irqs_disabled());
 
 	if ((__snsec) ukplat_monotonic_clock() < until) {
 		HYPERVISOR_set_timer_op(until);

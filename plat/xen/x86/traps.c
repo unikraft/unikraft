@@ -33,7 +33,6 @@
 
 #include <common/hypervisor.h>
 #include <xen-x86/smp.h>
-#include <xen-x86/irq.h>
 #include <xen-x86/traps.h>
 #include <xen-x86/hypercall.h>
 
@@ -213,34 +212,6 @@ trap_halt:
 	 * the above conditional.
 	 */
 	uk_pm_syscrash();
-}
-
-void uk_plat_xen_enable_irq(void)
-{
-	local_irq_enable();
-}
-
-void uk_plat_xen_disable_irq(void)
-{
-	local_irq_disable();
-}
-
-unsigned long uk_plat_xen_save_irqf(void)
-{
-	unsigned long flags;
-
-	local_irq_save(flags);
-	return flags;
-}
-
-void uk_plat_xen_restore_irqf(unsigned long flags)
-{
-	local_irq_restore(flags);
-}
-
-int uk_plat_xen_irqs_disabled(void)
-{
-	return irqs_disabled();
 }
 
 #endif

@@ -37,6 +37,7 @@
 #include <common/hypervisor.h>
 #include <common/events.h>
 #include <xen/xen.h>
+#include <uk/plat/xen/except.h>
 #include <uk/print.h>
 #include <uk/event.h>
 #include <uk/assert.h>
@@ -338,7 +339,7 @@ inline void unmask_evtchn(evtchn_port_t port)
 #ifdef XEN_HAVE_PV_UPCALL_MASK
 		if (!vcpu_info->evtchn_upcall_mask)
 #endif
-			uk_lcpu_irqs_handle_pending();
+			uk_plat_xen_irqs_handle_pending();
 	}
 }
 
@@ -347,14 +348,4 @@ inline void clear_evtchn(evtchn_port_t port)
 	shared_info_t *s = HYPERVISOR_shared_info;
 
 	uk_clear_bit(port, &s->evtchn_pending[0]);
-}
-
-struct uk_alloc;
-
-int ukplat_irq_init(struct uk_alloc *a __unused)
-{
-	UK_ASSERT(uk_lcpu_irqs_disabled());
-
-	/* Nothing for now */
-	return 0;
 }

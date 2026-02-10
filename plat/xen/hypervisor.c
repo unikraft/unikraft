@@ -81,7 +81,7 @@ void do_hypervisor_callback(struct uk_lcpu_regs *regs)
 	in_callback = 0;
 }
 
-void ukplat_lcpu_irqs_handle_pending(void)
+void uk_plat_xen_irqs_handle_pending(void)
 {
 #ifdef XEN_HAVE_PV_UPCALL_MASK
 	int save;
