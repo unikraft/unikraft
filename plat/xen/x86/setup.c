@@ -80,11 +80,7 @@
 
 #include <xen/xen.h>
 #include <common/events.h>
-#ifdef __X86_64__
-#include <xen-x86/hypercall64.h>
-#else
-#include <xen-x86/hypercall32.h>
-#endif
+#include <xen-x86/hypercall.h>
 #include <xen-x86/mm.h>
 #include <xen-x86/setup.h>
 #include <xen/arch-x86/cpuid.h>

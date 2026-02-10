@@ -42,10 +42,8 @@
 #include <uk/xen/console.h>
 #endif /* CONFIG_LIBXENCONS */
 
-#if defined __X86_32__
-#include <xen-x86/hypercall32.h>
-#elif defined __X86_64__
-#include <xen-x86/hypercall64.h>
+#if (defined __X86_32__) || (defined __X86_64__)
+#include <xen-x86/hypercall.h>
 #elif (defined __ARM_32__) || (defined __ARM_64__)
 #include <xen-arm/hypercall.h>
 #endif
