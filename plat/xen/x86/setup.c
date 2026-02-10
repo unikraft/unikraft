@@ -85,7 +85,6 @@
 #else
 #include <xen-x86/hypercall32.h>
 #endif
-#include <xen-x86/irq.h>
 #include <xen-x86/mm.h>
 #include <xen-x86/setup.h>
 #include <xen/arch-x86/cpuid.h>
