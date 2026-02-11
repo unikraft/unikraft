@@ -1,0 +1,5 @@
+config LIBUKSMCCC
+	bool "SMCCC helpers"
+	depends on ARCH_ARM_64
+	help
+		Firmware communication helpers via the Arm SMCCC

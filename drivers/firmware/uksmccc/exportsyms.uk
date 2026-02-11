@@ -1,0 +1,10 @@
+uk_smccc_arch_features
+uk_smccc_arch_soc_id
+uk_smccc_arch_workaround_1
+uk_smccc_arch_workaround_2
+uk_smccc_init
+uk_smccc_invoke
+uk_smccc_hvc
+uk_smccc_smc
+uk_smccc_svc_query
+uk_smccc_version

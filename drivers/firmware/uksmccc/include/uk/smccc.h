@@ -1,38 +1,15 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
-/*
- * Authors: Michalis Pappas <michalis.pappas@opensynergy.com>
- *
- * Copyright (c) 2021, OpenSynergy GmbH. All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- *
- * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- * 3. Neither the name of the copyright holder nor the names of its
- *    contributors may be used to endorse or promote products derived from
- *    this software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
- * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGE.
+/* Copyright (c) 2021, OpenSynergy GmbH. All rights reserved.
+ * Copyright (c) 2026, Unikraft GmbH and The Unikraft Authors.
+ * Licensed under the BSD-3-Clause License (the "License").
+ * You may not use this file except in compliance with the License.
  */
-#ifndef __UKARCH_SMCCC_H__
-#define __UKARCH_SMCCC_H__
+
+#ifndef __UK_SMCCC_H__
+#define __UK_SMCCC_H__
 
 #include <uk/config.h>
+#include <uk/arch/types.h>
 
 /**
  * Implements SMCCC up to v1.3 (ARM DEN 0028D)
@@ -113,35 +90,33 @@
 
 #ifndef __ASSEMBLY__
 
-struct smccc_config {
-	unsigned long conduit;
-	unsigned long version;
+struct uk_smccc_config {
+	__u64 conduit;
+	__u64 version;
 };
 
-struct smccc_args {
-	unsigned long a0;
-	unsigned long a1;
-	unsigned long a2;
-	unsigned long a3;
-	unsigned long a4;
-	unsigned long a5;
-	unsigned long a6;
-	unsigned long a7;
-#ifdef CONFIG_ARCH_ARM_64
-	unsigned long a8;
-	unsigned long a9;
-	unsigned long a10;
-	unsigned long a11;
-	unsigned long a12;
-	unsigned long a13;
-	unsigned long a14;
-	unsigned long a15;
-	unsigned long a16;
-	unsigned long a17;
-#endif
+struct uk_smccc_args {
+	__u64 a0;
+	__u64 a1;
+	__u64 a2;
+	__u64 a3;
+	__u64 a4;
+	__u64 a5;
+	__u64 a6;
+	__u64 a7;
+	__u64 a8;
+	__u64 a9;
+	__u64 a10;
+	__u64 a11;
+	__u64 a12;
+	__u64 a13;
+	__u64 a14;
+	__u64 a15;
+	__u64 a16;
+	__u64 a17;
 };
 
-typedef void (*smccc_conduit_fn_t)(struct smccc_args *args);
+typedef void (*uk_smccc_conduit_func)(struct uk_smccc_args *args);
 
 /**
  * Sets the conduit and version to use when issuing SMCCC calls.
@@ -156,7 +131,7 @@ typedef void (*smccc_conduit_fn_t)(struct smccc_args *args);
  *
  * @param config Pointer to config struct
  */
-void smccc_init(struct smccc_config *config);
+void uk_smccc_init(struct uk_smccc_config *config);
 
 /**
  * Issues an SMC.
@@ -168,7 +143,7 @@ void smccc_init(struct smccc_config *config);
  * @param args Arguments to be passed to the SMC call.
  *             Updated with return values upon completion.
  */
-void smccc_smc(struct smccc_args *args);
+void uk_smccc_smc(struct uk_smccc_args *args);
 
 /**
  * Issues an HVC
@@ -180,7 +155,7 @@ void smccc_smc(struct smccc_args *args);
  * @param args Arguments to be passed to the HVC call.
  *             Updated with return values upon completion.
  */
-void smccc_hvc(struct smccc_args *args);
+void uk_smccc_hvc(struct uk_smccc_args *args);
 
 /**
  * Issue an SMCCC call using the selected conduit
@@ -192,7 +167,7 @@ void smccc_hvc(struct smccc_args *args);
  * @param args Arguments to be passed to the conduit call.
  *             Updated with return values upon completion.
  */
-void smccc_invoke(struct smccc_args *args);
+void uk_smccc_invoke(struct uk_smccc_args *args);
 
 /**
  * Requests the implemented SMCCC version
@@ -206,7 +181,7 @@ void smccc_invoke(struct smccc_args *args);
  *
  * @return 32-bit version or SMCCC_NOT_SUPPORTED
  */
-unsigned long smccc_version(void);
+__u64 uk_smccc_version(void);
 
 /**
  * Requests information on the implementation of an
@@ -221,7 +196,7 @@ unsigned long smccc_version(void);
  *          additional feature-specific flags.
  *          A negative value indicates not implemented.
  */
-unsigned long smccc_arch_features(unsigned long fid);
+__u64 uk_smccc_arch_features(__u64 fid);
 
 /**
  * Obtains the SoC ID, as defined by the silicon provider
@@ -229,7 +204,7 @@ unsigned long smccc_arch_features(unsigned long fid);
  * @param type SMCCC_ARCH_SOC_VERSION or SMCCC_ARCH_SOC_REVISION
  * @return SoC ID on success, NOT_IMPLEMENTED or INVALID_PARAMETER on error
  */
-unsigned long smccc_arch_soc_id(unsigned long type);
+__u64 uk_smccc_arch_soc_id(__u64 type);
 
 /**
  * Requests the firmware to apply workaround for CVE-2017-5715
@@ -239,7 +214,7 @@ unsigned long smccc_arch_soc_id(unsigned long type);
  * discovery returns a non-negative value. For more information see
  * ARM DEN0028C Sect. 7.5
  */
-void smccc_arch_workaround_1(void);
+void uk_smccc_arch_workaround_1(void);
 
 /**
  * Requests the firmware to apply workaround for CVE-2018-3639.
@@ -249,7 +224,7 @@ void smccc_arch_workaround_1(void);
  * discovery returns a non-negative value. For more information see
  * ARM DEN0028C Sect. 7.6
  */
-void smccc_arch_workaround_2(void);
+void uk_smccc_arch_workaround_2(void);
 
 /**
  * Performs a general service query
@@ -269,8 +244,8 @@ void smccc_arch_workaround_2(void);
  * - SMCCC_QUERY_REVISION
  * @return Query-specific value
  */
-unsigned long smccc_svc_query(unsigned long service, unsigned long type);
+__u64 uk_smccc_svc_query(__u64 service, __u64 type);
 
 #endif /* __ASSEMBLY__ */
 
-#endif /* __UKARCH_SMCCC_H__ */
+#endif /* __UK_SMCCC_H__ */
