@@ -68,6 +68,9 @@ $(KVM_DEBUG_IMAGE): $(KVM_ALIBS) $(KVM_ALIBS-y) $(KVM_OLIBS) $(KVM_OLIBS-y) \
 ifeq ($(CONFIG_OPTIMIZE_PIE),y)
 	$(call build_uk_reloc,$@)
 endif
+ifeq ($(CONFIG_LIBUKPCPUVAR),y)
+	$(call build_uk_pcpuvar,$@)
+endif
 
 $(KVM_IMAGE): $(KVM_IMAGE).dbg
 	$(call build_cmd,SCSTRIP,,$@,\

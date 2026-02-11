@@ -1,0 +1,5 @@
+define build_uk_pcpuvar =
+	$(call build_cmd,UKPCPUVAR,,$(1).uk_pcpuvar.bin,\
+		$(SCRIPTS_DIR)/mkukpcpuvar.py $(1)	\
+		--max-cpus=$(CONFIG_UKPLAT_CPU_MAXCOUNT))
+endef
