@@ -31,7 +31,6 @@
 #include <uk/assert.h>
 #include <uk/boot.h>
 #include <uk/intctlr.h>
-#include <arm/smccc.h>
 #include <uk/arch/limits.h>
 #include <uk/arch/util.h>
 
@@ -46,76 +45,6 @@
 #ifdef CONFIG_HAVE_MEMTAG
 #include <uk/arch/memtag.h>
 #endif /* CONFIG_HAVE_MEMTAG */
-
-smccc_conduit_fn_t smccc_psci_call;
-
-#if CONFIG_LIBUKACPI
-static int get_psci_method(struct ukplat_bootinfo *bi __unused)
-{
-	struct uk_acpi_fadt *acpi_fadt = uk_acpi_get_fadt();
-
-	if (unlikely(!acpi_fadt))
-		return -ENOTSUP;
-
-	if (unlikely(!(acpi_fadt->arm_bflags & UK_ACPI_FADT_ARM_BFLAGS_PSCI)))
-		return -ENOTSUP;
-
-	if (acpi_fadt->arm_bflags & UK_ACPI_FADT_ARM_BFLAGS_PSCI_HVC)
-		smccc_psci_call = smccc_hvc;
-	else
-		smccc_psci_call = smccc_smc;
-
-	return 0;
-}
-#else /* !CONFIG_LIBUKACPI */
-static int get_psci_method(struct ukplat_bootinfo *bi)
-{
-	const char *fdtmethod;
-	int fdtpsci, len;
-	void *fdt;
-
-	fdt = (void *)bi->dtb;
-	UK_ASSERT(bi->dtb);
-
-	/*
-	 * We just support PSCI-0.2 and PSCI-1.0, the PSCI-0.1 would not
-	 * be supported.
-	 */
-	fdtpsci = fdt_node_offset_by_compatible(fdt, -1, "arm,psci-1.0");
-	if (unlikely(fdtpsci < 0))
-		fdtpsci = fdt_node_offset_by_compatible(fdt, -1,
-							"arm,psci-0.2");
-
-	if (unlikely(fdtpsci < 0)) {
-		uk_pr_info("No PSCI conduit found in DTB\n");
-		goto enomethod;
-	}
-
-	fdtmethod = fdt_getprop(fdt, fdtpsci, "method", &len);
-	if (unlikely(!fdtmethod || len <= 0)) {
-		uk_pr_info("No PSCI method found\n");
-		goto enomethod;
-	}
-
-	if (!strcmp(fdtmethod, "hvc"))
-		smccc_psci_call = smccc_hvc;
-	else if (!strcmp(fdtmethod, "smc"))
-		smccc_psci_call = smccc_smc;
-	else {
-		uk_pr_info("Invalid PSCI conduit method: %s\n", fdtmethod);
-		goto enomethod;
-	}
-	uk_pr_info("PSCI method: %s\n", fdtmethod);
-
-	return 0;
-
-enomethod:
-	uk_pr_info("Support PSCI from PSCI-0.2\n");
-	smccc_psci_call = NULL;
-
-	return -ENOENT;
-}
-#endif /* !CONFIG_LIBUKACPI */
 
 /* At this point we expect that the C runtime is configured and that
  * bootcode has enabled all CPU features used by compiled code.
@@ -183,10 +112,6 @@ void __no_pauth _ukplat_entry(void)
 	if (unlikely(rc))
 		UK_CRASH("SMP initialization failed: %d.\n", rc);
 #endif /* CONFIG_HAVE_SMP */
-
-	rc = get_psci_method(bi);
-	if (unlikely(rc < 0))
-		UK_CRASH("Failed to get PSCI method: %d.\n", rc);
 
 	/*
 	 * Switch away from the bootstrap stack as early as possible.
