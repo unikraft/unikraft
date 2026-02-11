@@ -369,9 +369,17 @@ void ukplat_memregion_list_coalesce(struct ukplat_memregion_list *list)
 				UK_ASSERT(mr_prio != MRD_PRIO_KRNL_RSRC);
 
 				/* We do not allow overlaps of same priority
-				 * and of different flags.
+				 * and of different flags.  However, if the
+				 * memory region is reserved, et al, we must
+				 * completely leave it alone for the purpose
+				 * of actually coalescing memory regions.
 				 */
-				UK_ASSERT(ml->flags == mr->flags);
+
+				if (mr->type == UKPLAT_MEMRT_FREE) {
+					UK_ASSERT(ml->type == mr->type);
+					UK_ASSERT(ml->flags == mr->flags);
+				}
+
 				UK_ASSERT(PAGE_ALIGNED(ml->pbase));
 				UK_ASSERT(PAGE_ALIGNED(mr->pbase));
 
@@ -401,6 +409,19 @@ void ukplat_memregion_list_coalesce(struct ukplat_memregion_list *list)
 					continue;
 				}
 
+				/* This is a partial overlap: only merge FREE.
+				 */
+				if (ml->type != UKPLAT_MEMRT_FREE ||
+				    mr->type != UKPLAT_MEMRT_FREE) {
+					uk_pr_debug("Skip merge non-FREE.\n");
+					i++;
+					continue;
+				}
+
+				UK_ASSERT(ml->flags == mr->flags);
+				UK_ASSERT_VALID_FREE_MRD(ml);
+				UK_ASSERT_VALID_FREE_MRD(mr);
+
 				uk_pr_debug("Merging two overlapping mrds.\n");
 
 				/* If they are not contained within each other,
@@ -426,7 +447,8 @@ void ukplat_memregion_list_coalesce(struct ukplat_memregion_list *list)
 		 */
 		} else if (ml->pbase + ml->len == mr->pbase &&
 			   ml_prio == mr_prio && ml->flags == mr->flags &&
-			   ml_prio != MRD_PRIO_KRNL_RSRC) {
+			   ml->type == UKPLAT_MEMRT_FREE &&
+			   mr->type == UKPLAT_MEMRT_FREE) {
 			/* We do not allow overlaps of memory regions
 			 * whose resource page offset into their region
 			 * is not equal to 0. Regions don't that meet
@@ -437,6 +459,8 @@ void ukplat_memregion_list_coalesce(struct ukplat_memregion_list *list)
 			UK_ASSERT(!mr->pg_off);
 			UK_ASSERT(PAGE_ALIGNED(ml->pbase));
 			UK_ASSERT(PAGE_ALIGNED(mr->pbase));
+			UK_ASSERT_VALID_FREE_MRD(ml);
+			UK_ASSERT_VALID_FREE_MRD(mr);
 
 			uk_pr_debug("Merging two contiguous mrd's.\n");
 			ml->len += mr->len;
