@@ -46,7 +46,7 @@
 #define active_evtchns(sh, idx)				\
 	((sh)->evtchn_pending[idx] & ~(sh)->evtchn_mask[idx])
 
-int in_callback;
+static int in_callback;
 
 void do_hypervisor_callback(struct uk_lcpu_regs *regs)
 {

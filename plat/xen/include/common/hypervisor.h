@@ -38,21 +38,6 @@
 
 #include <stdint.h>
 #include <xen/xen.h>
-#if defined(__X86_32__) || defined(__x86_64__)
-#include <xen-x86/hypercall.h>
-#include <xen-x86/traps.h>
-#include <xen-x86/smp.h>
-#elif (defined __ARM_32__) || (defined __ARM_64__)
-#include <xen-arm/hypercall.h>
-#include <xen-arm/smp.h>
-#else
-#error "Unsupported architecture"
-#endif
-#include <uk/lcpu.h>
-
-void do_hypervisor_callback(struct uk_lcpu_regs *regs);
-
-extern int in_callback;
 
 extern struct shared_info *HYPERVISOR_shared_info;
 
