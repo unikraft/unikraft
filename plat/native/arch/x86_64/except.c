@@ -82,21 +82,20 @@
  */
 
 static __align(8)
-UK_PER_LCPU_ARRAY_DEFINE(struct uk_arch_seg_gate_desc64, cpu_idt,
-			 UK_ARCH_IDT_NUM_ENTRIES);
+struct uk_arch_seg_gate_desc64
+cpu_idt[CONFIG_UKPLAT_CPU_MAXCOUNT][UK_ARCH_IDT_NUM_ENTRIES];
 
-static
-UK_PER_LCPU_DEFINE(__u8, idt_ist_disable_nesting);
+static __u8 idt_ist_disable_nesting[CONFIG_UKPLAT_CPU_MAXCOUNT];
 
 static __align(UKARCH_SP_ALIGN) /* IST{1, 2, 3} */
-UK_PER_LCPU_ARRAY_DEFINE(__u8, lcpu_except_stack, 3 * CPU_EXCEPT_STACK_SIZE);
+__u8 lcpu_except_stack[CONFIG_UKPLAT_CPU_MAXCOUNT][3 * CPU_EXCEPT_STACK_SIZE];
 
 static __align(8)
-UK_PER_LCPU_DEFINE(struct uk_arch_tss64, cpu_tss);
+struct uk_arch_tss64 cpu_tss[CONFIG_UKPLAT_CPU_MAXCOUNT];
 
 static __align(8)
-UK_PER_LCPU_ARRAY_DEFINE(struct uk_arch_seg_desc32, cpu_gdt64,
-			 UK_ARCH_GDT_NUM_ENTRIES);
+struct uk_arch_seg_desc32
+cpu_gdt64[CONFIG_UKPLAT_CPU_MAXCOUNT][UK_ARCH_GDT_NUM_ENTRIES];
 
 static void gdt_init(__u32 idx)
 {
@@ -136,7 +135,7 @@ static void tss_init(__u32 idx)
 
 #define IDT_IST_SAVE_LEN 32
 /* Space for the IST values of all exception vectors */
-static UK_PER_LCPU_ARRAY_DEFINE(__u8, idt_ist_saved, IDT_IST_SAVE_LEN);
+static __u8 idt_ist_saved[CONFIG_UKPLAT_CPU_MAXCOUNT][IDT_IST_SAVE_LEN];
 
 void uk_plat_native_except_push_nested(void)
 {
@@ -147,15 +146,16 @@ void uk_plat_native_except_push_nested(void)
 	struct uk_lcpu *lcpu;
 	unsigned int i;
 
-	disable_nesting = &uk_per_lcpu_current(idt_ist_disable_nesting);
+	lcpu = uk_lcpu_get_current_in_except();
+
+	disable_nesting = &idt_ist_disable_nesting[lcpu->idx];
 	UK_ASSERT(*disable_nesting < __U8_MAX);
 
 	if (*disable_nesting++)
 		return;
 
-	lcpu = uk_lcpu_get_current_in_except();
-	idt = uk_per_lcpu(cpu_idt, lcpu->idx);
-	ist_saved = uk_per_lcpu(idt_ist_saved, lcpu->idx);
+	idt = cpu_idt[lcpu->idx];
+	ist_saved = idt_ist_saved[lcpu->idx];
 
 	/* Save the value of the IST field and disable IST for the exception */
 	for (i = 0; i < IDT_IST_SAVE_LEN; i++) {
@@ -174,15 +174,16 @@ void uk_plat_native_except_pop_nested(void)
 	struct uk_lcpu *lcpu;
 	unsigned int i;
 
-	disable_nesting = &uk_per_lcpu_current(idt_ist_disable_nesting);
+	lcpu = uk_lcpu_get_current_in_except();
+
+	disable_nesting = &idt_ist_disable_nesting[lcpu->idx];
 	UK_ASSERT(*disable_nesting > 1);
 
 	if (--*disable_nesting != 0)
 		return;
 
-	lcpu = uk_lcpu_get_current_in_except();
-	idt = uk_per_lcpu(cpu_idt, lcpu->idx);
-	ist_saved = uk_per_lcpu(idt_ist_saved, lcpu->idx);
+	idt = cpu_idt[lcpu->idx];
+	ist_saved = idt_ist_saved[lcpu->idx];
 
 	/* Restore the IST field values */
 	for (i = 0; i < IDT_IST_SAVE_LEN; i++) {
@@ -350,13 +351,12 @@ void uk_plat_native_except_irq_handler(struct uk_plat_native_regs *regs,
 
 static struct uk_arch_desc_table_ptr64 idtptr;
 
-static inline void idt_fillgate(unsigned int num, void *fun, unsigned int ist)
+static inline void idt_fillgate(unsigned int num, void *fun, unsigned int ist,
+				__u32 idx)
 {
 	struct uk_arch_seg_gate_desc64 *desc;
-	struct uk_arch_seg_gate_desc64 *idt;
 
-	idt = uk_per_lcpu_current(cpu_idt);
-	desc = &idt[num];
+	desc = &cpu_idt[idx][num];
 
 	/*
 	 * All gates are interrupt gates, all handlers run with interrupts off.
@@ -378,7 +378,7 @@ static void idt_init(void)
 	uk_arch_lidt(&idtptr);
 }
 
-void uk_plat_native_traps_table_init(void)
+void uk_plat_native_traps_table_init(struct uk_lcpu *this_lcpu)
 {
 	/*
 	 * Load trap vectors. All traps run on a dedicated trap stack, except
@@ -394,7 +394,7 @@ void uk_plat_native_traps_table_init(void)
 	 */
 #define FILL_TRAP_GATE(name, ist)					\
 	extern void cpu_trap_##name(void);				\
-	idt_fillgate(TRAP_##name, ASM_TRAP_SYM(name), ist)
+	idt_fillgate(TRAP_##name, ASM_TRAP_SYM(name), ist, this_lcpu->idx)
 
 	FILL_TRAP_GATE(divide_error,	2);
 	FILL_TRAP_GATE(debug,		3); /* on IST3 (lcpu_except_stack) */
@@ -423,7 +423,7 @@ void uk_plat_native_traps_table_init(void)
 	 */
 #define FILL_IRQ_GATE(num, ist)						\
 	extern void cpu_irq_##num(void);				\
-	idt_fillgate(32 + num, cpu_irq_##num, ist)
+	idt_fillgate(32 + num, cpu_irq_##num, ist, this_lcpu->idx)
 
 	FILL_IRQ_GATE(0, 1);
 	FILL_IRQ_GATE(1, 1);

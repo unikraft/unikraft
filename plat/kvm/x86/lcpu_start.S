@@ -304,18 +304,16 @@ ENTRY(lcpu_start64)
 	cpuid
 	shrl	$24, %ebx
 
-	/* Use APIC_ID * LCPU_SIZE for indexing the cpu structure */
-	movl	$UK_LCPU_SIZE, %eax
-	imul	%ebx, %eax
+	/* Use APIC_ID for indexing the cpu var array */
+	uk_pcpuvar_x86_64_gsval	%rsp, %rbx
 
-	/* Compute pointer into CPU struct array and store it in RBP
+	/* Compute pointer into CPU variables array and store it in RBP
 	 * We do not use the frame pointer, yet
 	 * TODO: We are leaking implementation details. `lcpus` is defined
-	 * with `UK_PER_LCPU_DEFINE`. Find a way to properly access
-	 * this `lcpus` here.
+	 * with `__uk_pcpuvar`. Find a way to properly access this `lcpus` here.
 	 */
 	leaq	uk_lcpus(%rip), %rbp
-	addq	%rax, %rbp
+	addq	%rsp, %rbp
 
 	/* Put CPU into init state */
 	movl	$UK_LCPU_STATE_INIT, UK_LCPU_STATE_OFFSET(%rbp)

@@ -120,7 +120,7 @@ UK_CTOR_PRIO(init_fsgsbasefns, 0);
 
 #if CONFIG_LIBUKPLAT_NATIVE_LCPU
 void uk_plat_native_traps_init(struct uk_lcpu *this_lcpu);
-void uk_plat_native_traps_table_init(void);
+void uk_plat_native_traps_table_init(struct uk_lcpu *this_lcpu);
 
 #if CONFIG_HAVE_SMP
 static inline int x2apic_enable(void)
@@ -224,7 +224,7 @@ int uk_plat_native_lcpu_init(struct uk_lcpu *this_lcpu)
 	wrgsbasefn((__uptr)this_lcpu);
 	wrkgsbasefn((__uptr)this_lcpu);
 
-	uk_plat_native_traps_table_init();
+	uk_plat_native_traps_table_init(this_lcpu);
 	uk_plat_native_traps_init(this_lcpu);
 
 	wrgsbasefn((__uptr)this_lcpu);
