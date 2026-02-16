@@ -13,6 +13,7 @@
 #define __UK_LCPU_H__
 
 #include <uk/arch/types.h>
+#include <uk/pcpuvar.h>
 #include <uk/lcpu/core.h>
 #include <uk/plat/pal/lcpu.h>
 #include <uk/pal/lcpu.h>

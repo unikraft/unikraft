@@ -94,12 +94,12 @@ UK_TAILQ_HEAD(uk_thread_list, struct uk_thread);
 	uk_sched_thread_exit()
 
 /* managed by sched.c */
-extern UK_PER_LCPU_DEFINE(struct uk_thread *, __uk_sched_thread_current);
+extern __uk_pcpuvar struct uk_thread *__uk_sched_thread_current;
 
 static inline
 struct uk_thread *uk_thread_current(void)
 {
-	return uk_per_lcpu_current(__uk_sched_thread_current);
+	return uk_pcpuvar_current_get(__uk_sched_thread_current);
 }
 
 /**

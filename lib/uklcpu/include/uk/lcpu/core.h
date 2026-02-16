@@ -33,11 +33,6 @@ extern "C" {
 struct uk_lcpu_arch { };
 #endif /* !__ASSEMBLY__ */
 
-#define UK_LCPU_IS_LCPU_PTR(ptr)					\
-	(IN_RANGE((__uptr)(ptr),					\
-		  (__uptr)uk_lcpu_get(0),				\
-		  (__uptr)CONFIG_UKPLAT_CPU_MAXCOUNT * sizeof(struct uk_lcpu)))
-
 #endif /* !UK_LCPU_ARCH_SIZE */
 
 /*
@@ -257,22 +252,6 @@ __u32 uk_lcpu_count(void);
 #else /* !CONFIG_HAVE_SMP */
 #define uk_lcpu_count()	(1)
 #endif /* !CONFIG_HAVE_SMP */
-
-/* Per-LCPU variable definition */
-
-#define UK_PER_LCPU_DEFINE(var_type, var_name)				\
-	var_type var_name[CONFIG_UKPLAT_CPU_MAXCOUNT]
-#define uk_per_lcpu(var_name, lcpu_idx)					\
-	var_name[lcpu_idx]
-#define uk_per_lcpu_current(var_name)					\
-	uk_per_lcpu(var_name, uk_pal_lcpu_idx())
-
-#define UK_PER_LCPU_ARRAY_DEFINE(var_type, var_name, size)		\
-	var_type var_name[CONFIG_UKPLAT_CPU_MAXCOUNT][size]
-#define uk_per_lcpu_array(var_name, lcpu_idx, idx)			\
-	var_name[lcpu_idx][idx]
-#define uk_per_lcpu_array_current(var_name, idx)			\
-	uk_per_lcpu_array(var_name, uk_pal_lcpu_idx(), idx)
 
 #ifdef __cplusplus
 }

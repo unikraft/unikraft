@@ -1,6 +1,7 @@
 menuconfig LIBUKLCPU
 	bool "uklcpu: Generic logical CPU interface"
 	select LIBUKPAL
+	select LIBUKPCPUVAR
 	default y
 
 if LIBUKLCPU

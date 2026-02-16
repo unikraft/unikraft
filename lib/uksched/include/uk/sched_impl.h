@@ -102,11 +102,11 @@ void uk_sched_thread_switch(struct uk_thread *next)
 {
 	struct uk_thread *prev;
 
-	prev = uk_per_lcpu_current(__uk_sched_thread_current);
+	prev = uk_pcpuvar_current_get(__uk_sched_thread_current);
 
 	UK_ASSERT(prev);
 
-	uk_per_lcpu_current(__uk_sched_thread_current) = next;
+	uk_pcpuvar_current_set(__uk_sched_thread_current, next);
 
 	prev->tlsp = uk_lcpu_tlsp_get();
 

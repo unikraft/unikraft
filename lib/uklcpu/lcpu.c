@@ -32,7 +32,7 @@
  * for non-present CPUs and does not force us to configure the maximum number
  * of CPUs beforehand.
  */
-UK_PER_LCPU_DEFINE(struct uk_lcpu, uk_lcpus);
+__uk_pcpuvar struct uk_lcpu uk_lcpus;
 
 static const struct uk_lcpu_pm_ops *pm_ops;
 
@@ -59,7 +59,7 @@ struct uk_lcpu *uk_lcpu_alloc(__u64 id)
 	if (lcpu_count == CONFIG_UKPLAT_CPU_MAXCOUNT)
 		return __NULL;
 
-	lcpu = &uk_lcpus[lcpu_count];
+	lcpu = &uk_pcpuvar_lval(lcpu_count, uk_lcpus);
 	lcpu->state = UK_LCPU_STATE_OFFLINE;
 	lcpu->id    = id;
 	lcpu->idx   = lcpu_count;
@@ -79,7 +79,7 @@ struct uk_lcpu *uk_lcpu_get(__u32 idx)
 {
 	UK_ASSERT(idx < lcpu_count);
 
-	return &uk_lcpus[idx];
+	return &uk_pcpuvar_lval(idx, uk_lcpus);
 }
 
 struct uk_lcpu *uk_lcpu_get_current(void)
