@@ -11,8 +11,9 @@
  *
  * By convention, for the stats object ID we use the index
  * of the cpu this scheduler is running on. Yet we cannot
- * export that as a macro that expands to uk_lcpu_idx()
- * as the consumer may be executing on a different core.
+ * export that as a macro that expands to
+ * uk_pcpuvar_current_get(uk_pcpuvar_cpu_idx) as the consumer may be executing
+ * on a different core.
  *
  * Exported metrics
  * ----------------

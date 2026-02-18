@@ -88,7 +88,7 @@ __noreturn void _uk_crash(struct uk_lcpu_regs *regs,
 	struct uk_crash_event_param param;
 #if HAVE_SMP
 	static __s32 crash_cpu = -1;
-	int cpu_id = uk_lcpu_id();
+	int cpu_id = uk_pcpuvar_current_get(uk_pcpuvar_cpu_id);
 #endif /* HAVE_SMP */
 
 	UK_ASSERT(regs);

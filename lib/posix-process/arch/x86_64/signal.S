@@ -40,7 +40,8 @@ ENTRY(pprocess_signal_jmp_handler)
 	/*───────────────────────────────────────────────────────────────────*
 	 * Align auxspcb->curr_fp.
 	 *───────────────────────────────────────────────────────────────────*/
-	movq	%gs:UK_LCPU_AUXSP_OFFSET, %r10	/* get auxpcb */
+	movq	UK_PCPUVAR_X86_64_GSREL(UK_LCPU_AUXSP_SYM), %r10
+
 	subq	$(UKARCH_AUXSPCB_SIZE - UKARCH_AUXSPCB_OFFSETOF_CURR_FP), %r10
 	pushq	(%r10)				/* save curr_fp */
 	pushq	%r10				/* also save its addr */

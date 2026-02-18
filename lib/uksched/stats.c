@@ -123,7 +123,7 @@ int uk_sched_stats_init(struct uk_init_ctx *ctx __unused)
 	UK_ASSERT(t);
 
 	/* Create stats object */
-	obj_id = uk_lcpu_idx();
+	obj_id = uk_pcpuvar_current_get(uk_pcpuvar_cpu_idx);
 	rc = asprintf(&obj_name, "cpu%ld", obj_id);
 	if (unlikely(rc == -1)) {
 		uk_pr_err("Could not allocate object name\n");

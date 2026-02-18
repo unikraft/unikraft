@@ -217,7 +217,7 @@ int uk_sched_start(struct uk_sched *s)
 	 *       an TLS that is derived from the Unikraft TLS template.
 	 */
 	tlsp = uk_lcpu_tlsp_get();
-	auxsp = uk_lcpu_get_auxsp();
+	auxsp = uk_pcpuvar_current_get(UK_LCPU_AUXSP_SYM);
 	main_thread = uk_thread_create_bare(s->a,
 					    0x0, 0x0, auxsp,
 					    tlsp, !(!tlsp), false,

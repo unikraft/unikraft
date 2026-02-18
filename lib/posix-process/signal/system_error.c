@@ -29,7 +29,8 @@ int sys_error_handler_except(int signum,
 
 	UK_ASSERT(trap_ctx);
 
-	auxsp = uk_lcpu_get_auxsp_in_except();
+	auxsp = uk_pcpuvar_lval(uk_lcpu_get_current_idx_in_except(),
+				UK_LCPU_AUXSP_SYM);
 	curr_sp = uk_lcpu_regs_get(uk_lcpu_except_err_ctx_get_regs(trap_ctx),
 				   SP);
 

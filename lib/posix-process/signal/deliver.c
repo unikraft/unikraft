@@ -103,7 +103,8 @@ static void handle_self(struct uk_signal *sig, const struct kern_sigaction *ks,
 	UK_ASSERT(execenv);
 
 	/* We expect to be operating on the aux stack */
-	UK_ASSERT(SP_IN_AUXSP(uk_arch_read_sp(), uk_lcpu_get_auxsp()));
+	UK_ASSERT(SP_IN_AUXSP(uk_arch_read_sp(),
+			      uk_pcpuvar_current_get(UK_LCPU_AUXSP_SYM)));
 
 	this_process = uk_pprocess_current();
 	UK_ASSERT(this_process);

@@ -8,20 +8,10 @@
 #error Do not include this header directly
 #endif
 
-/* NOTE:
- * syscall.h is going to be included by many C-source files that may not
- * include headers from uk/plat/common and this is going to result in
- * lots of build errors.
- * TODO: Plat re-architecting will help with this, but for now, simply
- * re-define this macro to not waste time on this trivial matter.
- */
-#ifndef LCPU_AUXSP_OFFSET
-#define LCPU_AUXSP_OFFSET		0x20
-#endif /* !LCPU_AUXSP_OFFSET */
-
 #if !__ASSEMBLY__
 
 #include <uk/essentials.h>
+#include <uk/lcpu/auxsp.h>
 
 #define UK_SYSCALL_EXECENV_PROLOGUE_DEFINE(pname, fname, x, ...)	\
 	long __used							\
@@ -39,7 +29,8 @@
 		" * we actually return execution\n\t"                   \
 		" */\n\t"                                               \
 		"movq   %rsp, %r11\n\t"					\
-		"movq	%gs:(" STRINGIFY(LCPU_AUXSP_OFFSET) "), %rsp\n\t"\
+		"movq	" UK_PCPUVAR_X86_64_GSREL_GLOBAL(UK_LCPU_AUXSP_SYM) \
+			", %rsp\n\t"					\
 		"subq	$(" STRINGIFY(UKARCH_AUXSPCB_SIZE) "), %rsp\n\t"\
 		"movq	" STRINGIFY(UKARCH_AUXSPCB_OFFSETOF_CURR_FP)	\
 						"(%rsp), %rsp\n\t"	\
