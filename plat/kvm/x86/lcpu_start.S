@@ -345,9 +345,28 @@ no_avx:
 #if __FSGSBASE__
 	/* Enable FS and GS base */
 	LCPU_ENABLE_FSGSBASE fail
+	wrgsbase	%rsp
+	swapgs
+	wrgsbase	%rsp
+	swapgs
 #else /* !__FSGSBASE__ */
 	LCPU_ENABLE_FSGSBASE no_fsgsbase
+	wrgsbase	%rsp
+	swapgs
+	wrgsbase	%rsp
+	swapgs
+	jmp		0f
 no_fsgsbase:
+	movq     %rsp, %rax
+	movq     %rsp, %rdx
+	shrq     $32, %rdx
+
+	movl     $UK_ARCH_MSR_GS_BASE, %ecx
+	wrmsr
+
+	movl     $UK_ARCH_MSR_KERNEL_GS_BASE, %ecx
+	wrmsr
+0:
 #endif /* !__FSGSBASE__ */
 
 #if CONFIG_HAVE_X86PKU
