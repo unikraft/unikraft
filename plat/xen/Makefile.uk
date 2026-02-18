@@ -79,7 +79,6 @@ CXXINCLUDES-$(CONFIG_PLAT_XEN) += -I$(LIBXENPLAT_BASE)/pal/arch/$(CONFIG_UK_ARCH
 LIBXENPLAT_SRCS-y              += $(UK_PLAT_XEN_DEF_LDS)
 LIBXENPLAT_SRCS-y              += $(LIBXENPLAT_BASE)/hypervisor.c
 LIBXENPLAT_SRCS-y              += $(LIBXENPLAT_BASE)/memory.c
-LIBXENPLAT_SRCS-y              += $(LIBXENPLAT_BASE)/io.c
 LIBXENPLAT_SRCS-y              += $(UK_PLAT_COMMON_BASE)/memory.c|common
 
 LIBXENPLAT_SRCS-y                += $(UK_PLAT_COMMON_BASE)/bootinfo.c|common
