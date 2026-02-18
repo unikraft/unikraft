@@ -565,9 +565,10 @@ static int bbuddy_addmem(struct uk_alloc *a, void *base, size_t len)
 	 */
 	if (range < round_pgup(sizeof(*memr) + BYTES_PER_MAPWORD) +
 			__PAGE_SIZE) {
-		uk_pr_err("%"__PRIuptr": Failed to add memory region %"__PRIuptr"-%"__PRIuptr": Not enough space after applying page alignments\n",
-			  (uintptr_t) a, (uintptr_t) base,
-			  (uintptr_t) base + (uintptr_t) len);
+		uk_pr_debug("%"__PRIuptr": Failed to add memory region %"__PRIuptr \
+            "-%"__PRIuptr": Not enough space after applying page alignments\n",
+            (uintptr_t) a, (uintptr_t) base,
+            (uintptr_t) base + (uintptr_t) len);
 		return -EINVAL;
 	}
 
