@@ -16,32 +16,20 @@
  * stack that is prefaulted and at all times available to switch to.
  */
 
+/**
+ * The platform must define a per-CPU variable for the auxiliary stack pointer
+ * and export its symbol through the PAL by aliasing this macro to it.
+ */
+#ifndef UK_PAL_AUXSP_SYM
+#error "UK_PAL_AUXSP_SYM undefined"
+#endif
+
 #if !__ASSEMBLY__
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-/**
- * Set auxiliary stack pointer.
- * Configures the stack used for exception handling.
- *
- * @param auxsp  New auxiliary stack pointer
- */
 void uk_pal_set_auxsp(__uptr auxsp);
-
-/**
- * Get current auxiliary stack pointer.
- *
- * @return Auxiliary stack pointer value
- */
-__uptr uk_pal_get_auxsp(void);
-
-/**
- * Get auxiliary stack pointer during exception handling.
- *
- * @return Current auxiliary stack pointer (ISR-safe variant)
- */
-__isr __uptr uk_pal_get_auxsp_in_except(void);
 
 #ifdef __cplusplus
 }

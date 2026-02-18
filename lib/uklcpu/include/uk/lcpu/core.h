@@ -62,17 +62,10 @@ UK_CTASSERT(sizeof(struct uk_lcpu_sargs) == UK_LCPU_SARGS_SIZE);
  * Logical CPU (LCPU) Structure
  */
 #define UK_LCPU_STATE_OFFSET		0x00
-#define UK_LCPU_IDX_OFFSET		(UK_LCPU_STATE_OFFSET + 0x04)
-#define UK_LCPU_ID_OFFSET		(UK_LCPU_IDX_OFFSET   + 0x04)
-#define UK_LCPU_ENTRY_OFFSET		(UK_LCPU_ID_OFFSET    + 0x08)
+#define UK_LCPU_ENTRY_OFFSET		(UK_LCPU_STATE_OFFSET + 0x08)
 #define UK_LCPU_STACKP_OFFSET		(UK_LCPU_ENTRY_OFFSET + 0x08)
-#define UK_LCPU_ERR_OFFSET		(UK_LCPU_ENTRY_OFFSET + 0x00)
-/* TODO: See comment from syscall_prologue.h architecture specific files */
-#ifdef UK_LCPU_AUXSP_OFFSET
-#undef UK_LCPU_AUXSP_OFFSET
-#endif /* UK_LCPU_AUXSP_OFFSET */
-#define UK_LCPU_AUXSP_OFFSET		(UK_LCPU_ENTRY_OFFSET + 0x10)
-#define UK_LCPU_ARCH_OFFSET		(UK_LCPU_ENTRY_OFFSET + 0x18)
+#define UK_LCPU_ERR_OFFSET		(UK_LCPU_ENTRY_OFFSET + 0x0)
+#define UK_LCPU_ARCH_OFFSET		(UK_LCPU_ENTRY_OFFSET + 0x10)
 
 #if CONFIG_HAVE_SMP
 #define UK_LCPU_FUNC_SIZE		0x10
@@ -103,7 +96,7 @@ UK_CTASSERT(sizeof(struct uk_lcpu_func) == UK_LCPU_FUNC_SIZE);
 #define UK_LCPU_MEMBERS_SIZE						\
 	(UK_LCPU_ARCH_OFFSET  + UK_LCPU_ARCH_SIZE)
 #define UK_LCPU_SIZE							\
-	ALIGN_UP(UK_LCPU_MEMBERS_SIZE, UK_ARCH_CACHE_LINE_SIZE)
+	(ALIGN_UP(UK_LCPU_MEMBERS_SIZE, UK_ARCH_CACHE_LINE_SIZE))
 
 #if !__ASSEMBLY__
 struct __align(UK_ARCH_CACHE_LINE_SIZE) uk_lcpu {
@@ -111,9 +104,6 @@ struct __align(UK_ARCH_CACHE_LINE_SIZE) uk_lcpu {
 	 * Working on it with atomic instructions - must be 8-byte aligned
 	 */
 	volatile int state __align(8);
-
-	__u32 idx;
-	__u64 id;
 
 	union {
 		/* Startup arguments
@@ -134,23 +124,14 @@ struct __align(UK_ARCH_CACHE_LINE_SIZE) uk_lcpu {
 		int error_code;
 	};
 
-	/*
-	 * Auxiliary stack pointer of the thread currently executing on
-	 * UK_LCPU
-	 */
-	__uptr auxsp;
-
 	/* Architecture-dependent part */
 	struct uk_lcpu_arch arch;
 };
 
 UK_CTASSERT(__offsetof(struct uk_lcpu, state) == UK_LCPU_STATE_OFFSET);
-UK_CTASSERT(__offsetof(struct uk_lcpu, idx) == UK_LCPU_IDX_OFFSET);
-UK_CTASSERT(__offsetof(struct uk_lcpu, id) == UK_LCPU_ID_OFFSET);
 UK_CTASSERT(__offsetof(struct uk_lcpu, s_args.entry) == UK_LCPU_ENTRY_OFFSET);
 UK_CTASSERT(__offsetof(struct uk_lcpu, s_args.stackp) == UK_LCPU_STACKP_OFFSET);
 UK_CTASSERT(__offsetof(struct uk_lcpu, error_code) == UK_LCPU_ERR_OFFSET);
-UK_CTASSERT(__offsetof(struct uk_lcpu, auxsp) == UK_LCPU_AUXSP_OFFSET);
 UK_CTASSERT(__offsetof(struct uk_lcpu, arch) == UK_LCPU_ARCH_OFFSET);
 
 UK_CTASSERT(sizeof(struct uk_lcpu) == UK_LCPU_SIZE);
@@ -180,40 +161,11 @@ UK_CTASSERT(UK_LCPU_MEMBERS_SIZE <= UK_LCPU_SIZE);
 
 #if !__ASSEMBLY__
 /**
- * Return the UK_LCPU structure for the logical CPU with the given index.
- *
- * @param idx the index of the requested UK_LCPU. The index must be less than
- *    the value returned by uk_lcpu_count(), otherwise behavior is
- *    undefined
- * @return pointer to the requested UK_LCPU structure
- */
-struct uk_lcpu *uk_lcpu_get(__u32 idx);
-
-#define _lcpu_lcpuidx_list_entry(list, i, n)				\
-	(((i) < (n)) ?							\
-	  uk_lcpu_get((list) ? (list)[i] : (__u32)(i))		\
-	  : __NULL)
-
-#define uk_lcpu_lcpuidx_list_foreach(list, num, n, i, lcpu)		\
-	if ((num) == __NULL) {						\
-		UK_ASSERT(!(list));					\
-		(n) = uk_lcpu_count();					\
-	} else	{							\
-		UK_ASSERT((*num) <= uk_lcpu_count());			\
-		(n) = *(num);						\
-	}								\
-	for ((i) = 0,							\
-	     ({ if (num) *num = i; }),					\
-	     (lcpu) = _lcpu_lcpuidx_list_entry(list, i, n);		\
-	     (i) < (n);							\
-	     (i)++,							\
-	     ({ if (num) *num = i; }),					\
-	     (lcpu) = _lcpu_lcpuidx_list_entry(list, i, n))
-
-/**
  * Return the UK_LCPU structure for the CPU executing this function
  */
 struct uk_lcpu *uk_lcpu_get_current(void);
+
+extern __uk_pcpuvar struct uk_lcpu uk_lcpus;
 
 /**
  * Return the UK_LCPU structure for the bootstraping CPU
@@ -221,7 +173,7 @@ struct uk_lcpu *uk_lcpu_get_current(void);
 static inline struct uk_lcpu *uk_lcpu_get_bsp(void)
 {
 	/* The BSP is always index 0 */
-	return uk_lcpu_get(0);
+	return &uk_pcpuvar_lval(0, uk_lcpus);
 }
 
 /**
@@ -244,14 +196,7 @@ static inline int uk_lcpu_current_is_bsp(void)
 /* The IRQ vectors passed to lcpu_mp_init */
 extern const unsigned long * const uk_lcpu_run_irqv;
 extern const unsigned long * const uk_lcpu_wakeup_irqv;
-
-/**
- * Returns the number of logical CPUs present in the system
- */
-__u32 uk_lcpu_count(void);
-#else /* !CONFIG_HAVE_SMP */
-#define uk_lcpu_count()	(1)
-#endif /* !CONFIG_HAVE_SMP */
+#endif /* CONFIG_HAVE_SMP */
 
 #ifdef __cplusplus
 }

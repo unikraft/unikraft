@@ -45,59 +45,19 @@ int uk_lcpu_pm_ops_register(const struct uk_lcpu_pm_ops *ops)
 	return 0;
 }
 
-/**
- * Number of allocated logical CPUs in the system.
- * Must be [1, CONFIG_UKPLAT_CPU_MAXCOUNT) after boot
- */
-static __u32 lcpu_count = 1;
-
-#if CONFIG_HAVE_SMP
-struct uk_lcpu *uk_lcpu_alloc(__u64 id)
-{
-	struct uk_lcpu *lcpu;
-
-	if (lcpu_count == CONFIG_UKPLAT_CPU_MAXCOUNT)
-		return __NULL;
-
-	lcpu = &uk_pcpuvar_lval(lcpu_count, uk_lcpus);
-	lcpu->state = UK_LCPU_STATE_OFFLINE;
-	lcpu->id    = id;
-	lcpu->idx   = lcpu_count;
-
-	lcpu_count++;
-
-	return lcpu;
-}
-
-__u32 uk_lcpu_count(void)
-{
-	return lcpu_count;
-}
-#endif /* CONFIG_HAVE_SMP */
-
-struct uk_lcpu *uk_lcpu_get(__u32 idx)
-{
-	UK_ASSERT(idx < lcpu_count);
-
-	return &uk_pcpuvar_lval(idx, uk_lcpus);
-}
-
 struct uk_lcpu *uk_lcpu_get_current(void)
 {
-	return uk_lcpu_get(uk_pal_lcpu_idx());
+	return uk_pcpuvar_current_ptr_get(uk_lcpus);
 }
 
-__isr struct uk_lcpu *uk_lcpu_get_current_in_except(void)
+__isr __u64 uk_lcpu_get_current_idx_in_except(void)
 {
-	return uk_lcpu_get((uk_arch_read_sp() -
-			   uk_pal_except_get_except_stack_base()) /
-			   (CPU_EXCEPT_STACK_SIZE * 3));
+	return (uk_arch_read_sp() - uk_pal_except_get_except_stack_base()) /
+		(CPU_EXCEPT_STACK_SIZE * 3);
 }
 
 int uk_lcpu_init(struct uk_lcpu *this_lcpu)
 {
-	int rc;
-
 	/*
 	 * NOTE: Do not use anything that might need initialized exception
 	 * traps until after lcpu_arch_init(), as traps might not be
@@ -106,21 +66,11 @@ int uk_lcpu_init(struct uk_lcpu *this_lcpu)
 
 	/* Initialize the bootstrap CPU */
 	if (uk_lcpu_is_bsp(this_lcpu)) {
-		if (unlikely(lcpu_count > 1))
-			return -EPERM;
-
-		this_lcpu->idx   = 0;
-		this_lcpu->id    = uk_pal_lcpu_id();
 		this_lcpu->state = UK_LCPU_STATE_INIT;
 	} else {
 		/* We should already be in INIT state for secondary CPUs */
 		UK_ASSERT(this_lcpu->state == UK_LCPU_STATE_INIT);
 	}
-
-	/* Do architecture-specific initialization */
-	rc = uk_pal_lcpu_init(this_lcpu);
-	if (unlikely(rc))
-		return rc;
 
 	UK_ASSERT(uk_lcpu_irqs_disabled());
 
@@ -137,7 +87,7 @@ int uk_lcpu_init(struct uk_lcpu *this_lcpu)
 	 */
 	this_lcpu->state = UK_LCPU_STATE_BUSY0;
 
-	return 0;
+	return uk_pal_except_init();
 }
 
 static void __noreturn lcpu_halt(struct uk_lcpu *this_cpu, int error_code)
@@ -275,7 +225,6 @@ int uk_lcpu_mp_init(unsigned long run_irq, unsigned long wakeup_irq, void *arg)
 	int rc;
 
 	/* Make sure this is run on the BSP only */
-	UK_ASSERT(lcpu_count == 1);
 	UK_ASSERT(uk_lcpu_current_is_bsp());
 
 	/* Initialize architecture-dependent functionality. This will also do
@@ -346,17 +295,18 @@ void __weak __noreturn uk_lcpu_entry_default(struct uk_lcpu *this_lcpu)
 	}
 }
 
-int uk_lcpu_start(const __u32 lcpuidx[], unsigned int *num,
+int uk_lcpu_start(const __u64 lcpuidx[], unsigned int *num,
 		  __uptr sp[], __uptr entry[],
 		  unsigned long flags __unused)
 {
-	__u64 this_cpu_id = uk_lcpu_id();
-	struct uk_lcpu *lcpu;
-	unsigned int i, n, argi = 0;
+	__u64 this_cpu_id = uk_pcpuvar_current_get(uk_pcpuvar_cpu_id);
 	const int new = UK_LCPU_STATE_INIT;
+	struct uk_lcpu *lcpu;
 	int old, rc = 0, rc2;
+	unsigned int i, n;
 
-	UK_ASSERT(((lcpuidx) && (num)) || ((!lcpuidx) && (!num)));
+	UK_ASSERT(lcpuidx);
+	UK_ASSERT(num);
 	UK_ASSERT(sp);
 
 	if (unlikely(!pm_ops || !pm_ops->start))
@@ -367,30 +317,20 @@ int uk_lcpu_start(const __u32 lcpuidx[], unsigned int *num,
 		return -ENODEV;
 #endif /* CONFIG_HAVE_CPU_MULTI_PHASE_STARTUP */
 
-	uk_lcpu_lcpuidx_list_foreach(lcpuidx, num, n, i, lcpu) {
-		if (lcpu->id == this_cpu_id) {
-			/* If the caller did not supply an index array, we
-			 * assume that we do not have parameters and a stack
-			 * for the executing CPU. Otherwise, i.e., if the
-			 * caller explicitly put the executing CPU in, we still
-			 * ignore it but need to skip the parameters.
-			 */
-			if (lcpuidx)
-				argi++;
-
+	for (i = 0, n = *num; i < n; i++) {
+		if (uk_pcpuvar_lval(lcpuidx[i],
+				    uk_pcpuvar_cpu_id) == this_cpu_id)
 			continue;
-		}
 
+		lcpu = &uk_pcpuvar_lval(lcpuidx[i], uk_lcpus);
 retry:
 		old = uk_load_n(&lcpu->state);
 
 		/* We ignore CPUs that are already started */
 		if (unlikely(old != UK_LCPU_STATE_OFFLINE)) {
 			uk_pr_warn("Failed to start CPU 0x%lx: not offline\n",
-				   lcpu->id);
-
-			/* Skip CPU and its arguments*/
-			argi++;
+				   uk_pcpuvar_lval(lcpuidx[i],
+						   uk_pcpuvar_cpu_id));
 			continue;
 		}
 
@@ -418,7 +358,7 @@ retry:
 		 */
 		uk_arch_wmb();
 
-		rc = pm_ops->start(lcpu);
+		rc = pm_ops->start(lcpuidx[i]);
 		if (unlikely(rc)) {
 			lcpu->state = UK_LCPU_STATE_HALTED;
 			lcpu->error_code = rc;
@@ -428,10 +368,9 @@ retry:
 			 */
 			break;
 		}
-
-		/* Move to next argument */
-		argi++;
 	}
+
+	*num = i;
 
 #if CONFIG_HAVE_CPU_MULTI_PHASE_STARTUP
 	/* At this point, i has been set to the number of successfully
@@ -440,10 +379,8 @@ retry:
 	 */
 	rc2 = pm_ops->post_start(lcpuidx, &i);
 	if (unlikely(rc2)) {
-		if (num) {
-			UK_ASSERT(i <= *num);
-			*num = i;
-		}
+		UK_ASSERT(i <= *num);
+		*num = i;
 
 		/* Return the first error */
 		return (rc) ? rc : rc2;
@@ -481,20 +418,24 @@ static inline int lcpu_transition_safe(struct uk_lcpu *lcpu, int incr)
 	return 1;
 }
 
-int uk_lcpu_run(const __u32 lcpuidx[], unsigned int *num,
+int uk_lcpu_run(const __u64 lcpuidx[], unsigned int *num,
 		const struct uk_lcpu_func *fn, unsigned long flags)
 {
-	__u64 this_cpu_id = uk_lcpu_idx();
+	__u64 this_cpu_id = uk_pcpuvar_current_get(uk_pcpuvar_cpu_id);
 	struct uk_lcpu *lcpu;
 	unsigned int n, i;
-	int rc;
+	int rc = 0;
 
-	UK_ASSERT(((lcpuidx) && (num)) || ((!lcpuidx) && (!num)));
+	UK_ASSERT(lcpuidx);
+	UK_ASSERT(num);
 	UK_ASSERT(fn);
 
-	uk_lcpu_lcpuidx_list_foreach(lcpuidx, num, n, i, lcpu) {
-		if (lcpu->id == this_cpu_id)
+	for (i = 0, n = *num; i < n; i++) {
+		if (uk_pcpuvar_lval(lcpuidx[i],
+				    uk_pcpuvar_cpu_id) == this_cpu_id)
 			continue;
+
+		lcpu = &uk_pcpuvar_lval(lcpuidx[i], uk_lcpus);
 
 		/* Try to transition state to a higher busy level.
 		 * We ignore CPUs that are not online
@@ -508,9 +449,11 @@ int uk_lcpu_run(const __u32 lcpuidx[], unsigned int *num,
 		while (1) {
 			rc = uk_lcpu_fn_enqueue(lcpu, fn);
 			if (unlikely(rc))
-				return rc;
+				goto lcpu_run_err;
 
-			rc = uk_pal_send_ipi(lcpu->id, *uk_lcpu_run_irqv);
+			rc = uk_pal_send_ipi(uk_pcpuvar_lval(lcpuidx[i],
+							     uk_pcpuvar_cpu_id),
+					     *uk_lcpu_run_irqv);
 			if (unlikely(rc)) {
 				/* Retry if we could not enqueue the function
 				 * and it is ok to block
@@ -523,34 +466,39 @@ int uk_lcpu_run(const __u32 lcpuidx[], unsigned int *num,
 				 * don't care if the CPU is no longer online
 				 */
 				lcpu_transition_safe(lcpu, -1);
-
-				return rc;
+				goto lcpu_run_err;
 			}
 
 			break;
 		}
 	}
 
-	return 0;
+lcpu_run_err:
+	*num = i;
+	return rc;
 }
 
-int uk_lcpu_wait(const __u32 lcpuidx[], unsigned int *num,
+int uk_lcpu_wait(const __u64 lcpuidx[], unsigned int *num,
 		 __nsec timeout)
 {
-	__u64 this_cpu_id = uk_lcpu_id();
+	__u64 this_cpu_id = uk_pcpuvar_current_get(uk_pcpuvar_cpu_id);
 	struct uk_lcpu *lcpu;
 	unsigned int n, i;
-	int state;
+	int state, rc = 0;
 	__nsec end;
 
-	UK_ASSERT(((lcpuidx) && (num)) || ((!lcpuidx) && (!num)));
+	UK_ASSERT(lcpuidx);
+	UK_ASSERT(num);
 
 	if (timeout > 0)
 		end = ukplat_monotonic_clock() + timeout;
 
-	uk_lcpu_lcpuidx_list_foreach(lcpuidx, num, n, i, lcpu) {
-		if (lcpu->id == this_cpu_id)
+	for (i = 0, n = *num; i < n; i++) {
+		if (uk_pcpuvar_lval(lcpuidx[i],
+				    uk_pcpuvar_cpu_id) == this_cpu_id)
 			continue;
+
+		lcpu = &uk_pcpuvar_lval(lcpuidx[i], uk_lcpus);
 
 		/* Perform a busy wait until we reach IDLE state. However, we
 		 * do not want to wait on HALTED or OFFLINE CPUs. So we are
@@ -567,26 +515,34 @@ int uk_lcpu_wait(const __u32 lcpuidx[], unsigned int *num,
 			if (state == UK_LCPU_STATE_IDLE)
 				break;
 
-			if (timeout && (ukplat_monotonic_clock() >= end))
-				return -ETIMEDOUT; /* Timed out */
+			if (timeout && (ukplat_monotonic_clock() >= end)) {
+				rc = -ETIMEDOUT; /* Timed out */
+				goto lcpu_wait_err;
+			}
 		}
 	}
 
-	return 0;
+lcpu_wait_err:
+	*num = i;
+	return rc;
 }
 
-int uk_lcpu_wakeup(const __u32 lcpuidx[], unsigned int *num)
+int uk_lcpu_wakeup(const __u64 lcpuidx[], unsigned int *num)
 {
-	__u64 this_cpu_id = uk_lcpu_id();
+	__u64 this_cpu_id = uk_pcpuvar_current_get(uk_pcpuvar_cpu_id);
 	struct uk_lcpu *lcpu;
 	unsigned int n, i;
-	int rc;
+	int rc = 0;
 
-	UK_ASSERT(((lcpuidx) && (num)) || ((!lcpuidx) && (!num)));
+	UK_ASSERT(lcpuidx);
+	UK_ASSERT(num);
 
-	uk_lcpu_lcpuidx_list_foreach(lcpuidx, num, n, i, lcpu) {
-		if (lcpu->id == this_cpu_id)
+	for (i = 0, n = *num; i < n; i++) {
+		if (uk_pcpuvar_lval(lcpuidx[i],
+				    uk_pcpuvar_cpu_id) == this_cpu_id)
 			continue;
+
+		lcpu = &uk_pcpuvar_lval(lcpuidx[i], uk_lcpus);
 
 		/* We ignore CPUs that are not online. Note that the CPU may
 		 * change to HALTED state afterwards. However, that is not a
@@ -596,11 +552,15 @@ int uk_lcpu_wakeup(const __u32 lcpuidx[], unsigned int *num)
 		if (!uk_lcpu_state_is_online(lcpu->state))
 			continue;
 
-		rc = uk_pal_send_ipi(lcpu->id, *uk_lcpu_wakeup_irqv);
+		rc = uk_pal_send_ipi(uk_pcpuvar_lval(lcpuidx[i],
+						     uk_pcpuvar_cpu_id),
+				     *uk_lcpu_wakeup_irqv);
 		if (unlikely(rc))
-			return rc;
+			goto lcpu_wakeup_err;
 	}
 
-	return 0;
+lcpu_wakeup_err:
+	*num = i;
+	return rc;
 }
 #endif /* CONFIG_HAVE_SMP */

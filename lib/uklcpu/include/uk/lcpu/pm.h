@@ -16,16 +16,16 @@ extern "C" {
 #endif
 
 #if CONFIG_HAVE_SMP
-typedef int (*uk_lcpu_pm_start_t)(struct uk_lcpu *lcpu);
+typedef int (*uk_lcpu_pm_start_func)(__u64 idx);
 
 #if CONFIG_HAVE_CPU_MULTI_PHASE_STARTUP
-typedef int (*uk_lcpu_pm_post_start_t)(const __u32 lcpuidx[],
-				       unsigned int *num);
+typedef int (*uk_lcpu_pm_post_start_func)(const __u64 lcpuidx[],
+					  unsigned int *num);
 #endif /* CONFIG_HAVE_CPU_MULTI_PHASE_STARTUP */
 #endif /* CONFIG_HAVE_SMP */
 
-typedef void (*uk_lcpu_pm_halt_t)(void);
-typedef void (*uk_lcpu_pm_halt_irq_t)(void);
+typedef void (*uk_lcpu_pm_halt_func)(void);
+typedef void (*uk_lcpu_pm_halt_irq_func)(void);
 
 struct uk_lcpu_pm_ops {
 #if CONFIG_HAVE_SMP
@@ -37,7 +37,7 @@ struct uk_lcpu_pm_ops {
 	 * @return
 	 *   0 on success, !=0 on error
 	 */
-	uk_lcpu_pm_start_t start;
+	uk_lcpu_pm_start_func start;
 #if CONFIG_HAVE_CPU_MULTI_PHASE_STARTUP
 	/**
 	 * Allows the driver to do operations post-start/boot of secondary CPUs.
@@ -54,7 +54,7 @@ struct uk_lcpu_pm_ops {
 	 * @return
 	 *   0 on success, !=0 on error
 	 */
-	uk_lcpu_pm_post_start_t post_start;
+	uk_lcpu_pm_post_start_func post_start;
 #endif /* CONFIG_HAVE_CPU_MULTI_PHASE_STARTUP */
 #endif /* CONFIG_HAVE_SMP */
 	/**
@@ -67,7 +67,7 @@ struct uk_lcpu_pm_ops {
 	 * able to be returned from in case of non-maskable asynchronous
 	 * exceptions.
 	 */
-	uk_lcpu_pm_halt_t halt;
+	uk_lcpu_pm_halt_func halt;
 	/**
 	 * Halt the current CPU but with IRQs enabled.
 	 * Typically involves some power management operation that may put the
@@ -79,7 +79,7 @@ struct uk_lcpu_pm_ops {
 	 * resume execution if some IRQ happens (e.g. useful for idle waiting
 	 * and checking for a condition in an idle thread).
 	 */
-	uk_lcpu_pm_halt_irq_t halt_irq;
+	uk_lcpu_pm_halt_irq_func halt_irq;
 };
 
 /**
@@ -97,29 +97,24 @@ int uk_lcpu_pm_ops_register(const struct uk_lcpu_pm_ops *ops);
  * otherwise. CPUs that have already been started are ignored.
  *
  * @param lcpuidx array with the indices of the logical CPUs that are to be
- *   started. CPUs are started in the order specified in the array. Can be NULL
- *   to include all logical CPUs except the one executing the function, in which
- *   case CPUs are started in sequential order according to their CPU index
- * @param[inout] num if lcpuidx is not NULL, provides [IN] the number of
- *   elements in lcpuidx, and [OUT] the number of successfully started CPUs in
- *   sequential order of lcpuidx. If the call succeeds, input and output values
- *   are equal. Must be NULL if lcpuidx is NULL
- * @param sp array of stack pointers, one for each logical CPU to start. If
- *   lcpuidx is NULL, must be uk_lcpu_count() - 1 stack pointers. The
+ *   started. CPUs are started in the order specified in the array.
+ * @param[inout] num  provides [IN] the number of elements in lcpuidx, and
+ *  [OUT] the number of successfully started CPUs in sequential order of
+ *  lcpuidx. If the call succeeds, input and output values are equal.
+ * @param sp array of stack pointers, one for each logical CPU to start. The
  *   stacks may be specifically prepared to contain arguments for the entry
  *   function (e.g., cdecl calling convention). The platform may use the
  *   following stack space to execute initialization routines
  * @param entry array of entry functions, one for each logical CPU to start.
- *   Can be NULL, otherwise if lcpuidx is NULL, must contain
- *   uk_lcpu_count() - 1 function pointers. Provided functions must not
- *   return. If the parameter or individual function pointers are NULL the
+ *   Provided functions must not return.
+ *   If the parameter or individual function pointers are NULL the
  *   respective logical CPUs enter a low-power wait state after startup
  * @param flags (architecture-dependent) flags that specify how to start the
  *   CPUs (see UK_LCPU_SFLG_* flags if available)
  *
  * @return 0 on success, an errno-type error value otherwise
  */
-int uk_lcpu_start(const __u32 lcpuidx[],
+int uk_lcpu_start(const __u64 lcpuidx[],
 		  unsigned int *num,
 		  __u64 sp[], __u64 entry[],
 		  unsigned long flags);

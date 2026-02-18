@@ -15,21 +15,11 @@
  */
 
 #include <uk/arch/types.h>
-#include <uk/lcpu/core.h>
 
 #if !__ASSEMBLY__
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-/**
- * Initialize logical CPU.
- * Sets up per-CPU state and prepares the CPU for operation.
- *
- * @param this_lcpu  LCPU structure for the current CPU
- * @return 0 on success, negative errno on failure
- */
-int uk_pal_lcpu_init(struct uk_lcpu *this_lcpu);
 
 #if CONFIG_HAVE_SMP
 /**
@@ -50,20 +40,6 @@ int uk_pal_lcpu_mp_init(void *arg);
  */
 int uk_pal_send_ipi(__u64 id, unsigned long irq);
 #endif /* CONFIG_HAVE_SMP */
-
-/**
- * Get logical CPU hardware identifier.
- *
- * @return Platform-specific CPU ID
- */
-__u64 uk_pal_lcpu_id(void);
-
-/**
- * Get logical CPU index.
- *
- * @return Sequential CPU index (0..N-1)
- */
-__u32 uk_pal_lcpu_idx(void);
 
 #ifdef __cplusplus
 }

@@ -11,20 +11,13 @@
 #include <uk/plat/pal/auxsp.h>
 #include <uk/pal/auxsp.h>
 
+#define UK_LCPU_AUXSP_SYM						\
+	UK_PAL_AUXSP_SYM
+
 #if !__ASSEMBLY__
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-static inline __uptr uk_lcpu_get_auxsp(void)
-{
-	return uk_pal_get_auxsp();
-}
-
-__isr static inline __uptr uk_lcpu_get_auxsp_in_except(void)
-{
-	return uk_pal_get_auxsp_in_except();
-}
 
 static inline void uk_lcpu_set_auxsp(__uptr auxsp)
 {

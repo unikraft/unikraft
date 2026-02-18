@@ -60,17 +60,6 @@ int uk_lcpu_init(struct uk_lcpu *this_lcpu);
 
 #if CONFIG_HAVE_SMP
 /**
- * Allocate a logical CPU and assign the provided CPU ID. This function may
- * only be called from one thread running on the bootstrap processor before
- * secondary CPUs are started.
- *
- * @param id ID of the CPU for which to allocate an UK_LCPU structure
- * @return an UK_LCPU on success, which is in OFFLINE state with the lock, id,
- *    and idx initialized; NULL on failure.
- */
-struct uk_lcpu *uk_lcpu_alloc(__u64 id);
-
-/**
  * Initialize multi-processor functions. Must only be executed once on the
  * bootstrap processor (BSP)
  *
@@ -118,19 +107,18 @@ int uk_lcpu_fn_enqueue(struct uk_lcpu *lcpu, const struct uk_lcpu_func *fn);
  * Waits for the specified logical CPUs to enter idle state, or until the
  * timeout expires.
  *
- * @param lcpuidx array with the indices of the logical CPUs to wait for. Can
- *   be NULL to include all logical CPUs except the one executing the function
- * @param[inout] num if lcpuidx is not NULL, provides [IN] the number of
- *   elements in lcpuidx, and [OUT] the number of CPUs in idle state until the
- *   timeout expired in sequential order of lcpuidx. If the call succeeds,
- *   input and output values are equal. Must be NULL if lcpuidx is NULL
+ * @param lcpuidx array with the indices of the logical CPUs to wait for.
+ * @param[inout] num provides [IN] the number of elements in lcpuidx,
+ *   and [OUT] the number of CPUs in idle state until the timeout expired
+ *   in sequential order of lcpuidx. If the call succeeds, input and output
+ *   values are equal
  * @param timeout timeout in nanoseconds for the wait to be satisfied. Can be
  *   0 to wait indefinitely
  *
  * @return 0 if the wait for all specified logical CPUs has been satisfied,
  *   an errno-type error value otherwise (e.g., timeout)
  */
-int uk_lcpu_wait(const __u32 lcpuidx[], unsigned int *num,
+int uk_lcpu_wait(const __u64 lcpuidx[], unsigned int *num,
 		 __nsec timeout);
 
 /**
@@ -139,20 +127,18 @@ int uk_lcpu_wait(const __u32 lcpuidx[], unsigned int *num,
  * at the same time without having to wait for their completion.
  *
  * @param lcpuidx array with the indices of the logical CPUs that should
- *   execute the function. Can be NULL to execute the function on all logical
- *   CPUs except the current one
- * @param[inout] num if lcpuidx is not NULL, provides [IN] the number of
- *   elements in lcpuidx, and [OUT] the number of CPUs on which the function has
+ *   execute the function.
+ * @param[inout] num provides [IN] the number of elements in lcpuidx,
+ *   and [OUT] the number of CPUs on which the function has
  *   been successfully queued in sequential order of lcpuidx. If the call
- *   succeeds, input and output values are equal. Must be NULL if lcpuidx is
- *   NULL
+ *   succeeds, input and output values are equal.
  * @param fn the function to be executed
  * @param flags (architecture-dependent) flags that specify how the function
  *   should be executed (see UK_LCPU_RFLG_* flags)
  *
  * @return 0 on success, an errno-type error value otherwise
  */
-int uk_lcpu_run(const __u32 lcpuidx[], unsigned int *num,
+int uk_lcpu_run(const __u64 lcpuidx[], unsigned int *num,
 		const struct uk_lcpu_func *fn, unsigned long flags);
 
 /* Do not block while trying to queue the function to the remote core */
@@ -162,40 +148,28 @@ int uk_lcpu_run(const __u32 lcpuidx[], unsigned int *num,
  * Wakes up the specified logical CPUs from a halt or low-power sleep state.
  *
  * @param lcpuidx array with the indices of the logical CPUs that should be
- *   woken up. Can be NULL to wakeup all logical CPUs except the current one
- * @param[inout] num if lcpuidx is not NULL, provides [IN] the number of
- *   elements in lcpuidx, and [OUT] the number of successfully woken up CPUs in
- *   sequential order of lcpuidx. If the call succeeds, input and output values
- *   are equal. Must be NULL if lcpuidx is NULL
+ *   woken up
+ * @param[inout] num provides [IN] the number of elements in lcpuidx,
+ *   and [OUT] the number of successfully woken up CPUs in sequential
+ *   order of lcpuidx. If the call succeeds, input and output values
+ *   are equal.
  *
  * @return 0 on success, an errno-type error value otherwise
  */
-int uk_lcpu_wakeup(const __u32 lcpuidx[], unsigned int *num);
+int uk_lcpu_wakeup(const __u64 lcpuidx[], unsigned int *num);
 #endif /* CONFIG_HAVE_SMP */
 
 struct uk_lcpu *uk_lcpu_get_current(void);
 
-static inline __u64 uk_lcpu_id(void)
-{
-	return uk_lcpu_get_current()->id;
-}
-
 /**
  * Assuming we are in an exception handler on an exception stack, fetch the
- * current UK_LCPU pointer in such a manner that we do not assume any register
+ * current CPU index in such a manner that we do not assume any register
  * state.
  *
  * WARNING: Again, only use in exception context (e.g. trap (non-syscall),
  *          IRQ)!
  */
-__isr struct uk_lcpu *uk_lcpu_get_current_in_except(void);
-
-struct uk_lcpu *uk_lcpu_get(__u32 idx);
-
-static inline __u32 uk_lcpu_idx(void)
-{
-	return uk_pal_lcpu_idx();
-}
+__isr __u64 uk_lcpu_get_current_idx_in_except(void);
 
 #ifdef __cplusplus
 }

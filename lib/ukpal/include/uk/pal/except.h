@@ -188,6 +188,13 @@ __isr unsigned long uk_pal_save_irqf(void);
  */
 __isr __uptr uk_pal_except_get_except_stack_base(void);
 
+/**
+ * Initialize exception handling.
+ *
+ * @return 0 on success, !=0 on error
+ */
+__isr int uk_pal_except_init(void);
+
 #ifdef __cplusplus
 }
 #endif
