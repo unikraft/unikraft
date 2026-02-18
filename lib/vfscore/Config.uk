@@ -16,6 +16,14 @@ menuconfig LIBVFSCORE
 	select HAVE_VFS
 
 if LIBVFSCORE
+config LIBVFSCORE_MMAP_SHARED_PRIVATE_FALLBACK
+	bool "Enable private-mapping fallback for writable MAP_SHARED"
+	help
+		When enabled, writable MAP_SHARED mappings will not require
+		UK_VMA_FILE_SHARED and will effectively fallback to private
+		mappings. This is a temporary workaround for workloads that do
+		not rely on in-kernel writeback or cross-mapping visibility.
+
 config LIBVFSCORE_NONLARGEFILE
 	bool "Non-largefile system calls"
 	default y if LIBSYSCALL_SHIM_HANDLER
