@@ -25,6 +25,10 @@ CINCLUDES   += -I$(CONFIG_UK_BASE)/arch/include
 ASINCLUDES  += -I$(CONFIG_UK_BASE)/arch/include
 CXXINCLUDES += -I$(CONFIG_UK_BASE)/arch/include
 
+CINCLUDES   += -I$(CONFIG_UK_BASE)/arch/arm64/include
+ASINCLUDES  += -I$(CONFIG_UK_BASE)/arch/arm64/include
+CXXINCLUDES += -I$(CONFIG_UK_BASE)/arch/arm64/include
+
 # Architecture Extensions
 #
 # Define these in the order of arch revision, to allow march

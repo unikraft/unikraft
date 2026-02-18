@@ -31,7 +31,7 @@
 #define __UK_ASM_LCPU_H__
 
 #include <uk/asm.h>
-#include <uk/asm/arch.h>
+#include <uk/arch/arm64.h>
 #include <uk/config.h>
 #include <uk/essentials.h>
 
