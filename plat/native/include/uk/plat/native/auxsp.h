@@ -11,14 +11,18 @@
 
 /* Auxiliary stack management for exception handling */
 
+#if CONFIG_LIBUKPLAT_NATIVE_AUXSP
+#ifndef UK_PLAT_NATIVE_AUXSP_SYM
+#error "UK_PLAT_NATIVE_AUXSP_SYM undefined"
+#endif
+#endif /* CONFIG_LIBUKPLAT_NATIVE_AUXSP */
+
 #if !__ASSEMBLY__
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 #if CONFIG_LIBUKPLAT_NATIVE_AUXSP
-__uptr uk_plat_native_get_auxsp(void);
-__isr __uptr uk_plat_native_get_auxsp_in_except(void);
 void uk_plat_native_set_auxsp(__uptr auxsp);
 #endif /* CONFIG_LIBUKPLAT_NATIVE_AUXSP */
 

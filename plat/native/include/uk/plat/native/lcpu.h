@@ -9,7 +9,6 @@
 
  /* Logical CPU (LCPU) Management - Architecture-Independent Interface */
 
-#include <uk/lcpu/core.h>
 #include <uk/plat/native/arch/lcpu.h>
 
 #if !__ASSEMBLY__
@@ -18,20 +17,6 @@ extern "C" {
 #endif
 
 #if CONFIG_LIBUKPLAT_NATIVE_LCPU
-/* LCPU identification (convenience wrappers) */
-
-__u64 uk_plat_native_lcpu_id(void);
-__u32 uk_plat_native_lcpu_idx(void);
-
-/**
- * Initialize logical CPU structures and per-CPU state.
- * Must be called once per CPU during boot.
- *
- * @param this_lcpu  LCPU structure for the current CPU
- * @return 0 on success, negative errno on failure
- */
-int uk_plat_native_lcpu_init(struct uk_lcpu *this_lcpu);
-
 #if CONFIG_HAVE_SMP
 /**
  * Detect and populate LCPU structures for all processors.

@@ -1,12 +1,8 @@
 uk_plat_native_disable_irq
 uk_plat_native_enable_irq
-uk_plat_native_get_auxsp
-uk_plat_native_get_auxsp_in_except
 uk_plat_native_halt
 uk_plat_native_halt_irq
-uk_plat_native_lcpu_id
-uk_plat_native_lcpu_idx
-uk_plat_native_lcpu_init
+uk_plat_native_except_init
 uk_plat_native_irqs_disabled
 uk_plat_native_irqs_handle_pending
 uk_plat_native_nop
@@ -16,6 +12,7 @@ uk_plat_native_restore_irqf
 uk_plat_native_lcpu_run
 uk_plat_native_save_irqf
 uk_plat_native_set_auxsp
+uk_plat_native_auxsp
 uk_plat_native_lcpu_start
 uk_plat_native_sysctx_load
 uk_plat_native_sysctx_store

@@ -11,7 +11,6 @@
 #include <uk/arch/util.h>
 #include <uk/config.h>
 #include <uk/plat/native/arch/regs.h>
-#include <uk/lcpu/core.h>
 
 #if !__ASSEMBLY__
 #ifdef __cplusplus
@@ -195,6 +194,13 @@ uk_plat_native_except_irq_ctx_set_irq(
 }
 
 #if CONFIG_LIBUKPLAT_NATIVE_EXCEPT
+/**
+ * Initialize exception handling: GDT and IDT.
+ *
+ * @return 0 on success, !=0 on error
+ */
+__isr int uk_plat_native_except_init(void);
+
 /**
  * Enable x86_64 interrupts (STI instruction).
  * Sets RFLAGS.IF, allowing maskable hardware interrupts.

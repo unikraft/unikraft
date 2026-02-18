@@ -176,6 +176,11 @@ __isr static inline void uk_pal_except_pop_nested(void)
 	uk_plat_native_except_pop_nested();
 }
 
+__isr static inline int uk_pal_except_init(void)
+{
+	return uk_plat_native_except_init();
+}
+
 #ifdef __cplusplus
 }
 #endif

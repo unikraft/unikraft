@@ -1,6 +1,5 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
-/*
- * Copyright (c) 2022, Karlsruhe Institute of Technology (KIT)
+/* Copyright (c) 2022, Karlsruhe Institute of Technology (KIT)
  *                     All rights reserved.
  * Copyright (c) 2022, University POLITEHNICA of Bucharest.
  *                     All rights reserved.
@@ -9,154 +8,17 @@
  * You may not use this file except in compliance with the License.
  */
 
-#include <errno.h>
-#include <string.h>
-
-#include <uk/arch/ctx.h>
-#include <uk/ctors.h>
-#include <uk/arch.h>
-#include <uk/lcpu/core.h>
+#include <uk/boot/earlytab.h>
+#include <uk/arch/util.h>
+#include <uk/essentials.h>
 #include <uk/lcpu/pm.h>
+#include <uk/prio.h>
+
 #include <uk/plat/common/acpi.h>
 #include <uk/plat/common/memory.h>
-#include <uk/asm.h>
 #include <x86/delay.h>
 
-#if CONFIG_LIBUKPLAT_NATIVE_SYSCTX || CONFIG_LIBUKPLAT_NATIVE_LCPU
-static void uk_arch_wrmsrgsbase(__u64 gsbase)
-{
-	uk_arch_wrmsrl(UK_ARCH_MSR_GS_BASE, gsbase);
-}
-
-static __u64 uk_arch_rdmsrgsbase(void)
-{
-	return uk_arch_rdmsrl(UK_ARCH_MSR_GS_BASE);
-}
-
-static __u64 rdgsbase_cr4fsgsbase(void)
-{
-	__u64 gsbase;
-
-	__asm__ __volatile__(
-		"rdgsbase	%0"
-		: "=r" (gsbase)
-		:
-		: "memory"
-	);
-
-	return gsbase;
-}
-
-static void wrgsbase_cr4fsgsbase(__u64 gsbase)
-{
-	__asm__ __volatile__(
-		"wrgsbase	%0"
-		:
-		: "r" (gsbase)
-		: "memory"
-	);
-}
-
-static void uk_arch_wrmsrkgsbase(__u64 kgsbase)
-{
-	uk_arch_wrmsrl(UK_ARCH_MSR_KERNEL_GS_BASE, kgsbase);
-}
-
-static void uk_arch_wrmsrfsbase(__u64 fsbase)
-{
-	uk_arch_wrmsrl(UK_ARCH_MSR_FS_BASE, fsbase);
-}
-
-static __u64 uk_arch_rdmsrfsbase(void)
-{
-	return uk_arch_rdmsrl(UK_ARCH_MSR_FS_BASE);
-}
-
-static __u64 rdfsbase_cr4fsgsbase(void)
-{
-	__u64 fsbase;
-
-	__asm__ __volatile__(
-		"rdfsbase	%0"
-		: "=r" (fsbase)
-		:
-		: "memory"
-	);
-
-	return fsbase;
-}
-
-static void wrfsbase_cr4fsgsbase(__u64 fsbase)
-{
-	__asm__ __volatile__(
-		"wrfsbase	%0"
-		:
-		: "r" (fsbase)
-		: "memory"
-	);
-}
-
-static void (*wrgsbasefn)(__u64) = &uk_arch_wrmsrgsbase;
-static __u64 (*rdgsbasefn)(void) = &uk_arch_rdmsrgsbase;
-void (*uk_plat_native_wrfsbasefn)(__u64) = &uk_arch_wrmsrfsbase;
-__u64 (*uk_plat_native_rdfsbasefn)(void) = &uk_arch_rdmsrfsbase;
-static void (*wrkgsbasefn)(__u64) = &uk_arch_wrmsrkgsbase;
-
-static void init_fsgsbasefns(void)
-{
-	__u32 eax, ebx, ecx, edx;
-
-	uk_arch_cpuid(7, 0, &eax, &ebx, &ecx, &edx);
-	if (ebx & UK_ARCH_CPUID7_EBX_FSGSBASE) {
-		wrgsbasefn = wrgsbase_cr4fsgsbase;
-		rdgsbasefn = rdgsbase_cr4fsgsbase;
-		uk_plat_native_wrfsbasefn = wrfsbase_cr4fsgsbase;
-		uk_plat_native_rdfsbasefn = rdfsbase_cr4fsgsbase;
-	}
-}
-
-UK_CTOR_PRIO(init_fsgsbasefns, 0);
-#endif /* CONFIG_LIBUKPLAT_NATIVE_SYSCTX || CONFIG_LIBUKPLAT_NATIVE_LCPU */
-
-#if CONFIG_LIBUKPLAT_NATIVE_LCPU
-void uk_plat_native_traps_init(struct uk_lcpu *this_lcpu);
-void uk_plat_native_traps_table_init(struct uk_lcpu *this_lcpu);
-
 #if CONFIG_HAVE_SMP
-static inline int x2apic_enable(void)
-{
-	__u32 eax, ebx, ecx, edx;
-
-	/* Check for x2APIC support */
-	uk_arch_cpuid(1, 0, &eax, &ebx, &ecx, &edx);
-	if (!(ecx & UK_ARCH_CPUID1_ECX_X2APIC))
-		return -ENOTSUP;
-
-	/* Check if APIC is active */
-	uk_arch_rdmsr(UK_ARCH_APIC_MSR_BASE, &eax, &edx);
-	if (!(eax & UK_ARCH_APIC_BASE_EN))
-		return -ENOTSUP;
-
-	/* Switch to x2APIC mode */
-	eax |= UK_ARCH_APIC_BASE_EXTD;
-	uk_arch_wrmsr(UK_ARCH_APIC_MSR_BASE, eax, edx);
-
-	/* Set APIC software enable flag if necessary */
-	uk_arch_rdmsr(UK_ARCH_APIC_MSR_SVR, &eax, &edx);
-	if ((eax & UK_ARCH_APIC_SVR_EN) == 0) {
-		eax |= UK_ARCH_APIC_SVR_EN;
-		uk_arch_wrmsr(UK_ARCH_APIC_MSR_SVR, eax, edx);
-	}
-
-	/*
-	 * TODO: Configure spurious interrupt vector number
-	 * After power-up or reset this is 0xff, which might not be
-	 * configured in the trap table
-	 */
-
-	return 0;
-}
-
 static inline void x2apic_send_ipi(int irqno, int dest)
 {
 	__u32 eax;
@@ -198,42 +60,11 @@ static inline void x2apic_send_iipi(int dest)
 #define x2apic_send_iipi_deassert() {}
 
 /* We only support x2APIC at the moment */
-#define apic_enable		x2apic_enable
 #define apic_send_ipi		x2apic_send_ipi
 #define apic_send_sipi		x2apic_send_sipi
 #define apic_send_iipi		x2apic_send_iipi
 #define apic_send_iipi_deassert x2apic_send_iipi_deassert
-#endif /* CONFIG_HAVE_SMP */
 
-static int plat_native_lcpu_pm_ops_register(void);
-
-int uk_plat_native_lcpu_init(struct uk_lcpu *this_lcpu)
-{
-	int rc;
-
-#if CONFIG_HAVE_SMP
-	rc = apic_enable();
-	if (unlikely(rc))
-		return rc;
-#endif /* CONFIG_HAVE_SMP */
-
-	rc = plat_native_lcpu_pm_ops_register();
-	if (unlikely(rc))
-		return rc;
-
-	wrgsbasefn((__uptr)this_lcpu);
-	wrkgsbasefn((__uptr)this_lcpu);
-
-	uk_plat_native_traps_table_init(this_lcpu);
-	uk_plat_native_traps_init(this_lcpu);
-
-	wrgsbasefn((__uptr)this_lcpu);
-	wrkgsbasefn((__uptr)this_lcpu);
-
-	return 0;
-}
-
-#if CONFIG_HAVE_SMP
 /* Secondary cores start in 16-bit real-mode and we have to provide the
  * corresponding boot code somewhere in the first 1 MiB. We copy the trampoline
  * code to the target address during MP initialization.
@@ -340,7 +171,7 @@ static void start16_reloc_mp_init(void)
 
 int uk_plat_native_lcpu_mp_init(void *arg __unused)
 {
-	__u64 bsp_cpu_id = uk_lcpu_get(0)->id;
+	__u64 bsp_cpu_id = uk_pcpuvar_lval(0, uk_pcpuvar_cpu_id);
 	union {
 		struct acpi_madt_x2apic *x2apic;
 		struct acpi_madt_lapic *lapic;
@@ -348,9 +179,9 @@ int uk_plat_native_lcpu_mp_init(void *arg __unused)
 	} m;
 	int bsp_found __maybe_unused = 0;
 	struct acpi_madt *madt;
-	struct uk_lcpu *lcpu;
-	__u64 cpu_id;
 	__sz off, len;
+	__u64 cpu_id;
+	__u32 idx;
 	int rc;
 
 	uk_pr_info("Bootstrapping processor has the ID %ld\n", bsp_cpu_id);
@@ -360,6 +191,7 @@ int uk_plat_native_lcpu_mp_init(void *arg __unused)
 	UK_ASSERT(madt);
 
 	len = madt->hdr.tab_len - sizeof(*madt);
+	idx = 1;
 	for (off = 0; off < len; off += m.h->len) {
 		m.h = (struct acpi_subsdt_hdr *)(madt->entries + off);
 
@@ -391,15 +223,9 @@ int uk_plat_native_lcpu_mp_init(void *arg __unused)
 			continue;
 		}
 
-		lcpu = uk_lcpu_alloc(cpu_id);
-		if (unlikely(!lcpu)) {
-			/* If we cannot allocate another LCPU, we probably have
-			 * reached the maximum number of supported CPUs. So
-			 * just stop here.
-			 */
-			uk_pr_warn("Maximum number of cores exceeded.\n");
-			return 0;
-		}
+		uk_pcpuvar_lval(idx, uk_pcpuvar_cpu_id) = cpu_id;
+		uk_pcpuvar_lval(idx, uk_pcpuvar_cpu_idx) = idx;
+		idx++;
 	}
 	UK_ASSERT(bsp_found);
 
@@ -423,10 +249,10 @@ int uk_plat_native_lcpu_mp_init(void *arg __unused)
 	return 0;
 }
 
-static int plat_native_lcpu_start(struct uk_lcpu *lcpu)
+static int plat_native_lcpu_start(__u64 idx)
 {
 	/* Send INIT IPI */
-	apic_send_iipi(lcpu->id);
+	apic_send_iipi(uk_pcpuvar_lval(idx, uk_pcpuvar_cpu_id));
 
 	/* Deassert */
 	apic_send_iipi_deassert();
@@ -435,23 +261,22 @@ static int plat_native_lcpu_start(struct uk_lcpu *lcpu)
 }
 
 #if CONFIG_HAVE_CPU_MULTI_PHASE_STARTUP
-static int plat_native_lcpu_post_start(const __u32 lcpuidx[], unsigned int *num)
+static int plat_native_lcpu_post_start(const __u64 lcpuidx[], unsigned int *num)
 {
-	__u64 this_cpu_id = uk_lcpu_id();
-	unsigned int i, n, j;
-	struct uk_lcpu *lcpu;
+	__u64 id, this_cpu_id = uk_pcpuvar_current_get(uk_pcpuvar_cpu_id);
+	unsigned int i, j;
 
 	/* wait 10 msec (according to Intel manual 8.4.4.1) */
 	mdelay(10);
 
-	uk_lcpu_lcpuidx_list_foreach(lcpuidx, num, n, i, lcpu) {
-		if (lcpu->id == this_cpu_id)
+	for (i = 0; i < *num; i++) {
+		id = uk_pcpuvar_lval(lcpuidx[i], uk_pcpuvar_cpu_id);
+		if (id == this_cpu_id)
 			continue;
 
 		for (j = 0; j < 2; j++) {
 			/* Send STARTUP IPI */
-			apic_send_sipi(uk_plat_native_x86_64_start16_addr,
-				       lcpu->id);
+			apic_send_sipi(uk_plat_native_x86_64_start16_addr, id);
 
 			/* wait 200 usec (according to Intel manual 8.4.4.1) */
 			udelay(200);
@@ -506,26 +331,10 @@ static const struct uk_lcpu_pm_ops plat_native_pm_ops = {
 	.halt_irq = plat_native_lcpu_halt_irq,
 };
 
-static int plat_native_lcpu_pm_ops_register(void)
+__isr static
+int plat_native_lcpu_pm_ops_register(struct ukplat_bootinfo *bi __unused)
 {
 	return uk_lcpu_pm_ops_register(&plat_native_pm_ops);
 }
-#endif /* CONFIG_LIBUKPLAT_NATIVE_LCPU */
 
-#if CONFIG_LIBUKPLAT_NATIVE_SYSCTX
-__isr void uk_plat_native_sysctx_store(struct uk_plat_native_sysctx *sysctx)
-{
-	UK_ASSERT(sysctx);
-
-	sysctx->gsbase = rdgsbasefn();
-	sysctx->fsbase = uk_plat_native_rdfsbasefn();
-}
-
-__isr void uk_plat_native_sysctx_load(struct uk_plat_native_sysctx *sysctx)
-{
-	UK_ASSERT(sysctx);
-
-	wrgsbasefn(sysctx->gsbase);
-	uk_plat_native_wrfsbasefn(sysctx->fsbase);
-}
-#endif /* CONFIG_LIBUKPLAT_NATIVE_SYSCTX */
+UK_BOOT_EARLYTAB_ENTRY(plat_native_lcpu_pm_ops_register, UK_PRIO_EARLIEST);

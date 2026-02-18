@@ -25,13 +25,15 @@
  * CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+#include <errno.h>
+
 #include <uk/asm.h>
+#include <uk/essentials.h>
 #include <uk/arch.h>
 #include <uk/arch/util.h>
 #include <uk/arch/ctx.h>
 #include <uk/arch/limits.h>
 #include <uk/plat/config.h>
-#include <uk/lcpu.h>
 #include <uk/arch/types.h>
 #include <uk/event.h>
 #include <uk/print.h>
@@ -143,19 +145,19 @@ void uk_plat_native_except_push_nested(void)
 	struct uk_arch_seg_gate_desc64 *idt;
 	__u8 *disable_nesting;
 	__u8 *ist_saved;
-	struct uk_lcpu *lcpu;
 	unsigned int i;
+	__u32 idx;
 
-	lcpu = uk_lcpu_get_current_in_except();
+	idx = uk_lcpu_get_current_idx_in_except();
 
-	disable_nesting = &idt_ist_disable_nesting[lcpu->idx];
+	disable_nesting = &idt_ist_disable_nesting[idx];
 	UK_ASSERT(*disable_nesting < __U8_MAX);
 
 	if (*disable_nesting++)
 		return;
 
-	idt = cpu_idt[lcpu->idx];
-	ist_saved = idt_ist_saved[lcpu->idx];
+	idt = cpu_idt[idx];
+	ist_saved = idt_ist_saved[idx];
 
 	/* Save the value of the IST field and disable IST for the exception */
 	for (i = 0; i < IDT_IST_SAVE_LEN; i++) {
@@ -171,19 +173,19 @@ void uk_plat_native_except_pop_nested(void)
 	struct uk_arch_seg_gate_desc64 *idt;
 	__u8 *disable_nesting;
 	__u8 *ist_saved;
-	struct uk_lcpu *lcpu;
 	unsigned int i;
+	__u32 idx;
 
-	lcpu = uk_lcpu_get_current_in_except();
+	idx = uk_lcpu_get_current_idx_in_except();
 
-	disable_nesting = &idt_ist_disable_nesting[lcpu->idx];
+	disable_nesting = &idt_ist_disable_nesting[idx];
 	UK_ASSERT(*disable_nesting > 1);
 
 	if (--*disable_nesting != 0)
 		return;
 
-	idt = cpu_idt[lcpu->idx];
-	ist_saved = idt_ist_saved[lcpu->idx];
+	idt = cpu_idt[idx];
+	ist_saved = idt_ist_saved[idx];
 
 	/* Restore the IST field values */
 	for (i = 0; i < IDT_IST_SAVE_LEN; i++) {
@@ -378,7 +380,7 @@ static void idt_init(void)
 	uk_arch_lidt(&idtptr);
 }
 
-void uk_plat_native_traps_table_init(struct uk_lcpu *this_lcpu)
+static void traps_table_init(__u32 idx)
 {
 	/*
 	 * Load trap vectors. All traps run on a dedicated trap stack, except
@@ -394,7 +396,7 @@ void uk_plat_native_traps_table_init(struct uk_lcpu *this_lcpu)
 	 */
 #define FILL_TRAP_GATE(name, ist)					\
 	extern void cpu_trap_##name(void);				\
-	idt_fillgate(TRAP_##name, ASM_TRAP_SYM(name), ist, this_lcpu->idx)
+	idt_fillgate(TRAP_##name, ASM_TRAP_SYM(name), ist, idx)
 
 	FILL_TRAP_GATE(divide_error,	2);
 	FILL_TRAP_GATE(debug,		3); /* on IST3 (lcpu_except_stack) */
@@ -423,7 +425,7 @@ void uk_plat_native_traps_table_init(struct uk_lcpu *this_lcpu)
 	 */
 #define FILL_IRQ_GATE(num, ist)						\
 	extern void cpu_irq_##num(void);				\
-	idt_fillgate(32 + num, cpu_irq_##num, ist, this_lcpu->idx)
+	idt_fillgate(32 + num, cpu_irq_##num, ist, idx)
 
 	FILL_IRQ_GATE(0, 1);
 	FILL_IRQ_GATE(1, 1);
@@ -654,10 +656,13 @@ void uk_plat_native_traps_table_init(struct uk_lcpu *this_lcpu)
 	idtptr.base = (__u64)&cpu_idt;
 }
 
-void uk_plat_native_traps_init(struct uk_lcpu *this_lcpu)
+static void uk_plat_native_traps_init(void)
 {
-	gdt_init(this_lcpu->idx);
-	tss_init(this_lcpu->idx);
+	__u32 idx = uk_pcpuvar_current_get(uk_pcpuvar_cpu_idx);
+
+	traps_table_init(idx);
+	gdt_init(idx);
+	tss_init(idx);
 	idt_init();
 }
 
@@ -666,24 +671,55 @@ __isr __uptr uk_plat_native_except_get_except_stack_base(void)
 	return (__uptr)&lcpu_except_stack;
 }
 
-void uk_plat_native_set_auxsp(__uptr auxsp)
+#if CONFIG_HAVE_SMP
+static inline int x2apic_enable(void)
 {
-	struct uk_lcpu *lcpu = uk_lcpu_get_current();
-	struct uk_plat_native_sysctx *sc;
-	struct ukarch_auxspcb *auxspcb;
+	__u32 eax, ebx, ecx, edx;
 
-	lcpu->auxsp = auxsp;
-	auxspcb = ukarch_auxsp_get_cb(auxsp);
-	sc = (struct uk_plat_native_sysctx *)auxspcb->uksysctx;
-	sc->gsbase = (__u64)lcpu;
+	/* Check for x2APIC support */
+	uk_arch_cpuid(1, 0, &eax, &ebx, &ecx, &edx);
+	if (!(ecx & UK_ARCH_CPUID1_ECX_X2APIC))
+		return -ENOTSUP;
+
+	/* Check if APIC is active */
+	uk_arch_rdmsr(UK_ARCH_APIC_MSR_BASE, &eax, &edx);
+	if (!(eax & UK_ARCH_APIC_BASE_EN))
+		return -ENOTSUP;
+
+	/* Switch to x2APIC mode */
+	eax |= UK_ARCH_APIC_BASE_EXTD;
+	uk_arch_wrmsr(UK_ARCH_APIC_MSR_BASE, eax, edx);
+
+	/* Set APIC software enable flag if necessary */
+	uk_arch_rdmsr(UK_ARCH_APIC_MSR_SVR, &eax, &edx);
+	if ((eax & UK_ARCH_APIC_SVR_EN) == 0) {
+		eax |= UK_ARCH_APIC_SVR_EN;
+		uk_arch_wrmsr(UK_ARCH_APIC_MSR_SVR, eax, edx);
+	}
+
+	/*
+	 * TODO: Configure spurious interrupt vector number
+	 * After power-up or reset this is 0xff, which might not be
+	 * configured in the trap table
+	 */
+
+	return 0;
 }
 
-__uptr uk_plat_native_get_auxsp(void)
-{
-	return uk_lcpu_get_current()->auxsp;
-}
+#define apic_enable		x2apic_enable
+#endif /* CONFIG_HAVE_SMP */
 
-__isr __uptr uk_plat_native_get_auxsp_in_except(void)
+__isr int uk_plat_native_except_init(void)
 {
-	return uk_lcpu_get_current_in_except()->auxsp;
+	int rc __maybe_unused;
+
+#if CONFIG_HAVE_SMP
+	rc = apic_enable();
+	if (unlikely(rc))
+		return rc;
+#endif /* CONFIG_HAVE_SMP */
+
+	uk_plat_native_traps_init();
+
+	return 0;
 }

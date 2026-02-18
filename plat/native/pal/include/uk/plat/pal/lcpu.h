@@ -15,21 +15,6 @@
 extern "C" {
 #endif
 
-static inline __u64 uk_pal_lcpu_id(void)
-{
-	return uk_plat_native_lcpu_id();
-}
-
-static inline __u32 uk_pal_lcpu_idx(void)
-{
-	return uk_plat_native_lcpu_idx();
-}
-
-static inline int uk_pal_lcpu_init(struct uk_lcpu *this_lcpu)
-{
-	return uk_plat_native_lcpu_init(this_lcpu);
-}
-
 #if CONFIG_HAVE_SMP
 static inline int uk_pal_lcpu_mp_init(void *arg)
 {

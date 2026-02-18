@@ -69,6 +69,7 @@ endif
 
 config LIBUKPLAT_NATIVE_AUXSP
 	bool
+	select LIBUKPLAT_NATIVE_SYSCTX
 
 config LIBUKPLAT_NATIVE_LCPU
 	bool
@@ -85,5 +86,9 @@ config LIBUKPLAT_NATIVE_EXCEPT
 
 config LIBUKPLAT_NATIVE_SYSCTX
 	bool
+
+config LIBUKPLAT_NATIVE_LCPU_PM
+	bool
+	depends on LIBUKLCPU
 
 endif

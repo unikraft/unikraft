@@ -19,42 +19,6 @@ extern "C" {
 #if CONFIG_LIBUKPLAT_NATIVE_LCPU
 extern __vaddr_t uk_plat_native_x86_64_start16_addr; /* target address */
 
-/**
- * Get x86_64 logical CPU hardware ID (APIC ID).
- * Reads the initial APIC ID from CPUID leaf 1 (EBX[31:24]).
- *
- * @return APIC ID of the current logical CPU
- */
-static inline __u64 uk_plat_native_lcpu_id(void)
-{
-	__u32 eax, ebx, ecx, edx;
-
-	uk_arch_cpuid(1, 0, &eax, &ebx, &ecx, &edx);
-	return (ebx >> 24);
-}
-
-/**
- * Get logical CPU index (sequential 0..N-1 identifier).
- * Reads the index from a fixed offset in the GS_BASE-relative LCPU structure.
- * This is faster than APIC ID lookup and used for per-CPU data access.
- *
- * @return Sequential index of the current logical CPU
- */
-static inline __u32 uk_plat_native_lcpu_idx(void)
-{
-	return uk_arch_rdgsbase32(UK_LCPU_IDX_OFFSET);
-}
-
-/**
- * Initialize x86_64 logical CPU structures.
- * Sets up per-CPU state including GS_BASE register for fast per-CPU access.
- * Must be called once per CPU during boot.
- *
- * @param this_lcpu  Pointer to LCPU structure for this CPU
- * @return 0 on success, negative errno on failure
- */
-int uk_plat_native_lcpu_init(struct uk_lcpu *this_lcpu);
-
 #if CONFIG_HAVE_SMP
 /**
  * Detect and populate LCPU structures for all x86_64 CPUs.

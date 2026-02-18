@@ -18,7 +18,6 @@
 #include <uk/print.h>
 #include <uk/print/hexdump.h>
 #include <uk/isr/string.h> /* memset_isr */
-#include <uk/lcpu/core.h>
 
 enum x86_save_method {
 	X86_SAVE_NONE = 0,

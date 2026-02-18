@@ -10,20 +10,13 @@
 #include <uk/arch/types.h>
 #include <uk/plat/native/arch/auxsp.h>
 
+#define UK_PAL_AUXSP_SYM						\
+	UK_PLAT_NATIVE_AUXSP_SYM
+
 #if !__ASSEMBLY__
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-static inline __uptr uk_pal_get_auxsp(void)
-{
-	return uk_plat_native_get_auxsp();
-}
-
-static inline __isr __uptr uk_pal_get_auxsp_in_except(void)
-{
-	return uk_plat_native_get_auxsp_in_except();
-}
 
 static inline void uk_pal_set_auxsp(__uptr auxsp)
 {
