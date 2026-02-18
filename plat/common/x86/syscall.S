@@ -65,7 +65,7 @@ ENTRY(_ukplat_syscall)
 	 * in corrupted memory or we could unwantedly modify variables stored
 	 * in the Red Zone.
 	 */
-	movq	%gs:UK_LCPU_AUXSP_OFFSET, %rsp
+	movq	UK_PCPUVAR_X86_64_GSREL(UK_LCPU_AUXSP_SYM), %rsp
 
 	/* Describing the rsp relative to GS would make it necessary to emit
 	 * raw CFI. Instead of doing so, mark rsp as undefined temporarily
@@ -136,7 +136,7 @@ ENTRY(_ukplat_syscall)
 	.cfi_adjust_cfa_offset (UKARCH_EXECENV_END_ALIGN - 8)
 
 	/* Push out auxsp for faster access later. */
-	pushq	%gs:UK_LCPU_AUXSP_OFFSET
+	pushq	UK_PCPUVAR_X86_64_GSREL(UK_LCPU_AUXSP_SYM)
 	.cfi_adjust_cfa_offset 8
 
 	/**
