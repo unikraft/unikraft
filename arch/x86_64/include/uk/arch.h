@@ -11,9 +11,6 @@
 #ifndef __UK_ARCH_H__
 #define __UK_ARCH_H__
 
-/** Cache line size */
-#define UK_ARCH_CACHE_LINE_SIZE			64
-
 /* CPUID feature bits in ECX and EDX when EAX=1 */
 /** x2APIC feature */
 #define UK_ARCH_CPUID1_ECX_X2APIC		(1 << 21)

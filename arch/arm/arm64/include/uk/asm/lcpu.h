@@ -35,8 +35,6 @@
 #include <uk/config.h>
 #include <uk/essentials.h>
 
-#define CACHE_LINE_SIZE		64
-
 /* Device-nGnRnE memory */
 #define MAIR_DEVICE_nGnRnE	0x00
 /* Device-nGnRE memory */
