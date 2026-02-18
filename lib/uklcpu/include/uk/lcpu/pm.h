@@ -8,9 +8,10 @@
 #define __UK_LCPU_PM_H__
 
 #include <uk/arch/types.h>
-#include <uk/lcpu/core.h>
 
 #if !__ASSEMBLY__
+#include <uk/arch/time.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
