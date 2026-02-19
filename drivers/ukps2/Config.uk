@@ -1,3 +1,0 @@
-config HAVE_IBMPC_PS2
-	bool
-	depends on ARCH_X86_64

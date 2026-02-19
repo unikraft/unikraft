@@ -1,0 +1,16 @@
+config HAVE_IBMPC_PS2
+	bool
+	depends on ARCH_X86_64
+
+menuconfig LIBUKPS2
+	bool "PS/2 Controller drivers"
+	depends on HAVE_IBMPC_PS2
+	select LIBUKBITOPS
+
+if LIBUKPS2
+
+config LIBUKPS2_KBD
+	bool "PS/2 Keyboard driver"
+	select HAVE_SHUTDOWN_DISPATCHER
+
+endif

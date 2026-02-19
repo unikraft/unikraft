@@ -10,28 +10,10 @@
 #include <uk/intctlr.h>
 #include <x86/delay.h>
 
+#include "ps2.h"
+
 /* Default legacy IRQ for the PS/2 keyboard */
 #define PIC1_IRQ_KBD				0x1
-
-#define I8042_DATA_REG				0x60
-
-#define I8042_STATUS_REG			0x64
-#define I8042_STATUS_RECV_FULL			UK_BIT(0)
-#define I8042_STATUS_SEND_FULL			UK_BIT(1)
-
-#define I8042_CMD_REG				0x64
-#define I8042_CMD_READ_CFG			0x20
-#define I8042_CMD_WRITE_CFG			0x60
-#define I8042_CMD_DIS_KBD			0xAD
-#define I8042_CMD_EN_KBD			0xAE
-
-#define I8042_CFG_REG_EN_KBD_IRQ		UK_BIT(0)
-#define I8042_CFG_REG_DIS_KBD_CLK		UK_BIT(4)
-
-/* ACPI scan code set - enough for Firecracker "Send CtrlAltDelete" */
-#define I8042_KEY_CTRL				0x0014
-#define I8042_KEY_ALT				0x0011
-#define I8042_KEY_DEL				0xE071
 
 static __u8 lctrl_pressed;
 static __u8 lalt_pressed;
@@ -44,22 +26,22 @@ static int kbd_ps2_irq_handler(void *arg __unused)
 	__u16 sc;
 
 	/* If not a key pressed, probably another event on first PS/2 port */
-	if (!(uk_arch_inb(I8042_STATUS_REG) & I8042_STATUS_RECV_FULL))
+	if (!(uk_arch_inb(PS2_STATUS_REG) & PS2_STATUS_RECV_FULL))
 		return 0;
 
-	sc = (uk_arch_inb(I8042_DATA_REG) << 8) + uk_arch_inb(I8042_DATA_REG);
+	sc = (uk_arch_inb(PS2_DATA_REG) << 8) + uk_arch_inb(PS2_DATA_REG);
 
 	switch (sc) {
 	/* TODO: This is dumbed down, enough for Firecracker shutdown. In
 	 * reality the scan codes will most likely not conveniently come one
 	 * after another.
 	 */
-	case ((I8042_KEY_CTRL << 8) | I8042_KEY_ALT):
+	case ((PS2_KEY_CTRL << 8) | PS2_KEY_ALT):
 		lctrl_pressed = 1;
 		lalt_pressed = 1;
 
 		break;
-	case I8042_KEY_DEL:
+	case PS2_KEY_DEL:
 		if (!(lctrl_pressed && lalt_pressed))
 			break;
 
@@ -85,17 +67,17 @@ static int kbd_ps2_probe(struct uk_init_ctx *ictx __unused)
 	 */
 
 	/* PS/2 Keyboard is on first port. Just enable it. */
-	uk_arch_outb(I8042_CMD_REG, I8042_CMD_EN_KBD);
+	uk_arch_outb(PS2_CMD_REG, PS2_CMD_EN_KBD);
 
 	/* Send read current configuration register command */
-	uk_arch_outb(I8042_CMD_REG, I8042_CMD_READ_CFG);
+	uk_arch_outb(PS2_CMD_REG, PS2_CMD_READ_CFG);
 
 	/* Wait for response byte by checking status bit of receive buffer.
 	 * Try for 5 times, but it should work the first time usually.
 	 */
-	while (!(uk_arch_inb(I8042_STATUS_REG) & I8042_STATUS_RECV_FULL)) {
+	while (!(uk_arch_inb(PS2_STATUS_REG) & PS2_STATUS_RECV_FULL)) {
 		if (unlikely(counter >= 5)) {
-			uk_arch_outb(I8042_CMD_REG, I8042_CMD_DIS_KBD);
+			uk_arch_outb(PS2_CMD_REG, PS2_CMD_DIS_KBD);
 			uk_pr_err("PS/2 Controller unresponsie\n");
 			return -ENODEV;
 		}
@@ -108,19 +90,19 @@ static int kbd_ps2_probe(struct uk_init_ctx *ictx __unused)
 	}
 
 	/* Read the configuration register */
-	cfg = uk_arch_inb(I8042_DATA_REG);
+	cfg = uk_arch_inb(PS2_DATA_REG);
 
 	/* This shouldn't even be needed in a virtualized environment, e.g.
-	 * on Firecracker the above sending of I8042_CMD_EN_KBD would be enough.
+	 * on Firecracker the above sending of PS2_CMD_EN_KBD would be enough.
 	 */
-	cfg |= I8042_CFG_REG_EN_KBD_IRQ;
-	cfg &= ~I8042_CFG_REG_DIS_KBD_CLK;
+	cfg |= PS2_CFG_REG_EN_KBD_IRQ;
+	cfg &= ~PS2_CFG_REG_DIS_KBD_CLK;
 
 	/* Send write current configuration register command */
-	uk_arch_outb(I8042_CMD_REG, I8042_CMD_WRITE_CFG);
+	uk_arch_outb(PS2_CMD_REG, PS2_CMD_WRITE_CFG);
 
 	/* Send the new configuration register value */
-	uk_arch_outb(I8042_DATA_REG, cfg);
+	uk_arch_outb(PS2_DATA_REG, cfg);
 
 	/* TODO: Legacy wired to Master PIC IRQ 1, with I/O-APIC this is likely
 	 * rewired so check ACPI MADT Interrupt Source Override.

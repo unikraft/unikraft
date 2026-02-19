@@ -4,6 +4,6 @@
 #
 ################################################################################
 
-UK_DRIV_PS2_BASE = $(UK_DRIV_BASE)/ukps2
+UK_DRIV_INPUT_BASE := $(UK_DRIV_BASE)/input
 
-$(eval $(call import_lib,$(UK_DRIV_PS2_BASE)/kbd))
+$(eval $(call import_lib,$(UK_DRIV_INPUT_BASE)/ukps2))
