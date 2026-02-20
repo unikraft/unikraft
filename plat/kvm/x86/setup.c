@@ -118,13 +118,13 @@ static void __noreturn ukplat_entry2(void *arg __unused)
 /* At this point we expect that the C runtime is configured and that
  * bootcode has enabled all CPU features used by compiled code.
  */
-void _ukplat_entry(struct uk_lcpu *lcpu, struct ukplat_bootinfo *bi)
+void _ukplat_entry(struct ukplat_bootinfo *bi)
 {
 	void *bstack;
 	int rc;
 
 	/* Initialize LCPU of bootstrap processor */
-	rc = uk_lcpu_init(lcpu);
+	rc = uk_lcpu_init(uk_pcpuvar_current_ptr_get(uk_lcpus));
 	if (unlikely(rc))
 		UK_CRASH("Bootstrap processor init failed: %d\n", rc);
 

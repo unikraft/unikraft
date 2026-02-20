@@ -194,10 +194,6 @@ SEC_END(start16)
  * loaded with descriptors for 4GiB flat CS and DS segments. CS must have
  * execute/read permission and DS must have read/write permission. Interrupts
  * must be disabled. A20 gate must be enabled.
- *
- * NOTE: We assume a pointer to a struct uk_lcpu_sargs in EDI and a pointer to
- * potential platform boot arguments in ESI (e.g., multiboot) if this is the
- * first boot.
  */
 
 .section .data.boot.32
@@ -283,20 +279,12 @@ END(lcpu_start32)
  * read/write permission. ES and ES must be the same as DS. Interrupts must be
  * disabled.
  *
- * NOTE: We assume a pointer to a struct uk_lcpu_sargs in RDI and a pointer to
- * potential platform boot arguments in RSI (e.g., multiboot) if this is the
- * first boot. In that case, we setup the CPU with the provided startup
- * arguments.
- *
  * NOTE: Code should be position-independent
  */
 
 .code64
 .section .text.boot.64
 ENTRY(lcpu_start64)
-	/* Save the startup args pointer */
-	movq	%rdi, %r8
-
 	/* Request basic CPU features and APIC ID
 	 * TODO: This APIC ID is limited to 256. Better get from leaf 0x1f
 	 */
@@ -375,22 +363,10 @@ no_fsgsbase:
 no_pku:
 #endif /* CONFIG_HAVE_X86PKU */
 
-	/* Check if we have startup arguments supplied */
-	test	%r8, %r8
-	jz	no_args
+	movq	UK_PCPUVAR_X86_64_GSREL(UK_LCPU_SARG_SYM), %rdi
+	movq	UK_PCPUVAR_X86_64_GSREL(UK_LCPU_SENTRY_SYM), %rax
+	movq	UK_PCPUVAR_X86_64_GSREL(UK_LCPU_SSTACKP_SYM), %rsp
 
-	/* Initialize the CPU configuration with the supplied startup args */
-	movq	UK_LCPU_SARGS_ENTRY_OFFSET(%r8), %rax
-	movq	UK_LCPU_SARGS_STACKP_OFFSET(%r8), %rsp
-
-	jmp	jump_to_entry
-
-no_args:
-	/* Load the stack pointer and the entry address from the CPU struct */
-	movq	UK_LCPU_ENTRY_OFFSET(%rbp), %rax
-	movq	UK_LCPU_STACKP_OFFSET(%rbp), %rsp
-
-jump_to_entry:
 	/* According to System V AMD64 the stack pointer must be aligned to
 	 * 16-bytes. In other words, the value (RSP+8) must be a multiple of
 	 * 16 when control is transferred to the function entry point (i.e.,
@@ -400,7 +376,6 @@ jump_to_entry:
 	andq	$~0xf, %rsp
 	subq	$0x8, %rsp
 
-	movq	%rbp, %rdi
 #if !__OMIT_FRAMEPOINTER__
 	/* Reset frame pointer */
 	xorq	%rbp, %rbp

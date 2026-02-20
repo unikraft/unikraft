@@ -17,7 +17,7 @@
 
 #define lxboot_crash(rc, msg, ...) uk_pm_syscrash()
 
-void _ukplat_entry(struct uk_lcpu *lcpu, struct ukplat_bootinfo *bi);
+void _ukplat_entry(struct ukplat_bootinfo *bi);
 
 static void
 lxboot_init_cmdline(struct ukplat_bootinfo *bi, struct lxboot_params *bp)
@@ -132,7 +132,7 @@ lxboot_init_mem(struct ukplat_bootinfo *bi, struct lxboot_params *bp)
 			     "Failed to insert legacy high memory region\n");
 }
 
-void lxboot_entry(struct uk_lcpu *lcpu, struct lxboot_params *bp)
+void lxboot_entry(struct lxboot_params *bp)
 {
 	struct ukplat_bootinfo *bi;
 
@@ -149,5 +149,5 @@ void lxboot_entry(struct uk_lcpu *lcpu, struct lxboot_params *bp)
 
 	memcpy(bi->bootprotocol, "lxboot", sizeof("lxboot"));
 
-	_ukplat_entry(lcpu, bi);
+	_ukplat_entry(bi);
 }

@@ -15,11 +15,7 @@
  */
 .section .bss
 .space 4096
-lcpu_bootstack:
-
-lcpu_boot_startup_args:
-	.quad	0
-	.quad	0
+lxboot_bootstack:
 
 /**
  * 64-bit Linux Boot Protocol entry function
@@ -39,7 +35,7 @@ ENTRY(_lxboot_entry)
 	/* We are going to taint the early lcpu_bootstack but we do not care.
 	 * Since it's a stack, it does not need to not be tainted anyway.
 	 */
-	leaq	lcpu_bootstack(%rip), %rsp
+	leaq	lxboot_bootstack(%rip), %rsp
 	/* Make sure it is aligned */
 	andq	$~0xf, %rsp
 	pushq	%rsi
@@ -54,12 +50,13 @@ ENTRY(_lxboot_entry)
 	 */
 #endif /* CONFIG_LIBUKRELOC */
 
-	/* startup args for boot CPU */
-	leaq	lcpu_boot_startup_args(%rip), %rdi
+	leaq	lxboot_bootstack(%rip), %rax
+	movq	%rax, uk_plat_native_sstackp(%rip)
+
 	leaq	lxboot_entry(%rip), %rax
-	movq	%rax, UK_LCPU_SARGS_ENTRY_OFFSET(%rdi)
-	leaq	lcpu_bootstack(%rip), %rax
-	movq	%rax, UK_LCPU_SARGS_STACKP_OFFSET(%rdi)
+	movq	%rax, uk_plat_native_sentry(%rip)
+
+	movq	%rsi, uk_plat_native_sarg(%rip)
 
 	leaq	x86_bpt_pml4(%rip), %rax
 	movq	%rax, %cr3
