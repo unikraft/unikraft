@@ -3,6 +3,8 @@
  * Licensed under the BSD-3-Clause License (the "License").
  * You may not use this file except in compliance with the License.
  */
+
+#include <uk/arch/util.h>
 #include <uk/arch/ctx.h>
 #include <uk/assert.h>
 
@@ -27,12 +29,12 @@ void ukarch_sysctx_store(struct ukarch_sysctx *sysctx)
 {
 	UK_ASSERT(sysctx);
 
-	sysctx->tpidr_el0 = SYSREG_READ(TPIDR_EL0);
+	sysctx->tpidr_el0 = UK_ARCH_ARM64_SYSREG_READ(TPIDR_EL0);
 }
 
 void ukarch_sysctx_load(struct ukarch_sysctx *sysctx)
 {
 	UK_ASSERT(sysctx);
 
-	SYSREG_WRITE(TPIDR_EL0, sysctx->tpidr_el0);
+	UK_ARCH_ARM64_SYSREG_WRITE(TPIDR_EL0, sysctx->tpidr_el0);
 }

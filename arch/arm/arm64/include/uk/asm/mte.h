@@ -46,7 +46,7 @@
 
 #define PSTATE_TCO_SET() ({					\
 	__asm__ __volatile__ ("msr	tco, %0\n"		\
-			      : : "r"(PSTATE_TCO_BIT));		\
+			      : : "r"(UK_ARCH_ARM64_PSTATE_TCO_BIT));		\
 })
 
 #define PSTATE_TCO_CLEAR() ({					\
