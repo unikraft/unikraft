@@ -22,34 +22,13 @@
 #include <uk/lcpu/except.h>
 #include <uk/lcpu/auxsp.h>
 #include <uk/lcpu/regs.h>
+#include <uk/lcpu/start.h>
 #include <uk/lcpu/sysctx.h>
 #include <uk/lcpu/pm.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
-/*
- * UK_LCPU Startup Arguments
- */
-#define UK_LCPU_SARGS_ENTRY_OFFSET	0x00
-#define UK_LCPU_SARGS_STACKP_OFFSET					\
-	(UK_LCPU_SARGS_ENTRY_OFFSET + 0x08)
-
-#define UK_LCPU_SARGS_SIZE		0x10
-
-#if !__ASSEMBLY__
-struct uk_lcpu_sargs {
-	__uptr entry;
-	__uptr stackp;
-};
-
-UK_CTASSERT(__offsetof(struct uk_lcpu_sargs, entry)  ==
-	    UK_LCPU_SARGS_ENTRY_OFFSET);
-UK_CTASSERT(__offsetof(struct uk_lcpu_sargs, stackp) ==
-	    UK_LCPU_SARGS_STACKP_OFFSET);
-
-UK_CTASSERT(sizeof(struct uk_lcpu_sargs) == UK_LCPU_SARGS_SIZE);
-#endif /* !__ASSEMBLY__ */
 
 #if CONFIG_HAVE_SMP
 #define UK_LCPU_FUNC_SIZE		0x10
@@ -81,12 +60,16 @@ UK_CTASSERT(sizeof(struct uk_lcpu_func) == UK_LCPU_FUNC_SIZE);
  * Logical CPU (LCPU) Structure
  */
 #define UK_LCPU_STATE_OFFSET		0x00
-#define UK_LCPU_ENTRY_OFFSET		(UK_LCPU_STATE_OFFSET + 0x08)
-#define UK_LCPU_STACKP_OFFSET		(UK_LCPU_ENTRY_OFFSET + 0x08)
-#define UK_LCPU_ERR_OFFSET		(UK_LCPU_ENTRY_OFFSET + 0x0)
+#define UK_LCPU_ERR_OFFSET		(UK_LCPU_STATE_OFFSET + 0x4)
+#if CONFIG_HAVE_SMP
+#define UK_LCPU_FN_OFFSET		(UK_LCPU_ERR_OFFSET + 0x4)
 
 #define UK_LCPU_MEMBERS_SIZE						\
-	(UK_LCPU_STACKP_OFFSET  + 8)
+	(UK_LCPU_FN_OFFSET + UK_LCPU_FUNC_SIZE)
+#else /* !CONFIG_HAVE_SMP */
+#define UK_LCPU_MEMBERS_SIZE						\
+	(UK_LCPU_ERR_OFFSET + 4)
+#endif /* !CONFIG_HAVE_SMP */
 #define UK_LCPU_SIZE							\
 	(ALIGN_UP(UK_LCPU_MEMBERS_SIZE, UK_ARCH_CACHE_LINE_SIZE))
 
@@ -118,30 +101,24 @@ struct __align(UK_ARCH_CACHE_LINE_SIZE) uk_lcpu {
 	 */
 	volatile int state __align(8);
 
-	union {
-		/* Startup arguments
-		 * Only valid in UK_LCPU_STATE_INIT
-		 */
-		struct uk_lcpu_sargs s_args;
+	/* Error code indicating the halt reason
+	 * Only valid in UK_LCPU_STATE_HALTED
+	 */
+	int error_code;
 
-		/* Remote function to execute
-		 * Only valid in UK_LCPU_STATE_IDLE and busy states
-		 */
 #if CONFIG_HAVE_SMP
-		struct uk_lcpu_func fn;
+	/* Remote function to execute
+	 * Only valid in UK_LCPU_STATE_IDLE and busy states
+	 */
+	struct uk_lcpu_func fn;
 #endif /* CONFIG_HAVE_SMP */
-
-		/* Error code indicating the halt reason
-		 * Only valid in UK_LCPU_STATE_HALTED
-		 */
-		int error_code;
-	};
 };
 
 UK_CTASSERT(__offsetof(struct uk_lcpu, state) == UK_LCPU_STATE_OFFSET);
-UK_CTASSERT(__offsetof(struct uk_lcpu, s_args.entry) == UK_LCPU_ENTRY_OFFSET);
-UK_CTASSERT(__offsetof(struct uk_lcpu, s_args.stackp) == UK_LCPU_STACKP_OFFSET);
 UK_CTASSERT(__offsetof(struct uk_lcpu, error_code) == UK_LCPU_ERR_OFFSET);
+#if CONFIG_HAVE_SMP
+UK_CTASSERT(__offsetof(struct uk_lcpu, fn) == UK_LCPU_FN_OFFSET);
+#endif /* CONFIG_HAVE_SMP */
 
 UK_CTASSERT(sizeof(struct uk_lcpu) == UK_LCPU_SIZE);
 UK_CTASSERT(UK_LCPU_MEMBERS_SIZE <= UK_LCPU_SIZE);

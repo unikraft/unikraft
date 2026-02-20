@@ -258,7 +258,7 @@ int uk_lcpu_mp_init(unsigned long run_irq, unsigned long wakeup_irq, void *arg)
 
 void __weak __noreturn uk_lcpu_entry_default(struct uk_lcpu *this_lcpu)
 {
-	struct uk_lcpu_sargs s_args = this_lcpu->s_args;
+	__uptr sentry, sstackp, sarg;
 	int rc;
 
 	UK_ASSERT(!uk_lcpu_is_bsp(this_lcpu));
@@ -271,10 +271,12 @@ void __weak __noreturn uk_lcpu_entry_default(struct uk_lcpu *this_lcpu)
 		lcpu_halt(this_lcpu, rc);
 
 	/* If the user supplied an entry function jump to it */
-	if (s_args.entry &&
-	    (__uptr)s_args.entry != (__uptr)uk_lcpu_entry_default) {
+	sentry = uk_pcpuvar_current_get(UK_LCPU_SENTRY_SYM);
+	sstackp = uk_pcpuvar_current_get(UK_LCPU_SSTACKP_SYM);
+	sarg = uk_pcpuvar_current_get(UK_LCPU_SARG_SYM);
+	if (sentry && sentry != (__uptr)uk_lcpu_entry_default) {
 		/* Does not return */
-		uk_arch_jump_to((__u64)s_args.stackp, (__u64)s_args.entry);
+		uk_arch_jump_to_with_arg(sstackp, sentry, sarg);
 	} else {
 		/* We are coming from BUSY0 state and want to transition to
 		 * IDLE state. However, there can be functions queued already
@@ -348,10 +350,12 @@ retry:
 		 * Since we are ignoring the executing CPU, we must keep a
 		 * separate counter to index the arguments.
 		 */
-		lcpu->s_args.entry = (entry && entry[argi]) ?
-				     entry[argi] :
-				     (__uptr)uk_lcpu_entry_default;
-		lcpu->s_args.stackp = sp[argi];
+		uk_pcpuvar_lval(lcpuidx[i], UK_LCPU_SENTRY_SYM) =
+			(entry && entry[i]) ?
+				entry[i] :
+				(__uptr)uk_lcpu_entry_default;
+		uk_pcpuvar_lval(lcpuidx[i], UK_LCPU_SSTACKP_SYM) = sp[i];
+		uk_pcpuvar_lval(lcpuidx[i], UK_LCPU_SARG_SYM) = (__uptr)lcpu;
 
 		/* Ensure that the startup arguments have been written back
 		 * before issuing the startup call
