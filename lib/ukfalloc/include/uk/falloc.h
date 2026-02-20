@@ -38,9 +38,9 @@
 #include <uk/arch/types.h>
 #include <uk/essentials.h>
 #include <uk/assert.h>
+#include <uk/atomic.h>
 
 #ifdef CONFIG_LIBUKFALLOC_STATS
-#include <uk/atomic.h>
 #include <uk/falloc/store.h>
 #include <uk/list.h>
 #include <uk/store.h>
@@ -220,6 +220,72 @@ static inline void uk_ffree(struct uk_falloc *fa, __paddr_t paddr,
 	rc = fa->ffree(fa, paddr, frames);
 	UK_ASSERT(rc == 0);
 }
+
+/**
+ * Atomic accessor for the total memory field in struct ukfalloc
+ *
+ * @param fa the frame allocator from which we are reading the total memory
+ * @param out the location in memory to which we are writing the total memory
+ * value
+ *
+ * @return 0
+ */
+int uk_falloc_get_total_memory(struct uk_falloc *fa, __sz *out);
+
+/**
+ * Atomic accessor for the free memory field in struct ukfalloc
+ *
+ * @param fa the frame allocator from which we are reading the free memory
+ * @param out the location in memory to which we are writing the free memory
+ * value
+ *
+ * @return 0
+ */
+int uk_falloc_get_free_memory(struct uk_falloc *fa, __sz *out);
+
+/**
+ * Atomic adder for the total memory field in struct ukfalloc
+ *
+ * @param fa the frame allocator whose total memory field we are adding to
+ * @param add the value we are adding to the frame allocator's total memory
+ * field
+ *
+ * @return 0
+ */
+int uk_falloc_add_total_memory(struct uk_falloc *fa, __sz add);
+
+/**
+ * Atomic adder for the free memory field in struct ukfalloc
+ *
+ * @param fa the frame allocator whose free memory field we are adding to
+ * @param add the value we are adding to the frame allocator's free memory field
+ *
+ * @return 0
+ */
+int uk_falloc_add_free_memory(struct uk_falloc *fa, __sz add);
+
+/**
+ * Atomic subtracter for the total memory field in struct ukfalloc
+ *
+ * @param fa the frame allocator whose total memory field we are subtracting
+ * from
+ * @param sub the value we are subtracting from the frame allocator's total
+ * memory field
+ *
+ * @return 0
+ */
+int uk_falloc_sub_total_memory(struct uk_falloc *fa, __sz sub);
+
+/**
+ * Atomic subtracter for the free memory field in struct ukfalloc
+ *
+ * @param fa the frame allocator whose free memory field we are subtracting from
+ * @param sub the value we are subtracting from the frame allocator's free
+ * memory field
+ *
+ * @return 0
+ */
+int uk_falloc_sub_free_memory(struct uk_falloc *fa, __sz sub);
 
 /* The following should be used to instrument the frame allocator
  * implementation for statistics.

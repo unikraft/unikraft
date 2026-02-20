@@ -1,2 +1,8 @@
+uk_falloc_get_total_memory
+uk_falloc_get_free_memory
+uk_falloc_add_total_memory
+uk_falloc_add_free_memory
+uk_falloc_sub_total_memory
+uk_falloc_sub_free_memory
 _uk_falloc_stats_global
 _uk_falloc_init_stats
