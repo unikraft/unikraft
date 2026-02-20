@@ -1,35 +1,13 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
-/*
- * Authors: Răzvan Vîrtan <virtanrazvan@gmail.com>
- *
- * Copyright (c) 2022, University Politehnica of Bucharest.
+/* Copyright (c) 2022, University Politehnica of Bucharest.
  *                     All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- *
- * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- * 3. Neither the name of the copyright holder nor the names of its
- *    contributors may be used to endorse or promote products derived from
- *    this software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
- * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGE.
+ * Copyright (c) 2025, Unikraft GmbH and The Unikraft Authors.
+ * Licensed under the BSD-3-Clause License (the "License").
+ * You may not use this file except in compliance with the License.
  */
+
+#include <uk/arch/arm64.h>
+#include <uk/arch/util.h>
 #include <uk/arch/lcpu.h>
 #include <uk/arch/ctx.h>
 #include <uk/paging.h>
@@ -86,7 +64,7 @@ __lcpuid lcpu_arch_id(void)
 {
 	__u64 mpidr_reg;
 
-	mpidr_reg = SYSREG_READ64(mpidr_el1);
+	mpidr_reg = UK_ARCH_ARM64_SYSREG_READ64(mpidr_el1);
 
 	/* return the affinity bits for the current core */
 	return mpidr_reg & CPU_ID_MASK;
@@ -94,7 +72,7 @@ __lcpuid lcpu_arch_id(void)
 
 void __noreturn lcpu_arch_jump_to(void *sp, ukplat_lcpu_entry_t entry)
 {
-	uk_arch_arm64_lcpu_jump_to(sp, entry);
+	uk_arch_arm64_jump_to(sp, entry);
 }
 
 /**
@@ -121,11 +99,11 @@ int lcpu_arch_init(struct lcpu *this_lcpu)
 			return ret;
 	}
 
-	SYSREG_WRITE64(tpidr_el1, (__uptr)this_lcpu);
+	UK_ARCH_ARM64_SYSREG_WRITE64(tpidr_el1, (__uptr)this_lcpu);
 
 	except_sp = (__uptr)&lcpu_except_stack[this_lcpu->idx *
 					       CPU_EXCEPT_STACK_SIZE * 3];
-	SYSREG_WRITE64(sp_el0, except_sp);
+	UK_ARCH_ARM64_SYSREG_WRITE64(sp_el0, except_sp);
 
 	return ret;
 }
@@ -135,7 +113,7 @@ static __paddr_t lcpu_start_paddr;
 
 __lcpuidx lcpu_arch_idx(void)
 {
-	struct lcpu *this_lcpu = SYSREG_READ64(tpidr_el1);
+	struct lcpu *this_lcpu = UK_ARCH_ARM64_SYSREG_READ64(tpidr_el1);
 
 	UK_ASSERT(IS_LCPU_PTR(this_lcpu));
 
