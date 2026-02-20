@@ -13,6 +13,7 @@ config LIBUKPLAT_NATIVE_PAL
 	select LIBUKPLAT_NATIVE_LCPU
 	select LIBUKPLAT_NATIVE_REGS
 	select LIBUKPLAT_NATIVE_SYSCTX
+	select LIBUKPLAT_NATIVE_START
 
 # Platform configuration. These options can also be selected
 # by implementations that reuse code from liubkplat_native.
@@ -90,5 +91,8 @@ config LIBUKPLAT_NATIVE_SYSCTX
 config LIBUKPLAT_NATIVE_LCPU_PM
 	bool
 	depends on LIBUKLCPU
+
+config LIBUKPLAT_NATIVE_START
+	bool
 
 endif
