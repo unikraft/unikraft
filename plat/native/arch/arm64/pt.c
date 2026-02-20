@@ -5,8 +5,9 @@
  * You may not use this file except in compliance with the License.
  */
 
+#include <uk/arch/arm64.h>
 #include <uk/arch/types.h>
-#include <uk/asm/arch.h>
+#include <uk/asm/lcpu.h>
 #include <uk/assert.h>
 #include <uk/plat/native/addr.h>
 #include <uk/plat/native/page.h>
@@ -19,9 +20,9 @@ __pte_t uk_plat_native_pte_create(__paddr_t paddr, unsigned long attr,
 	__pte_t pte;
 
 	static unsigned long pte_lx_map_paddr_mask[] = {
-		PTE_L0_PAGE_PADDR_MASK,
-		PTE_L1_BLOCK_PADDR_MASK,
-		PTE_L2_BLOCK_PADDR_MASK,
+		UK_ARCH_ARM64_PTE_L0_PAGE_PADDR_MASK,
+		UK_ARCH_ARM64_PTE_L1_BLOCK_PADDR_MASK,
+		UK_ARCH_ARM64_PTE_L2_BLOCK_PADDR_MASK,
 	};
 
 	UK_ASSERT(UK_PLAT_NATIVE_PAGE_ALIGNED(paddr));
@@ -30,32 +31,35 @@ __pte_t uk_plat_native_pte_create(__paddr_t paddr, unsigned long attr,
 	pte = paddr & pte_lx_map_paddr_mask[level];
 
 	if (!tmpl)
-		pte |= PTE_ATTR_AF;
+		pte |= UK_ARCH_ARM64_PTE_ATTR_AF;
 	else
-		pte |= tmpl & (PTE_ATTR_CONTIGUOUS | PTE_ATTR_DBM |
-			       PTE_ATTR_nG | PTE_ATTR_SH_MASK |
-			       PTE_ATTR_AF | PTE_ATTR_IDX_MASK);
+		pte |= tmpl & (UK_ARCH_ARM64_PTE_ATTR_CONTIGUOUS |
+			       UK_ARCH_ARM64_PTE_ATTR_DBM |
+			       UK_ARCH_ARM64_PTE_ATTR_nG |
+			       UK_ARCH_ARM64_PTE_ATTR_SH_MASK |
+			       UK_ARCH_ARM64_PTE_ATTR_AF |
+			       UK_ARCH_ARM64_PTE_ATTR_IDX_MASK);
 
 	if (level == UK_PLAT_NATIVE_PAGE_LEVEL)
-		pte |= PTE_TYPE_PAGE;
+		pte |= UK_ARCH_ARM64_PTE_TYPE_PAGE;
 	else
-		pte |= PTE_TYPE_BLOCK;
+		pte |= UK_ARCH_ARM64_PTE_TYPE_BLOCK;
 
 	if (!(attr & UK_PLAT_NATIVE_PAGE_ATTR_PROT_WRITE))
-		pte |= PTE_ATTR_AP(PTE_ATTR_AP_RO);
+		pte |= UK_ARCH_ARM64_PTE_ATTR_AP(UK_ARCH_ARM64_PTE_ATTR_AP_RO);
 
 	if (!(attr & UK_PLAT_NATIVE_PAGE_ATTR_PROT_EXEC))
-		pte |= PTE_ATTR_XN;
+		pte |= UK_ARCH_ARM64_PTE_ATTR_XN;
 
-	switch (attr & PTE_ATTR_SH_MASK) {
-	case PTE_ATTR_SH(PTE_ATTR_SH_IS):
-		pte |= PTE_ATTR_SH(PTE_ATTR_SH_IS);
+	switch (attr & UK_ARCH_ARM64_PTE_ATTR_SH_MASK) {
+	case UK_ARCH_ARM64_PTE_ATTR_SH(UK_ARCH_ARM64_PTE_ATTR_SH_IS):
+		pte |= UK_ARCH_ARM64_PTE_ATTR_SH(UK_ARCH_ARM64_PTE_ATTR_SH_IS);
 		break;
-	case PTE_ATTR_SH(PTE_ATTR_SH_OS):
-		pte |= PTE_ATTR_SH(PTE_ATTR_SH_OS);
+	case UK_ARCH_ARM64_PTE_ATTR_SH(UK_ARCH_ARM64_PTE_ATTR_SH_OS):
+		pte |= UK_ARCH_ARM64_PTE_ATTR_SH(UK_ARCH_ARM64_PTE_ATTR_SH_OS);
 		break;
-	case PTE_ATTR_SH(PTE_ATTR_SH_NS):
-		pte |= PTE_ATTR_SH(PTE_ATTR_SH_NS);
+	case UK_ARCH_ARM64_PTE_ATTR_SH(UK_ARCH_ARM64_PTE_ATTR_SH_NS):
+		pte |= UK_ARCH_ARM64_PTE_ATTR_SH(UK_ARCH_ARM64_PTE_ATTR_SH_NS);
 		break;
 	default:
 		UK_ASSERT(0 && "Invalid shareability type\n");
@@ -64,25 +68,25 @@ __pte_t uk_plat_native_pte_create(__paddr_t paddr, unsigned long attr,
 	switch (attr & (UK_PLAT_NATIVE_PAGE_ATTR_TYPE_MASK <<
 			UK_PLAT_NATIVE_PAGE_ATTR_TYPE_SHIFT)) {
 	case UK_PLAT_NATIVE_PAGE_ATTR_TYPE_NORMAL_WB:
-		pte |= PTE_ATTR_IDX(NORMAL_WB);
+		pte |= UK_ARCH_ARM64_PTE_ATTR_IDX(NORMAL_WB);
 		break;
 	case UK_PLAT_NATIVE_PAGE_ATTR_TYPE_NORMAL_WT:
-		pte |= PTE_ATTR_IDX(NORMAL_WT);
+		pte |= UK_ARCH_ARM64_PTE_ATTR_IDX(NORMAL_WT);
 		break;
 	case UK_PLAT_NATIVE_PAGE_ATTR_TYPE_NORMAL_NC:
-		pte |= PTE_ATTR_IDX(NORMAL_NC);
+		pte |= UK_ARCH_ARM64_PTE_ATTR_IDX(NORMAL_NC);
 		break;
 	case UK_PLAT_NATIVE_PAGE_ATTR_TYPE_DEVICE_nGnRnE:
-		pte |= PTE_ATTR_IDX(DEVICE_nGnRnE);
+		pte |= UK_ARCH_ARM64_PTE_ATTR_IDX(DEVICE_nGnRnE);
 		break;
 	case UK_PLAT_NATIVE_PAGE_ATTR_TYPE_DEVICE_nGnRE:
-		pte |= PTE_ATTR_IDX(DEVICE_nGnRE);
+		pte |= UK_ARCH_ARM64_PTE_ATTR_IDX(DEVICE_nGnRE);
 		break;
 	case UK_PLAT_NATIVE_PAGE_ATTR_TYPE_DEVICE_GRE:
-		pte |= PTE_ATTR_IDX(DEVICE_GRE);
+		pte |= UK_ARCH_ARM64_PTE_ATTR_IDX(DEVICE_GRE);
 		break;
 	case UK_PLAT_NATIVE_PAGE_ATTR_TYPE_NORMAL_WB_TAGGED:
-		pte |= PTE_ATTR_IDX(NORMAL_WB_TAGGED);
+		pte |= UK_ARCH_ARM64_PTE_ATTR_IDX(NORMAL_WB_TAGGED);
 		break;
 	default:
 		UK_ASSERT(0 && "Invalid memory type\n");
@@ -105,46 +109,46 @@ unsigned long uk_plat_native_attr_from_pte(__pte_t pte,
 {
 	unsigned long attr = UK_PLAT_NATIVE_PAGE_ATTR_PROT_READ;
 
-	if (!(pte & PTE_ATTR_AP(PTE_ATTR_AP_RO)))
+	if (!(pte & UK_ARCH_ARM64_PTE_ATTR_AP(UK_ARCH_ARM64_PTE_ATTR_AP_RO)))
 		attr |= UK_PLAT_NATIVE_PAGE_ATTR_PROT_WRITE;
 
-	if (!(pte & PTE_ATTR_PXN))
+	if (!(pte & UK_ARCH_ARM64_PTE_ATTR_PXN))
 		attr |= UK_PLAT_NATIVE_PAGE_ATTR_PROT_EXEC;
 
-	switch (pte & PTE_ATTR_SH_MASK) {
-	case (PTE_ATTR_SH(PTE_ATTR_SH_NS)):
-		attr |= PTE_ATTR_SH(PTE_ATTR_SH_NS);
+	switch (pte & UK_ARCH_ARM64_PTE_ATTR_SH_MASK) {
+	case (UK_ARCH_ARM64_PTE_ATTR_SH(UK_ARCH_ARM64_PTE_ATTR_SH_NS)):
+		attr |= UK_ARCH_ARM64_PTE_ATTR_SH(UK_ARCH_ARM64_PTE_ATTR_SH_NS);
 		break;
-	case (PTE_ATTR_SH(PTE_ATTR_SH_IS)):
-		attr |= PTE_ATTR_SH(PTE_ATTR_SH_IS);
+	case (UK_ARCH_ARM64_PTE_ATTR_SH(UK_ARCH_ARM64_PTE_ATTR_SH_IS)):
+		attr |= UK_ARCH_ARM64_PTE_ATTR_SH(UK_ARCH_ARM64_PTE_ATTR_SH_IS);
 		break;
-	case (PTE_ATTR_SH(PTE_ATTR_SH_OS)):
-		attr |= PTE_ATTR_SH(PTE_ATTR_SH_OS);
+	case (UK_ARCH_ARM64_PTE_ATTR_SH(UK_ARCH_ARM64_PTE_ATTR_SH_OS)):
+		attr |= UK_ARCH_ARM64_PTE_ATTR_SH(UK_ARCH_ARM64_PTE_ATTR_SH_OS);
 		break;
 	default:
 		UK_ASSERT(0 && "Invalid shareability type\n");
 	};
 
-	switch (pte & PTE_ATTR_IDX_MASK) {
-	case PTE_ATTR_IDX(NORMAL_WB):
+	switch (pte & UK_ARCH_ARM64_PTE_ATTR_IDX_MASK) {
+	case UK_ARCH_ARM64_PTE_ATTR_IDX(NORMAL_WB):
 		attr |= UK_PLAT_NATIVE_PAGE_ATTR_TYPE_NORMAL_WB;
 		break;
-	case PTE_ATTR_IDX(NORMAL_WT):
+	case UK_ARCH_ARM64_PTE_ATTR_IDX(NORMAL_WT):
 		attr |= UK_PLAT_NATIVE_PAGE_ATTR_TYPE_NORMAL_WT;
 		break;
-	case PTE_ATTR_IDX(NORMAL_NC):
+	case UK_ARCH_ARM64_PTE_ATTR_IDX(NORMAL_NC):
 		attr |= UK_PLAT_NATIVE_PAGE_ATTR_TYPE_NORMAL_NC;
 		break;
-	case PTE_ATTR_IDX(DEVICE_nGnRnE):
+	case UK_ARCH_ARM64_PTE_ATTR_IDX(DEVICE_nGnRnE):
 		attr |= UK_PLAT_NATIVE_PAGE_ATTR_TYPE_DEVICE_nGnRnE;
 		break;
-	case PTE_ATTR_IDX(DEVICE_nGnRE):
+	case UK_ARCH_ARM64_PTE_ATTR_IDX(DEVICE_nGnRE):
 		attr |= UK_PLAT_NATIVE_PAGE_ATTR_TYPE_DEVICE_nGnRE;
 		break;
-	case PTE_ATTR_IDX(DEVICE_GRE):
+	case UK_ARCH_ARM64_PTE_ATTR_IDX(DEVICE_GRE):
 		attr |= UK_PLAT_NATIVE_PAGE_ATTR_TYPE_DEVICE_GRE;
 		break;
-	case PTE_ATTR_IDX(NORMAL_WB_TAGGED):
+	case UK_ARCH_ARM64_PTE_ATTR_IDX(NORMAL_WB_TAGGED):
 		attr |= UK_PLAT_NATIVE_PAGE_ATTR_TYPE_NORMAL_WB_TAGGED;
 		break;
 	default:

@@ -72,7 +72,7 @@ static struct uk_alloc *a;
 
 static __u32 pl031_read_raw(void)
 {
-	return ioreg_read32(PL031_REG(RTC_DR));
+	return uk_arch_arm64_ioreg_read32(PL031_REG(RTC_DR));
 }
 
 void pl031_read_time(struct rtc_time *rt)
@@ -85,7 +85,7 @@ void pl031_read_time(struct rtc_time *rt)
 
 static void pl031_write_raw(__u32 val)
 {
-	ioreg_write32(PL031_REG(RTC_LR), val);
+	uk_arch_arm64_ioreg_write32(PL031_REG(RTC_LR), val);
 }
 
 void pl031_write_time(struct rtc_time *rt)
@@ -98,7 +98,7 @@ void pl031_write_time(struct rtc_time *rt)
 
 static void pl031_write_alarm_raw(__u32 alarm)
 {
-	ioreg_write32(PL031_REG(RTC_MR), alarm);
+	uk_arch_arm64_ioreg_write32(PL031_REG(RTC_MR), alarm);
 }
 
 void pl031_write_alarm(struct rtc_time *rt)
@@ -111,7 +111,7 @@ void pl031_write_alarm(struct rtc_time *rt)
 
 static __u32 pl031_read_alarm_raw(void)
 {
-	return ioreg_read32(PL031_REG(RTC_MR));
+	return uk_arch_arm64_ioreg_read32(PL031_REG(RTC_MR));
 }
 
 void pl031_read_alarm(struct rtc_time *rt)
@@ -121,42 +121,42 @@ void pl031_read_alarm(struct rtc_time *rt)
 
 void pl031_enable(void)
 {
-	ioreg_write32(PL031_REG(RTC_CR), 1);
+	uk_arch_arm64_ioreg_write32(PL031_REG(RTC_CR), 1);
 }
 
 void pl031_disable(void)
 {
-	ioreg_write32(PL031_REG(RTC_CR), 0);
+	uk_arch_arm64_ioreg_write32(PL031_REG(RTC_CR), 0);
 }
 
 int pl031_get_status(void)
 {
 	int val;
 
-	val = ioreg_read32(PL031_REG(RTC_CR));
+	val = uk_arch_arm64_ioreg_read32(PL031_REG(RTC_CR));
 	val &= PL031_RTC_CR_STATUS_MASK;
 	return val;
 }
 
 void pl031_enable_intr(void)
 {
-	ioreg_write32(PL031_REG(RTC_IMSC), 1);
+	uk_arch_arm64_ioreg_write32(PL031_REG(RTC_IMSC), 1);
 }
 
 void pl031_disable_intr(void)
 {
-	ioreg_write32(PL031_REG(RTC_IMSC), 0);
+	uk_arch_arm64_ioreg_write32(PL031_REG(RTC_IMSC), 0);
 }
 
 static __u32 pl031_get_raw_intr_state(void)
 {
-	return ioreg_read32(PL031_REG(RTC_RIS));
+	return uk_arch_arm64_ioreg_read32(PL031_REG(RTC_RIS));
 }
 
 void pl031_clear_intr(void)
 {
 	while (pl031_get_raw_intr_state())
-		ioreg_write32(PL031_REG(RTC_ICR), 1);
+		uk_arch_arm64_ioreg_write32(PL031_REG(RTC_ICR), 1);
 }
 
 int pl031_register_alarm_handler(int (*handler)(void *))

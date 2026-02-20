@@ -1,40 +1,11 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
-/*
+/* Copyright (c) 2018, Arm Ltd. All rights reserved.
  * Copyright (c) 2020, OpenSynergy GmbH. All rights reserved.
- *
- * ARM Generic Interrupt Controller support v3 version
- * based on plat/drivers/gic/gic-v2.c:
- *
- * Authors: Wei Chen <Wei.Chen@arm.com>
- *          Jianyong Wu <Jianyong.Wu@arm.com>
- *
- * Copyright (c) 2018, Arm Ltd. All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- *
- * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- * 3. Neither the name of the copyright holder nor the names of its
- *    contributors may be used to endorse or promote products derived from
- *    this software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
- * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGE.
+ * Copyright (c) 2025, Unikraft GmbH and The Unikraft Authors.
+ * Licensed under the BSD-3-Clause License (the "License").
+ * You may not use this file except in compliance with the License.
  */
+
 #include <string.h>
 #include <libfdt.h>
 #include <uk/arch/arm64.h>
@@ -100,37 +71,37 @@ static const char * const gic_device_list[] __maybe_unused = {
 /* Inline functions to access GICD & GICR registers */
 static inline void write_gicd8(__u64 offset, __u8 val)
 {
-	ioreg_write8(GIC_DIST_REG(gicv3_drv, offset), val);
+	uk_arch_arm64_ioreg_write8(GIC_DIST_REG(gicv3_drv, offset), val);
 }
 
 static inline void write_gicrd8(__u64 offset, __u8 val)
 {
-	ioreg_write8(GIC_RDIST_REG(gicv3_drv, offset), val);
+	uk_arch_arm64_ioreg_write8(GIC_RDIST_REG(gicv3_drv, offset), val);
 }
 
 static inline void write_gicd32(__u64 offset, __u32 val)
 {
-	ioreg_write32(GIC_DIST_REG(gicv3_drv, offset), val);
+	uk_arch_arm64_ioreg_write32(GIC_DIST_REG(gicv3_drv, offset), val);
 }
 
 static inline void write_gicd64(__u64 offset, __u64 val)
 {
-	ioreg_write64(GIC_DIST_REG(gicv3_drv, offset), val);
+	uk_arch_arm64_ioreg_write64(GIC_DIST_REG(gicv3_drv, offset), val);
 }
 
 static inline __u32 read_gicd32(__u64 offset)
 {
-	return ioreg_read32(GIC_DIST_REG(gicv3_drv, offset));
+	return uk_arch_arm64_ioreg_read32(GIC_DIST_REG(gicv3_drv, offset));
 }
 
 static inline void write_gicrd32(__u64 offset, __u32 val)
 {
-	ioreg_write32(GIC_RDIST_REG(gicv3_drv, offset), val);
+	uk_arch_arm64_ioreg_write32(GIC_RDIST_REG(gicv3_drv, offset), val);
 }
 
 static inline __u32 read_gicrd32(__u64 offset)
 {
-	return ioreg_read32(GIC_RDIST_REG(gicv3_drv, offset));
+	return uk_arch_arm64_ioreg_read32(GIC_RDIST_REG(gicv3_drv, offset));
 }
 
 /**
@@ -143,7 +114,7 @@ static void wait_for_rwp(__u64 offset)
 	__u32 val;
 
 	do {
-		val = ioreg_read32((void *)(offset + GICD_CTLR));
+		val = uk_arch_arm64_ioreg_read32((void *)(offset + GICD_CTLR));
 	} while ((val & GICD_CTLR_RWP));
 }
 
@@ -176,8 +147,8 @@ static __u32 gicv3_ack_irq(void)
 {
 	__u32 irq;
 
-	irq = SYSREG_READ32(ICC_IAR1_EL1);
-	dsb(sy);
+	irq = UK_ARCH_ARM64_SYSREG_READ32(ICC_IAR1_EL1);
+	uk_arch_arm64_dsb(sy);
 
 	return irq;
 }
@@ -191,12 +162,12 @@ static __u32 gicv3_ack_irq(void)
 static void gicv3_eoi_irq(__u32 irq)
 {
 	/* Lower the priority */
-	SYSREG_WRITE32(ICC_EOIR1_EL1, irq);
-	isb();
+	UK_ARCH_ARM64_SYSREG_WRITE32(ICC_EOIR1_EL1, irq);
+	uk_arch_arm64_isb();
 
 	/* Deactivate */
-	SYSREG_WRITE32(ICC_DIR_EL1, irq);
-	isb();
+	UK_ARCH_ARM64_SYSREG_WRITE32(ICC_DIR_EL1, irq);
+	uk_arch_arm64_isb();
 }
 
 /**
@@ -262,7 +233,7 @@ static void gicv3_sgi_gen(__u8 sgintid, __u32 cpuid)
 	 **/
 	aff0 = extended_cpuid & UK_ARCH_ARM64_MPIDR_EL1_AFF0_MASK;
 	if (aff0 >= 16) {
-		control_register_rss = SYSREG_READ64(ICC_CTLR_EL1) & (1 << 18);
+		control_register_rss = UK_ARCH_ARM64_SYSREG_READ64(ICC_CTLR_EL1) & (1 << 18);
 		type_register_rss =  read_gicd32(GICD_TYPER)  & (1 << 26);
 		if (control_register_rss == 1 && type_register_rss == 1) {
 			range_selector = aff0 / 16;
@@ -277,7 +248,7 @@ static void gicv3_sgi_gen(__u8 sgintid, __u32 cpuid)
 
 	/* Generate interrupt */
 	dist_lock(gicv3_drv);
-	SYSREG_WRITE64(ICC_SGI1R_EL1, sgi_register);
+	UK_ARCH_ARM64_SYSREG_WRITE64(ICC_SGI1R_EL1, sgi_register);
 	dist_unlock(gicv3_drv);
 }
 
@@ -436,24 +407,24 @@ static void gicv3_init_redist(void)
 	wait_for_rwp(gicv3_drv.rdist_mem_addr);
 
 	/* Enable system register access */
-	val  = SYSREG_READ32(ICC_SRE_EL1);
+	val  = UK_ARCH_ARM64_SYSREG_READ32(ICC_SRE_EL1);
 	val |= 0x7;
-	SYSREG_WRITE32(ICC_SRE_EL1, val);
-	isb();
+	UK_ARCH_ARM64_SYSREG_WRITE32(ICC_SRE_EL1, val);
+	uk_arch_arm64_isb();
 
 	/* No priority grouping */
-	SYSREG_WRITE32(ICC_BPR1_EL1, 0);
+	UK_ARCH_ARM64_SYSREG_WRITE32(ICC_BPR1_EL1, 0);
 
 	/* Set priority mask register */
-	SYSREG_WRITE32(ICC_PMR_EL1, 0xff);
+	UK_ARCH_ARM64_SYSREG_WRITE32(ICC_PMR_EL1, 0xff);
 
 	/* EOI drops priority, DIR deactivates the interrupt (mode 1) */
-	SYSREG_WRITE32(ICC_CTLR_EL1, GICC_CTLR_EL1_EOImode_drop);
+	UK_ARCH_ARM64_SYSREG_WRITE32(ICC_CTLR_EL1, GICC_CTLR_EL1_EOImode_drop);
 
 	/* Enable Group 1 interrupts */
-	SYSREG_WRITE32(ICC_IGRPEN1_EL1, 1);
+	UK_ARCH_ARM64_SYSREG_WRITE32(ICC_IGRPEN1_EL1, 1);
 
-	isb();
+	uk_arch_arm64_isb();
 
 	uk_pr_info("GICv3 redistributor initialized.\n");
 }
@@ -530,7 +501,7 @@ static void gicv3_handle_irq(struct __regs *regs)
 #endif /* CONFIG_HAVE_SMP */
 
 		/* Ensure interrupt processing starts only after ACK */
-		isb();
+		uk_arch_arm64_isb();
 
 		if (irq <= GIC_MAX_IRQ) {
 			uk_intctlr_irq_handle(regs, irq);

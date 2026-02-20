@@ -1,23 +1,10 @@
 /* SPDX-License-Identifier: ISC */
-/*
- * Authors: Wei Chen <Wei.Chen@arm.com>
- *
- * Copyright (c) 2018 Arm Ltd.
- *
- * Permission to use, copy, modify, and/or distribute this software
- * for any purpose with or without fee is hereby granted, provided
- * that the above copyright notice and this permission notice appear
- * in all copies.
- *
- * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL
- * WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED
- * WARRANTIES OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE
- * AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR
- * CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS
- * OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT,
- * NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN
- * CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+/* Copyright (c) 2018 Arm Ltd.
+ * Copyright (c) 2025, Unikraft GmbH and The Unikraft Authors.
+ * Licensed under the BSD-3-Clause License (the "License").
+ * You may not use this file except in compliance with the License.
  */
+
 #include <libfdt.h>
 #include <uk/assert.h>
 #include <uk/arch/util.h>
@@ -99,8 +86,12 @@ UK_LIBPARAM_PARAM_ALIAS(base, &earlycon.base, __u64, "pl011 base");
 
 /* Macros to access PL011 Registers with base address */
 #define PL011_REG(base, r)		((__u16 *)((base) + (r)))
-#define PL011_REG_READ(base, r)		ioreg_read16(PL011_REG(base, r))
-#define PL011_REG_WRITE(base, r, v)	ioreg_write16(PL011_REG(base, r), v)
+
+#define PL011_REG_READ(base, r)		\
+	uk_arch_arm64_ioreg_read16(PL011_REG(base, r))
+
+#define PL011_REG_WRITE(base, r, v)	\
+	uk_arch_arm64_ioreg_write16(PL011_REG(base, r), v)
 
 static void pl011_putc(__u64 base, char a)
 {

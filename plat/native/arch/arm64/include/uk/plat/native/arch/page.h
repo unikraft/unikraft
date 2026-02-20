@@ -74,7 +74,7 @@ extern "C" {
 
 #define UK_PLAT_NATIVE_PAGE_Lx_IS(pte, lvl)		    \
 	(((lvl) == UK_PLAT_NATIVE_PAGE_LEVEL) ||	    \
-	 ((pte) & PTE_TYPE_MASK) == PTE_TYPE_BLOCK)
+	 ((pte) & UK_ARCH_ARM64_PTE_TYPE_MASK) == UK_ARCH_ARM64_PTE_TYPE_BLOCK)
 
 #endif /* !__ASSEMBLY__ */
 
