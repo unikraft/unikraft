@@ -993,5 +993,49 @@ static inline void __noreturn uk_arch_jump_to(__u64 sp, __u64 ip)
 	__builtin_unreachable();
 }
 
+/**
+ * Set current instruction pointer to a custom place by jumping to it while
+ * switching the stack pointer to a custom value beforehand, and passing a
+ * single argument to the target function.
+ *
+ * The argument is placed in %rdi as per the System V AMD64 calling
+ * convention, making it the first parameter of the function being
+ * jumped to.
+ *
+ * This function does not return!
+ *
+ * @param sp  Stack pointer to switch to before jumping
+ * @param ip  The place to jump to
+ * @param arg The argument to pass to the target function
+ */
+static inline void __noreturn uk_arch_jump_to_with_arg(__u64 sp, __u64 ip,
+						       __u64 arg)
+{
+	asm volatile (
+		"movq	%0, %%rsp\n"
+
+		/* According to System V AMD64 the stack pointer must be
+		 * aligned to 16-bytes. In other words, the value (RSP+8) must
+		 * be a multiple of 16 when control is transferred to the
+		 * function entry point (i.e., the compiler expects a
+		 * misalignment due to the return address having been pushed
+		 * onto the stack).
+		 */
+		"andq	$~0xf, %%rsp\n"
+		"subq	$0x8, %%rsp\n"
+
+#if !__OMIT_FRAMEPOINTER__
+		"xorq	%%rbp, %%rbp\n"
+#endif /* __OMIT_FRAMEPOINTER__ */
+
+		"jmp	*%1\n"
+		:
+		: "r" (sp), "r" (ip), "D" (arg)
+		: /* clobbers not needed */);
+
+	/* just make the compiler happy about noreturn function */
+	__builtin_unreachable();
+}
+
 #endif /* !__ASSEMBLY__ */
 #endif /* __UK_ARCH_UTIL_H__ */
