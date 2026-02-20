@@ -43,9 +43,11 @@ ENTRY(_lxboot_entry)
 	/* Make sure it is aligned */
 	andq	$~0xf, %rsp
 	pushq	%rsi
+	subq	$0x8, %rsp
 	xorl	%esi, %esi
 	xorl	%edi, %edi
 	call	do_uk_reloc
+	addq	$0x8, %rsp
 	popq	%rsi
 	/* We do not restore the previous %rsp. At this time it does not seem to
 	 * be needed.
