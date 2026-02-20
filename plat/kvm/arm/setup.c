@@ -195,6 +195,6 @@ void __no_pauth _ukplat_entry(void)
 	 */
 	uk_pr_info("Switch from bootstrap stack to stack @%p\n", bstack);
 
-	lcpu_arch_jump_to(bstack, uk_boot_entry);
+	lcpu_arch_jump_to((__u64)bstack, (__u64)uk_boot_entry);
 	uk_lcpu_halt();
 }

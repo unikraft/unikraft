@@ -41,11 +41,11 @@ bpt_unmap_mrd:
  */
 .align 12
 arm64_bpt_l3_pt0:
-	ur_pte  arm64_bpt_l2_pt0, PTE_TYPE_TABLE
-	ur_pte  arm64_bpt_l2_pt1, PTE_TYPE_TABLE
+	ur_pte  arm64_bpt_l2_pt0, UK_ARCH_ARM64_PTE_TYPE_TABLE
+	ur_pte  arm64_bpt_l2_pt1, UK_ARCH_ARM64_PTE_TYPE_TABLE
 	pte_zero	, 509
 #if CONFIG_HAVE_PAGING
-	ur_pte  arm64_bpt_l2_pt511, PTE_TYPE_TABLE
+	ur_pte  arm64_bpt_l2_pt511, UK_ARCH_ARM64_PTE_TYPE_TABLE
 #else /* !CONFIG_HAVE_PAGING */
 	pte_zero	, 1
 #endif /* !CONFIG_HAVE_PAGING */
@@ -59,7 +59,7 @@ arm64_bpt_l3_pt0:
 .align 12
 arm64_bpt_l2_pt0:
 	pte_fill	0x0000000000000000, 2, 2, PTE_BLOCK_DEVICE_nGnRnE
-	ur_pte  arm64_bpt_l1_pt0, PTE_TYPE_TABLE
+	ur_pte  arm64_bpt_l1_pt0, UK_ARCH_ARM64_PTE_TYPE_TABLE
 	pte_fill	0x00000000c0000000, 509, 2, PTE_BLOCK_NORMAL_RW
 
 /* L2: 512GiB - 1TiB (1GiB / entry)
@@ -87,7 +87,7 @@ arm64_bpt_l2_pt511:
  */
 .align 12
 arm64_bpt_l1_pt0:
-	ur_pte  arm64_bpt_l0_pt0, PTE_TYPE_TABLE
+	ur_pte  arm64_bpt_l0_pt0, UK_ARCH_ARM64_PTE_TYPE_TABLE
 	pte_fill	0x0000000080200000, 511, 1, PTE_BLOCK_NORMAL_RWX
 
 /* L0: 2GiB - 2.2GiB (4KiB / entry)

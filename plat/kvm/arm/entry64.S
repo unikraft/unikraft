@@ -71,7 +71,7 @@ ENTRY(_libkvmplat_entry)
 	 *         can write anywhere we also invalidate the entire image.
 	 */
 	mrs	x19, sctlr_el1
-	and	x19, x19, #SCTLR_EL1_M_BIT
+	and	x19, x19, #UK_ARCH_ARM64_SCTLR_EL1_M_BIT
 #if CONFIG_LIBUKRELOC
 	/* If PIE is enabled and the MMU is disabled we proceed to
 	 * invalidate the entire image region anyway, as libukreloc
@@ -90,7 +90,7 @@ ENTRY(_libkvmplat_entry)
 	/* Disable the MMU and D-Cache. */
 	dsb	sy
 	mrs	x2, sctlr_el1
-	mov	x3, #SCTLR_EL1_M_BIT|SCTLR_EL1_C_BIT
+	mov	x3, #UK_ARCH_ARM64_SCTLR_EL1_M_BIT|UK_ARCH_ARM64_SCTLR_EL1_C_BIT
 	bic	x2, x2, x3
 	msr	sctlr_el1, x2
 	isb

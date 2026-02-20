@@ -85,7 +85,7 @@ setup_tcr_el1:
 	mov x5, #64
 	sub x5, x5, x4
 	mov x4, x5
-	lsl x5, x5, #TCR_EL1_T1SZ_SHIFT
+	lsl x5, x5, #UK_ARCH_ARM64_TCR_EL1_T1SZ_SHIFT
 	orr x5, x4, x5
 	ldr x2, =TCR_INIT_FLAGS
 	orr x2, x5, x2

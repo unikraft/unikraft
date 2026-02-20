@@ -125,9 +125,9 @@
 .if \except_type == TYPE_TRAP
 	/* Is this trap a system call? */
 	mrs	x0, esr_el1
-	and	x0, x0, #ESR_EC_MASK
-	orr	x0, xzr, x0, lsr #ESR_EC_SHIFT
-	cmp	x0, #ESR_EL1_EC_SVC64
+	and	x0, x0, #UK_ARCH_ARM64_ESR_EC_MASK
+	orr	x0, xzr, x0, lsr #UK_ARCH_ARM64_ESR_EC_SHIFT
+	cmp	x0, #UK_ARCH_ARM64_ESR_EL1_EC_SVC64
 	bne	2f
 
 	/* If we are in a system call trap then switch to auxiliary stack
