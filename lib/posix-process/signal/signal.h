@@ -312,13 +312,6 @@ void pprocess_signal_arch_set_ucontext(struct ukarch_execenv *execenv,
 void pprocess_signal_arch_get_ucontext(ucontext_t *ucontext,
 				       struct ukarch_execenv *execenv);
 
-/* Checks whether a signal can be delivered to a given thread, depending
- * on the thread's mask, whether the process chooses to ingores this signal,
- * or whether the process uses a default disposition of ignore.
- *
- * Does NOT check permissions.
- */
-bool pprocess_signal_is_deliverable(struct posix_thread *pthread, int signum);
 
 #if CONFIG_LIBPOSIX_PROCESS_SIGNALFD
 /* Add a signal file to a process in order to track it */
@@ -359,12 +352,32 @@ void pthread_signal_files_notify(struct posix_process *pproc,
 }
 #endif /* CONFIG_LIBPOSIX_PROCESS_SIGNALFD */
 
+#if CONFIG_LIBPOSIX_PROCESS_SIGNAL
+/* Checks whether a signal can be delivered to a given thread, depending
+ * on the thread's mask, whether the process chooses to ingores this signal,
+ * or whether the process uses a default disposition of ignore.
+ *
+ * Does NOT check permissions.
+ */
+static inline
+bool pprocess_signal_is_deliverable(struct posix_thread *pthread, int signum)
+{
+	struct posix_process *proc;
+
+	UK_ASSERT(pthread);
+	UK_ASSERT(signum);
+
+	proc = tid2pprocess(pthread->tid);
+	UK_ASSERT(proc);
+
+	return (!IS_MASKED(pthread, signum) && !IS_IGNORED(proc, signum));
+}
+
+#if CONFIG_LIBPOSIX_PROCESS_SIGNALFD
 /*
  * Check if a signal should be dropped: it is ignored by the process and
  * there are no signal files that are monitoring for this signal.
  */
-#if CONFIG_LIBPOSIX_PROCESS_SIGNAL
-#if CONFIG_LIBPOSIX_PROCESS_SIGNALFD
 static inline
 bool pprocess_signal_should_drop(struct posix_process *pproc, int signum)
 {

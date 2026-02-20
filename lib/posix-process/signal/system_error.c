@@ -22,26 +22,36 @@ void sys_error_handler(struct ukarch_execenv *ee __unused, long arg);
 static
 int sys_error_handler_except(int signum, struct ukarch_trap_ctx *trap_ctx)
 {
-	__uptr auxsp, handler_sp, curr_sp;
+	__uptr auxsp, handler_sp;
 	struct sys_error_desc *handler_desc;
 	struct ukarch_auxspcb *auxspcb;
+	struct posix_thread *pthread;
+	struct posix_process *pproc;
 	struct ukarch_ctx ctx;
 
 	UK_ASSERT(trap_ctx);
 
-	auxsp = ukplat_lcpu_get_auxsp_in_except();
-	curr_sp = ukarch_regs_get_sp(trap_ctx->regs);
+	pthread = uk_pthread_current();
 
-	/* If there is no auxsp, the fault happened during boot before
-	 * an aux stack is set up. If, however, we are executing in auxsp
-	 * then we know fore sure we are in uk context (not application).
-	 */
-	if (!auxsp || SP_IN_AUXSP(curr_sp, auxsp))
+	/* If not in pprocess context, fall through */
+	if (!pthread)
+		return UK_EVENT_NOT_HANDLED;
+
+	pproc = uk_pprocess_current();
+	UK_ASSERT(pproc);
+
+	/* If the appliation does not trap the signal, fall through */
+	if (KERN_SIGACTION(pproc, signum)->ks_handler == SIG_DFL)
+		return UK_EVENT_NOT_HANDLED;
+
+	/* If the appliation ignores the signal, fall through */
+	if (!pprocess_signal_is_deliverable(pthread, signum))
 		return UK_EVENT_NOT_HANDLED;
 
 	/* Prepare execution stack. Use the aux stack, as it's
 	 * the stack handle_self() expects to be opreating on.
 	 */
+	auxsp = ukplat_lcpu_get_auxsp_in_except();
 	auxspcb = ukarch_auxsp_get_cb(auxsp);
 	handler_sp = ukarch_auxspcb_get_curr_fp(auxspcb);
 	handler_sp = ALIGN_DOWN(handler_sp - sizeof(*handler_desc),
