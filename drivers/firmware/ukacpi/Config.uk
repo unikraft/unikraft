@@ -1,0 +1,12 @@
+menuconfig LIBUKACPI
+	bool "ACPI drivers"
+	depends on (ARCH_X86_64 || ARCH_ARM_64)
+	help
+		Drivers for operating with the ACPI specification.
+
+if LIBUKACPI
+
+config LIBUKACPI_CHECKSUM
+	bool "Verify ACPI structures' checksum"
+
+endif

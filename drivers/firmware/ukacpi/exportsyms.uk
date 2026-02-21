@@ -1,0 +1,3 @@
+uk_acpi_get_fadt
+uk_acpi_get_madt
+uk_acpi_init
