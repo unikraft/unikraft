@@ -6,7 +6,9 @@
 
 #include <string.h>
 #include <x86/traps.h>
-#include <uk/plat/common/acpi.h>
+#if CONFIG_LIBUKACPI
+#include <uk/acpi.h>
+#endif /* CONFIG_LIBUKACPI */
 #include <uk/arch/limits.h>
 #include <uk/arch/types.h>
 #include <uk/asm/cfi.h>
@@ -136,8 +138,8 @@ void _ukplat_entry(struct ukplat_bootinfo *bi)
 	if (unlikely(rc))
 		UK_CRASH("Interrupt controller init failed: %d\n", rc);
 
-#if defined(CONFIG_HAVE_SMP) && defined(CONFIG_UKPLAT_ACPI)
-	rc = acpi_init();
+#if CONFIG_HAVE_SMP && CONFIG_LIBUKACPI
+	rc = uk_acpi_init();
 	if (likely(rc == 0)) {
 		rc = uk_lcpu_mp_init(CONFIG_LIBUKLCPU_RUN_IRQ,
 				     CONFIG_LIBUKLCPU_WAKEUP_IRQ,
@@ -147,7 +149,7 @@ void _ukplat_entry(struct ukplat_bootinfo *bi)
 	} else {
 		uk_pr_err("ACPI init failed: %d\n", rc);
 	}
-#endif /* CONFIG_HAVE_SMP && CONFIG_UKPLAT_ACPI */
+#endif /* CONFIG_HAVE_SMP && CONFIG_LIBUKACPI */
 
 	/* Allocate boot stack */
 	bstack = ukplat_memregion_alloc(__STACK_SIZE, UKPLAT_MEMRT_STACK,

@@ -35,7 +35,9 @@
 #include <uk/paging.h>
 #include <uk/plat/config.h>
 #include <uk/plat/common/bootinfo.h>
-#include <uk/plat/common/acpi.h>
+#if CONFIG_LIBUKACPI
+#include <uk/acpi.h>
+#endif /* CONFIG_LIBUKACPI */
 #include <uk/plat/lcpu.h>
 #include <uk/ofw/fdt.h>
 #include <arm/smccc.h>
@@ -138,7 +140,7 @@ int lcpu_arch_init(struct lcpu *this_lcpu)
 	return ret;
 }
 
-#ifdef CONFIG_HAVE_SMP
+#if CONFIG_HAVE_SMP
 static __paddr_t lcpu_start_paddr;
 
 __lcpuidx lcpu_arch_idx(void)
@@ -150,33 +152,33 @@ __lcpuidx lcpu_arch_idx(void)
 	return this_lcpu->idx;
 }
 
-#ifdef CONFIG_UKPLAT_ACPI
+#if CONFIG_LIBUKACPI
 static int do_arch_mp_init(void *arg __unused)
 {
 	__lcpuid bsp_cpu_id = lcpu_get(0)->id;
 	int bsp_found __maybe_unused = 0;
 	union {
-		struct acpi_madt_gicc *gicc;
-		struct acpi_subsdt_hdr *h;
+		struct uk_acpi_madt_gicc *gicc;
+		struct uk_acpi_subsdt_hdr *h;
 	} m;
 	struct lcpu *lcpu;
-	struct acpi_madt *madt;
+	struct uk_acpi_madt *madt;
 	__lcpuid cpu_id;
 	__sz off, len;
 
 	uk_pr_info("Bootstrapping processor has the ID %ld\n", bsp_cpu_id);
 
 	/* Enumerate all other CPUs */
-	madt = acpi_get_madt();
+	madt = uk_acpi_get_madt();
 	UK_ASSERT(madt);
 
 	len = madt->hdr.tab_len - sizeof(*madt);
 	for (off = 0; off < len; off += m.h->len) {
-		m.h = (struct acpi_subsdt_hdr *)(madt->entries + off);
+		m.h = (struct uk_acpi_subsdt_hdr *)(madt->entries + off);
 
-		if (m.h->type != ACPI_MADT_GICC ||
-		    (!(m.gicc->flags & ACPI_MADT_GICC_FLAGS_EN) &&
-		     !(m.gicc->flags & ACPI_MADT_GICC_FLAGS_ON_CAP)))
+		if (m.h->type != UK_ACPI_MADT_GICC ||
+		    (!(m.gicc->flags & UK_ACPI_MADT_GICC_FLAGS_EN) &&
+		     !(m.gicc->flags & UK_ACPI_MADT_GICC_FLAGS_ON_CAP)))
 			continue;
 
 		cpu_id = m.gicc->mpidr & CPU_ID_MASK;
@@ -202,7 +204,7 @@ static int do_arch_mp_init(void *arg __unused)
 
 	return 0;
 }
-#else
+#else /* !CONFIG_LIBUKACPI */
 static int do_arch_mp_init(void *arg)
 {
 	int fdt_cpu;
@@ -322,7 +324,7 @@ static int do_arch_mp_init(void *arg)
 
 	return 0;
 }
-#endif
+#endif /* !CONFIG_LIBUKACPI */
 
 int lcpu_arch_mp_init(void *arg)
 {

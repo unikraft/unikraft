@@ -58,7 +58,7 @@ config KVM_BOOT_PROTO_EFI_STUB
 	bool "EFI stub"
 	depends on KVM_VMM_QEMU && !KVM_VMM_FIRECRACKER
 	depends on OPTIMIZE_PIE
-	select UKPLAT_ACPI
+	select LIBUKACPI
 	select LIBUKEFI
 	help
 		Make Unikraft bootable by UEFI firmware

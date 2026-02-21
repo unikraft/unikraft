@@ -24,7 +24,9 @@
 #include <libfdt.h>
 #include <uk/plat/common/sections.h>
 #include <uk/plat/common/bootinfo.h>
-#include <uk/plat/common/acpi.h>
+#if CONFIG_LIBUKACPI
+#include <uk/acpi.h>
+#endif /* CONFIG_LIBUKACPI */
 #include <uk/lcpu.h>
 #include <uk/assert.h>
 #include <uk/boot.h>
@@ -48,25 +50,25 @@
 
 smccc_conduit_fn_t smccc_psci_call;
 
-#ifdef CONFIG_UKPLAT_ACPI
+#if CONFIG_LIBUKACPI
 static int get_psci_method(struct ukplat_bootinfo *bi __unused)
 {
-	struct acpi_fadt *acpi_fadt = acpi_get_fadt();
+	struct uk_acpi_fadt *acpi_fadt = uk_acpi_get_fadt();
 
 	if (unlikely(!acpi_fadt))
 		return -ENOTSUP;
 
-	if (unlikely(!(acpi_fadt->arm_bflags & ACPI_FADT_ARM_BFLAGS_PSCI)))
+	if (unlikely(!(acpi_fadt->arm_bflags & UK_ACPI_FADT_ARM_BFLAGS_PSCI)))
 		return -ENOTSUP;
 
-	if (acpi_fadt->arm_bflags & ACPI_FADT_ARM_BFLAGS_PSCI_HVC)
+	if (acpi_fadt->arm_bflags & UK_ACPI_FADT_ARM_BFLAGS_PSCI_HVC)
 		smccc_psci_call = smccc_hvc;
 	else
 		smccc_psci_call = smccc_smc;
 
 	return 0;
 }
-#else
+#else /* !CONFIG_LIBUKACPI */
 static int get_psci_method(struct ukplat_bootinfo *bi)
 {
 	const char *fdtmethod;
@@ -114,7 +116,7 @@ enomethod:
 
 	return -ENOENT;
 }
-#endif
+#endif /* !CONFIG_LIBUKACPI */
 
 /* At this point we expect that the C runtime is configured and that
  * bootcode has enabled all CPU features used by compiled code.
@@ -160,11 +162,11 @@ void __no_pauth _ukplat_entry(void)
 		UK_CRASH("Could not initialize MTE (%d)\n", rc);
 #endif /* CONFIG_HAVE_MEMTAG */
 
-#if defined(CONFIG_UKPLAT_ACPI)
-	rc = acpi_init();
+#if CONFIG_LIBUKACPI
+	rc = uk_acpi_init();
 	if (unlikely(rc < 0))
 		uk_pr_err("ACPI init failed: %d\n", rc);
-#endif /* CONFIG_UKPLAT_ACPI */
+#endif /* CONFIG_LIBUKACPI */
 
 	/* Initialize interrupt controller */
 	rc = uk_intctlr_probe();

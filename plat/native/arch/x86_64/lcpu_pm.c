@@ -14,7 +14,9 @@
 #include <uk/lcpu/pm.h>
 #include <uk/prio.h>
 
-#include <uk/plat/common/acpi.h>
+#if CONFIG_LIBUKACPI
+#include <uk/acpi.h>
+#endif /* CONFIG_LIBUKACPI */
 #include <uk/plat/common/memory.h>
 #include <x86/delay.h>
 
@@ -169,16 +171,17 @@ static void start16_reloc_mp_init(void)
 			    (__u64)uk_plat_native_x86_64_start16_addr, 4);
 }
 
+#if CONFIG_LIBUKACPI
 int uk_plat_native_lcpu_mp_init(void *arg __unused)
 {
 	__u64 bsp_cpu_id = uk_pcpuvar_lval(0, uk_pcpuvar_cpu_id);
 	union {
-		struct acpi_madt_x2apic *x2apic;
-		struct acpi_madt_lapic *lapic;
-		struct acpi_subsdt_hdr *h;
+		struct uk_acpi_madt_x2apic *x2apic;
+		struct uk_acpi_madt_lapic *lapic;
+		struct uk_acpi_subsdt_hdr *h;
 	} m;
 	int bsp_found __maybe_unused = 0;
-	struct acpi_madt *madt;
+	struct uk_acpi_madt *madt;
 	__sz off, len;
 	__u64 cpu_id;
 	__u32 idx;
@@ -187,26 +190,27 @@ int uk_plat_native_lcpu_mp_init(void *arg __unused)
 	uk_pr_info("Bootstrapping processor has the ID %ld\n", bsp_cpu_id);
 
 	/* Enumerate all other CPUs */
-	madt = acpi_get_madt();
+	madt = uk_acpi_get_madt();
 	UK_ASSERT(madt);
 
 	len = madt->hdr.tab_len - sizeof(*madt);
 	idx = 1;
 	for (off = 0; off < len; off += m.h->len) {
-		m.h = (struct acpi_subsdt_hdr *)(madt->entries + off);
+		m.h = (struct uk_acpi_subsdt_hdr *)(madt->entries + off);
 
 		switch (m.h->type) {
-		case ACPI_MADT_LAPIC:
-			if (!(m.lapic->flags & ACPI_MADT_LAPIC_FLAGS_EN) &&
-			    !(m.lapic->flags & ACPI_MADT_LAPIC_FLAGS_ON_CAP))
+		case UK_ACPI_MADT_LAPIC:
+			if (!(m.lapic->flags & UK_ACPI_MADT_LAPIC_FLAGS_EN) &&
+			    !(m.lapic->flags & UK_ACPI_MADT_LAPIC_FLAGS_ON_CAP))
 				continue; /* goto next MADT entry */
 
 			cpu_id = m.lapic->lapic_id;
 			break;
 
-		case ACPI_MADT_LX2APIC:
-			if (!(m.x2apic->flags & ACPI_MADT_X2APIC_FLAGS_EN) &&
-			    !(m.x2apic->flags & ACPI_MADT_X2APIC_FLAGS_ON_CAP))
+		case UK_ACPI_MADT_LX2APIC:
+			if (!(m.x2apic->flags & UK_ACPI_MADT_X2APIC_FLAGS_EN) &&
+			    !(m.x2apic->flags &
+			      UK_ACPI_MADT_X2APIC_FLAGS_ON_CAP))
 				continue; /* goto next MADT entry */
 
 			cpu_id = m.x2apic->lapic_id;
@@ -248,6 +252,7 @@ int uk_plat_native_lcpu_mp_init(void *arg __unused)
 
 	return 0;
 }
+#endif /* CONFIG_LIBUKACPI */
 
 static int plat_native_lcpu_start(__u64 idx)
 {
