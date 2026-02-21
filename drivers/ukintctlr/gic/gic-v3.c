@@ -44,9 +44,9 @@
 #include <uk/bitops.h>
 #include <uk/asm.h>
 #include <uk/lcpu.h>
-#ifdef CONFIG_UKPLAT_ACPI
-#include <uk/plat/common/acpi.h>
-#endif /* CONFIG_UKPLAT_ACPI */
+#if CONFIG_LIBUKACPI
+#include <uk/acpi.h>
+#endif /* CONFIG_LIBUKACPI */
 #include <uk/plat/common/bootinfo.h>
 #include <uk/plat/spinlock.h>
 #include <arm/cpu.h>
@@ -592,17 +592,17 @@ static inline void gicv3_set_ops(void)
 	gicv3_drv.ops = drv_ops;
 }
 
-#if defined(CONFIG_UKPLAT_ACPI)
+#if CONFIG_LIBUKACPI
 static int acpi_get_gicr(struct _gic_dev *g)
 {
 	union {
-		struct acpi_madt_gicr *gicr;
-		struct acpi_subsdt_hdr *h;
+		struct uk_acpi_madt_gicr *gicr;
+		struct uk_acpi_subsdt_hdr *h;
 	} m;
-	struct acpi_madt *madt;
+	struct uk_acpi_madt *madt;
 	__sz off, len;
 
-	madt = acpi_get_madt();
+	madt = uk_acpi_get_madt();
 	UK_ASSERT(madt);
 
 	/* We do not count the Redistributor regions, instead we rely on
@@ -612,9 +612,9 @@ static int acpi_get_gicr(struct _gic_dev *g)
 	 */
 	len = madt->hdr.tab_len - sizeof(*madt);
 	for (off = 0; off < len; off += m.h->len) {
-		m.h = (struct acpi_subsdt_hdr *)(madt->entries + off);
+		m.h = (struct uk_acpi_subsdt_hdr *)(madt->entries + off);
 
-		if (m.h->type != ACPI_MADT_GICR)
+		if (m.h->type != UK_ACPI_MADT_GICR)
 			continue;
 
 		g->rdist_mem_addr = m.gicr->paddr;
@@ -646,7 +646,7 @@ static int gicv3_do_probe(void)
 	 */
 	return acpi_get_gicr(&gicv3_drv);
 }
-#else /* CONFIG_UKPLAT_ACPI */
+#else /* !CONFIG_LIBUKACPI */
 static int gicv3_do_probe(void)
 {
 	struct ukplat_bootinfo *bi = ukplat_bootinfo_get();
@@ -695,7 +695,7 @@ static int gicv3_do_probe(void)
 
 	return 0;
 }
-#endif /* !CONFIG_UKPLAT_ACPI */
+#endif /* !CONFIG_LIBUKACPI */
 
 #if CONFIG_LIBUKPAGING
 static int gicv3_map(void)

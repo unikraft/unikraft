@@ -39,9 +39,9 @@
 #include <uk/asm.h>
 #include <uk/arch/limits.h>
 #include <uk/lcpu.h>
-#ifdef CONFIG_UKPLAT_ACPI
-#include <uk/plat/common/acpi.h>
-#endif /* CONFIG_UKPLAT_ACPI */
+#if CONFIG_LIBUKACPI
+#include <uk/acpi.h>
+#endif /* CONFIG_LIBUKACPI */
 #include <uk/plat/common/bootinfo.h>
 #include <uk/plat/spinlock.h>
 #include <arm/cpu.h>
@@ -522,25 +522,25 @@ static void gicv2_set_ops(void)
 	gicv2_drv.ops = drv_ops;
 }
 
-#if defined(CONFIG_UKPLAT_ACPI)
+#if CONFIG_LIBUKACPI
 static int acpi_get_gicc(struct _gic_dev *g)
 {
 	union {
-		struct acpi_madt_gicc *gicc;
-		struct acpi_subsdt_hdr *h;
+		struct uk_acpi_madt_gicc *gicc;
+		struct uk_acpi_subsdt_hdr *h;
 	} m;
-	struct acpi_madt *madt;
+	struct uk_acpi_madt *madt;
 	__sz off, len;
 
-	madt = acpi_get_madt();
+	madt = uk_acpi_get_madt();
 	UK_ASSERT(madt);
 
 	/* In ACPI all GICCs' base address must be the same */
 	len = madt->hdr.tab_len - sizeof(*madt);
 	for (off = 0; off < len; off += m.h->len) {
-		m.h = (struct acpi_subsdt_hdr *)(madt->entries + off);
+		m.h = (struct uk_acpi_subsdt_hdr *)(madt->entries + off);
 
-		if (m.h->type != ACPI_MADT_GICC)
+		if (m.h->type != UK_ACPI_MADT_GICC)
 			continue;
 
 		/* If GICv3/4 this field is 0 */
@@ -573,7 +573,7 @@ static int gicv2_do_probe(void)
 
 	return 0;
 }
-#else /* CONFIG_UKPLAT_ACPI */
+#else /* !CONFIG_LIBUKACPI */
 static int gicv2_do_probe(void)
 {
 	struct ukplat_bootinfo *bi = ukplat_bootinfo_get();
@@ -611,7 +611,7 @@ static int gicv2_do_probe(void)
 
 	return 0;
 }
-#endif /* !CONFIG_UKPLAT_ACPI */
+#endif /* !CONFIG_LIBUKACPI */
 
 #if CONFIG_LIBUKPAGING
 static int gicv2_map(void)

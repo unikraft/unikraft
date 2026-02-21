@@ -140,8 +140,8 @@ struct _gic_dev {
  *
  * @return 0 on success, < 0 otherwise
  */
-#if defined(CONFIG_UKPLAT_ACPI)
+#if CONFIG_LIBUKACPI
 int acpi_get_gicd(struct _gic_dev *g);
-#endif /* CONFIG_UKPLAT_ACPI */
+#endif /* CONFIG_LIBUKACPI */
 
 #endif /* __UK_INTCTLR_GIC_H__ */
