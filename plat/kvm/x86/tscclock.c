@@ -94,6 +94,54 @@
 /* RTC wall time offset at monotonic time base. */
 static __u64 rtc_epochoffset;
 
+/* KVM paravirtual wall clock MSRs */
+#define MSR_KVM_WALL_CLOCK 0x11
+#define MSR_KVM_WALL_CLOCK_NEW 0x4b564d00
+#define KVM_FEATURE_CLOCKSOURCE (1 << 0)
+#define KVM_FEATURE_CLOCKSOURCE2 (1 << 3)
+
+struct pvclock_wall_clock {
+	volatile __u32 version;
+	volatile __u32 sec;
+	volatile __u32 nsec;
+} __attribute__((__packed__));
+
+static struct pvclock_wall_clock wall_clock_data __align(4);
+
+static __u64 pvclock_read_wall_clock(void)
+{
+	__u32 eax, ebx, ecx, edx;
+	__u32 features, msr, version;
+	__u64 wall_nsec;
+
+	cpuid(0x40000000, 0, &eax, &ebx, &ecx, &edx);
+	if (eax < 0x40000001)
+		return 0;
+
+	cpuid(0x40000001, 0, &features, &ebx, &ecx, &edx);
+
+	if (features & KVM_FEATURE_CLOCKSOURCE2)
+		msr = MSR_KVM_WALL_CLOCK_NEW;
+	else if (features & KVM_FEATURE_CLOCKSOURCE)
+		msr = MSR_KVM_WALL_CLOCK;
+	else
+		return 0;
+
+	/* Identity mapped at boot, so virt == phys */
+	wrmsrl(msr, (__u64)(__uptr) & wall_clock_data);
+
+	do {
+		version = wall_clock_data.version;
+		barrier();
+		wall_nsec = ((__u64)wall_clock_data.sec * UKARCH_NSEC_PER_SEC) +
+			    wall_clock_data.nsec;
+		barrier();
+	} while ((wall_clock_data.version & 1) ||
+		 (version != wall_clock_data.version));
+
+	return wall_nsec;
+}
+
 /*
  * TSC clock specific.
  */
@@ -229,7 +277,11 @@ int tscclock_init(void)
 	/*
 	 * Read RTC "time at boot". This must be done just before tsc_base is
 	 * initialised in order to get a correct offset below.
+	 *
+	 * Try KVM pvclock first. Fall back to legacy RTC if pvclock is unavailable.
 	 */
+	rtc_boot = pvclock_read_wall_clock();
+	if (!rtc_boot)
 	rtc_boot = rtc_gettimeofday();
 
 	/*
@@ -283,8 +335,8 @@ int tscclock_init(void)
 	tscclock_monotonic();
 
 	/*
-	 * Compute RTC epoch offset by subtracting monotonic time_base from RTC
-	 * time at boot.
+	 * Compute wall time epoch offset by subtracting monotonic time_base
+	 * from wall time at boot.
 	 */
 	rtc_epochoffset = rtc_boot - time_base;
 
