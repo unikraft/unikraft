@@ -21,16 +21,6 @@ extern __vaddr_t uk_plat_native_x86_64_start16_addr; /* target address */
 
 #if CONFIG_HAVE_SMP
 /**
- * Detect and populate LCPU structures for all x86_64 CPUs.
- * Enumerates logical CPUs via ACPI MADT or MP tables and creates
- * corresponding LCPU structures. Called once during boot on BSP.
- *
- * @param arg  Reserved for future use (currently unused)
- * @return 0 on success, negative errno on failure
- */
-int uk_plat_native_lcpu_mp_init(void *arg __unused);
-
-/**
  * Send an Interprocessor Interrupt.
  *
  * @param id The CPU ID to send the IPI to

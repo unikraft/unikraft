@@ -6,7 +6,6 @@ uk_plat_native_except_init
 uk_plat_native_irqs_disabled
 uk_plat_native_irqs_handle_pending
 uk_plat_native_nop
-uk_plat_native_lcpu_mp_init
 uk_plat_native_lcpu_post_start
 uk_plat_native_restore_irqf
 uk_plat_native_lcpu_run

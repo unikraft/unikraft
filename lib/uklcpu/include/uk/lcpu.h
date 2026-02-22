@@ -200,12 +200,10 @@ int uk_lcpu_init(struct uk_lcpu *this_lcpu);
  *
  * @param run_irq the IRQ vector to use for running remote functions
  * @param wakeup_irq the IRQ vector to use for waking up CPUs
- * @param arg an optional parameter from the boot code that is passed to the
- *    architectural initialization
  *
  * @return 0 on success, -errno otherwise
  */
-int uk_lcpu_mp_init(unsigned long run_irq, unsigned long wakeup_irq, void *arg);
+int uk_lcpu_mp_init(unsigned long run_irq, unsigned long wakeup_irq);
 
 /**
  * Default entry function for secondary logical CPUs. Calls uk_lcpu_init() and

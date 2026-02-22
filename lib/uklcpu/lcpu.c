@@ -220,19 +220,12 @@ static unsigned long _lcpu_wakeup_irqv;
 const unsigned long * const uk_lcpu_run_irqv = &_lcpu_run_irqv;
 const unsigned long * const uk_lcpu_wakeup_irqv = &_lcpu_wakeup_irqv;
 
-int uk_lcpu_mp_init(unsigned long run_irq, unsigned long wakeup_irq, void *arg)
+int uk_lcpu_mp_init(unsigned long run_irq, unsigned long wakeup_irq)
 {
 	int rc;
 
 	/* Make sure this is run on the BSP only */
 	UK_ASSERT(uk_lcpu_current_is_bsp());
-
-	/* Initialize architecture-dependent functionality. This will also do
-	 * CPU discovery and allocation
-	 */
-	rc = uk_pal_lcpu_mp_init(arg);
-	if (unlikely(rc))
-		return rc;
 
 	/* Register the lcpu_run and lcpu_wakeup interrupt handlers */
 	rc = uk_intctlr_irq_register(run_irq, lcpu_ipi_run_handler, __NULL);

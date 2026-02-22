@@ -1,3 +1,4 @@
 uk_acpi_get_fadt
 uk_acpi_get_madt
 uk_acpi_init
+uk_acpi_madt_fill_cpu_idmap

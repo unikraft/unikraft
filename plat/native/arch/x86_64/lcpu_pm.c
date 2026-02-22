@@ -8,16 +8,17 @@
  * You may not use this file except in compliance with the License.
  */
 
-#include <uk/boot/earlytab.h>
 #include <uk/arch/util.h>
 #include <uk/essentials.h>
 #include <uk/lcpu/pm.h>
+#include <uk/pcpuvar.h>
 #include <uk/prio.h>
 
-#if CONFIG_LIBUKACPI
-#include <uk/acpi.h>
-#endif /* CONFIG_LIBUKACPI */
+#if CONFIG_LIBUKBOOT
+#include <uk/boot/earlytab.h>
 #include <uk/plat/common/memory.h>
+#endif /* CONFIG_LIBUKBOOT */
+
 #include <x86/delay.h>
 
 #if CONFIG_HAVE_SMP
@@ -73,26 +74,7 @@ static inline void x2apic_send_iipi(int dest)
  */
 extern void *x86_start16_begin[];
 extern void *x86_start16_end[];
-extern __vaddr_t uk_plat_native_x86_64_start16_addr; /* target address */
-
-static inline int memregion_alloc_sipi_vect(void)
-{
-#define X86_VIDEO_MEM_START	0xA0000UL
-#define X86_VIDEO_MEM_LEN	0x20000UL
-	__sz len;
-
-	len = (__sz)((__uptr)x86_start16_end - (__uptr)x86_start16_begin);
-	len = UK_PAGING_PAGE_ALIGN_UP(len);
-	uk_plat_native_x86_64_start16_addr = (__uptr)ukplat_memregion_alloc(len,
-							  UKPLAT_MEMRT_RESERVED,
-							  UKPLAT_MEMRF_READ  |
-							  UKPLAT_MEMRF_WRITE);
-	if (unlikely(!uk_plat_native_x86_64_start16_addr ||
-		     uk_plat_native_x86_64_start16_addr >= X86_VIDEO_MEM_START))
-		return -ENOMEM;
-
-	return 0;
-}
+extern __uptr uk_plat_native_x86_64_start16_addr; /* target address */
 
 #define UK_ARCH_START16_SIZE						\
 	((__uptr)x86_start16_end - (__uptr)x86_start16_begin)
@@ -171,74 +153,22 @@ static void start16_reloc_mp_init(void)
 			    (__u64)uk_plat_native_x86_64_start16_addr, 4);
 }
 
-#if CONFIG_LIBUKACPI
-int uk_plat_native_lcpu_mp_init(void *arg __unused)
+#if CONFIG_LIBUKBOOT
+static int boot_memregion_alloc_sipi_vect(struct ukplat_bootinfo *bi __unused)
 {
-	__u64 bsp_cpu_id = uk_pcpuvar_lval(0, uk_pcpuvar_cpu_id);
-	union {
-		struct uk_acpi_madt_x2apic *x2apic;
-		struct uk_acpi_madt_lapic *lapic;
-		struct uk_acpi_subsdt_hdr *h;
-	} m;
-	int bsp_found __maybe_unused = 0;
-	struct uk_acpi_madt *madt;
-	__sz off, len;
-	__u64 cpu_id;
-	__u32 idx;
-	int rc;
+#define X86_VIDEO_MEM_START	0xA0000UL
+#define X86_VIDEO_MEM_LEN	0x20000UL
+	__sz len;
 
-	uk_pr_info("Bootstrapping processor has the ID %ld\n", bsp_cpu_id);
-
-	/* Enumerate all other CPUs */
-	madt = uk_acpi_get_madt();
-	UK_ASSERT(madt);
-
-	len = madt->hdr.tab_len - sizeof(*madt);
-	idx = 1;
-	for (off = 0; off < len; off += m.h->len) {
-		m.h = (struct uk_acpi_subsdt_hdr *)(madt->entries + off);
-
-		switch (m.h->type) {
-		case UK_ACPI_MADT_LAPIC:
-			if (!(m.lapic->flags & UK_ACPI_MADT_LAPIC_FLAGS_EN) &&
-			    !(m.lapic->flags & UK_ACPI_MADT_LAPIC_FLAGS_ON_CAP))
-				continue; /* goto next MADT entry */
-
-			cpu_id = m.lapic->lapic_id;
-			break;
-
-		case UK_ACPI_MADT_LX2APIC:
-			if (!(m.x2apic->flags & UK_ACPI_MADT_X2APIC_FLAGS_EN) &&
-			    !(m.x2apic->flags &
-			      UK_ACPI_MADT_X2APIC_FLAGS_ON_CAP))
-				continue; /* goto next MADT entry */
-
-			cpu_id = m.x2apic->lapic_id;
-			break;
-
-		default:
-			continue; /* goto next MADT entry */
-		}
-
-		if (bsp_cpu_id == cpu_id) {
-			UK_ASSERT(!bsp_found);
-
-			bsp_found = 1;
-			continue;
-		}
-
-		uk_pcpuvar_lval(idx, uk_pcpuvar_cpu_id) = cpu_id;
-		uk_pcpuvar_lval(idx, uk_pcpuvar_cpu_idx) = idx;
-		idx++;
-	}
-	UK_ASSERT(bsp_found);
-
-	/* Allocate an mrd for the SIPI vector */
-	rc = memregion_alloc_sipi_vect();
-	if (unlikely(rc)) {
-		uk_pr_err("Could not allocate mrd for the SIPI vector(%d)", rc);
-		return rc;
-	}
+	len = (__sz)((__uptr)x86_start16_end - (__uptr)x86_start16_begin);
+	len = UK_PAGING_PAGE_ALIGN_UP(len);
+	uk_plat_native_x86_64_start16_addr = (__uptr)ukplat_memregion_alloc(len,
+							  UKPLAT_MEMRT_RESERVED,
+							  UKPLAT_MEMRF_READ  |
+							  UKPLAT_MEMRF_WRITE);
+	if (unlikely(!uk_plat_native_x86_64_start16_addr ||
+		     uk_plat_native_x86_64_start16_addr >= X86_VIDEO_MEM_START))
+		return -ENOMEM;
 
 	/* Copy AP startup code to target address in first 1MiB */
 	UK_ASSERT(uk_plat_native_x86_64_start16_addr < 0x100000);
@@ -252,7 +182,9 @@ int uk_plat_native_lcpu_mp_init(void *arg __unused)
 
 	return 0;
 }
-#endif /* CONFIG_LIBUKACPI */
+
+UK_BOOT_EARLYTAB_ENTRY(boot_memregion_alloc_sipi_vect, UK_PRIO_EARLIEST);
+#endif /* CONFIG_LIBUKBOOT */
 
 static int plat_native_lcpu_start(__u64 idx)
 {

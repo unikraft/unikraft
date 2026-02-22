@@ -138,18 +138,12 @@ void _ukplat_entry(struct ukplat_bootinfo *bi)
 	if (unlikely(rc))
 		UK_CRASH("Interrupt controller init failed: %d\n", rc);
 
-#if CONFIG_HAVE_SMP && CONFIG_LIBUKACPI
-	rc = uk_acpi_init();
-	if (likely(rc == 0)) {
-		rc = uk_lcpu_mp_init(CONFIG_LIBUKLCPU_RUN_IRQ,
-				     CONFIG_LIBUKLCPU_WAKEUP_IRQ,
-				     __NULL);
-		if (unlikely(rc))
-			uk_pr_err("SMP init failed: %d\n", rc);
-	} else {
-		uk_pr_err("ACPI init failed: %d\n", rc);
-	}
-#endif /* CONFIG_HAVE_SMP && CONFIG_LIBUKACPI */
+#if CONFIG_HAVE_SMP
+	rc = uk_lcpu_mp_init(CONFIG_LIBUKLCPU_RUN_IRQ,
+			     CONFIG_LIBUKLCPU_WAKEUP_IRQ);
+	if (unlikely(rc))
+		uk_pr_err("SMP init failed: %d\n", rc);
+#endif /* CONFIG_HAVE_SMP */
 
 	/* Allocate boot stack */
 	bstack = ukplat_memregion_alloc(__STACK_SIZE, UKPLAT_MEMRT_STACK,

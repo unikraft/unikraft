@@ -231,6 +231,16 @@ struct uk_acpi_madt_mp_wkp_src {
  */
 struct uk_acpi_madt *uk_acpi_get_madt(void);
 
+#if CONFIG_LIBUKACPI_MADT_FILL_CPU_IDMAP
+/**
+ * Fills in the per-CPU ID/IDX map by parsing the MADT entries corresponding
+ * to the architecture.
+ *
+ * @return 0 on success, !=0 on error.
+ */
+int uk_acpi_madt_fill_cpu_idmap(void);
+#endif /* CONFIG_LIBUKACPI_MADT_FILL_CPU_IDMAP */
+
 #ifdef __cplusplus
 }
 #endif

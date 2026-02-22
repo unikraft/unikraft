@@ -9,4 +9,10 @@ if LIBUKACPI
 config LIBUKACPI_CHECKSUM
 	bool "Verify ACPI structures' checksum"
 
+config LIBUKACPI_MADT_FILL_CPU_IDMAP
+	bool "Fill in the ID/IDX map at the core of per-CPU variables"
+	depends on LIBUKPCPUVAR
+	depends on ARCH_X86_64
+	default y
+
 endif

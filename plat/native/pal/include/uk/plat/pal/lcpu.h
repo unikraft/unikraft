@@ -16,11 +16,6 @@ extern "C" {
 #endif
 
 #if CONFIG_HAVE_SMP
-static inline int uk_pal_lcpu_mp_init(void *arg)
-{
-	return uk_plat_native_lcpu_mp_init(arg);
-}
-
 static inline int uk_pal_send_ipi(__u64 id, unsigned long irq)
 {
 	return uk_plat_native_send_ipi(id, irq);

@@ -23,15 +23,6 @@ extern "C" {
 
 #if CONFIG_HAVE_SMP
 /**
- * Detect and populate LCPU structures for all processors.
- * Enumerates available CPUs and creates LCPU structures.
- *
- * @param arg  Platform-specific argument (may be unused)
- * @return 0 on success, negative errno on failure
- */
-int uk_pal_lcpu_mp_init(void *arg);
-
-/**
  * Send an Interprocessor Interrupt.
  *
  * @param id The CPU ID to send the IPI to

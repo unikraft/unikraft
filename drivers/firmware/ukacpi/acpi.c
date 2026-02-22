@@ -8,12 +8,17 @@
 #include <uk/print.h>
 #include <uk/assert.h>
 #include <uk/acpi.h>
+#include <uk/acpi/prio.h>
 #include <string.h>
 #include <errno.h>
 #if CONFIG_LIBUKEFI
 #include <uk/efi.h>
 #endif /* CONFIG_LIBUKEFI */
 #include <uk/plat/common/bootinfo.h>
+
+#if CONFIG_LIBUKBOOT
+#include <uk/boot/earlytab.h>
+#endif /* CONFIG_LIBUKBOOT */
 
 #define RSDP10_LEN		20
 #define BIOS_ROM_START		0xE0000UL
@@ -241,6 +246,14 @@ int uk_acpi_init(void)
 	return 0;
 }
 
+#if CONFIG_LIBUKBOOT
+static int boot_acpi_init(struct ukplat_bootinfo *bi __unused)
+{
+	return uk_acpi_init();
+}
+
+UK_BOOT_EARLYTAB_ENTRY(boot_acpi_init, UK_ACPI_INIT_PRIO);
+#endif /* CONFIG_LIBUKBOOT */
 
 /*
  * Return the Multiple APIC Descriptor Table (MADT).
