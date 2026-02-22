@@ -16,8 +16,6 @@
 #include <uk/arch.h>
 #include <uk/arch/types.h>
 #include <uk/pcpuvar.h>
-#include <uk/plat/pal/lcpu.h>
-#include <uk/pal/lcpu.h>
 #include <uk/lcpu/ectx.h>
 #include <uk/lcpu/except.h>
 #include <uk/lcpu/auxsp.h>

@@ -706,7 +706,27 @@ static inline int x2apic_enable(void)
 	return 0;
 }
 
+static inline void x2apic_send_ipi(int irqno, int dest)
+{
+	__u32 eax;
+
+	UK_ASSERT(((32 + irqno) & 0xff) == (32 + irqno));
+
+	eax = UK_ARCH_APIC_ICR_TRIGGER_LEVEL | UK_ARCH_APIC_ICR_LEVEL_ASSERT |
+	      UK_ARCH_APIC_ICR_DESTMODE_PHYSICAL |
+	      UK_ARCH_APIC_ICR_DMODE_FIXED | (32 + irqno);
+
+	uk_arch_wrmsr(UK_ARCH_APIC_MSR_ICR, eax, dest);
+}
+
 #define apic_enable		x2apic_enable
+#define apic_send_ipi		x2apic_send_ipi
+
+int uk_plat_native_except_send_ipi(__u64 id, unsigned long irq)
+{
+	apic_send_ipi(irq, id);
+	return 0;
+}
 #endif /* CONFIG_HAVE_SMP */
 
 __isr int uk_plat_native_except_init(void)

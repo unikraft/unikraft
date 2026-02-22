@@ -195,6 +195,17 @@ __isr __uptr uk_pal_except_get_except_stack_base(void);
  */
 __isr int uk_pal_except_init(void);
 
+#if CONFIG_HAVE_SMP
+/**
+ * Send an Interprocessor Interrupt.
+ *
+ * @param id The CPU ID to send the IPI to
+ * @param irq The IRQ to send to the CPU
+ * @return 0 on success, negative errno on failure
+ */
+int uk_pal_except_send_ipi(__u64 id, unsigned long irq);
+#endif /* CONFIG_HAVE_SMP */
+
 #ifdef __cplusplus
 }
 #endif

@@ -22,19 +22,6 @@
 #include <x86/delay.h>
 
 #if CONFIG_HAVE_SMP
-static inline void x2apic_send_ipi(int irqno, int dest)
-{
-	__u32 eax;
-
-	UK_ASSERT(((32 + irqno) & 0xff) == (32 + irqno));
-
-	eax = UK_ARCH_APIC_ICR_TRIGGER_LEVEL | UK_ARCH_APIC_ICR_LEVEL_ASSERT |
-	      UK_ARCH_APIC_ICR_DESTMODE_PHYSICAL |
-	      UK_ARCH_APIC_ICR_DMODE_FIXED | (32 + irqno);
-
-	uk_arch_wrmsr(UK_ARCH_APIC_MSR_ICR, eax, dest);
-}
-
 static inline void x2apic_send_sipi(__vaddr_t addr, int dest)
 {
 	__u32 eax;
@@ -63,7 +50,6 @@ static inline void x2apic_send_iipi(int dest)
 #define x2apic_send_iipi_deassert() {}
 
 /* We only support x2APIC at the moment */
-#define apic_send_ipi		x2apic_send_ipi
 #define apic_send_sipi		x2apic_send_sipi
 #define apic_send_iipi		x2apic_send_iipi
 #define apic_send_iipi_deassert x2apic_send_iipi_deassert
@@ -223,12 +209,6 @@ static int plat_native_lcpu_post_start(const __u64 lcpuidx[], unsigned int *num)
 	return 0;
 }
 #endif /* CONFIG_HAVE_CPU_MULTI_PHASE_STARTUP */
-
-int uk_plat_native_send_ipi(__u64 id, unsigned long irq)
-{
-	apic_send_ipi(irq, id);
-	return 0;
-}
 #endif /* CONFIG_HAVE_SMP */
 
 static void plat_native_lcpu_halt(void)

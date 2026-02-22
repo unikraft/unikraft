@@ -288,6 +288,17 @@ __isr void uk_plat_native_except_push_nested(void);
  * Must be called with interrupts disabled.
  */
 __isr void uk_plat_native_except_pop_nested(void);
+
+#if CONFIG_HAVE_SMP
+/**
+ * Send an Interprocessor Interrupt.
+ *
+ * @param id The CPU ID to send the IPI to
+ * @param irq The IRQ to send to the CPU
+ * @return 0 on success, negative errno on failure
+ */
+int uk_plat_native_except_send_ipi(__u64 id, unsigned long irq);
+#endif /* CONFIG_HAVE_SMP */
 #endif /* CONFIG_LIBUKPLAT_NATIVE_EXCEPT */
 
 #ifdef __cplusplus

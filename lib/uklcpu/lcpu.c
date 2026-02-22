@@ -448,9 +448,9 @@ int uk_lcpu_run(const __u64 lcpuidx[], unsigned int *num,
 			if (unlikely(rc))
 				goto lcpu_run_err;
 
-			rc = uk_pal_send_ipi(uk_pcpuvar_lval(lcpuidx[i],
-							     uk_pcpuvar_cpu_id),
-					     *uk_lcpu_run_irqv);
+			rc = uk_pal_except_send_ipi(uk_pcpuvar_lval(lcpuidx[i],
+							uk_pcpuvar_cpu_id),
+						    *uk_lcpu_run_irqv);
 			if (unlikely(rc)) {
 				/* Retry if we could not enqueue the function
 				 * and it is ok to block
@@ -549,8 +549,8 @@ int uk_lcpu_wakeup(const __u64 lcpuidx[], unsigned int *num)
 		if (!uk_lcpu_state_is_online(lcpu->state))
 			continue;
 
-		rc = uk_pal_send_ipi(uk_pcpuvar_lval(lcpuidx[i],
-						     uk_pcpuvar_cpu_id),
+		rc = uk_pal_except_send_ipi(uk_pcpuvar_lval(lcpuidx[i],
+							    uk_pcpuvar_cpu_id),
 				     *uk_lcpu_wakeup_irqv);
 		if (unlikely(rc))
 			goto lcpu_wakeup_err;

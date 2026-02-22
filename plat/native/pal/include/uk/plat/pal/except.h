@@ -181,6 +181,13 @@ __isr static inline int uk_pal_except_init(void)
 	return uk_plat_native_except_init();
 }
 
+#if CONFIG_HAVE_SMP
+static inline int uk_pal_except_send_ipi(__u64 id, unsigned long irq)
+{
+	return uk_plat_native_except_send_ipi(id, irq);
+}
+#endif /* CONFIG_HAVE_SMP */
+
 #ifdef __cplusplus
 }
 #endif
