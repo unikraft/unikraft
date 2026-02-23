@@ -48,6 +48,7 @@
 #include <uk/plat/common/lcpu.h>
 #include <uk/plat/common/_time.h>
 #include <uk/print.h>
+#include <stdbool.h>
 
 #include <limits.h>
 #include <errno.h>
@@ -60,6 +61,8 @@
  * of CPUs beforehand.
  */
 UKPLAT_PER_LCPU_DEFINE(struct lcpu, lcpus);
+UKPLAT_PER_LCPU_DEFINE(bool, rcu_flags);
+
 
 #ifdef CONFIG_HAVE_SMP
 /**
