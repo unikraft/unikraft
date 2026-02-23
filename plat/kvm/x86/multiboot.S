@@ -38,7 +38,25 @@
 #include <uk/asm.h>
 #include <uk/reloc.h>
 
+#if CONFIG_KVM_BOOT_PROTO_MULTIBOOT
 #include <kvm-x86/multiboot.h>
+#elif CONFIG_KVM_BOOT_PROTO_MULTIBOOT2
+#include <kvm-x86/multiboot2.h>
+#else /* !CONFIG_KVM_BOOT_PROTO_MULTIBOOT &&
+	 !CONFIG_KVM_BOOT_PROTO_MULTIBOOT2 */
+#error "Unknown multiboot version"
+#endif /* !CONFIG_KVM_BOOT_PROTO_MULTIBOOT &&
+	 !CONFIG_KVM_BOOT_PROTO_MULTIBOOT2 */
+
+#if CONFIG_KVM_BOOT_PROTO_MULTIBOOT
+#define MULTIBOOT_MAGIC MULTIBOOT_BOOTLOADER_MAGIC
+#elif  CONFIG_KVM_BOOT_PROTO_MULTIBOOT2
+#define MULTIBOOT_MAGIC MULTIBOOT2_BOOTLOADER_MAGIC
+#else /* !CONFIG_KVM_BOOT_PROTO_MULTIBOOT &&
+	 !CONFIG_KVM_BOOT_PROTO_MULTIBOOT2 */
+#error "Unknown multiboot version"
+#endif /* !CONFIG_KVM_BOOT_PROTO_MULTIBOOT &&
+	  !CONFIG_KVM_BOOT_PROTO_MULTIBOOT2 */
 
 /**
  * Stack and entry function to use during CPU initialization
@@ -49,7 +67,15 @@ lcpu_bootstack:
 
 .section .rodata
 lcpu_boot_startup_args:
+#if CONFIG_KVM_BOOT_PROTO_MULTIBOOT
 	ur_data	quad, multiboot_entry, 8
+#elif  CONFIG_KVM_BOOT_PROTO_MULTIBOOT2
+	ur_data	quad, multiboot2_entry, 8
+#else /* !CONFIG_KVM_BOOT_PROTO_MULTIBOOT &&
+	 !CONFIG_KVM_BOOT_PROTO_MULTIBOOT2 */
+#error "Unknown multiboot version"
+#endif /* !CONFIG_KVM_BOOT_PROTO_MULTIBOOT &&
+	  !CONFIG_KVM_BOOT_PROTO_MULTIBOOT2 */
 	ur_data	quad, lcpu_bootstack, 8
 
 /**
@@ -63,8 +89,7 @@ lcpu_boot_startup_args:
 .code32
 .section .text.32.boot
 ENTRY(_multiboot_entry)
-	/* only multiboot is supported for now */
-	cmpl	$MULTIBOOT_BOOTLOADER_MAGIC, %eax
+	cmpl	$MULTIBOOT_MAGIC, %eax
 	jne	no_multiboot
 
 	/* Hardcoding for now I guess... */

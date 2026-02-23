@@ -2,6 +2,10 @@ define build_multiboot =
 	$(call build_cmd,MULTIBT,,$(1).multiboot,$(SCRIPTS_DIR)/multiboot.py $(1))
 endef
 
+define build_multiboot2 =
+	@$(SCRIPTS_DIR)/multiboot2.py $(1)
+endef
+
 BINFO_FLAGS := -a $(CONFIG_UK_ARCH)
 
 ifeq ($(CONFIG_UKPLAT_MEMRNAME),y)
