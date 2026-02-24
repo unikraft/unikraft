@@ -189,6 +189,10 @@ extern void *x86_start16_begin[];
 extern void *x86_start16_end[];
 extern __uptr x86_start16_addr; /* target address */
 
+#ifndef X86_VIDEO_MEM_START
+#define X86_VIDEO_MEM_START	0xA0000UL
+#endif
+
 static inline int
 ukplat_memregion_alloc_sipi_vect(void)
 {

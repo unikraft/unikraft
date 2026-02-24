@@ -351,6 +351,13 @@ no_avx:
 no_fsgsbase:
 #endif /* !__FSGSBASE__ */
 
+	/* Set GS base to lcpu struct pointer (RBP) so that
+	 * per-LCPU variables work before lcpu_init() runs.
+	 * Without this, traps_table_init() crashes on SMP builds
+	 * because ukplat_per_lcpu_current() calls rdgsbase().
+	 */
+	wrgsbase %rbp
+
 #if CONFIG_HAVE_X86PKU
 	/* Enable memory protection keys (PKU) */
 	LCPU_ENABLE_PKU no_pku

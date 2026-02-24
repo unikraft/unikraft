@@ -17,6 +17,7 @@
 #include <uk/assert.h>
 #include <uk/essentials.h>
 #include <uk/intctlr.h>
+#include <uk/plat/common/memory.h>
 
 #include <uk/plat/lcpu.h>
 #include <uk/plat/common/lcpu.h>
@@ -59,6 +60,19 @@ void _ukplat_entry(struct lcpu *lcpu, struct ukplat_bootinfo *bi)
 	rc = uk_intctlr_probe();
 	if (unlikely(rc))
 		UK_CRASH("Interrupt controller init failed: %d\n", rc);
+
+#if defined(CONFIG_HAVE_SMP)
+	/* Allocate SIPI vector region FIRST, before boot stack, so it gets
+	 * a low physical address (< 0x10000). The 16-bit AP trampoline code
+	 * uses 16-bit relocations that break if the SIPI vector is above
+	 * 64KB. Must also be before paging init, because paging init sets
+	 * vbase=__U64_MAX on unmapped free regions, which fails the
+	 * UK_ASSERT_VALID_FREE_MRD page alignment check.
+	 */
+	rc = ukplat_memregion_alloc_sipi_vect();
+	if (unlikely(rc))
+		UK_CRASH("SIPI vector alloc failed: %d\n", rc);
+#endif
 
 	/* Allocate boot stack */
 	bstack = ukplat_memregion_alloc(__STACK_SIZE, UKPLAT_MEMRT_STACK,
