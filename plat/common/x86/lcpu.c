@@ -43,6 +43,7 @@
 #include <x86/traps.h>
 #include <x86/delay.h>
 #include <uk/plat/common/acpi.h>
+#include <uk/plat/common/memory.h>
 
 #include <uk/plat/lcpu.h>
 #include <uk/plat/common/lcpu.h>
@@ -243,11 +244,15 @@ int lcpu_arch_mp_init(void *arg __unused)
 	}
 	UK_ASSERT(bsp_found);
 
-	/* Allocate an mrd for the SIPI vector */
-	rc = ukplat_memregion_alloc_sipi_vect();
-	if (unlikely(rc)) {
-		uk_pr_err("Could not allocate mrd for the SIPI vector(%d)", rc);
-		return rc;
+	/* Allocate an mrd for the SIPI vector (skip if already allocated
+	 * in early boot before paging init)
+	 */
+	if (!x86_start16_addr) {
+		rc = ukplat_memregion_alloc_sipi_vect();
+		if (unlikely(rc)) {
+			uk_pr_err("SIPI vector alloc failed: %d\n", rc);
+			return rc;
+		}
 	}
 
 	/* Copy AP startup code to target address in first 1MiB */
