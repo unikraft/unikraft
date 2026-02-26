@@ -1,8 +1,8 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /*
- * Authors: Jia He <justin.he@arm.com>
+ * Authors: Marco Schlumpp <marco@unikraft.io>
  *
- * Copyright (c) 2020, Arm Ltd. All rights reserved.
+ * Copyright (c) 2022, Unikraft GmbH. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -30,68 +30,37 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef __UK_BUS_PCI_ECAM_H__
-#define __UK_BUS_PCI_ECAM_H__
+#ifndef __UKPLAT_COMMON_PCI_X86_MSIX_H__
+#define __UKPLAT_COMMON_PCI_X86_MSIX_H__
 
-#include <uk/arch/types.h>
-#include <uk/list.h>
+#include <uk/essentials.h>
 #include <uk/bus/pci.h>
-#include <uk/bus/platform.h>
-#include <libfdt.h>
 
-struct fdt_phandle_args;
-extern struct pci_config_window pcw;
-extern int gen_pci_irq_parse(const fdt32_t *addr, struct fdt_phandle_args *out_irq);
+#define PCI_MSIX_X86_DEST_MODE_PHYSICAL		0x0
+#define PCI_MSIX_X86_DEST_MODE_LOGICAL 		0x1
 
-/*
- * struct to hold bus shift of the config window
- * for a PCI controller.
- */
-struct pci_ecam_ops {
-	unsigned int			bus_shift;
+#define PCI_MSIX_X86_DELIVERY_FIXED		0x0
+#define PCI_MSIX_X86_DELIVERY_LOWER_PRIO	0x1
+#define PCI_MSIX_X86_DELIVERY_SMI		0x2
+#define PCI_MSIX_X86_DELIVERY_NMI		0x4
+#define PCI_MSIX_X86_DELIVERY_INIT		0x5
+#define PCI_MSIX_X86_DELIVERY_EXTINT		0x7
+
+#define PCI_MSIX_X86_TRIGGER_EDGE		0x0
+#define PCI_MSIX_X86_TRIGGER_LEVEL		0x1
+
+#define PCI_MSIX_X86_LEVEL_ASSERT		0x0
+#define PCI_MSIX_X86_LEVEL_DEASSERT		0x1
+
+struct pci_msix_table_entry_x86 {
+	__u8 dest_id;
+	__u8 redirection_hint;
+	__u8 destination_mode;
+
+	__u8 vector;
+	__u8 delivery_mode;
+	__u8 level;
+	__u8 trigger;
 };
 
-/*
- * struct to hold the mappings of a config space window. This
- * is expected to be used for PCI controllers that
- * use ECAM.
- */
-struct bus_range {
-	__u8			bus_start;
-	__u8			bus_end;
-};
-
-struct pci_config_window {
-	__paddr_t		config_base;
-	__u64			config_space_size;
-	struct bus_range br;
-	struct pci_ecam_ops		*ops;
-	__paddr_t		pci_device_base;
-	__u64			pci_device_limit;
-};
-
-struct fdt_phandle_args {
-	int np;
-	int args_count;
-	__u32 args[16];
-};
-
-/*
- * IO resources have these defined flags.
- *
- * PCI devices expose these flags to userspace in the "resource" sysfs file,
- * so don't move them.
- */
-#define IORESOURCE_BITS		0x000000ff	/* Bus-specific bits */
-
-#define IORESOURCE_TYPE_BITS	0x00001f00	/* Resource type */
-#define IORESOURCE_IO		0x00000100	/* PCI/ISA I/O ports */
-#define IORESOURCE_MEM		0x00000200
-#define IORESOURCE_REG		0x00000300	/* Register offsets */
-#define IORESOURCE_IRQ		0x00000400
-#define IORESOURCE_DMA		0x00000800
-#define IORESOURCE_BUS		0x00001000
-
-extern struct pf_driver gen_pci_driver;
-
-#endif /* __UK_BUS_PCI_ECAM_H__ */
+#endif /* __UKPLAT_COMMON_PCI_X86_MSIX_H__ */

@@ -65,6 +65,7 @@
 #define __UK_BUS_PCI_H__
 
 #include <stddef.h>
+#include <uk/arch/types.h>
 #include <uk/bus.h>
 #include <uk/alloc.h>
 #include <uk/ctors.h>
@@ -150,6 +151,16 @@ enum pci_device_state {
 	PCI_DEVICE_STATE_RUNNING
 };
 
+/**
+ * @brief Description of a mapped BAR.
+ */
+struct pci_bar_memory {
+	/**< Start address of memory region */
+	void *start;
+	/**< Size of the memory region */
+	size_t size;
+};
+
 struct pci_device {
 	struct uk_list_head list;
 	struct pci_device_id  id;
@@ -159,8 +170,154 @@ struct pci_device {
 
 	unsigned long base;
 	unsigned long irq;
+	/* Memory address of the device configuration space */
+	__u32 config_addr;
+	/* Offset of the MSI-X capability */
+	__u8 msix_cap_offset;
 };
 
+/**
+ * Finds the first capability with the given vendor ID.
+ *
+ * First checks if capabilites are enabled for the @p pci_dev device.
+ * Then looks for the first capability register in the capability linked list
+ * of this device that matches the given @p vndr_id vendor ID.
+ * Returns its offset from the beginning of the device configuration space.
+ *
+ * @param pci_dev pci device whose capabilities are being detected
+ * @param vndr_id vendor ID
+ * @param[out] cap_offset address (offset) of the first found capability register
+ * @return int 0 if found, -1 if none found
+ */
+int arch_pci_find_cap(struct pci_device *pci_dev, __u16 vndr_id,
+		      __u8 *cap_offset);
+
+/**
+ * Finds the next capability with the given vendor ID.
+ *
+ * Looks for the capability that comes after the @p curr_cap capability
+ * in the capability linked list of the device @p pci_dev and
+ * matches the given @p vndr_id vendor ID.
+ * Through @p cap, returns found capability's offset from the beginning of the
+ * device configuration space.
+ *
+ * @param pci_dev
+ *   PCI device whose capabilities are being detected
+ * @param vndr_id
+ *   Vendor ID
+ * @param curr_cap_offset
+ *   Current capability. List traversal begins after this one. Cannot be 0.
+ * @param[out] next_cap_offset
+ *   Address (offset) of the first found capability register
+ * @return
+ *   0 if found, -1 if no matching capability found
+ */
+int arch_pci_find_next_cap(struct pci_device *pci_dev, __u16 vndr_id,
+			   __u8 curr_cap_offset,
+			   __u8 *next_cap_offset);
+
+/**
+ * Read a register in the configuration space header, located at @p a.
+ *
+ * Reads a register, identified by @p s, and writes its contents into the @ret.
+ * Type determines, how much of the data should be returned
+ *
+ * @param a
+ *   configuration space header address
+ * @param s
+ *   macro suffix for the register-specific offset, mask and shift
+ * @param[out] ret
+ *   return variable
+ * @param type
+ *   return type
+ */
+#define PCI_CONF_READ_HEADER(type, ret, a, s)				\
+	do {								\
+		__u32 _conf_data;					\
+		outl(PCI_CONFIG_ADDR, (a) | PCI_CONF_##s);		\
+		_conf_data = ((inl(PCI_CONFIG_DATA) >> PCI_CONF_##s##_SHFT)\
+			      & PCI_CONF_##s##_MASK);			\
+		*(ret) = (type) _conf_data;				\
+	} while (0)
+
+/**
+ * Same as PCI_CONF_READ but allows for register offset, shift and mask
+ * values to be set on runtime, instead of by a macro.
+ *
+ * @param a
+ *   Configuration space header address
+ * @param[out] ret
+ *   Return variable
+ * @param type
+ *   Return type
+ * @param offset
+ *   Offset in bytes, from the beginning of the configuration space.
+ *   Configuration space is 256 bytes large.
+ */
+#define PCI_CONF_READ_OFFSET(type, ret, a, offset, shift, mask)		\
+	do {								\
+		__u32 _conf_data;					\
+		outl(PCI_CONFIG_ADDR, (a) | (offset));			\
+		_conf_data = ((inl(PCI_CONFIG_DATA) >> (shift))		\
+			      & (mask));				\
+		*(ret) = (type) _conf_data;				\
+	} while (0)
+
+/**
+ * Write a register in the configuration space header, located at @p a,
+ * identified by @p s.
+ *
+ * @param a
+ *   Configuration space header address
+ * @param s
+ *   Macro suffix for the register-specific offset, mask and shift
+ * @param value
+ *   The value to write
+ * @param type
+ *   Register type
+ */
+#define PCI_CONF_WRITE_HEADER(type, a, s, value)				\
+	do {									\
+		__u32 _conf_data;						\
+		outl(PCI_CONFIG_ADDR, (a) | PCI_CONF_##s);			\
+		_conf_data = inl(PCI_CONFIG_DATA);				\
+										\
+                _conf_data &= ~(PCI_CONF_##s##_MASK << PCI_CONF_##s##_SHFT);	\
+                _conf_data |=							\
+		    ((value) & PCI_CONF_##s##_MASK) << PCI_CONF_##s##_SHFT;	\
+		outl(PCI_CONFIG_ADDR, (a) | PCI_CONF_##s);			\
+		outl(PCI_CONFIG_DATA, _conf_data);				\
+	} while (0)
+
+/**
+ * Same as PCI_CONF_WRITE_HEADER but allows for register offset, shift
+ * and mask values to be set on runtime, instead of by a macro.
+ *
+ * @param a
+ *   Configuration space header address
+ * @param offset
+ *   The offset of the register in the configuration space
+ * @param shift
+ *   The bit position of the value
+ * @param mask
+ *   The mask used to select the bits after the shift
+ * @param value
+ *   The value to write
+ * @param type
+ *   Register type
+ */
+#define PCI_CONF_WRITE_OFFSET(type, a, offset, shift, mask, value)		\
+	do {									\
+		__u32 _conf_data;						\
+		outl(PCI_CONFIG_ADDR, (a) | (offset));				\
+		_conf_data = inl(PCI_CONFIG_DATA);				\
+										\
+                _conf_data &= ~((mask) << (shift));				\
+                _conf_data |=							\
+		    ((value) & (mask)) << (shift);				\
+		outl(PCI_CONFIG_ADDR, (a) | (offset));				\
+		outl(PCI_CONFIG_DATA, _conf_data);				\
+	} while (0)
 
 #define PCI_REGISTER_DRIVER(b)                  \
 	_PCI_REGISTER_DRIVER(__LIBNAME__, b)
@@ -209,6 +366,17 @@ static struct pci_bus_handler ph __unused;
 #define PCI_FUNCTION_SHIFT          (8)
 #define PCI_ENABLE_BIT              (1u << 31)
 
+#define PCI_MAX_BARS                (6)
+
+/* Offsets, masks and shifts for reading different registers inside a PCI
+ * configuration space header.
+ */
+#define PCI_CONF_STATUS            (0x04)
+#define PCI_CONF_STATUS_SHFT       (16)
+#define PCI_CONF_STATUS_MASK       (0x0000FFFF)
+
+#define PCI_CONF_CAP_STATUS_BIT (0x10) /* set if PCI capabilites are enabled */
+
 #define PCI_CONF_CLASS_ID          (0x08)
 #define PCI_CONF_CLASS_ID_SHFT     (16)
 #define PCI_CONF_CLASS_ID_MASK     (0xFF00)
@@ -233,10 +401,20 @@ static struct pci_bus_handler ph __unused;
 #define PCI_CONF_SECONDARY_BUS_SHFT     (0)
 #define PCI_CONF_SECONDARY_BUS_MASK     (0xFF00)
 
-#define PCI_HEADER_TYPE_MSB_MASK   (0x80)
-#define PCI_CONF_HEADER_TYPE       (0x00)
-#define PCI_CONF_HEADER_TYPE_SHFT  (16)
-#define PCI_CONF_HEADER_TYPE_MASK  (0xFF)
+#define PCI_CONF_REVISION_ID		(0x08)
+#define PCI_CONF_REVISION_ID_SHFT	(0)
+#define PCI_CONF_REVISION_ID_MASK	(0xf)
+
+#define PCI_HEADER_TYPE_MSB_MASK	(0x80)
+#define PCI_CONF_HEADER_TYPE		(0x0C)
+#define PCI_CONF_HEADER_TYPE_SHFT	(16)
+#define PCI_CONF_HEADER_TYPE_MASK	(0xFF)
+/*Bit 7 identifies a multi-function device*/
+#define PCI_CONF_HEADER_TYPE_HEADER_TYPE_MASK (0x7F)
+#define PCI_CONF_HEADER_TYPE_STANDARD	(0x0)
+#define PCI_CONF_HEADER_TYPE_PCI_TO_PCI	(0x1)
+#define PCI_CONF_HEADER_TYPE_CARDBUS_BRIDGE (0x2)
+#define PCI_CONF_CARDBUS_BRIDGE_CAP_LIST_PTR (0x14)
 
 #define PCI_CONF_SUBSYS_ID          (0x2c)
 #define PCI_CONF_SUBSYS_ID_SHFT     (16)
@@ -245,6 +423,14 @@ static struct pci_bus_handler ph __unused;
 #define PCI_CONF_IRQ                (0X3C)
 #define PCI_CONF_IRQ_SHFT           (0x0)
 #define PCI_CONF_IRQ_MASK           (0XFF)
+
+#define PCI_CONF_CAP_POINTER (0x34)
+#define PCI_CONF_CAP_POINTER_SHFT (0x0)
+/**
+ * The bottom two bits are reserved and should be masked before
+ * the Pointer is used to access the Configuration Space.
+ */
+#define PCI_CONF_CAP_POINTER_MASK (0xFC)
 
 #define PCI_CONF_IOBAR              (0x10)
 #define PCI_CONF_IOBAR_SHFT         (0x0)
@@ -278,6 +464,14 @@ static struct pci_bus_handler ph __unused;
 #define PCI_CONFIG_SECONDARY_BUS   0x19
 #define PCI_CAPABILITIES_PTR   0x34
 
+/* Offsets inside a capability register */
+#define PCI_CAP_VENDOR_ID_SHIFT	0
+#define PCI_CAP_VENDOR_ID_MASK	0x000000FF
+#define PCI_CAP_NEXT_SHIFT	8
+#define PCI_CAP_NEXT_MASK	0x000000FC /*last two bits are reserved*/
+
+#define PCI_HEADER_END      0xFF
+
 #define PCI_COMMAND		0x04	/* 16 bits */
 #define  PCI_COMMAND_IO		0x1	/* Enable response in I/O space */
 #define  PCI_COMMAND_MEMORY	0x2	/* Enable response in Memory space */
@@ -298,7 +492,48 @@ static struct pci_bus_handler ph __unused;
 #define PCI_MIN_GNT		0x3e	/* 8 bits */
 #define PCI_MAX_LAT		0x3f	/* 8 bits */
 
+/* PCI capabilities */
+#define PCI_CAP_MSIX		0x11
+
 struct pci_driver *pci_find_driver(struct pci_device_id *id);
+
+int pci_generic_config_read(__u8 bus, __u8 devfn,
+			    int where, int size, void *val);
+
+int pci_generic_config_write(__u8 bus, __u8 devfn,
+			     int where, int size, __u32 val);
+/**
+ * Create a memory mapping for a memory BAR
+ *
+ * @param dev
+ *   The device to act on
+ * @param idx
+ *   The index of the BAR register
+ * @param mem[out]
+ *   Description of the mapped memory
+ * @param attr
+ *   The page attributes to use for mapping the memory. See the PAGE_ATTR_PROT_*
+ *   constants.
+ * @return
+ *   0 if the memory was mapped successfully, a non-zero value if an error
+ *   occurred.
+ */
+int pci_map_bar(struct pci_device *dev, __u8 idx, int attr,
+		struct pci_bar_memory *mem);
+
+/**
+ * Unmap a previously mapped memory BAR
+ *
+ * @param dev
+ *   The device to act on
+ * @param idx
+ *   The index of the BAR register
+ * @param mem[in]
+ *   Description of the mapped memory
+ * @return 0 if the memory was unmapped successfully, a non-zero value if an
+ *   error occurred.
+ */
+int pci_unmap_bar(struct pci_device *dev, __u8 idx, struct pci_bar_memory *mem);
 
 #ifdef __cplusplus
 }
