@@ -33,9 +33,24 @@ __isr static inline void qemu_debug_exit(int value)
 	uk_arch_outw(QEMU_ISA_DEBUG_EXIT_PORT, value);
 }
 
+__isr static inline void _do_qemu_acpi_shutdown(void)
+{
+	/*
+	 * Perform an ACPI shutdown by writing (SLP_TYPa | SLP_EN) to PM1a_CNT.
+	 * Generally speaking, we'd have to jump through a lot of hoops to
+	 * collect those values, however, for QEMU, those are static. Should be
+	 * harmless if we're not running on QEMU, especially considering we're
+	 * already shutting down, so who cares if we crash.
+	 */
+	uk_arch_outw(0x604, 0x2000);
+}
+
 __isr static int qemu_exit(void)
 {
 	qemu_debug_exit(QEMU_ISA_DEBUG_EXIT_NO_CRASH);
+
+	/* Use QEMU hardcoded ACPI shutdown port/value as a fallback */
+	_do_qemu_acpi_shutdown();
 
 	/* Return error if writing to port failed as that should not return. */
 	return -EIO;
@@ -52,6 +67,9 @@ __isr static int qemu_crash(void)
 	 */
 	qemu_debug_exit(QEMU_ISA_DEBUG_EXIT_CRASH);
 	uk_arch_outb(QEMU_PVPANIC_EXIT_PORT, QEMU_PVPANIC_GUEST_PANICKED);
+
+	/* Use QEMU hardcoded ACPI shutdown port/value as a fallback */
+	_do_qemu_acpi_shutdown();
 
 	/* Return error if writing to port failed as that should not return. */
 	return -EIO;
