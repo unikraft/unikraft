@@ -238,7 +238,7 @@ int lcpu_arch_mp_init(void *arg __unused)
 			 * just stop here.
 			 */
 			uk_pr_warn("Maximum number of cores exceeded.\n");
-			return 0;
+			break;
 		}
 	}
 	UK_ASSERT(bsp_found);
