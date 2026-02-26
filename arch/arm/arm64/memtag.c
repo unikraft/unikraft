@@ -28,7 +28,12 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+#include <uk/config.h>
+#if CONFIG_LIBNOLIBC
 #include <assert.h>
+#else
+#include <uk/assert.h>
+#endif
 #include <errno.h>
 #include <stddef.h>
 #include <uk/arch/memtag.h>
