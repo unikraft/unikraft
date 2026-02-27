@@ -26,11 +26,9 @@ if LIBUKPLAT_NATIVE
 
 config LIBUKPLAT_NATIVE_ADDR
 	bool
-	depends on HAVE_PAGING
 
 config LIBUKPLAT_NATIVE_PAGE
 	bool
-	depends on HAVE_PAGING
 
 config LIBUKPLAT_NATIVE_PAGING
 	bool
@@ -42,7 +40,6 @@ config LIBUKPLAT_NATIVE_PAGING
 
 config LIBUKPLAT_NATIVE_PT
 	bool
-	depends on HAVE_PAGING
 	depends on LIBUKPLAT_NATIVE_ADDR
 	depends on LIBUKPLAT_NATIVE_PAGE
 
