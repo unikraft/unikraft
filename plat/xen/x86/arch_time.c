@@ -37,7 +37,6 @@
 #include <stdint.h>
 #include <time.h>
 #include <uk/plat/time.h>
-#include <x86/cpu.h>
 #include <uk/plat/common/_time.h>
 #include <common/hypervisor.h>
 #include <common/events.h>

@@ -30,7 +30,6 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <x86/cpu.h>
 #include <common/hypervisor.h>
 
 

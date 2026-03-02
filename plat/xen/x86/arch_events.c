@@ -28,7 +28,6 @@
  * Ported from Mini-OS
  */
 #include <stdint.h>
-#include <x86/cpu.h>
 #include <uk/arch/ctx.h>
 #include <uk/arch/util.h>
 #include <uk/plat/config.h>
