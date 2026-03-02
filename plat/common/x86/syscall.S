@@ -33,11 +33,11 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <uk/arch.h>
-#include <uk/lcpu.h>
+#include <uk/arch/ctx.h>
+#include <uk/arch/x86_64.h>
 #include <uk/asm.h>
 #include <uk/asm/cfi.h>
-#include <uk/arch/ctx.h>
+#include <uk/lcpu.h>
 
 ENTRY(_ukplat_syscall)
 	.cfi_startproc simple
@@ -166,7 +166,7 @@ ENTRY(_ukplat_syscall)
 	subq	$(UKARCH_EXECENV_SIZE - UK_LCPU_REGS_SIZE), %rsp
 	.cfi_adjust_cfa_offset (UKARCH_EXECENV_SIZE - UK_LCPU_REGS_SIZE)
 
-	pushq_cfi	$(UK_ARCH_GDT_DESC_OFFSET(UK_ARCH_GDT_DESC_DATA))
+	pushq_cfi	$(UK_ARCH_X86_64_GDT_DESC_OFFSET(UK_ARCH_X86_64_GDT_DESC_DATA))
 
 	pushq_reg_cfi r11
 	.cfi_rel_offset rsp, 0
@@ -184,10 +184,10 @@ ENTRY(_ukplat_syscall)
 	 */
 	pushfq			/* eflags */
 	.cfi_adjust_cfa_offset 8
-	orq	$UK_ARCH_RFLAGS_IF, 0(%rsp)
+	orq	$UK_ARCH_X86_64_RFLAGS_IF, 0(%rsp)
 
 	/* cs */
-	pushq_cfi	$(UK_ARCH_GDT_DESC_OFFSET(UK_ARCH_GDT_DESC_CODE))
+	pushq_cfi	$(UK_ARCH_X86_64_GDT_DESC_OFFSET(UK_ARCH_X86_64_GDT_DESC_CODE))
 	pushq_reg_cfi rcx	/* rcx contains the next rip on syscall exit */
 
 	pushq_reg_cfi rax	/* orig_rax */
