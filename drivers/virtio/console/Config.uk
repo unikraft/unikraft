@@ -1,0 +1,21 @@
+menuconfig LIBVIRTIO_CONSOLE
+	bool "Virtio Console device"
+	depends on LIBUKCONSOLE
+	select LIBVIRTIO_BUS
+	select LIBUKSGLIST
+	select LIBUKALLOC
+	help
+		Driver for Virtual I/O Console devices.
+
+if LIBVIRTIO_CONSOLE
+
+config LIBVIRTIO_CONSOLE_NB_DESC
+	int "Default descriptor number per virtqueue"
+	default 64
+	help
+		The device driver will set up the virtqueues with this number
+		of descriptors. This is ignored in legacy virtio cases since
+		the queue size is immutable and the guest driver will use
+		whatever the host reports.
+
+endif

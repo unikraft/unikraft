@@ -1,0 +1,11 @@
+$(eval $(call addlib_s,libvirtio_console,$(CONFIG_LIBVIRTIO_CONSOLE)))
+
+# common virtio headers
+LIBVIRTIO_CONSOLE_CINCLUDES-y  += -I$(LIBVIRTIO_BUS_BASE)/include
+LIBVIRTIO_CONSOLE_CINCLUDES-y  += -I$(LIBVIRTIO_RING_BASE)/include
+LIBVIRTIO_CONSOLE_CINCLUDES-y  += -I$(UK_DRIV_LIBVIRTIO_BASE)/include
+
+# TODO Remove as soon as plat dependencies go away
+LIBVIRTIO_CONSOLE_CINCLUDES-y += -I$(LIBVIRTIO_CONSOLE_BASE)/include
+
+LIBVIRTIO_CONSOLE_SRCS-y += $(LIBVIRTIO_CONSOLE_BASE)/virtio_console.c
