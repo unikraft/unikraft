@@ -9,6 +9,7 @@
 
 #include <uk/arch/types.h>
 #include <uk/arch/util.h>
+#include <uk/arch/x86_64.h>
 #include <uk/config.h>
 #include <uk/plat/native/arch/regs.h>
 
@@ -207,7 +208,7 @@ __isr int uk_plat_native_except_init(void);
  */
 __isr static inline void uk_plat_native_enable_irq(void)
 {
-	uk_arch_enable_irq();
+	uk_arch_x86_64_enable_irq();
 }
 
 /**
@@ -217,7 +218,7 @@ __isr static inline void uk_plat_native_enable_irq(void)
  */
 __isr static inline void uk_plat_native_disable_irq(void)
 {
-	uk_arch_disable_irq();
+	uk_arch_x86_64_disable_irq();
 }
 
 /**
@@ -231,10 +232,10 @@ __isr static inline unsigned long uk_plat_native_save_irqf(void)
 {
 	unsigned long flags;
 
-	flags = uk_arch_rflags_get();
-	uk_arch_disable_irq();
+	flags = uk_arch_x86_64_rflags_get();
+	uk_arch_x86_64_disable_irq();
 
-	return !!(flags & UK_ARCH_RFLAGS_IF);
+	return !!(flags & UK_ARCH_X86_64_RFLAGS_IF);
 }
 
 /**
@@ -246,9 +247,9 @@ __isr static inline unsigned long uk_plat_native_save_irqf(void)
 __isr static inline void uk_plat_native_restore_irqf(unsigned long flags)
 {
 	if (flags)
-		uk_arch_enable_irq();
+		uk_arch_x86_64_enable_irq();
 	else
-		uk_arch_disable_irq();
+		uk_arch_x86_64_disable_irq();
 }
 
 /**
@@ -258,7 +259,7 @@ __isr static inline void uk_plat_native_restore_irqf(unsigned long flags)
  */
 __isr static inline int uk_plat_native_irqs_disabled(void)
 {
-	return !(uk_arch_rflags_get() & UK_ARCH_RFLAGS_IF);
+	return !(uk_arch_x86_64_rflags_get() & UK_ARCH_X86_64_RFLAGS_IF);
 }
 
 /**

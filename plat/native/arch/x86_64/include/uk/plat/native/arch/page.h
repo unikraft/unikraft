@@ -44,14 +44,14 @@ extern "C" {
 
 /* Default PAT value (see SDM Vol 3, 11.12.4 Programming the PAT) */
 #define __X86_64_PAT_DEFAULT						\
-	(__X86_64_PAT_ENTRY(0, UK_ARCH_PAT_WB) |			\
-	 __X86_64_PAT_ENTRY(1, UK_ARCH_PAT_WT) |			\
-	 __X86_64_PAT_ENTRY(2, UK_ARCH_PAT_UCM) |			\
-	 __X86_64_PAT_ENTRY(3, UK_ARCH_PAT_UC) |			\
-	 __X86_64_PAT_ENTRY(4, UK_ARCH_PAT_WB) |			\
-	 __X86_64_PAT_ENTRY(5, UK_ARCH_PAT_WT) |			\
-	 __X86_64_PAT_ENTRY(6, UK_ARCH_PAT_UCM) |			\
-	 __X86_64_PAT_ENTRY(7, UK_ARCH_PAT_UC))
+	(__X86_64_PAT_ENTRY(0, UK_ARCH_X86_64_PAT_WB) |			\
+	 __X86_64_PAT_ENTRY(1, UK_ARCH_X86_64_PAT_WT) |			\
+	 __X86_64_PAT_ENTRY(2, UK_ARCH_X86_64_PAT_UCM) |		\
+	 __X86_64_PAT_ENTRY(3, UK_ARCH_X86_64_PAT_UC) |			\
+	 __X86_64_PAT_ENTRY(4, UK_ARCH_X86_64_PAT_WB) |			\
+	 __X86_64_PAT_ENTRY(5, UK_ARCH_X86_64_PAT_WT) |			\
+	 __X86_64_PAT_ENTRY(6, UK_ARCH_X86_64_PAT_UCM) |		\
+	 __X86_64_PAT_ENTRY(7, UK_ARCH_X86_64_PAT_UC))
 
 #define UK_PLAT_NATIVE_PAGE_ATTR_PROT_NONE	0x00 /* Page is not accessible */
 #define UK_PLAT_NATIVE_PAGE_ATTR_PROT_READ	0x01 /* Page is readable */
@@ -64,10 +64,10 @@ extern "C" {
 	((lvl) <= UK_PLAT_NATIVE_PAGE_HUGE_LEVEL)
 
 /* For lvl > UK_PLAT_NATIVE_PAGE_HUGE_LEVEL the
- * UK_ARCH_PTE_PSE bit must always be 0 (resv.)
+ * UK_ARCH_X86_64_PTE_PSE bit must always be 0 (resv.)
  */
 #define UK_PLAT_NATIVE_PAGE_Lx_IS(pte, lvl)		\
-	(((lvl) == UK_PLAT_NATIVE_PAGE_LEVEL) || ((pte) & UK_ARCH_PTE_PSE))
+	(((lvl) == UK_PLAT_NATIVE_PAGE_LEVEL) || ((pte) & UK_ARCH_X86_64_PTE_PSE))
 
 #endif /* !__ASSEMBLY__ */
 
