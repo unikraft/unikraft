@@ -2,7 +2,10 @@
  * Licensed under the BSD-3-Clause License (the "License").
  * You may not use this file except in compliance with the License.
  */
+
 #include <errno.h>
+#include <uk/arch/util.h>
+#include <uk/arch/x86_64.h>
 #include <uk/assert.h>
 #include <uk/event.h>
 #include <uk/config.h>
@@ -10,31 +13,36 @@
 #include <uk/lcpu.h>
 
 #if CONFIG_LIBUKINTCTLR_APIC
-#include <uk/arch.h>
+#include <uk/arch/x86_64.h>
+#include <uk/arch/util.h>
 
 static inline int x2apic_enable(void)
 {
 	__u32 eax, ebx, ecx, edx;
 
 	/* Check for x2APIC support */
-	uk_arch_cpuid(1, 0, &eax, &ebx, &ecx, &edx);
-	if (!(ecx & UK_ARCH_CPUID1_ECX_X2APIC))
+	uk_arch_x86_64_cpuid(1, 0, &eax, &ebx, &ecx, &edx);
+	if (!(ecx & UK_ARCH_X86_64_CPUID1_ECX_X2APIC))
 		return -ENOTSUP;
 
 	/* Check if APIC is active */
-	uk_arch_rdmsr(UK_ARCH_APIC_MSR_BASE, &eax, &edx);
-	if (!(eax & UK_ARCH_APIC_BASE_EN))
+	uk_arch_x86_64_rdmsr(UK_ARCH_X86_64_APIC_MSR_BASE,
+					    &eax, &edx);
+	if (!(eax & UK_ARCH_X86_64_APIC_BASE_EN))
 		return -ENOTSUP;
 
 	/* Switch to x2APIC mode */
-	eax |= UK_ARCH_APIC_BASE_EXTD;
-	uk_arch_wrmsr(UK_ARCH_APIC_MSR_BASE, eax, edx);
+	eax |= UK_ARCH_X86_64_APIC_BASE_EXTD;
+	uk_arch_x86_64_wrmsr(UK_ARCH_X86_64_APIC_MSR_BASE,
+					    eax, edx);
 
 	/* Set APIC software enable flag if necessary */
-	uk_arch_rdmsr(UK_ARCH_APIC_MSR_SVR, &eax, &edx);
-	if ((eax & UK_ARCH_APIC_SVR_EN) == 0) {
-		eax |= UK_ARCH_APIC_SVR_EN;
-		uk_arch_wrmsr(UK_ARCH_APIC_MSR_SVR, eax, edx);
+	uk_arch_x86_64_rdmsr(UK_ARCH_X86_64_APIC_MSR_SVR,
+					    &eax, &edx);
+	if ((eax & UK_ARCH_X86_64_APIC_SVR_EN) == 0) {
+		eax |= UK_ARCH_X86_64_APIC_SVR_EN;
+		uk_arch_x86_64_wrmsr(UK_ARCH_X86_64_APIC_MSR_SVR,
+						    eax, edx);
 	}
 
 	/*
@@ -48,7 +56,7 @@ static inline int x2apic_enable(void)
 
 static inline void x2apic_ack_interrupt(void)
 {
-	uk_arch_wrmsr(UK_ARCH_APIC_MSR_EOI, 0, 0);
+	uk_arch_x86_64_wrmsr(UK_ARCH_X86_64_APIC_MSR_EOI, 0, 0);
 }
 
 #define apic_ack_interrupt	x2apic_ack_interrupt

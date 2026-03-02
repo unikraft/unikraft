@@ -26,6 +26,7 @@
  */
 
 #include <uk/arch/types.h>
+#include <uk/arch/util.h>
 #include <uk/console/driver.h>
 #include <uk/plat/common/bootinfo.h>
 #include <uk/prio.h>
@@ -141,20 +142,20 @@ UK_LIBPARAM_PARAM_ALIAS(early_port, &early_dev.port, __u16,
 static inline void com_setup(int port_addr, __u8 bauddiv_lo, __u8 bauddiv_hi)
 {
 	/* Disable all interrupts */
-	uk_arch_outb(COM_INTR(port_addr), 0x00);
+	uk_arch_x86_64_outb(COM_INTR(port_addr), 0x00);
 	/* Enable DLAB (set baudrate divisor) */
-	uk_arch_outb(COM_CTRL(port_addr), DLAB);
+	uk_arch_x86_64_outb(COM_CTRL(port_addr), DLAB);
 	/* Div (lo byte) */
-	uk_arch_outb(COM_DIV_LO(port_addr), bauddiv_lo);
+	uk_arch_x86_64_outb(COM_DIV_LO(port_addr), bauddiv_lo);
 	/* Div (hi byte) */
-	uk_arch_outb(COM_DIV_HI(port_addr), bauddiv_hi);
+	uk_arch_x86_64_outb(COM_DIV_HI(port_addr), bauddiv_hi);
 	/* Set 8N1, clear DLAB */
-	uk_arch_outb(COM_CTRL(port_addr), PROT);
+	uk_arch_x86_64_outb(COM_CTRL(port_addr), PROT);
 }
 
 static inline int com_check_tx_empty(int port_addr)
 {
-	return (int)uk_arch_inb(COM_STATUS(port_addr)) &
+	return (int)uk_arch_x86_64_inb(COM_STATUS(port_addr)) &
 		COM_STATUS_TX_READY_BIT;
 }
 
@@ -162,12 +163,12 @@ static inline void com_write(int port_addr, char chr)
 {
 	while (!com_check_tx_empty(port_addr))
 		;
-	uk_arch_outb(COM_DATA(port_addr), chr);
+	uk_arch_x86_64_outb(COM_DATA(port_addr), chr);
 }
 
 static inline int com_check_rx_ready(int port_addr)
 {
-	return (int)uk_arch_inb(COM_STATUS(port_addr)) &
+	return (int)uk_arch_x86_64_inb(COM_STATUS(port_addr)) &
 		COM_STATUS_RX_READY_BIT;
 }
 
@@ -200,7 +201,7 @@ __ssz com_in(struct uk_console *dev, char *buf, __sz len)
 	for (i = 0; i < len; i++) {
 		if (!com_check_rx_ready(com_dev->port))
 			return i;
-		buf[i] = uk_arch_inb(COM_DATA(com_dev->port));
+		buf[i] = uk_arch_x86_64_inb(COM_DATA(com_dev->port));
 	}
 
 	return len;

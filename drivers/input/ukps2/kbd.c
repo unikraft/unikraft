@@ -4,6 +4,7 @@
  * You may not use this file except in compliance with the License.
  */
 
+#include <uk/arch/util.h>
 #include <uk/bitops.h>
 #include <uk/event.h>
 #include <uk/init.h>
@@ -25,10 +26,11 @@ static int kbd_ps2_irq_handler(void *arg __unused)
 	__u16 sc;
 
 	/* If not a key pressed, probably another event on first PS/2 port */
-	if (!(uk_arch_inb(PS2_STATUS_REG) & PS2_STATUS_RECV_FULL))
+	if (!(uk_arch_x86_64_inb(PS2_STATUS_REG) & PS2_STATUS_RECV_FULL))
 		return 0;
 
-	sc = (uk_arch_inb(PS2_DATA_REG) << 8) + uk_arch_inb(PS2_DATA_REG);
+	sc = (uk_arch_x86_64_inb(PS2_DATA_REG) << 8) +
+	      uk_arch_x86_64_inb(PS2_DATA_REG);
 
 	switch (sc) {
 	/* TODO: This is dumbed down, enough for Firecracker shutdown. In
@@ -66,17 +68,17 @@ static int kbd_ps2_probe(struct uk_init_ctx *ictx __unused)
 	 */
 
 	/* PS/2 Keyboard is on first port. Just enable it. */
-	uk_arch_outb(PS2_CMD_REG, PS2_CMD_EN_KBD);
+	uk_arch_x86_64_outb(PS2_CMD_REG, PS2_CMD_EN_KBD);
 
 	/* Send read current configuration register command */
-	uk_arch_outb(PS2_CMD_REG, PS2_CMD_READ_CFG);
+	uk_arch_x86_64_outb(PS2_CMD_REG, PS2_CMD_READ_CFG);
 
 	/* Wait for response byte by checking status bit of receive buffer.
 	 * Try for 5 times, but it should work the first time usually.
 	 */
-	while (!(uk_arch_inb(PS2_STATUS_REG) & PS2_STATUS_RECV_FULL)) {
+	while (!(uk_arch_x86_64_inb(PS2_STATUS_REG) & PS2_STATUS_RECV_FULL)) {
 		if (unlikely(counter >= 5)) {
-			uk_arch_outb(PS2_CMD_REG, PS2_CMD_DIS_KBD);
+			uk_arch_x86_64_outb(PS2_CMD_REG, PS2_CMD_DIS_KBD);
 			uk_pr_err("PS/2 Controller unresponsie\n");
 			return -ENODEV;
 		}
@@ -89,7 +91,7 @@ static int kbd_ps2_probe(struct uk_init_ctx *ictx __unused)
 	}
 
 	/* Read the configuration register */
-	cfg = uk_arch_inb(PS2_DATA_REG);
+	cfg = uk_arch_x86_64_inb(PS2_DATA_REG);
 
 	/* This shouldn't even be needed in a virtualized environment, e.g.
 	 * on Firecracker the above sending of PS2_CMD_EN_KBD would be enough.
@@ -98,10 +100,10 @@ static int kbd_ps2_probe(struct uk_init_ctx *ictx __unused)
 	cfg &= ~PS2_CFG_REG_DIS_KBD_CLK;
 
 	/* Send write current configuration register command */
-	uk_arch_outb(PS2_CMD_REG, PS2_CMD_WRITE_CFG);
+	uk_arch_x86_64_outb(PS2_CMD_REG, PS2_CMD_WRITE_CFG);
 
 	/* Send the new configuration register value */
-	uk_arch_outb(PS2_DATA_REG, cfg);
+	uk_arch_x86_64_outb(PS2_DATA_REG, cfg);
 
 	/* TODO: Legacy wired to Master PIC IRQ 1, with I/O-APIC this is likely
 	 * rewired so check ACPI MADT Interrupt Source Override.

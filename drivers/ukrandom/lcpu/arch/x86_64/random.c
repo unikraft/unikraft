@@ -6,6 +6,7 @@
 
 #include <errno.h>
 #include <uk/arch/util.h>
+#include <uk/arch/x86_64.h>
 #include <uk/lcpu.h>
 #include <uk/arch/types.h>
 #include <uk/errptr.h>
@@ -134,14 +135,14 @@ struct uk_random_driver_ops *device_init(void)
 {
 	__u32 eax, ebx, ecx, edx;
 
-	uk_arch_cpuid(1, 0, &eax, &ebx, &ecx, &edx);
-	if (unlikely(!(ecx & UK_ARCH_CPUID1_ECX_RDRAND))) {
+	uk_arch_x86_64_cpuid(1, 0, &eax, &ebx, &ecx, &edx);
+	if (unlikely(!(ecx & UK_ARCH_X86_64_CPUID1_ECX_RDRAND))) {
 		uk_pr_debug("RDRAND not available on this CPU\n");
 		return ERR2PTR(-ENOTSUP);
 	}
 
-	uk_arch_cpuid(7, 0, &eax, &ebx, &ecx, &edx);
-	if (ebx & UK_ARCH_CPUID7_EBX_RDSEED)
+	uk_arch_x86_64_cpuid(7, 0, &eax, &ebx, &ecx, &edx);
+	if (ebx & UK_ARCH_X86_64_CPUID7_EBX_RDSEED)
 		have_rdseed = __true;
 	else
 		uk_pr_warn("RDSEED not available on this CPU, falling back to RDRAND\n");

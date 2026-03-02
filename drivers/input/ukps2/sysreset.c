@@ -21,7 +21,7 @@ __isr int uk_ps2_cpu_reset(void)
 	/* Trigger the reset line via the PS/2 controller. On firecracker
 	 * this will shutdown the VM.
 	 */
-	uk_arch_outb(PS2_CMD_REG, PS2_CMD_CPU_RESET);
+	uk_arch_x86_64_outb(PS2_CMD_REG, PS2_CMD_CPU_RESET);
 
 	/* Return error if writing to port failed as that should not return. */
 	return -EIO;

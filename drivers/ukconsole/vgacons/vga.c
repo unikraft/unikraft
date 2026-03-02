@@ -29,7 +29,8 @@
 #include <sys/types.h>
 #include <stdint.h>
 #include <string.h>
-#include <uk/arch.h>
+#include <uk/arch/x86_64.h>
+#include <uk/arch/util.h>
 #include <uk/console/driver.h>
 #include <uk/prio.h>
 #include <uk/boot/earlytab.h>
@@ -118,16 +119,16 @@ static void vga_update_cursor(void)
 	uint8_t old;
 
 	irq_flags = uk_lcpu_save_irqf();
-	old = uk_arch_inb(areg);
+	old = uk_arch_x86_64_inb(areg);
 	/* Cursor Location High */
-	uk_arch_outb(areg, 0x0e);
-	uk_arch_outb(dreg, ((terminal_row * VGA_WIDTH) +
+	uk_arch_x86_64_outb(areg, 0x0e);
+	uk_arch_x86_64_outb(dreg, ((terminal_row * VGA_WIDTH) +
 			    terminal_column) >> 8);
 	/* Cursor Location Low */
-	uk_arch_outb(areg, 0x0f);
-	uk_arch_outb(dreg, ((terminal_row * VGA_WIDTH) +
+	uk_arch_x86_64_outb(areg, 0x0f);
+	uk_arch_x86_64_outb(dreg, ((terminal_row * VGA_WIDTH) +
 			    terminal_column) & 0xff);
-	uk_arch_outb(areg, old);
+	uk_arch_x86_64_outb(areg, old);
 	uk_lcpu_restore_irqf(irq_flags);
 }
 
@@ -232,14 +233,14 @@ static int vga_check_settings(void)
 	 * It should be set, signifying that the VGA controller detects writes
 	 * to the VGA memory region.
 	 */
-	eram = uk_arch_inb(VGA_MISC_OUTPUT_REG) & VGA_ERAM_MASK;
+	eram = uk_arch_x86_64_inb(VGA_MISC_OUTPUT_REG) & VGA_ERAM_MASK;
 
 	/* Second, read 'Memory Map Select' filed in the 'Miscellaneous
 	 * Graphics Register'. It should be 0b11 in order to select the
 	 * 0xb8000-0xbffff address range.
 	 */
-	uk_arch_outb(VGA_GRAPHICS_ADDRESS_REG, VGA_MISC_GRAPHICS_REG);
-	memory_map_select = uk_arch_inb(VGA_GRAPHICS_DATA_REG)
+	uk_arch_x86_64_outb(VGA_GRAPHICS_ADDRESS_REG, VGA_MISC_GRAPHICS_REG);
+	memory_map_select = uk_arch_x86_64_inb(VGA_GRAPHICS_DATA_REG)
 			    & VGA_MEMORY_MAP_SELECT_MASK;
 
 	return eram && memory_map_select == VGA_MEMORY_MAP_SELECT_MASK;
@@ -260,14 +261,15 @@ static int vga_init(struct ukplat_bootinfo *bi)
 		__u8 val;
 
 		/* Set 'ERAM' in 'Miscellaneous Output Register'. */
-		val = uk_arch_inb(VGA_MISC_OUTPUT_REG);
-		uk_arch_outb(VGA_MISC_OUTPUT_REG, val | VGA_ERAM_MASK);
+		val = uk_arch_x86_64_inb(VGA_MISC_OUTPUT_REG);
+		uk_arch_x86_64_outb(VGA_MISC_OUTPUT_REG, val | VGA_ERAM_MASK);
 
 		/* Set 'Memory Map Select' in 'Miscellaneous Graphics Reg'. */
-		uk_arch_outb(VGA_GRAPHICS_ADDRESS_REG, VGA_MISC_GRAPHICS_REG);
-		val = uk_arch_inb(VGA_GRAPHICS_DATA_REG);
-		uk_arch_outb(VGA_GRAPHICS_DATA_REG,
-			     val | VGA_MEMORY_MAP_SELECT_MASK);
+		uk_arch_x86_64_outb(VGA_GRAPHICS_ADDRESS_REG,
+				    VGA_MISC_GRAPHICS_REG);
+		val = uk_arch_x86_64_inb(VGA_GRAPHICS_DATA_REG);
+		uk_arch_x86_64_outb(VGA_GRAPHICS_DATA_REG,
+				    val | VGA_MEMORY_MAP_SELECT_MASK);
 
 		/* When the settings are still not correct, we assume that there
 		 * is no VGA controller.
@@ -283,7 +285,7 @@ static int vga_init(struct ukplat_bootinfo *bi)
 	 * at 0x3cc. For our emulated color display, they should always be
 	 * 0x3d{4,5}, but better safe than sorry, so let's check at init time.
 	 */
-	if (uk_arch_inb(VGA_MISC_OUTPUT_REG) & VGA_IO_ADDRESS_SELECT_MASK) {
+	if (uk_arch_x86_64_inb(VGA_MISC_OUTPUT_REG) & VGA_IO_ADDRESS_SELECT_MASK) {
 		areg = 0x3d4;
 		dreg = 0x3d5;
 	} else {
@@ -295,10 +297,10 @@ static int vga_init(struct ukplat_bootinfo *bi)
 	 * and CURSOR_END (0x0b) to 0x0f enables the cursor and produces
 	 * a blinking underscore.
 	 */
-	uk_arch_outb(areg, 0x0a);
-	uk_arch_outb(dreg, 0x0e);
-	uk_arch_outb(areg, 0x0b);
-	uk_arch_outb(dreg, 0x0f);
+	uk_arch_x86_64_outb(areg, 0x0a);
+	uk_arch_x86_64_outb(dreg, 0x0e);
+	uk_arch_x86_64_outb(areg, 0x0b);
+	uk_arch_x86_64_outb(dreg, 0x0f);
 	uk_lcpu_restore_irqf(irq_flags);
 
 	clear_terminal();
