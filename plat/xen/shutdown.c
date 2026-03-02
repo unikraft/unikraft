@@ -4,6 +4,7 @@
  *
  *
  * Copyright (c) 2017, NEC Europe Ltd., NEC Corporation. All rights reserved.
+ *           (c) 2026, Unikraft GmbH and The Unikraft Authors
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -31,11 +32,12 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <inttypes.h>
-#include <string.h>
-#include <uk/lcpu.h>
-#include <uk/plat/bootstrap.h>
 #include <errno.h>
+
+#include <uk/config.h>
+#include <uk/pm.h>
+#include <uk/boot/earlytab.h>
+#include <uk/prio.h>
 
 #include <xen/xen.h>
 #if CONFIG_LIBXENCONS
@@ -48,38 +50,43 @@
 #include <xen-arm/hypercall.h>
 #endif
 
-void ukplat_terminate(enum ukplat_gstate request)
+__isr static inline int xen_shutdown(int reason)
 {
-	int reason;
-
-	switch (request) {
-	case UKPLAT_HALT:
-		reason = SHUTDOWN_poweroff;
-		break;
-	case UKPLAT_RESTART:
-		reason = SHUTDOWN_reboot;
-		break;
-	default: /* UKPLAT_CRASH */
-		reason = SHUTDOWN_crash;
-		break;
-	}
+	struct sched_shutdown sched_shutdown = { .reason = reason };
 
 #if CONFIG_LIBXENCONS
 	xencons_flush();
 #endif /* CONFIG_LIBXENCONS */
 
-	for (;;) {
-		struct sched_shutdown sched_shutdown = { .reason = reason };
-
-		HYPERVISOR_sched_op(SCHEDOP_shutdown, &sched_shutdown);
-	}
+	HYPERVISOR_sched_op(SCHEDOP_shutdown, &sched_shutdown);
+	/* Report error in case shutdown hypercall fails & returns */
+	return -EIO;
 }
 
-int ukplat_suspend(void)
+__isr static int xen_halt(void)
 {
-	int ret;
-
-	ret = EBUSY;
-	/* ret = HYPERVISOR_suspend(virt_to_mfn(start_info_ptr)); */
-	return -ret;
+	return xen_shutdown(SHUTDOWN_poweroff);
 }
+
+__isr static int xen_restart(void)
+{
+	return xen_shutdown(SHUTDOWN_reboot);
+}
+
+__isr static int xen_crash(void)
+{
+	return xen_shutdown(SHUTDOWN_crash);
+}
+
+static const struct uk_pm_ops xen_pm_ops = {
+	.syshalt = xen_halt,
+	.sysrestart = xen_restart,
+	.syscrash = xen_crash
+};
+
+static int xen_register_pm_ops(struct ukplat_bootinfo *bi __unused)
+{
+	return uk_pm_ops_register(&xen_pm_ops);
+}
+
+UK_BOOT_EARLYTAB_ENTRY(xen_register_pm_ops, UK_PRIO_EARLIEST);
