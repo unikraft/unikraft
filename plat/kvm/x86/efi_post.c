@@ -3,6 +3,8 @@
  * Licensed under the BSD-3-Clause License (the "License").
  * You may not use this file except in compliance with the License.
  */
+
+#include <uk/arch/util.h>
 #include <uk/efi.h>
 #include <uk/paging.h>
 #include <uk/plat/common/bootinfo.h>
@@ -40,8 +42,8 @@ static __u8 __align(16) uk_efi_bootstack[UK_PAGING_PAGE_SIZE];
  */
 static inline void unmask_8259_pic(void)
 {
-	uk_arch_outb(PIC1_DATA, PIC1_DATA_DEFAULT_MASK);
-	uk_arch_outb(PIC2_DATA, PIC2_DATA_DEFAULT_MASK);
+	uk_arch_x86_64_outb(PIC1_DATA, PIC1_DATA_DEFAULT_MASK);
+	uk_arch_x86_64_outb(PIC2_DATA, PIC2_DATA_DEFAULT_MASK);
 }
 
 /* UEFI enables the LAPIC Timer to run periodic routines, usually at 10KHz */
@@ -51,7 +53,7 @@ static inline void lapic_timer_disable(void)
 	__u32 eax, edx;
 
 	/* Check if APIC is active */
-	uk_arch_rdmsr(LAPIC_MSR_BASE, &eax, &edx);
+	uk_arch_x86_64_rdmsr(LAPIC_MSR_BASE, &eax, &edx);
 	if (unlikely(!(eax & LAPIC_BASE_EN)))
 		return;
 
@@ -67,7 +69,8 @@ static inline void lapic_timer_disable(void)
  */
 static inline void pic_8259_elcr2_level_irq10_11(void)
 {
-	uk_arch_outb(PIC2_ELCR2, PIC2_ELCR2_IRQ11_ECL | PIC2_ELCR2_IRQ10_ECL);
+	uk_arch_x86_64_outb(PIC2_ELCR2,
+			    PIC2_ELCR2_IRQ11_ECL | PIC2_ELCR2_IRQ10_ECL);
 }
 
 void __noreturn uk_efi_jmp_to_kern()

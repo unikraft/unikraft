@@ -11,6 +11,8 @@
 #endif /* CONFIG_LIBUKACPI */
 #include <uk/arch/limits.h>
 #include <uk/arch/types.h>
+#include <uk/arch/util.h>
+#include <uk/arch/x86_64.h>
 #include <uk/asm/cfi.h>
 #include <uk/boot.h>
 #include <uk/paging.h>
@@ -61,27 +63,33 @@ static inline void _init_syscall(void)
 	int have_syscall = 0;
 
 	/* Check for availability of extended features */
-	uk_arch_cpuid(0x80000000, 0, &eax, &ebx, &ecx, &edx);
+	uk_arch_x86_64_cpuid(0x80000000, 0, &eax, &ebx, &ecx, &edx);
 	if (eax >= 0x80000001) {
-		uk_arch_cpuid(0x80000001, 0, &eax, &ebx, &ecx, &edx);
-		have_syscall = (edx & UK_ARCH_CPUID3_SYSCALL);
+		uk_arch_x86_64_cpuid(0x80000001, 0, &eax, &ebx, &ecx, &edx);
+		have_syscall = (edx & UK_ARCH_X86_64_CPUID3_SYSCALL);
 	}
 
 	if (!have_syscall)
 		UK_CRASH("CPU does not support SYSCALL/SYSRET!\n");
 
 	/* Enable and program syscall/sysret */
-	uk_arch_wrmsrl(UK_ARCH_MSR_EFER,
-		       uk_arch_rdmsrl(UK_ARCH_MSR_EFER) |
-		       UK_ARCH_EFER_LMA | UK_ARCH_EFER_LME | UK_ARCH_EFER_SCE);
-	uk_arch_wrmsrl(UK_ARCH_MSR_STAR, (0x08ULL << 48) | (0x08ULL << 32));
-	uk_arch_wrmsrl(UK_ARCH_MSR_LSTAR, (__uptr)_ukplat_syscall);
+	uk_arch_x86_64_wrmsrl(UK_ARCH_X86_64_MSR_EFER,
+			      uk_arch_x86_64_rdmsrl(UK_ARCH_X86_64_MSR_EFER) |
+			      UK_ARCH_X86_64_EFER_LMA |
+			      UK_ARCH_X86_64_EFER_LME |
+			      UK_ARCH_X86_64_EFER_SCE);
+	uk_arch_x86_64_wrmsrl(UK_ARCH_X86_64_MSR_STAR,
+			      (0x08ULL << 48) | (0x08ULL << 32));
+	uk_arch_x86_64_wrmsrl(UK_ARCH_X86_64_MSR_LSTAR,
+			      (__uptr)_ukplat_syscall);
 
 	/* Clear IF flag during an interrupt */
-	uk_arch_wrmsrl(UK_ARCH_MSR_SYSCALL_MASK,
-		       UK_ARCH_RFLAGS_TF | UK_ARCH_RFLAGS_DF |
-		       UK_ARCH_RFLAGS_IF | UK_ARCH_RFLAGS_AC |
-		       UK_ARCH_RFLAGS_NT);
+	uk_arch_x86_64_wrmsrl(UK_ARCH_X86_64_MSR_SYSCALL_MASK,
+			      UK_ARCH_X86_64_RFLAGS_TF |
+			      UK_ARCH_X86_64_RFLAGS_DF |
+			      UK_ARCH_X86_64_RFLAGS_IF |
+			      UK_ARCH_X86_64_RFLAGS_AC |
+			      UK_ARCH_X86_64_RFLAGS_NT);
 
 	uk_pr_info("SYSCALL entrance @ %p\n", _ukplat_syscall);
 }
@@ -92,8 +100,8 @@ static inline void _check_ospke(void)
 {
 	__u32 eax, ebx, ecx, edx;
 
-	uk_arch_cpuid(0x7, 0, &eax, &ebx, &ecx, &edx);
-	if (!(ecx & UK_ARCH_CPUID7_ECX_OSPKE)) {
+	uk_arch_x86_64_cpuid(0x7, 0, &eax, &ebx, &ecx, &edx);
+	if (!(ecx & UK_ARCH_X86_64_CPUID7_ECX_OSPKE)) {
 		/* if PKU is not enabled, abort the boot process. Images
 		 * compiled with HAVE_X86PKU are *specialized* to be executed on
 		 * PKU-enabled hardware. This allows us to avoid checks later at
@@ -169,5 +177,5 @@ void _ukplat_entry(struct ukplat_bootinfo *bi)
 
 	/* Switch away from the bootstrap stack */
 	uk_pr_info("Switch from bootstrap stack to stack @%p\n", bstack);
-	uk_arch_jump_to((__u64)bstack, (__u64)ukplat_entry2);
+	uk_arch_x86_64_jump_to((__u64)bstack, (__u64)ukplat_entry2);
 }

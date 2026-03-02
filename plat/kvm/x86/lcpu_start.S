@@ -37,7 +37,7 @@
  */
 
 #include <uk/config.h>
-#include <uk/arch.h>
+#include <uk/arch/x86_64.h>
 #include <uk/asm.h>
 #include <uk/reloc.h>
 #include <uk/lcpu.h>
@@ -128,13 +128,13 @@ gdt32_ptr:
 	.word	(gdt32_end - gdt32 - 1)	/* size - 1	*/
 	data_start16	long, gdt32, 4	/* GDT address	*/
 gdt32_cs:
-	.quad	UK_ARCH_GDT_DESC_CODE32_VAL	/* 32-bit CS	*/
+	.quad	UK_ARCH_X86_64_GDT_DESC_CODE32_VAL	/* 32-bit CS	*/
 gdt32_ds:
-	.quad	UK_ARCH_GDT_DESC_DATA32_VAL	/* DS		*/
+	.quad	UK_ARCH_X86_64_GDT_DESC_DATA32_VAL	/* DS		*/
 gdt32_end:
 
 #define CR0_BOOT16_SETTINGS						\
-	  UK_ARCH_CR0_PE	/* Protected mode */
+	  UK_ARCH_X86_64_CR0_PE	/* Protected mode */
 
 .code16
 ENTRY(lcpu_start16)
@@ -202,24 +202,24 @@ gdt64:
 gdt64_null:
 	.quad	0x0000000000000000	/* null segment */
 gdt64_cs:
-	.quad	UK_ARCH_GDT_DESC_CODE64_VAL	/* 64-bit CS	*/
+	.quad	UK_ARCH_X86_64_GDT_DESC_CODE64_VAL	/* 64-bit CS	*/
 gdt64_ds:
-	.quad	UK_ARCH_GDT_DESC_DATA64_VAL	/* DS		*/
+	.quad	UK_ARCH_X86_64_GDT_DESC_DATA64_VAL	/* DS		*/
 gdt64_end:
 gdt64_ptr:
 	.word	gdt64_end - gdt64 - 1
 	ur_data	quad, gdt64, 8, _phys
 
 #define CR4_BOOT32_SETTINGS						\
-	  UK_ARCH_CR4_PAE	/* Physical Address Extension */
+	  UK_ARCH_X86_64_CR4_PAE	/* Physical Address Extension */
 
 #define EFER_BOOT32_SETTINGS						\
-	  UK_ARCH_EFER_LME	/* IA-32e Mode */
+	  UK_ARCH_X86_64_EFER_LME	/* IA-32e Mode */
 
 #define CR0_BOOT32_SETTINGS						\
-	  UK_ARCH_CR0_PE	/* Protected mode */			\
-	| UK_ARCH_CR0_WP	/* Write Protect */			\
-	| UK_ARCH_CR0_PG	/* Paging */
+	  UK_ARCH_X86_64_CR0_PE	/* Protected mode */			\
+	| UK_ARCH_X86_64_CR0_WP	/* Write Protect */			\
+	| UK_ARCH_X86_64_CR0_PG	/* Paging */
 
 .code32
 .section .text.boot.32
@@ -231,7 +231,7 @@ ENTRY(lcpu_start32)
 	/* Switch to IA-32e mode (long mode) */
 	xorl	%edx, %edx
 	movl	$EFER_BOOT32_SETTINGS, %eax
-	movl	$UK_ARCH_MSR_EFER, %ecx
+	movl	$UK_ARCH_X86_64_MSR_EFER, %ecx
 	wrmsr
 
 	/* Set boot page table and enable paging */
@@ -349,10 +349,10 @@ no_fsgsbase:
 	movq     %rsp, %rdx
 	shrq     $32, %rdx
 
-	movl     $UK_ARCH_MSR_GS_BASE, %ecx
+	movl     $UK_ARCH_X86_64_MSR_GS_BASE, %ecx
 	wrmsr
 
-	movl     $UK_ARCH_MSR_KERNEL_GS_BASE, %ecx
+	movl     $UK_ARCH_X86_64_MSR_KERNEL_GS_BASE, %ecx
 	wrmsr
 0:
 #endif /* !__FSGSBASE__ */
