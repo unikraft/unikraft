@@ -52,5 +52,77 @@ UK_TESTCASE(ukallocbbuddy, test_init)
 	UK_TEST_ASSERT(head != NULL);
 }
 
+UK_TESTCASE(ukallocbbuddy, test_alloc_dealloc)
+{
+    struct uk_alloc *head;
+    static char pool[POOL_SIZE] __align(PAGE_SIZE);
+    void *ptr;
+
+    head = uk_allocbbuddy_init(pool, POOL_SIZE);
+    UK_TEST_ASSERT(head != NULL);
+
+    ptr = uk_palloc(head, 1);
+    UK_TEST_EXPECT(ptr != NULL);
+
+    if(ptr)
+        uk_pfree(head, ptr, 1);
+}
+
+UK_TESTCASE(ukallocbbuddy, test_exhaustion)
+{
+    struct uk_alloc *head;
+    static char pool[POOL_SIZE] __align(PAGE_SIZE);
+    void *ptr;
+
+    head = uk_allocbbuddy_init(pool, POOL_SIZE);
+    UK_TEST_ASSERT(head != NULL);
+
+    ptr = uk_palloc(head, 1000);
+
+    UK_TEST_EXPECT(ptr == NULL);
+    UK_TEST_EXPECT(errno == ENOMEM);
+}
+
+UK_TESTCASE(ukallocbbuddy, test_coalescing)
+{
+    struct uk_alloc *head;
+    static char pool[POOL_SIZE] __align(PAGE_SIZE);
+    void *p1, *p2, *p3;
+
+    head = uk_allocbbuddy_init(pool, POOL_SIZE);
+    UK_TEST_ASSERT(head != NULL);
+
+    p1 = uk_palloc(head, 1);
+    p2 = uk_palloc(head, 1);
+    UK_TEST_EXPECT(p1 != NULL && p2 != NULL);
+
+    uk_pfree(head, p1, 1);
+    uk_pfree(head, p2, 1);
+
+    p3 = uk_palloc(head, 2);
+    UK_TEST_EXPECT(p3 != NULL);
+
+    if (p3)
+        uk_pfree(head, p3, 2);
+}
+
+UK_TESTCASE(ukallocbbuddy, test_multipage_alloc)
+{
+    struct uk_alloc *head;
+    static char pool[POOL_SIZE] __align(PAGE_SIZE);
+    void *ptr;
+    unsigned long pages = 4;
+
+    head = uk_allocbbuddy_init(pool, POOL_SIZE);
+    UK_TEST_ASSERT(head != NULL);
+
+    ptr = uk_palloc(head, pages);
+    UK_TEST_EXPECT(ptr != NULL);
+
+    UK_TEST_EXPECT(((uintptr_t)ptr % PAGE_SIZE) == 0);
+
+    if (ptr)
+        uk_pfree(head, ptr, pages);
+}
 uk_testsuite_register(ukallocbbuddy, NULL);
 
