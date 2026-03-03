@@ -50,7 +50,7 @@ static int gdb_arch_debug_handler(void *data)
 
 	if ((r = gdb_arch_dbg_trap(5 /* SIGTRAP */,
 				   (struct uk_lcpu_regs *)
-				   uk_lcpu_except_err_ctx_get(ctx, REGS))) < 0)
+				   uk_lcpu_except_err_ctx_get_regs(ctx))) < 0)
 		return r;
 	else
 		return UK_EVENT_HANDLED;
