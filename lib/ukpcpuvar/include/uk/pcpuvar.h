@@ -7,7 +7,6 @@
 #ifndef __UK_PCPUVAR_H__
 #define __UK_PCPUVAR_H__
 
-#include <uk/arch.h>
 #include <uk/essentials.h>
 #include <uk/config.h>
 #include <uk/pcpuvar/arch.h>

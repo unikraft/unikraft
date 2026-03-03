@@ -4,7 +4,7 @@
  * You may not use this file except in compliance with the License.
  */
 
-#include <uk/arch.h>
+#include <uk/arch/x86_64.h>
 #include <uk/arch/ctx.h>
 #include <uk/essentials.h>
 
@@ -28,9 +28,9 @@ void execve_arch_execenv_init(struct ukarch_execenv *execenv_new,
 			 uk_lcpu_regs_get(execenv->regs, RFLAGS));
 
 	uk_lcpu_regs_set(execenv_new->regs, CS,
-			 UK_ARCH_GDT_DESC_OFFSET(UK_ARCH_GDT_DESC_CODE));
+			 UK_ARCH_X86_64_GDT_DESC_OFFSET(UK_ARCH_X86_64_GDT_DESC_CODE));
 	uk_lcpu_regs_set(execenv_new->regs, SS,
-			 UK_ARCH_GDT_DESC_OFFSET(UK_ARCH_GDT_DESC_DATA));
+			 UK_ARCH_X86_64_GDT_DESC_OFFSET(UK_ARCH_X86_64_GDT_DESC_DATA));
 
 	/* Copy current ectx to inerhit platform-initialized regs like mxcsr */
 	uk_lcpu_ectx_sanitize((struct uk_lcpu_ectx *)execenv_new->ectx);

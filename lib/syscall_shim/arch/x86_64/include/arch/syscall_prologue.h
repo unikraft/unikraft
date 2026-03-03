@@ -10,6 +10,7 @@
 
 #if !__ASSEMBLY__
 
+#include <uk/arch/x86_64.h>
 #include <uk/essentials.h>
 #include <uk/lcpu/auxsp.h>
 
@@ -65,7 +66,7 @@
 		" * manually set the flag.\n\t"				\
 		" */\n\t"						\
 		"pushfq\n\t"						\
-		"orq	$(" STRINGIFY(UK_ARCH_RFLAGS_IF) "), 0(%rsp)\n\t"\
+		"orq	$(" STRINGIFY(UK_ARCH_X86_64_RFLAGS_IF) "), 0(%rsp)\n\t"\
 		"/* Push code segment, GDT code segment selector:\n\t"	\
 		" * [15: 3]: Selector Index - first GDT entry\n\t"	\
 		" * [ 2: 2]: Table Indicator - GDT, table 0\n\t"	\

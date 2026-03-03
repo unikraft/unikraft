@@ -7,7 +7,8 @@
 #define _GNU_SOURCE
 #include <signal.h>
 
-#include <uk/arch.h>
+#include <uk/arch/ctx.h>
+#include <uk/lcpu.h>
 #include <uk/syscall.h>
 
 void pprocess_signal_arch_set_ucontext(struct ukarch_execenv *execenv,
