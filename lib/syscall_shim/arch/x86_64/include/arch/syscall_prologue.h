@@ -57,7 +57,7 @@
 		" * the rsp we were given, plus 8.\n\t"			\
 		" */\n\t"						\
 		"addq   $8, (%rsp)\n\t"                                 \
-		"/* Push EFLAGS register. Additionally, since we\n\t"	\
+		"/* Push RFLAGS register. Additionally, since we\n\t"	\
 		" * pushed it with IRQs disabled, it won't have\n\t"	\
 		" * the corresponding bit flag set, making it look\n\t"	\
 		" * like the caller of the syscall had IRQs off,\n\t"	\
@@ -65,7 +65,7 @@
 		" * manually set the flag.\n\t"				\
 		" */\n\t"						\
 		"pushfq\n\t"						\
-		"orq	$(" STRINGIFY(UK_ARCH_EFLAGS_IF) "), 0(%rsp)\n\t"\
+		"orq	$(" STRINGIFY(UK_ARCH_RFLAGS_IF) "), 0(%rsp)\n\t"\
 		"/* Push code segment, GDT code segment selector:\n\t"	\
 		" * [15: 3]: Selector Index - first GDT entry\n\t"	\
 		" * [ 2: 2]: Table Indicator - GDT, table 0\n\t"	\

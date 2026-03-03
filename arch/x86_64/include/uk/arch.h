@@ -60,39 +60,39 @@
 /** SYSCALL/SYSRET instructions */
 #define UK_ARCH_CPUID3_SYSCALL			(1 << 11)
 
-/* EFLAGS register */
+/* RFLAGS register */
 /** Carry flag */
-#define UK_ARCH_EFLAGS_CF			(1 << 0)
+#define UK_ARCH_RFLAGS_CF			(1 << 0)
 /** Parity flag */
-#define UK_ARCH_EFLAGS_PF			(1 << 2)
+#define UK_ARCH_RFLAGS_PF			(1 << 2)
 /** Auxiliary flag */
-#define UK_ARCH_EFLAGS_AF			(1 << 4)
+#define UK_ARCH_RFLAGS_AF			(1 << 4)
 /** Zero flag */
-#define UK_ARCH_EFLAGS_ZF			(1 << 6)
+#define UK_ARCH_RFLAGS_ZF			(1 << 6)
 /** Sign flag */
-#define UK_ARCH_EFLAGS_SF			(1 << 7)
+#define UK_ARCH_RFLAGS_SF			(1 << 7)
 /** Trap flag */
-#define UK_ARCH_EFLAGS_TF			(1 << 8)
+#define UK_ARCH_RFLAGS_TF			(1 << 8)
 /** Interrupt flag */
-#define UK_ARCH_EFLAGS_IF			(1 << 9)
+#define UK_ARCH_RFLAGS_IF			(1 << 9)
 /** Direction flag */
-#define UK_ARCH_EFLAGS_DF			(1 << 10)
+#define UK_ARCH_RFLAGS_DF			(1 << 10)
 /** Overflow flag */
-#define UK_ARCH_EFLAGS_OF			(1 << 11)
+#define UK_ARCH_RFLAGS_OF			(1 << 11)
 /** Nested task flag */
-#define UK_ARCH_EFLAGS_NT			(1 << 14)
+#define UK_ARCH_RFLAGS_NT			(1 << 14)
 /** Resume flag */
-#define UK_ARCH_EFLAGS_RF			(1 << 16)
+#define UK_ARCH_RFLAGS_RF			(1 << 16)
 /** Virtual 8086 mode flag */
-#define UK_ARCH_EFLAGS_VM			(1 << 17)
+#define UK_ARCH_RFLAGS_VM			(1 << 17)
 /** Alignment check flag */
-#define UK_ARCH_EFLAGS_AC			(1 << 18)
+#define UK_ARCH_RFLAGS_AC			(1 << 18)
 /** Virtual interrupt flag */
-#define UK_ARCH_EFLAGS_VIF			(1 << 19)
+#define UK_ARCH_RFLAGS_VIF			(1 << 19)
 /** Virtual interrupt pending */
-#define UK_ARCH_EFLAGS_VIP			(1 << 20)
+#define UK_ARCH_RFLAGS_VIP			(1 << 20)
 /** ID flag */
-#define UK_ARCH_EFLAGS_ID			(1 << 21)
+#define UK_ARCH_RFLAGS_ID			(1 << 21)
 
 /* Basic CPU control in CR0 */
 /** Protection Enable */
@@ -149,7 +149,7 @@
 #define UK_ARCH_MSR_LSTAR			0xc0000082
 /** Compat mode SYSCALL target */
 #define UK_ARCH_MSR_CSTAR			0xc0000083
-/** EFLAGS mask for syscall */
+/** RFLAGS mask for syscall */
 #define UK_ARCH_MSR_SYSCALL_MASK		0xc0000084
 /** Page attribute table configuration */
 #define UK_ARCH_MSR_PAT				0x277

@@ -234,7 +234,7 @@ __isr static inline unsigned long uk_plat_native_save_irqf(void)
 	flags = uk_arch_rflags_get();
 	uk_arch_disable_irq();
 
-	return !!(flags & UK_ARCH_EFLAGS_IF);
+	return !!(flags & UK_ARCH_RFLAGS_IF);
 }
 
 /**
@@ -258,7 +258,7 @@ __isr static inline void uk_plat_native_restore_irqf(unsigned long flags)
  */
 __isr static inline int uk_plat_native_irqs_disabled(void)
 {
-	return !(uk_arch_rflags_get() & UK_ARCH_EFLAGS_IF);
+	return !(uk_arch_rflags_get() & UK_ARCH_RFLAGS_IF);
 }
 
 /**

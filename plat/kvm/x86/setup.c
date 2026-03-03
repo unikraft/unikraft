@@ -79,9 +79,9 @@ static inline void _init_syscall(void)
 
 	/* Clear IF flag during an interrupt */
 	uk_arch_wrmsrl(UK_ARCH_MSR_SYSCALL_MASK,
-		       UK_ARCH_EFLAGS_TF | UK_ARCH_EFLAGS_DF |
-		       UK_ARCH_EFLAGS_IF | UK_ARCH_EFLAGS_AC |
-		       UK_ARCH_EFLAGS_NT);
+		       UK_ARCH_RFLAGS_TF | UK_ARCH_RFLAGS_DF |
+		       UK_ARCH_RFLAGS_IF | UK_ARCH_RFLAGS_AC |
+		       UK_ARCH_RFLAGS_NT);
 
 	uk_pr_info("SYSCALL entrance @ %p\n", _ukplat_syscall);
 }

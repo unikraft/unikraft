@@ -177,14 +177,14 @@ ENTRY(_ukplat_syscall)
 	 * `struct uk_lcpu_regs *` argument to the system call handler.
 	 */
 	/* We now have %ss and %rsp on the frame, finish classic trap frame */
-	/* Push EFLAGS register. Additionally, since we pushed it with IRQs
+	/* Push RFLAGS register. Additionally, since we pushed it with IRQs
 	 * disabled, it won't have the corresponding bit flag set, making it
 	 * look like the caller of the syscall had IRQs off, which no sane
 	 * application would do, therefore manually set the flag.
 	 */
 	pushfq			/* eflags */
 	.cfi_adjust_cfa_offset 8
-	orq	$UK_ARCH_EFLAGS_IF, 0(%rsp)
+	orq	$UK_ARCH_RFLAGS_IF, 0(%rsp)
 
 	/* cs */
 	pushq_cfi	$(UK_ARCH_GDT_DESC_OFFSET(UK_ARCH_GDT_DESC_CODE))
