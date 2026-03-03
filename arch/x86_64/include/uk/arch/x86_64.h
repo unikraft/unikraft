@@ -11,6 +11,10 @@
 #ifndef __UK_ARCH_H__
 #define __UK_ARCH_H__
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /* CPUID feature bits in ECX and EDX when EAX=1 */
 /** x2APIC feature */
 #define UK_ARCH_CPUID1_ECX_X2APIC		(1 << 21)
@@ -753,4 +757,8 @@ struct uk_arch_tss64 {
 	__u16 iomap_base;
 } __packed;
 #endif /* !__ASSEMBLY__ */
+
+#ifdef __cplusplus
+}
+#endif
 #endif /* __UK_ARCH_H__ */
