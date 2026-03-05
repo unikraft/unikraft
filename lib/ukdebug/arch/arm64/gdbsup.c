@@ -19,26 +19,26 @@
 
 static void gdb_arch_enable_single_step(struct uk_lcpu_regs *regs)
 {
-	__sz mdscr = SYSREG_READ(mdscr_el1);
+	__sz mdscr = UK_ARCH_ARM64_SYSREG_READ(mdscr_el1);
 
-	mdscr |= MDSCR_EL1_SS;
-	mdscr |= MDSCR_EL1_KDE;
+	mdscr |= UK_ARCH_ARM64_MDSCR_EL1_SS;
+	mdscr |= UK_ARCH_ARM64_MDSCR_EL1_KDE;
 
-	SYSREG_WRITE(mdscr_el1, mdscr);
+	UK_ARCH_ARM64_SYSREG_WRITE(mdscr_el1, mdscr);
 
-	regs->spsr_el1 |= SPSR_EL1_SS;
+	regs->spsr_el1 |= UK_ARCH_ARM64_SPSR_EL1_SS;
 }
 
 static void gdb_arch_disable_single_step(struct uk_lcpu_regs *regs)
 {
-	__sz mdscr = SYSREG_READ(mdscr_el1);
+	__sz mdscr = UK_ARCH_ARM64_SYSREG_READ(mdscr_el1);
 
-	mdscr &= ~MDSCR_EL1_SS;
-	mdscr &= ~MDSCR_EL1_KDE;
+	mdscr &= ~UK_ARCH_ARM64_MDSCR_EL1_SS;
+	mdscr &= ~UK_ARCH_ARM64_MDSCR_EL1_KDE;
 
-	SYSREG_WRITE(mdscr_el1, mdscr);
+	UK_ARCH_ARM64_SYSREG_WRITE(mdscr_el1, mdscr);
 
-	regs->spsr_el1 &= ~SPSR_EL1_SS;
+	regs->spsr_el1 &= ~UK_ARCH_ARM64_SPSR_EL1_SS;
 }
 
 /* We get here via traps raised by the platform
@@ -61,7 +61,7 @@ static int gdb_arch_dbg_trap(int errnr, struct uk_lcpu_regs *regs)
 	} else if (r == GDB_DBG_STEP) { /* Single step */
 		gdb_arch_enable_single_step(regs);
 
-		regs->spsr_el1 &= ~SPSR_EL1_D;
+		regs->spsr_el1 &= ~UK_ARCH_ARM64_SPSR_EL1_D;
 	}
 
 	return 0;
@@ -100,9 +100,10 @@ static int gdb_arch_debug_handler(void *data)
 	if (unlikely(have_brk < 0))
 		return have_brk;
 
-	if ((ESR_EC_FROM(ctx->esr) == ESR_EL1_EC_BRK64) && (have_brk == 0)) {
+	if (UK_ARCH_ARM64_ESR_EC_FROM(ctx->esr) ==
+	    UK_ARCH_ARM64_ESR_EL1_EC_BRK64 && have_brk == 0) {
 		ctx->regs->elr_el1 += 4; /* instructions are all 4 bytes wide */
-		ctx->regs->spsr_el1 &= ~SPSR_EL1_SS;
+		ctx->regs->spsr_el1 &= ~UK_ARCH_ARM64_SPSR_EL1_SS;
 	}
 
 	return UK_EVENT_HANDLED;

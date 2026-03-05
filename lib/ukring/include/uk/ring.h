@@ -336,8 +336,8 @@ uk_ring_peek_clear_sc(struct uk_ring *br)
 	 */
 	#error "unsupported: atomic_thread_fence_acq()"
 	/* TODO atomic_thread_fence_acq(); */
-#elif defined(CONFIG_ARCH_ARM64)
-	dmb();
+#elif defined(CONFIG_ARCH_ARM_64)
+	uk_arch_arm64_dmb(ishld);
 #endif
 
 #ifdef DEBUG_BUFRING
