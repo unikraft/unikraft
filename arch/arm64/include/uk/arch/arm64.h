@@ -324,8 +324,11 @@ extern "C" {
 #define UK_ARCH_ARM64_SCTLR_EL1_DSSBS_BIT		(_AC(1, UL) << 44)
 
 /* SPSR: Saved Program Status Register */
-#define UK_ARCH_ARM64_SPSR_EL1_SS			UK_BIT(21)
-#define UK_ARCH_ARM64_SPSR_EL1_D			UK_BIT(9)
+#define UK_ARCH_ARM64_SPSR_EL1_SS			(_AC(1, UL) << 21)
+#define UK_ARCH_ARM64_SPSR_EL1_D			(_AC(1, UL) << 9)
+#define UK_ARCH_ARM64_SPSR_EL1_A			(_AC(1, UL) << 8)
+#define UK_ARCH_ARM64_SPSR_EL1_I			(_AC(1, UL) << 7)
+#define UK_ARCH_ARM64_SPSR_EL1_F			(_AC(1, UL) << 6)
 
 /* TCR_EL1 - Translation Control Register */
 #define UK_ARCH_ARM64_TCR_EL1_DS_SHIFT			59

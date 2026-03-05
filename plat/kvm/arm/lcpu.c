@@ -30,57 +30,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <stdint.h>
 #include <uk/arch/util.h>
 #include <uk/plat/lcpu.h>
-#include <arm/irq.h>
 #include <arm/cpu.h>
-
-void ukplat_lcpu_enable_irq(void)
-{
-	local_irq_enable();
-}
-
-void ukplat_lcpu_disable_irq(void)
-{
-	local_irq_disable();
-}
-
-void ukplat_lcpu_halt_irq(void)
-{
-	UK_ASSERT(ukplat_lcpu_irqs_disabled());
-
-	/* Note: If priority masking is enabled
-	 * interrupts need to be unmasked in the GIC.
-	 *
-	 * See Linux `cpu_do_idle(void)` implementation
-	 */
-	uk_arch_arm64_halt();
-}
-
-unsigned long ukplat_lcpu_save_irqf(void)
-{
-	unsigned long flags;
-
-	local_irq_save(flags);
-
-	return flags;
-}
-
-void ukplat_lcpu_restore_irqf(unsigned long flags)
-{
-	local_irq_restore(flags);
-}
-
-int ukplat_lcpu_irqs_disabled(void)
-{
-	return irqs_disabled();
-}
-
-void ukplat_lcpu_irqs_handle_pending(void)
-{
-	// TODO
-}
 
 void ukplat_lcpu_set_auxsp(__uptr auxsp)
 {
