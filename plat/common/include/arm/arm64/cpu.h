@@ -65,45 +65,4 @@ void system_off(enum ukplat_gstate request);
 int cpu_on(__lcpuid id, __paddr_t entry, void *arg);
 #endif /* CONFIG_HAVE_SMP */
 
-#ifdef CONFIG_FPSIMD
-
-struct fpsimd_state {
-	__u64		regs[32 * 2];
-	__u32		fpsr;
-	__u32		fpcr;
-};
-
-extern void fpsimd_save_state(uintptr_t ptr);
-extern void fpsimd_restore_state(uintptr_t ptr);
-
-static inline void save_extregs(void *ectx)
-{
-	fpsimd_save_state((uintptr_t) ectx);
-
-	/* make sure sysreg writing takes effects */
-	uk_arch_arm64_isb();
-}
-
-static inline void restore_extregs(void *ectx)
-{
-	fpsimd_restore_state((uintptr_t) ectx);
-
-	/* make sure sysreg writing takes effects */
-	uk_arch_arm64_isb();
-}
-
-#else /* !CONFIG_FPSIMD */
-
-struct fpsimd_state { };
-
-static inline void save_extregs(void *ectx __unused)
-{
-}
-
-static inline void restore_extregs(void *ectx __unused)
-{
-}
-
-#endif /* CONFIG_FPSIMD */
-
 #endif /* __PLAT_COMMON_ARM64_CPU_H__ */
