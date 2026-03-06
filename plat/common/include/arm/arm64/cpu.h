@@ -36,22 +36,7 @@
 #include <inttypes.h>
 
 #include <arm/smccc.h>
-
-#include <uk/alloc.h>
-#include <uk/arch/util.h>
-#include <uk/assert.h>
 #include <uk/essentials.h>
-#include <uk/lcpu.h>
-
-static inline void _init_cpufeatures(void)
-{
-}
-
-/* Define compatibility IO macros */
-#define outb(addr, v)   UK_BUG()
-#define outw(addr, v)   UK_BUG()
-#define inb(addr)       UK_BUG()
-
 /*
  * PSCI conduit method to call functions, based on the SMC Calling Convention.
  */
