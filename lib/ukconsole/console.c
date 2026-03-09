@@ -128,6 +128,64 @@ __ssz uk_console_in_direct(struct uk_console *dev, char *buf, __sz len)
 	return dev->ops->in(dev, buf, len);
 }
 
+int uk_console_out_direct_all(struct uk_console *dev,
+			      const char *buf, __sz len)
+{
+	__sz bytes_written = 0;
+	__ssz rc;
+
+	UK_ASSERT(dev && dev->ops);
+
+	if (unlikely(!len))
+		return 0;
+
+	if (unlikely(!buf))
+		return -EINVAL;
+
+	if (unlikely(!dev->ops->out))
+		return -EIO;
+
+	while (bytes_written < len) {
+		rc = dev->ops->out(dev, buf + bytes_written,
+				   len - bytes_written);
+		if (unlikely(rc < 0))
+			return (int)rc;
+
+		bytes_written += (__sz)rc;
+	}
+
+	return 0;
+}
+
+int uk_console_in_direct_all(struct uk_console *dev,
+			     char *buf, __sz len)
+{
+	__sz bytes_read = 0;
+	__ssz rc;
+
+	UK_ASSERT(dev && dev->ops);
+
+	if (unlikely(!len))
+		return 0;
+
+	if (unlikely(!buf))
+		return -EINVAL;
+
+	if (unlikely(!dev->ops->in))
+		return -EIO;
+
+	while (bytes_read < len) {
+		rc = dev->ops->in(dev, buf + bytes_read,
+				  len - bytes_read);
+		if (unlikely(rc < 0))
+			return (int)rc;
+
+		bytes_read += (__sz)rc;
+	}
+
+	return 0;
+}
+
 void uk_console_register(struct uk_console *dev)
 {
 	struct uk_console *known_dev __maybe_unused = __NULL;
