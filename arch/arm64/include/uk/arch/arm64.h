@@ -148,6 +148,9 @@ extern "C" {
 #define UK_ARCH_ARM64_ESR_ISS_ABRT_FSC_LOCKDOWN			0x34
 #define UK_ARCH_ARM64_ESR_ISS_ABRT_FSC_UNSUP_EXCL		0x35
 
+#define UK_ARCH_ARM64_ESR_ISS_ABRT_WnR_BIT		(_AC(1, UL) << 6)
+#define UK_ARCH_ARM64_ESR_ISS_ABRT_ISV_BIT		(_AC(1, UL) << 24)
+
 /* GCR_EL1: Tag Control Register */
 #define UK_ARCH_ARM64_GCR_EL1_RRND_BIT				\
 	(_AC(1, UL) << 16)
