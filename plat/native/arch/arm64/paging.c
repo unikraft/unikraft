@@ -11,6 +11,8 @@
 #include <uk/assert.h>
 #include <uk/plat/native/addr.h>
 
+#include <uk/asm/lcpu.h> /* FIXME tcr_ips_bits */
+
 int uk_plat_native_paging_init(void)
 {
 	/* Sanity checks to make sure that the PE supports the minimum
