@@ -16,6 +16,21 @@
 extern "C" {
 #endif
 
+enum uk_console_devclass {
+	_UK_CONSOLE_CLASS_MIN,
+	/**
+	 * Console registration that fits no device class, e.g. pseudo-devices
+	 */
+	UK_CONSOLE_CLASS_NONE,
+	/* UART-based console devices */
+	UK_CONSOLE_CLASS_UART,
+	/* Hypervisor-defined console devices */
+	UK_CONSOLE_CLASS_HVC,
+	/* Framebuffer/video/screen-based console devices */
+	UK_CONSOLE_CLASS_FB,
+	_UK_CONSOLE_CLASS_MAX,
+};
+
 struct uk_console;
 
 typedef __ssz (*uk_console_out_func)(struct uk_console *dev, const char *buf,
@@ -40,6 +55,7 @@ struct uk_console {
 	const struct uk_console_ops *ops;
 	const char *name; /* Optional */
 	int flags;
+	enum uk_console_devclass dclass;
 	struct uk_list_head _list;
 };
 
@@ -47,23 +63,29 @@ struct uk_console {
  * Initialize a `struct uk_console`
  *
  * @param name
- *  Optional name of the device
+ *   Optional name of the device
  * @param ops
  *   Operations of the device
  * @param flags
  *   Requested flags for the device
+ * @param dclass
+ *   Console device class
  */
 static inline void uk_console_init(struct uk_console *dev, const char *name,
-				   const struct uk_console_ops *ops, int flags)
+				   const struct uk_console_ops *ops, int flags,
+				   enum uk_console_devclass dclass)
 {
 	UK_ASSERT(dev);
 	UK_ASSERT(ops);
+	UK_ASSERT(dclass > _UK_CONSOLE_CLASS_MIN &&
+		  dclass < _UK_CONSOLE_CLASS_MAX);
 
 	*dev = (struct uk_console) {
 		.name = name,
 		.ops = ops,
 		.flags = flags,
-		.id = __U16_MAX
+		.id = __U16_MAX,
+		.dclass = dclass,
 	};
 	UK_INIT_LIST_HEAD(&dev->_list);
 }
