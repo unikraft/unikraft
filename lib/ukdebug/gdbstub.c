@@ -1194,7 +1194,8 @@ static int gdb_setup_backing_console(void)
 	UK_ASSERT(gdb_backing_console);
 
 	uk_console_init(&gdb_virt_console, "GDB virtual console",
-			&gdb_virt_ops, 0); /* Don't enable flags yet */
+			&gdb_virt_ops, 0, /* Don't enable flags yet */
+			UK_CONSOLE_CLASS_NONE);
 	if (gdb_mode_is_shared()) {
 		uk_console_register(&gdb_virt_console);
 	} else if (gdb_mode_is_auto()) {
