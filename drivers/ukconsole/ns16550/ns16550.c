@@ -314,7 +314,8 @@ static int early_init(struct ukplat_bootinfo *bi)
 	}
 
 	uk_console_init(&earlycon.dev, "NS16550", &ns16550_ops,
-			UK_CONSOLE_FLAG_STDOUT | UK_CONSOLE_FLAG_STDIN);
+			UK_CONSOLE_FLAG_STDOUT | UK_CONSOLE_FLAG_STDIN,
+			UK_CONSOLE_CLASS_UART);
 	uk_console_register(&earlycon.dev);
 
 	mrd.pbase = earlycon.base;
@@ -359,7 +360,8 @@ static int fdt_get_device(struct ns16550_device *dev, const void *dtb,
 
 	uk_pr_debug("ns16550 @ 0x%lx - 0x%lx\n", reg_base, reg_base + reg_size);
 
-	uk_console_init(&dev->dev, "NS16550", &ns16550_ops, 0);
+	uk_console_init(&dev->dev, "NS16550", &ns16550_ops, 0,
+			UK_CONSOLE_CLASS_UART);
 	dev->base = reg_base;
 	dev->size = reg_size;
 

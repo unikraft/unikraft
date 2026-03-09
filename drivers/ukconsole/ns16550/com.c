@@ -222,7 +222,8 @@ int com_early_init(struct ukplat_bootinfo *bi __unused)
 	if (!early_dev.port)
 		early_dev.port = COM_EARLY_PORT;
 	uk_console_init(&early_dev.dev, COM_EARLY_NAME, &com_ops,
-			UK_CONSOLE_FLAG_STDOUT | UK_CONSOLE_FLAG_STDIN);
+			UK_CONSOLE_FLAG_STDOUT | UK_CONSOLE_FLAG_STDIN,
+			UK_CONSOLE_CLASS_UART);
 	com_setup(early_dev.port, COM_EARLY_BAUDDIV_LO, COM_BAUDDIV_HI);
 
 	uk_console_register(&early_dev.dev);
@@ -243,7 +244,8 @@ static int com_init_port(struct uk_alloc *a, const char *name, __u16 port,
 
 	com_setup(port, bauddiv_lo, bauddiv_hi);
 	com_dev->port = port;
-	uk_console_init(&com_dev->dev, name, &com_ops, 0);
+	uk_console_init(&com_dev->dev, name, &com_ops, 0,
+			UK_CONSOLE_CLASS_UART);
 
 	uk_console_register(&com_dev->dev);
 

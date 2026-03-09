@@ -235,7 +235,8 @@ static int early_init(struct ukplat_bootinfo *bi)
 		return rc;
 
 	uk_console_init(&earlycon.dev, "PL011",  &pl011_ops,
-			UK_CONSOLE_FLAG_STDOUT | UK_CONSOLE_FLAG_STDIN);
+			UK_CONSOLE_FLAG_STDOUT | UK_CONSOLE_FLAG_STDIN,
+			UK_CONSOLE_CLASS_UART);
 	uk_console_register(&earlycon.dev);
 
 	/* Add an mrd to keep the device mapped past init */
@@ -281,7 +282,8 @@ static int fdt_get_device(struct pl011_device *dev, const void *dtb,
 
 	uk_pr_debug("pl011 @ 0x%lx - 0x%lx\n", reg_base, reg_base + reg_size);
 
-	uk_console_init(&dev->dev, "PL011", &pl011_ops, 0);
+	uk_console_init(&dev->dev, "PL011", &pl011_ops, 0,
+			UK_CONSOLE_CLASS_UART);
 	dev->base = reg_base;
 	dev->size = reg_size;
 
