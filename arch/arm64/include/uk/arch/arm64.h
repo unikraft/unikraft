@@ -66,6 +66,12 @@ extern "C" {
 #define UK_ARCH_ARM64_ESR_ISS2_FROM(x)		\
 	(((x) & UK_ARCH_ARM64_ESR_ISS2_MASK) >> UK_ARCH_ARM64_ESR_ISS2_SHIFT)
 
+/* DAIF */
+#define UK_ARCH_ARM64_DAIF_F_BIT			(_AC(1, UL) << 6)
+#define UK_ARCH_ARM64_DAIF_I_BIT			(_AC(1, UL) << 7)
+#define UK_ARCH_ARM64_DAIF_A_BIT			(_AC(1, UL) << 8)
+#define UK_ARCH_ARM64_DAIF_D_BIT			(_AC(1, UL) << 9)
+
 /* Exception classes */
 #define UK_ARCH_ARM64_ESR_EL1_EC_UNKNOWN		0x00
 #define UK_ARCH_ARM64_ESR_EL1_EC_WFx			0x01
