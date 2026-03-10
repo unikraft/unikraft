@@ -153,13 +153,13 @@ static inline void com_setup(int port_addr, __u8 bauddiv_lo, __u8 bauddiv_hi)
 	uk_arch_x86_64_outb(COM_CTRL(port_addr), PROT);
 }
 
-static inline int com_check_tx_empty(int port_addr)
+__isr static inline int com_check_tx_empty(int port_addr)
 {
 	return (int)uk_arch_x86_64_inb(COM_STATUS(port_addr)) &
 		COM_STATUS_TX_READY_BIT;
 }
 
-static inline void com_write(int port_addr, char chr)
+__isr static inline void com_write(int port_addr, char chr)
 {
 	while (!com_check_tx_empty(port_addr))
 		;
@@ -172,7 +172,7 @@ static inline int com_check_rx_ready(int port_addr)
 		COM_STATUS_RX_READY_BIT;
 }
 
-__ssz com_out(struct uk_console *dev, const char *buf, __sz len)
+__isr __ssz com_out(struct uk_console *dev, const char *buf, __sz len)
 {
 	struct com_device *com_dev;
 	__sz leftover = len;
@@ -207,9 +207,10 @@ __ssz com_in(struct uk_console *dev, char *buf, __sz len)
 	return len;
 }
 
-static struct uk_console_ops com_ops = {
+static const struct uk_console_ops com_ops = {
 	.out = com_out,
-	.in = com_in
+	.in = com_in,
+	.emerg_out = com_out,
 };
 
 #if CONFIG_LIBNS16550_EARLY_CONSOLE

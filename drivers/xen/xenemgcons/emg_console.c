@@ -77,8 +77,8 @@
 #include <uk/prio.h>
 #include <uk/plat/common/bootinfo.h>
 
-static __ssz console_out(struct uk_console *dev __unused, const char *str,
-			 __sz len)
+__isr static __ssz console_out(struct uk_console *dev __unused, const char *str,
+			       __sz len)
 {
 	int rc;
 
@@ -95,9 +95,10 @@ static __ssz console_in(struct uk_console *dev __unused, char *str __unused,
 	return 0;
 }
 
-static struct uk_console_ops console_ops = {
+static const struct uk_console_ops console_ops = {
 	.out = console_out,
-	.in = console_in
+	.in = console_in,
+	.emerg_out = console_out,
 };
 
 static struct uk_console console_dev;

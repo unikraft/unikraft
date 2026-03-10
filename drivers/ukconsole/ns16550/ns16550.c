@@ -105,7 +105,7 @@ static __u32 ns16550_reg_width = 1;
 /* Macros to access ns16550 registers with base address and reg shift */
 #define NS16550_REG(base, r) ((base) + ((r) << ns16550_reg_shift))
 
-static __u32 ns16550_reg_read(__u64 base, __u32 reg)
+__isr static __u32 ns16550_reg_read(__u64 base, __u32 reg)
 {
 	__u32 ret;
 
@@ -125,7 +125,7 @@ static __u32 ns16550_reg_read(__u64 base, __u32 reg)
 	return ret;
 }
 
-static void ns16550_reg_write(__u64 base, __u32 reg, __u32 value)
+__isr static void ns16550_reg_write(__u64 base, __u32 reg, __u32 value)
 {
 	switch (ns16550_reg_width) {
 	case 1:
@@ -145,7 +145,7 @@ static void ns16550_reg_write(__u64 base, __u32 reg, __u32 value)
 	}
 }
 
-static void ns16550_putc(__u64 base, char a)
+__isr static void ns16550_putc(__u64 base, char a)
 {
 	/* Wait until TX FIFO becomes empty */
 	while (!(ns16550_reg_read(base, NS16550_LSR_OFFSET) &
@@ -174,7 +174,8 @@ static int ns16550_getc(__u64 base)
 	return (int)(ns16550_reg_read(base, NS16550_RBR_OFFSET) & 0xff);
 }
 
-static __ssz ns16550_out(struct uk_console *dev, const char *buf, __sz len)
+__isr static __ssz ns16550_out(struct uk_console *dev,
+			       const char *buf, __sz len)
 {
 	struct ns16550_device *ns16550_dev;
 	__sz l = len;
@@ -209,9 +210,10 @@ static __ssz ns16550_in(struct uk_console *dev, char *buf, __sz len)
 	return len;
 }
 
-static struct uk_console_ops ns16550_ops = {
+static const struct uk_console_ops ns16550_ops = {
 	.out  = ns16550_out,
-	.in = ns16550_in
+	.in = ns16550_in,
+	.emerg_out = ns16550_out,
 };
 
 static int init_ns16550(__u64 base)

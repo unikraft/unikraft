@@ -93,7 +93,7 @@ UK_LIBPARAM_PARAM_ALIAS(base, &earlycon.base, __u64, "pl011 base");
 #define PL011_REG_WRITE(base, r, v)	\
 	uk_arch_arm64_ioreg_write16(PL011_REG(base, r), v)
 
-static void pl011_putc(__u64 base, char a)
+__isr static void pl011_putc(__u64 base, char a)
 {
 	/* Wait until TX FIFO becomes empty */
 	while (PL011_REG_READ(base, REG_UARTFR_OFFSET) & FR_TXFF)
@@ -112,7 +112,7 @@ static int pl011_getc(__u64 base)
 	return (int)(PL011_REG_READ(base, REG_UARTDR_OFFSET) & 0xff);
 }
 
-static __ssz pl011_out(struct uk_console *dev, const char *buf, __sz len)
+__isr static __ssz pl011_out(struct uk_console *dev, const char *buf, __sz len)
 {
 	struct pl011_device *pl011_dev;
 	__sz l = len;
@@ -147,9 +147,10 @@ static __ssz pl011_in(struct uk_console *dev, char *buf, __sz len)
 	return len;
 }
 
-static struct uk_console_ops pl011_ops = {
+static const struct uk_console_ops pl011_ops = {
 	.out = pl011_out,
-	.in = pl011_in
+	.in = pl011_in,
+	.emerg_out = pl011_out,
 };
 
 static int pl011_setup(__u64 base)
