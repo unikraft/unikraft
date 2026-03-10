@@ -43,7 +43,9 @@ __u16 uk_console_count(void);
  * Write bytes to the STDOUT default console(s).
  *
  * Write bytes to all devices that have the UK_CONSOLE_FLAG_STDOUT
- * flag set ("STDOUT devices").
+ * flag set ("STDOUT devices"). Output is best-effort: the
+ * function iterates all eligible devices regardless of individual
+ * device errors.
  *
  * @param buf
  *   Source of bytes to write
@@ -60,7 +62,9 @@ __ssz uk_console_out(const char *buf, __sz len);
  *
  * Read bytes from all devices that have the UK_CONSOLE_FLAG_STDIN
  * flag set ("STDIN devices"). Input from all of the devices is
- * concatenated and the total length is returned.
+ * concatenated and the total length is returned. Input is best-effort: the
+ * function iterates all eligible devices regardless of individual
+ * device errors.
  *
  * @param buf
  *   Destination of the bytes that are read
@@ -88,7 +92,7 @@ __ssz uk_console_in(char *buf, __sz len);
  *   - (>=0): Number of bytes written
  *   - (<0): Error
  */
-__ssz uk_console_emerg_out(const char *buf, __sz len);
+__isr __ssz uk_console_emerg_out(const char *buf, __sz len);
 
 /**
  * Write bytes to the given console device. If it's not possible to write
@@ -127,11 +131,28 @@ __ssz uk_console_out_direct(struct uk_console *dev, const char *buf, __sz len);
 __ssz uk_console_in_direct(struct uk_console *dev, char *buf, __sz len);
 
 /**
- * Tries to write all bytes to the given console device and blocks until
- * it achieves to do so.
+ * Write bytes to the given console device in emergency mode.
+ * If it's not possible to write the entire buffer, the number of bytes that
+ * were managed to be written are returned, leaving it to the caller to call
+ * this again for the remaining bytes.
  *
  * @param dev
  *   Console device to write to
+ * @param buf
+ *   Source of bytes to write
+ * @param len
+ *   Number of bytes to write starting at buf
+ * @return
+ *   - (>=0): Number of bytes written
+ *   - (<0): Error
+ */
+__isr __ssz uk_console_emerg_out_direct(struct uk_console *dev,
+					const char *buf, __sz len);
+
+/**
+ * Tries to write all bytes to the given console device and blocks until
+ * it achieves to do so.
+ *
  * @param buf
  *   Source of bytes to write
  * @param len
@@ -158,6 +179,23 @@ int uk_console_out_direct_all(struct uk_console *dev,
  *   - (<0): Error
  */
 int uk_console_in_direct_all(struct uk_console *dev, char *buf, __sz len);
+
+/**
+ * Tries to write all bytes to the given console device in emergency mode and
+ * blocks until it achieves to do so.
+ *
+ * @param dev
+ *   Console device to write to
+ * @param buf
+ *   Source of bytes to write
+ * @param len
+ *   Number of bytes to write starting at buf
+ * @return
+ *   - 0 on success
+ *   - (<0): Error
+ */
+__isr int uk_console_emerg_out_direct_all(struct uk_console *dev,
+					  const char *buf, __sz len);
 
 #ifdef __cplusplus
 }

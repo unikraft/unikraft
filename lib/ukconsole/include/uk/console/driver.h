@@ -22,14 +22,18 @@ typedef __ssz (*uk_console_out_func)(struct uk_console *dev, const char *buf,
 				     __sz len);
 typedef __ssz (*uk_console_in_func)(struct uk_console *dev, char *buf,
 				    __sz len);
+typedef __ssz (*uk_console_emerg_out_func)(struct uk_console *dev,
+					   const char *buf, __sz len);
 
 struct uk_console_ops {
 	uk_console_out_func out;
 	uk_console_in_func in;
+	uk_console_emerg_out_func emerg_out;
 };
 
 #define UK_CONSOLE_FLAG_STDOUT		UK_BIT(0)
 #define UK_CONSOLE_FLAG_STDIN		UK_BIT(1)
+#define UK_CONSOLE_FLAG_EMERG_STDOUT	UK_BIT(2)
 
 struct uk_console {
 	__u16 id;

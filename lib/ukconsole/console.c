@@ -21,6 +21,7 @@ static __u16 uk_console_device_count;
 
 static __bool uk_console_set_stdout_once;
 static __bool uk_console_set_stdin_once;
+static __bool uk_console_set_emerg_stdout_once;
 
 struct uk_console *uk_console_get(__u16 id)
 {
@@ -96,6 +97,26 @@ __ssz uk_console_in(char *buf, __sz len)
 	return len - leftover;
 }
 
+__isr __ssz uk_console_emerg_out(const char *buf, __sz len)
+{
+	struct uk_console *dev = __NULL;
+
+	if (unlikely(!len))
+		return 0;
+
+	if (unlikely(!buf))
+		return -EINVAL;
+
+	/* Output to all EMERG_STDOUT devices */
+	uk_list_for_each_entry(dev, &uk_console_device_list, _list) {
+		if ((dev->flags & UK_CONSOLE_FLAG_EMERG_STDOUT) &&
+		    dev->ops->emerg_out)
+			uk_console_emerg_out_direct(dev, buf, len);
+	}
+
+	return len;
+}
+
 __ssz uk_console_out_direct(struct uk_console *dev, const char *buf, __sz len)
 {
 	UK_ASSERT(dev && dev->ops);
@@ -126,6 +147,23 @@ __ssz uk_console_in_direct(struct uk_console *dev, char *buf, __sz len)
 		return -EIO;
 
 	return dev->ops->in(dev, buf, len);
+}
+
+__isr __ssz uk_console_emerg_out_direct(struct uk_console *dev,
+					const char *buf, __sz len)
+{
+	UK_ASSERT(dev && dev->ops);
+
+	if (unlikely(!len))
+		return 0;
+
+	if (unlikely(!buf))
+		return -EINVAL;
+
+	if (unlikely(!dev->ops->emerg_out))
+		return -EIO;
+
+	return dev->ops->emerg_out(dev, buf, len);
 }
 
 int uk_console_out_direct_all(struct uk_console *dev,
@@ -186,6 +224,35 @@ int uk_console_in_direct_all(struct uk_console *dev,
 	return 0;
 }
 
+__isr int uk_console_emerg_out_direct_all(struct uk_console *dev,
+					  const char *buf, __sz len)
+{
+	__sz bytes_written = 0;
+	__ssz rc;
+
+	UK_ASSERT(dev && dev->ops);
+
+	if (unlikely(!len))
+		return 0;
+
+	if (unlikely(!buf))
+		return -EINVAL;
+
+	if (unlikely(!dev->ops->emerg_out))
+		return -EIO;
+
+	while (bytes_written < len) {
+		rc = dev->ops->emerg_out(dev, buf + bytes_written,
+					 len - bytes_written);
+		if (unlikely(rc < 0))
+			return (int)rc;
+
+		bytes_written += (__sz)rc;
+	}
+
+	return 0;
+}
+
 void uk_console_register(struct uk_console *dev)
 {
 	struct uk_console *known_dev __maybe_unused = __NULL;
@@ -209,6 +276,9 @@ void uk_console_register(struct uk_console *dev)
 	if (dev->flags & UK_CONSOLE_FLAG_STDIN)
 		uk_console_set_stdin_once = __true;
 
+	if (dev->flags & UK_CONSOLE_FLAG_EMERG_STDOUT)
+		uk_console_set_emerg_stdout_once = __true;
+
 	/* Otherwise, if the current device doesn't have any flags set and
 	 * there has not yet been another device with any flags set, we give
 	 * the current device flags. Now we have at least one device with flags
@@ -225,6 +295,13 @@ void uk_console_register(struct uk_console *dev)
 	    dev->ops->in) {
 		uk_console_set_stdin_once = __true;
 		dev->flags |= UK_CONSOLE_FLAG_STDIN;
+	}
+
+	if (!uk_console_set_emerg_stdout_once &&
+	    !(dev->flags & UK_CONSOLE_FLAG_EMERG_STDOUT) &&
+	    dev->ops->emerg_out) {
+		uk_console_set_emerg_stdout_once = __true;
+		dev->flags |= UK_CONSOLE_FLAG_EMERG_STDOUT;
 	}
 
 	uk_list_add_tail(&dev->_list, &uk_console_device_list);
