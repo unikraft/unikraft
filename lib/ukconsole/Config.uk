@@ -2,6 +2,8 @@ menuconfig LIBUKCONSOLE
 	bool "ukconsole: generic console driver interface"
 	default y
 	select LIBUKBITOPS
+	select LIBUKLOCK
+	select LIBUKLOCK_SPINLOCK
 
 if LIBUKCONSOLE
 config LIBUKCONSOLE_TEST

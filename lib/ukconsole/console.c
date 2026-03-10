@@ -5,6 +5,7 @@
  */
 
 #include <uk/essentials.h>
+#include <uk/alloc.h>
 #include <uk/arch/types.h>
 #include <uk/list.h>
 #include <uk/console.h>
@@ -313,5 +314,119 @@ void uk_console_register(struct uk_console *dev)
 		   (dev->flags & UK_CONSOLE_FLAG_STDIN) ? 'I' : '-',
 		   (dev->flags & UK_CONSOLE_FLAG_STDOUT) ? 'O' : '-');
 #endif /* CONFIG_LIBUKDEBUG_PRINTK */
+}
 
+struct uk_console_async_callback {
+	void *cookie;
+	uk_console_async_handler_func handler;
+	__u32 evflags;
+	struct uk_list_head _list;
+};
+
+int uk_console_async_register_callback(struct uk_console *dev,
+				       uk_console_async_handler_func handler,
+				       void *cookie, __u32 event)
+{
+	struct uk_console_async_callback *cb;
+	struct uk_console_async *async_dev;
+
+	UK_ASSERT(dev);
+	UK_ASSERT(dev->ops);
+	UK_ASSERT(handler);
+
+	if (unlikely(!event ||
+		     (event & ~(UK_CONSOLE_ASYNC_EVENT_IN |
+				UK_CONSOLE_ASYNC_EVENT_OUT))))
+		return -EINVAL;
+
+	if (unlikely((event & UK_CONSOLE_ASYNC_EVENT_IN) &&
+		     !(dev->flags & UK_CONSOLE_FLAG_ASYNC_RX)))
+		return -ENOTSUP;
+
+	if (unlikely((event & UK_CONSOLE_ASYNC_EVENT_OUT) &&
+		     !(dev->flags & UK_CONSOLE_FLAG_ASYNC_TX)))
+		return -ENOTSUP;
+
+	cb = uk_malloc(uk_alloc_get_default(), sizeof(*cb));
+	if (unlikely(!cb)) {
+		uk_pr_err("Failed to allocate memory for the callback.\n");
+		return -ENOMEM;
+	}
+
+	cb->cookie = cookie;
+	cb->handler = handler;
+	cb->evflags = event;
+	UK_INIT_LIST_HEAD(&cb->_list);
+
+	async_dev = __containerof(dev, struct uk_console_async, cons);
+
+	uk_spin_lock(&async_dev->_cb_list_lock);
+	uk_list_add_tail(&cb->_list, &async_dev->_cb_list);
+	uk_spin_unlock(&async_dev->_cb_list_lock);
+
+	return 0;
+}
+
+int uk_console_async_unregister_callback(struct uk_console *dev,
+					 uk_console_async_handler_func handler,
+					 void *cookie, __u32 event)
+{
+	struct uk_console_async_callback *cb, *tmp;
+	struct uk_console_async *async_dev;
+
+	UK_ASSERT(dev);
+	UK_ASSERT(dev->ops);
+	UK_ASSERT(handler);
+
+	if (unlikely(!event ||
+		     (event & ~(UK_CONSOLE_ASYNC_EVENT_IN |
+				UK_CONSOLE_ASYNC_EVENT_OUT))))
+		return -EINVAL;
+
+	if (unlikely(!(dev->flags & (UK_CONSOLE_FLAG_ASYNC_RX |
+				     UK_CONSOLE_FLAG_ASYNC_TX))))
+		return -ENOTSUP;
+
+	async_dev = __containerof(dev, struct uk_console_async, cons);
+
+	uk_spin_lock(&async_dev->_cb_list_lock);
+	uk_list_for_each_entry_safe(cb, tmp, &async_dev->_cb_list, _list) {
+		if (cb->handler != handler ||
+		    cb->cookie != cookie  ||
+		    cb->evflags != event)
+			continue;
+
+		uk_list_del(&cb->_list);
+		uk_spin_unlock(&async_dev->_cb_list_lock);
+		uk_free(uk_alloc_get_default(), cb);
+		return 0;
+	}
+	uk_spin_unlock(&async_dev->_cb_list_lock);
+
+	return -ENOENT;
+}
+
+static inline void _uk_console_async_evhandle(struct uk_console_async *dev,
+					      __u32 event)
+{
+	struct uk_console_async_callback *cb;
+
+	uk_spin_lock(&dev->_cb_list_lock);
+	uk_list_for_each_entry(cb, &dev->_cb_list, _list) {
+		if (!(cb->evflags & event))
+			continue;
+
+		cb->handler(&dev->cons, cb->cookie);
+	}
+	uk_spin_unlock(&dev->_cb_list_lock);
+}
+
+void uk_console_async_in_handle(struct uk_console_async *dev)
+{
+	_uk_console_async_evhandle(dev, UK_CONSOLE_ASYNC_EVENT_IN);
+}
+
+void uk_console_async_out_handle(struct uk_console_async *dev)
+{
+	_uk_console_async_evhandle(dev, UK_CONSOLE_ASYNC_EVENT_OUT);
 }

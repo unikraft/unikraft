@@ -9,6 +9,7 @@
 
 #include <uk/arch/types.h>
 #include <uk/assert.h>
+#include <uk/bitops.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -197,6 +198,54 @@ int uk_console_in_direct_all(struct uk_console *dev, char *buf, __sz len);
 __isr int uk_console_emerg_out_direct_all(struct uk_console *dev,
 					  const char *buf, __sz len);
 
+typedef void (*uk_console_async_handler_func)(struct uk_console *dev,
+					      void *cookie);
+
+/* Event raised on RX IRQ of console device */
+#define UK_CONSOLE_ASYNC_EVENT_IN		UK_BIT(0)
+/* Event raised on TX IRQ of console device */
+#define UK_CONSOLE_ASYNC_EVENT_OUT		UK_BIT(1)
+
+/**
+ * Register an interrupt-safe callback with a console device. The console
+ * device will raise this callback if the corresponding interrupt is triggered.
+ *
+ * @param dev
+ *   The async-capable console device the callback will be called by
+ * @param handler
+ *   The callback function pointer that will be called on event
+ * @param cookie
+ *   The opaque cookie that will be passed to the handler as argument
+ * @param event
+ *   The event mask to call this callback on (UK_CONSOLE_ASYNC_EVENT_IN/OUT)
+ * @return
+ *   - 0 on success
+ *   - (<0): Error
+ */
+int uk_console_async_register_callback(struct uk_console *dev,
+				       uk_console_async_handler_func handler,
+				       void *cookie, __u32 event);
+
+/**
+ * Unregister a previously registered async event callback from a console
+ * device. The callback is identified by the exact (handler, cookie, event)
+ * triple used during registration.
+ *
+ * @param dev
+ *   The async-capable console device the callback was registered with
+ * @param handler
+ *   The callback function pointer that was registered
+ * @param cookie
+ *   The opaque cookie that was registered
+ * @param event
+ *   The event mask that was registered (UK_CONSOLE_ASYNC_EVENT_IN/OUT)
+ * @return
+ *   - 0 on success
+ *   - (<0): Error
+ */
+int uk_console_async_unregister_callback(struct uk_console *dev,
+					 uk_console_async_handler_func handler,
+					 void *cookie, __u32 event);
 #ifdef __cplusplus
 }
 #endif

@@ -11,6 +11,7 @@
 #include <uk/list.h>
 #include <uk/assert.h>
 #include <uk/bitops.h>
+#include <uk/spinlock.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -49,6 +50,8 @@ struct uk_console_ops {
 #define UK_CONSOLE_FLAG_STDOUT		UK_BIT(0)
 #define UK_CONSOLE_FLAG_STDIN		UK_BIT(1)
 #define UK_CONSOLE_FLAG_EMERG_STDOUT	UK_BIT(2)
+#define UK_CONSOLE_FLAG_ASYNC_TX	UK_BIT(3)
+#define UK_CONSOLE_FLAG_ASYNC_RX	UK_BIT(4)
 
 struct uk_console {
 	__u16 id;
@@ -57,6 +60,12 @@ struct uk_console {
 	int flags;
 	enum uk_console_devclass dclass;
 	struct uk_list_head _list;
+};
+
+struct uk_console_async {
+	struct uk_console cons;
+	struct uk_list_head _cb_list;
+	struct uk_spinlock _cb_list_lock;
 };
 
 /**
@@ -91,6 +100,33 @@ static inline void uk_console_init(struct uk_console *dev, const char *name,
 }
 
 /**
+ * Initialize a `struct uk_console_async`
+ *
+ * @param name
+ *   Optional name of the device
+ * @param ops
+ *   Operations of the device
+ * @param flags
+ *   Requested flags for the device
+ * @param dclass
+ *   Console device class
+ */
+static inline void uk_console_async_init(struct uk_console_async *dev,
+					 const char *name,
+					 const struct uk_console_ops *ops,
+					 int flags,
+					 enum uk_console_devclass dclass)
+{
+	UK_ASSERT(dev);
+	UK_ASSERT((flags & UK_CONSOLE_FLAG_ASYNC_TX) ||
+		  (flags & UK_CONSOLE_FLAG_ASYNC_RX));
+
+	uk_console_init(&dev->cons, name, ops, flags, dclass);
+	UK_INIT_LIST_HEAD(&dev->_cb_list);
+	uk_spin_init(&dev->_cb_list_lock);
+}
+
+/**
  * Register a console device driver with `ukconsole`.
  *
  * The device driver must be initialized and ready to be used. This
@@ -107,6 +143,22 @@ static inline void uk_console_init(struct uk_console *dev, const char *name,
  *   The device driver to register
  */
 void uk_console_register(struct uk_console *dev);
+
+/**
+ * Call registered interrupt-safe callbacks during RX interrupt.
+ *
+ * @param dev
+ *   Console device to handle the event for
+ */
+void uk_console_async_in_handle(struct uk_console_async *dev);
+
+/**
+ * Call registered interrupt-safe callbacks during TX interrupt.
+ *
+ * @param dev
+ *   Console device to handle the event for
+ */
+void uk_console_async_out_handle(struct uk_console_async *dev);
 
 #ifdef __cplusplus
 }
