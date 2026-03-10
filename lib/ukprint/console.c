@@ -78,6 +78,7 @@ struct vprint_console {
 };
 
 #if CONFIG_LIBUKCONSOLE
+#if !CONFIG_LIBUKPRINT_NOCARRIAGERETURN
 /* TODO: Some consoles require both a newline and a carriage return to
  * go to the start of the next line. This kind of behavior should be in
  * a single place in posix-tty. We keep this workaround until we have feature
@@ -114,6 +115,12 @@ static __ssz console_out(const char *buf, __sz len)
 
 	return len;
 }
+#else /* CONFIG_LIBUKPRINT_NOCARRIAGERETURN */
+static __ssz console_out(const char *buf, __sz len)
+{
+	return uk_console_out(buf, len);
+}
+#endif /* CONFIG_LIBUKPRINT_NOCARRIAGERETURN */
 #endif /* CONFIG_LIBUKCONSOLE */
 
 /* Console state for kernel output */
