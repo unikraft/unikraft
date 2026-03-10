@@ -65,6 +65,12 @@ static const char SERIAL_TERMIOS_CONTROL_CHARS[KNCCS] = {
 	[VWERASE] = 027,
 };
 
+#if CONFIG_LIBPOSIX_TTY_OUT_NOCARRIAGERETURN
+static inline __ssz _console_out(const char *buf, __sz len)
+{
+	return uk_console_out_direct(tty_cons, buf, len);
+}
+#else /* !CONFIG_LIBPOSIX_TTY_OUT_NOCARRIAGERETURN */
 /* TODO: Some consoles require both a newline and a carriage return to
  * go to the start of the next line. This kind of behavior should be in
  * a single place in posix-tty. We keep this workaround until we have feature
@@ -104,6 +110,7 @@ static inline __ssz _console_out(const char *buf, __sz len)
 
 	return len;
 }
+#endif /* !CONFIG_LIBPOSIX_TTY_OUT_NOCARRIAGERETURN */
 
 static ssize_t serial_read(const struct uk_file *f,
 			   const struct iovec *iov, size_t iovcnt,
@@ -139,8 +146,10 @@ static ssize_t serial_read(const struct uk_file *f,
 		if (*last == '\r')
 			*last = '\n';
 
+#if !CONFIG_LIBPOSIX_TTY_IN_NOECHOBACK
 		/* Echo the input to the console (NOT stdout!) */
 		_console_out(buf, bytes_read);
+#endif /* !CONFIG_LIBPOSIX_TTY_IN_NOECHOBACK */
 
 		if (*last == '\n')
 			break;

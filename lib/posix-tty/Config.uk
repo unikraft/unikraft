@@ -59,4 +59,10 @@ endchoice
 
 endif
 
+config LIBPOSIX_TTY_OUT_NOCARRIAGERETURN
+	bool "Serial output: no carriage return"
+
+config LIBPOSIX_TTY_IN_NOECHOBACK
+	bool "Serial input: no echo back"
+
 endif
