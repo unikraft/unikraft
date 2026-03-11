@@ -18,6 +18,14 @@
 #include <uk/console/driver.h>
 #include <uk/posix-fd.h>
 
+#if CONFIG_LIBUKFS_DEVFS
+#include <uk/devfs.h>
+#include <uk/fs.h>
+#include <uk/fs/prio.h>
+
+#include <stdio.h>
+#endif /* CONFIG_LIBUKFS_DEVFS */
+
 static const char SERIAL_VOLID[] = "serial_vol";
 
 /* EOT: End Of Transmission character; ^D */
@@ -344,3 +352,99 @@ const struct uk_file *uk_file_console_create(struct uk_console *cons)
 
 	return &consf->f;
 }
+
+#if CONFIG_LIBUKFS_DEVFS
+static int consf_create_devnode(struct uk_console *cons,
+				const char *name, __sz name_len)
+{
+	const struct uk_file *f;
+	unsigned int mode;
+	const void *r;
+
+	UK_ASSERT(cons);
+	UK_ASSERT(uk_fs_devfs_root);
+
+	f = uk_file_console_create(cons);
+	if (unlikely(PTRISERR(f))) {
+		uk_pr_err("Failed to create console file for %s\n", name);
+		return PTR2ERR(f);
+	}
+
+	mode = 0;
+	if ((cons->flags & UK_CONSOLE_FLAG_STDOUT) || cons->ops->out)
+		mode |= 0222;
+	if ((cons->flags & UK_CONSOLE_FLAG_STDIN) || cons->ops->in)
+		mode |= 0444;
+
+	/* We do not clean up created files on error, as they will be
+	 * dropped when the devfs root is released on system shutdown.
+	 */
+	r = uk_fs_createat(uk_fs_devfs_root,
+			   name, name_len, mode, O_EXCL,
+			   (union uk_fs_create_target){
+				.file = f,
+			   });
+	uk_file_release(f);
+	if (unlikely(PTRISERR(r))) {
+		uk_pr_err("Failed to create /dev/%s: %d\n", name, PTR2ERR(r));
+		return PTR2ERR(r);
+	}
+
+	return 0;
+}
+
+static int init_posix_tty_devfs_consnodes(struct uk_init_ctx *ictx __unused)
+{
+	__sz i, ccount, name_len, hvc_idx = 0, uart_idx = 0, fb_idx = 0;
+	struct uk_console *cons;
+	char name[32];  /* Somewhat pragmatic size for tty devfs nodes */
+	int rc;
+
+	ccount = uk_console_count();
+	for (i = 0; i < ccount; i++) {
+		cons = uk_console_get(i);
+		UK_ASSERT(cons);
+
+		switch (cons->dclass) {
+		case UK_CONSOLE_CLASS_HVC:
+			rc = snprintf(name, sizeof(name), "hvc%lu", hvc_idx);
+			hvc_idx++;
+			break;
+		case UK_CONSOLE_CLASS_UART:
+			rc = snprintf(name, sizeof(name), "ttyS%lu", uart_idx);
+			uart_idx++;
+			break;
+		case UK_CONSOLE_CLASS_FB:
+			rc = snprintf(name, sizeof(name), "tty%lu", fb_idx);
+			fb_idx++;
+			break;
+		default:
+			continue;
+		}
+
+		if (unlikely(rc < 0)) {
+			uk_pr_err("Failed to build devfs node name\n");
+			return rc;
+		}
+
+		UK_ASSERT((__sz)rc <= sizeof(name));
+		name_len = (__sz)rc;
+
+		rc = consf_create_devnode(cons, name, name_len);
+		if (unlikely(rc)) {
+			/* Not tracking previously allocated console files to
+			 * avoid leaks because they will be automatically
+			 * dropped on devfs drop during shutdown.
+			 */
+			uk_pr_err("Failed to create devfs node for %s\n",
+				  name);
+			return rc;
+		}
+	}
+
+	return 0;
+}
+
+uk_rootfs_initcall_prio(init_posix_tty_devfs_consnodes, 0x0,
+			UK_FS_PRIO_FSAVAIL);
+#endif /* CONFIG_LIBUKFS_DEVFS */

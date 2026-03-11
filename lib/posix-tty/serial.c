@@ -14,6 +14,14 @@
 #include <uk/console/driver.h>
 #include <uk/file.h>
 #include <uk/file-console.h>
+
+#if CONFIG_LIBUKFS_DEVFS
+#include <uk/fs.h>
+#include <uk/fs/prio.h>
+#include <uk/devfs.h>
+#include <uk/prio.h>
+#endif /* CONFIG_LIBUKFS_DEVFS */
+
 #include <uk/init.h>
 
 #if CONFIG_LIBUKLIBPARAM
@@ -29,6 +37,61 @@ UK_LIBPARAM_PARAM_ALIAS(console, &tty_cons_arg, charp,
 
 const struct uk_file *tty_f;
 
+#if CONFIG_LIBUKFS_DEVFS
+static int init_tty_cons(struct uk_init_ctx *ictx __unused)
+{
+	const unsigned int lflags = UKFS_LOOKUP_IGNMNT |
+				    UKFS_LOOKUP_NO_MNTAUX |
+				    UKFS_LOOKUP_NO_SYMAUX;
+	const struct uk_console *tty_cons;
+	union uk_fs_lookup_out lout;
+	const char *devname;
+	size_t prog, len;
+	int rc;
+
+	if (!tty_cons_arg) {
+		/* If no argument provided, assume the first registered one */
+		tty_cons = uk_console_get(0);
+
+		switch (tty_cons->dclass) {
+		case UK_CONSOLE_CLASS_HVC:
+			devname = "hvc0";
+			len = sizeof("hvc0") - 1;
+			break;
+		case UK_CONSOLE_CLASS_UART:
+			devname = "ttyS0";
+			len = sizeof("ttyS0") - 1;
+			break;
+		case UK_CONSOLE_CLASS_FB:
+			devname = "tty0";
+			len = sizeof("tty0") - 1;
+			break;
+		default:
+			UK_CRASH("First registered console has unknown device class\n");
+		}
+	} else {
+		devname = tty_cons_arg;
+		len = strlen(tty_cons_arg);
+	}
+
+	rc = uk_fs_lookupat(uk_fs_devfs_root, devname, len,
+			    lflags, &lout, &prog);
+	if (unlikely(rc < 0)) {
+		uk_pr_err("Failed to look up devfs node for posix_tty.console\n");
+		return rc;
+	}
+
+	if (unlikely(rc != UKFS_STOP_FILE || len != prog)) {
+		uk_pr_err("Look up for devfs node of posix_tty.console returned unexpected results\n");
+		return -EINVAL;
+	}
+
+	tty_f = lout.target;
+	return 0;
+}
+
+uk_rootfs_initcall_prio(init_tty_cons, 0x0, UK_PRIO_AFTER(UK_FS_PRIO_FSAVAIL));
+#else /* !CONFIG_LIBUKFS_DEVFS */
 static int init_tty_cons(struct uk_init_ctx *ictx __unused)
 {
 	__sz i, ccount, idx, cclass_str_len = 0;
@@ -106,3 +169,4 @@ setup_tty_globals:
 }
 
 uk_rootfs_initcall_prio(init_tty_cons, 0x0, UK_FS_PRIO_FSAVAIL);
+#endif /* !CONFIG_LIBUKFS_DEVFS */
