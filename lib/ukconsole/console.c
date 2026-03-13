@@ -7,6 +7,7 @@
 #include <uk/essentials.h>
 #include <uk/alloc.h>
 #include <uk/arch/types.h>
+#include <uk/bitops/bitmap.h>
 #include <uk/list.h>
 #include <uk/console.h>
 #include <uk/console/driver.h>
@@ -17,10 +18,15 @@
 #include <uk/print.h>
 #endif /* CONFIG_LIBUKDEBUG_PRINTK */
 
+/* Maximum number of simultaneously registered console devices */
+#define UK_CONSOLE_MAX_DEVS  CONFIG_LIBUKCONSOLE_DEVICES_MAXCOUNT
+
 /* List of dynamically registered devices */
 static struct uk_spinlock cons_dev_list_lock = UK_SPINLOCK_INITIALIZER();
 static UK_LIST_HEAD(cons_dev_list);
-static __u16 uk_console_device_count;
+static __u16 cons_dev_count;
+/* Bit n set <=> device ID n is currently in use */
+static unsigned long cons_id_bitmap[UK_BITS_TO_LONGS(UK_CONSOLE_MAX_DEVS)];
 
 static __bool uk_console_set_stdout_once;
 static __bool uk_console_set_stdin_once;
@@ -44,7 +50,13 @@ struct uk_console *uk_console_get(__u16 id)
 
 __u16 uk_console_count(void)
 {
-	return uk_console_device_count;
+	__u16 count;
+
+	uk_spin_lock(&cons_dev_list_lock);
+	count = cons_dev_count;
+	uk_spin_unlock(&cons_dev_list_lock);
+
+	return count;
 }
 
 __ssz uk_console_out(const char *buf, __sz len)
@@ -269,6 +281,7 @@ __isr int uk_console_emerg_out_direct_all(struct uk_console *dev,
 void uk_console_register(struct uk_console *dev)
 {
 	struct uk_console *known_dev __maybe_unused = __NULL;
+	unsigned long id;
 
 	UK_ASSERT(dev);
 	UK_ASSERT(dev->ops);
@@ -320,10 +333,22 @@ void uk_console_register(struct uk_console *dev)
 	}
 
 	uk_spin_lock(&cons_dev_list_lock);
+
 	uk_list_add_tail(&dev->_list, &cons_dev_list);
+
+	id = uk_find_next_zero_bit(cons_id_bitmap,
+				   UK_CONSOLE_MAX_DEVS, 0);
+	if (unlikely(id >= UK_CONSOLE_MAX_DEVS))
+		UK_CRASH("Cannot register more than %u console devices\n",
+			 UK_CONSOLE_MAX_DEVS);
+
+	uk_bitmap_set(cons_id_bitmap, (unsigned int)id, 1);
+	cons_dev_count++;
+
 	uk_spin_unlock(&cons_dev_list_lock);
 
-	dev->id = uk_console_device_count++;
+	UK_ASSERT(id < UK_CONSOLE_MAX_DEVS); /* out of console ID slots */
+	dev->id = (__u16)id;
 
 #if CONFIG_LIBUKDEBUG_PRINTK
 	uk_pr_info("Registered con%" __PRIu16 ": %s, flags: %c%c\n",
@@ -339,6 +364,60 @@ struct uk_console_async_callback {
 	__u32 evflags;
 	struct uk_list_head _list;
 };
+
+void console_async_release_cb(struct uk_console *dev)
+{
+	struct uk_console_async_callback *cb, *tmp;
+	struct uk_console_async *async_dev;
+
+	async_dev = __containerof(dev, struct uk_console_async, cons);
+
+	uk_spin_lock(&async_dev->_cb_list_lock);
+	uk_list_for_each_entry_safe(cb, tmp, &async_dev->_cb_list, _list) {
+		uk_list_del(&cb->_list);
+		uk_free(uk_alloc_get_default(), cb);
+	}
+	uk_spin_unlock(&async_dev->_cb_list_lock);
+}
+
+void uk_console_unregister(struct uk_console *dev)
+{
+	struct uk_console *cons;
+
+	UK_ASSERT(dev);
+	UK_ASSERT(dev->id < UK_CONSOLE_MAX_DEVS);
+
+	uk_spin_lock(&cons_dev_list_lock);
+
+	uk_list_del_init(&dev->_list);
+	uk_bitmap_clear(cons_id_bitmap, dev->id, 1);
+	cons_dev_count--;
+
+	dev->id = __U16_MAX;
+
+	if ((dev->flags & UK_CONSOLE_FLAG_ASYNC_RX) ||
+	    (dev->flags & UK_CONSOLE_FLAG_ASYNC_TX))
+		console_async_release_cb(dev);
+
+	/*
+	 * Re-evaluate the _once flags: if the removed device was the last
+	 * one carrying a given flag, future registrations must be able to
+	 * auto-assign that flag again.
+	 */
+	uk_console_set_stdout_once = __false;
+	uk_console_set_stdin_once = __false;
+	uk_console_set_emerg_stdout_once = __false;
+	uk_list_for_each_entry(cons, &cons_dev_list, _list) {
+		if (cons->flags & UK_CONSOLE_FLAG_STDOUT)
+			uk_console_set_stdout_once = __true;
+		if (cons->flags & UK_CONSOLE_FLAG_STDIN)
+			uk_console_set_stdin_once = __true;
+		if (cons->flags & UK_CONSOLE_FLAG_EMERG_STDOUT)
+			uk_console_set_emerg_stdout_once = __true;
+	}
+
+	uk_spin_unlock(&cons_dev_list_lock);
+}
 
 int uk_console_async_register_callback(struct uk_console *dev,
 				       uk_console_async_handler_func handler,

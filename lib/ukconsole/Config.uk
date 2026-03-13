@@ -6,6 +6,10 @@ menuconfig LIBUKCONSOLE
 	select LIBUKLOCK_SPINLOCK
 
 if LIBUKCONSOLE
+config LIBUKCONSOLE_DEVICES_MAXCOUNT
+	int "Maximum amount of registerable console devices"
+	default 16
+
 config LIBUKCONSOLE_TEST
 	bool "Enable unit tests"
 	select LIBUKTEST

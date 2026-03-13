@@ -132,8 +132,7 @@ static inline void uk_console_async_init(struct uk_console_async *dev,
  * The device driver must be initialized and ready to be used. This
  * function will assign a unique ID to the device. The ID can be found
  * in the `id` field of the `struct uk_console` structure after this
- * function has returned. There is no way to unregister a device so
- * assume that `dev` and all pointers inside `dev` must live forever.
+ * function has returned.
  *
  * NOTE: Drivers are only allowed to register a single `struct uk_console`
  * for each underlying device. E.g., it's forbidden to register two distinct
@@ -143,6 +142,16 @@ static inline void uk_console_async_init(struct uk_console_async *dev,
  *   The device driver to register
  */
 void uk_console_register(struct uk_console *dev);
+
+/**
+ * Unregister a console device driver with `ukconsole`.
+ * After this operation, the console framework is no longer aware of the
+ * unregistered device driver.
+ *
+ * @param dev
+ *   The device driver to unregister
+ */
+void uk_console_unregister(struct uk_console *dev);
 
 /**
  * Call registered interrupt-safe callbacks during RX interrupt.

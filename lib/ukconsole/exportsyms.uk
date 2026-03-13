@@ -10,6 +10,7 @@ uk_console_in_direct_all
 uk_console_emerg_out_direct_all
 uk_console_count
 uk_console_register
+uk_console_unregister
 uk_console_async_register_callback
 uk_console_async_unregister_callback
 uk_console_async_in_handle
