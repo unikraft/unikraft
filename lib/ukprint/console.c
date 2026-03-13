@@ -312,6 +312,6 @@ void uk_print_console_write(struct uk_print_msg *msg)
 		vprint_cout(cons, LVLC_RESET, sizeof(LVLC_RESET));
 
 		len -= llen;
-		lptr = nlptr + 1;
+		lptr = nlptr ? nlptr + 1 : lptr + llen;
 	}
 }
