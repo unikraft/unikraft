@@ -4,6 +4,8 @@ menuconfig LIBVIRTIO_CONSOLE
 	select LIBVIRTIO_BUS
 	select LIBUKSGLIST
 	select LIBUKALLOC
+	select LIBPOSIX_TTY_DEVFS if LIBUKFS_DEVFS
+	select LIBUKSCHED
 	help
 		Driver for Virtual I/O Console devices.
 
