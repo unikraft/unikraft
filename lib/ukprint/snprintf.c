@@ -44,7 +44,11 @@ static inline char *ksprintn(char *nbuf, uintmax_t num, int base, int *lenp,
 /*
  * Scaled down version of printf(3).
  */
+#if !__INTERRUPTSAFE__
 int uk_vsnprintf(char *str, size_t size, const char *fmt, va_list ap)
+#else /* __INTERRUPTSAFE__ */
+int uk_vsnprintf_isr(char *str, size_t size, const char *fmt, va_list ap)
+#endif /* __INTERRUPTSAFE__ */
 {
 #define PCHAR(c)                                                               \
 	{                                                                      \
@@ -344,13 +348,21 @@ number:
 #undef PCHAR
 }
 
+#if !__INTERRUPTSAFE__
 int uk_snprintf(char *str, size_t size, const char *fmt, ...)
+#else /* __INTERRUPTSAFE__ */
+int uk_snprintf_isr(char *str, size_t size, const char *fmt, ...)
+#endif /* __INTERRUPTSAFE__ */
 {
 	int ret;
 	va_list ap;
 
 	va_start(ap, fmt);
+#if !__INTERRUPTSAFE__
 	ret = uk_vsnprintf(str, size, fmt, ap);
+#else /* __INTERRUPTSAFE__ */
+	ret = uk_vsnprintf_isr(str, size, fmt, ap);
+#endif /* __INTERRUPTSAFE__ */
 	va_end(ap);
 
 	return ret;

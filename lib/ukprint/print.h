@@ -73,6 +73,7 @@ struct uk_print_msg {
 
 #if CONFIG_LIBUKCONSOLE
 void uk_print_console_write(struct uk_print_msg *msg);
+__isr void uk_print_console_write_isr(struct uk_print_msg *msg);
 #endif /* CONFIG_LIBUKCONSOLE */
 
 #endif /* __UK_PRINT_INT_H__ */

@@ -63,6 +63,12 @@ void _uk_vprintk(int flags, __u16 libid, const char *srcname,
 void _uk_printk(int flags, __u16 libid, const char *srcname,
 		unsigned int srcline, const char *fmt, ...) __printf(5, 6);
 
+__isr void _uk_vprintk_isr(int flags, __u16 libid, const char *srcname,
+			   unsigned int srcline, const char *fmt, va_list ap);
+__isr void _uk_printk_isr(int flags, __u16 libid, const char *srcname,
+			  unsigned int srcline,
+			  const char *fmt, ...) __printf(5, 6);
+
 #if defined UK_DEBUG
 #define UK_PRINTK_EN(_flags)						\
 	((((_flags) & UK_PRINT_KLVL_MASK) <= UK_PRINT_KLVL_MAX) ||	\
@@ -111,6 +117,48 @@ void _uk_printk(int flags, __u16 libid, const char *srcname,
 			}                                                      \
 		}                                                              \
 	} while (0)
+
+#define uk_vprintk_isr(flags, fmt, ap)                                         \
+	do {                                                                   \
+		if (UK_PRINTK_EN(flags))                                       \
+			_uk_vprintk_isr((flags), uk_libid_self(),              \
+					__STR_BASENAME__, __LINE__, (fmt), ap);\
+	} while (0)
+
+#define uk_vprintk_once_isr(flags, fmt, ap)                                    \
+	do {                                                                   \
+		if (UK_PRINTK_EN(flags)) {                                     \
+			static int __x;                                        \
+			if (unlikely(!__x)) {                                  \
+				_uk_vprintk_isr((flags), uk_libid_self(),      \
+						__STR_BASENAME__,              \
+						__LINE__, (fmt), ap);          \
+				__x = 1;                                       \
+			}                                                      \
+		}                                                              \
+	} while (0)
+
+#define uk_printk_isr(flags, fmt, ...)                                         \
+	do {                                                                   \
+		if (UK_PRINTK_EN(flags))                                       \
+			_uk_printk_isr((flags), uk_libid_self(),               \
+				       __STR_BASENAME__, __LINE__,             \
+				       (fmt), ##__VA_ARGS__);                  \
+	} while (0)
+
+#define uk_printk_once_isr(flags, fmt, ...)                                    \
+	do {                                                                   \
+		if (UK_PRINTK_EN(flags)) {                                     \
+			static int __x;                                        \
+			if (unlikely(!__x)) {                                  \
+				_uk_printk_isr((flags), uk_libid_self(),       \
+						__STR_BASENAME__,              \
+						__LINE__, (fmt),               \
+						##__VA_ARGS__);                \
+				__x = 1;                                       \
+			}                                                      \
+		}                                                              \
+	} while (0)
 #else /* !(CONFIG_LIBUKPRINT_PRINTK) */
 static inline void _uk_vprintk(int flags __unused, __u16 libid __unused,
 			       const char *srcname __unused,
@@ -143,6 +191,44 @@ static inline void uk_printk_once(int flags, const char *fmt, ...) __printf(2, 3
 static inline void uk_printk_once(int flags __unused,
 				  const char *fmt __unused, ...)
 {}
+
+static inline void _uk_vprintk_isr(int flags __unused, __u16 libid __unused,
+				   const char *srcname __unused,
+				   unsigned int srcline __unused,
+				   const char *fmt __unused,
+				   va_list ap __unused)
+{}
+
+static inline void _uk_printk_isr(int flags, __u16 libid, const char *srcname,
+				  unsigned int srcline,
+				  const char *fmt, ...) __printf(5, 6);
+static inline void _uk_printk_isr(int flags __unused, __u16 libid __unused,
+				  const char *srcname __unused,
+				  unsigned int srcline __unused,
+				  const char *fmt __unused, ...)
+{}
+
+static inline void uk_vprintk_isr(int flags __unused, const char *fmt __unused,
+				  va_list ap __unused)
+{}
+
+static inline void uk_printk_isr(int flags,
+				 const char *fmt, ...) __printf(2, 3);
+static inline void uk_printk_isr(int flags __unused,
+				 const char *fmt __unused, ...)
+{}
+
+static inline void uk_vprintk_once_isr(int flags __unused,
+				       const char *fmt __unused,
+				       va_list ap __unused)
+{}
+
+static inline void uk_printk_once_isr(int flags,
+				      const char *fmt, ...) __printf(2, 3);
+static inline void uk_printk_once_isr(int flags __unused,
+				      const char *fmt __unused, ...)
+{}
+
 #endif /* !(CONFIG_LIBUKPRINT_PRINTK) */
 
 /*
@@ -179,9 +265,42 @@ static inline void uk_printk_once(int flags __unused,
 #define uk_pr_crit_once(fmt, ...)				\
 	uk_printk_once(UK_PRINT_KLVL_CRIT, (fmt), ##__VA_ARGS__)
 
+#define uk_pr_debug_isr(fmt, ...)				\
+	uk_printk_isr(UK_PRINT_KLVL_DEBUG, (fmt), ##__VA_ARGS__)
+
+#define uk_pr_debug_once_isr(fmt, ...)				\
+	uk_printk_once_isr(UK_PRINT_KLVL_DEBUG, (fmt), ##__VA_ARGS__)
+
+#define uk_pr_info_isr(fmt, ...)				\
+	uk_printk_isr(UK_PRINT_KLVL_INFO, (fmt), ##__VA_ARGS__)
+
+#define uk_pr_info_once_isr(fmt, ...)				\
+	uk_printk_once_isr(UK_PRINT_KLVL_INFO, (fmt), ##__VA_ARGS__)
+
+#define uk_pr_warn_isr(fmt, ...)				\
+	uk_printk_isr(UK_PRINT_KLVL_WARN, (fmt), ##__VA_ARGS__)
+
+#define uk_pr_warn_once_isr(fmt, ...)				\
+	uk_printk_once_isr(UK_PRINT_KLVL_WARN, (fmt), ##__VA_ARGS__)
+
+#define uk_pr_err_isr(fmt, ...)					\
+	uk_printk_isr(UK_PRINT_KLVL_ERR, (fmt), ##__VA_ARGS__)
+
+#define uk_pr_err_once_isr(fmt, ...)				\
+	uk_printk_once_isr(UK_PRINT_KLVL_ERR, (fmt), ##__VA_ARGS__)
+
+#define uk_pr_crit_isr(fmt, ...)				\
+	uk_printk_isr(UK_PRINT_KLVL_CRIT, (fmt), ##__VA_ARGS__)
+
+#define uk_pr_crit_once_isr(fmt, ...)				\
+	uk_printk_once_isr(UK_PRINT_KLVL_CRIT, (fmt), ##__VA_ARGS__)
+
 /* Warning for stubbed functions */
 #define UK_WARN_STUBBED() \
 	uk_pr_warn_once("%s() stubbed\n", __func__)
+
+#define UK_WARN_STUBBED_ISR() \
+	uk_pr_warn_once_isr("%s() stubbed\n", __func__)
 
 /* DEPRECATED: Please use UK_WARN_STUBBED instead */
 #ifndef WARN_STUBBED
@@ -194,6 +313,7 @@ static inline void uk_printk_once(int flags __unused,
  * Print the log buffer's messages into console
  */
 void uk_print_dmesg(void);
+__isr void uk_print_dmesg_isr(void);
 #endif /* CONFIG_LIBUKPRINT_LOGBUF */
 
 #ifdef __cplusplus

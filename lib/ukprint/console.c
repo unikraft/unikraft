@@ -10,11 +10,11 @@
 #include <string.h>
 
 #include <uk/essentials.h>
+#include <uk/isr/string.h>
 #include <uk/plat/console.h>
 #include <uk/plat/time.h>
 #include <uk/print.h>
 #include <uk/errptr.h>
-#include <uk/lcpu.h>
 #if CONFIG_LIBUKPRINT_PRINT_THREAD
 #include <uk/thread.h>
 #endif /* CONFIG_LIBUKPRINT_PRINT_THREAD */
@@ -115,10 +115,47 @@ static __ssz console_out(const char *buf, __sz len)
 
 	return len;
 }
+
+__isr static __ssz console_out_isr(const char *buf, __sz len)
+{
+	const char *next_nl = __NULL;
+	__sz l = len;
+	__sz off = 0;
+	__ssz rc = 0;
+
+	if (unlikely(!len))
+		return 0;
+	if (unlikely(!buf))
+		return -EINVAL;
+
+	while (l > 0) {
+		next_nl = memchr_isr(buf, '\n', l);
+		if (next_nl) {
+			off = next_nl - buf;
+			if ((rc = uk_console_emerg_out(buf, off)) < 0)
+				return rc;
+			if ((rc = uk_console_emerg_out("\r\n", 2)) < 0)
+				return rc;
+			buf = next_nl + 1;
+			l -= off + 1;
+		} else {
+			if ((rc = uk_console_emerg_out(buf, l)) < 0)
+				return rc;
+			break;
+		}
+	}
+
+	return len;
+}
 #else /* CONFIG_LIBUKPRINT_NOCARRIAGERETURN */
 static __ssz console_out(const char *buf, __sz len)
 {
 	return uk_console_out(buf, len);
+}
+
+__isr static __ssz console_out_isr(const char *buf, __sz len)
+{
+	return uk_console_emerg_out(buf, len);
 }
 #endif /* CONFIG_LIBUKPRINT_NOCARRIAGERETURN */
 #endif /* CONFIG_LIBUKCONSOLE */
@@ -134,8 +171,26 @@ static struct vprint_console kconsole  = {
 	.prevlvl = INT_MIN
 };
 
+/* Console state for interrupt-safe kernel output */
+static struct vprint_console kconsole_isr  = {
+#if CONFIG_LIBUKCONSOLE
+	.cout = console_out_isr,
+#else /* !CONFIG_LIBUKCONSOLE */
+	.cout = __NULL,
+#endif /* !CONFIG_LIBUKCONSOLE */
+	.newline = 1,
+	.prevlvl = INT_MIN
+};
+
 static inline void vprint_cout(struct vprint_console *cons,
 			       const char *buf, __sz len)
+{
+	if (cons->cout)
+		cons->cout(buf, len);
+}
+
+__isr static inline void vprint_cout_isr(struct vprint_console *cons,
+					 const char *buf, __sz len)
 {
 	if (cons->cout)
 		cons->cout(buf, len);
@@ -155,6 +210,25 @@ static void print_timestamp(struct vprint_console *cons)
 			  "[%5" __PRInsec ".%06" __PRInsec "] ",
 			  sec, rem_usec);
 	vprint_cout(cons, (char *)buf, len);
+}
+
+__isr static void print_timestamp_isr(struct vprint_console *cons)
+{
+	char buf[BUFLEN];
+	int len;
+	/* TODO: This is not __isr but in practice it seems to be fine. Add
+	 * a proper __isr variant when moving timer/wallclock related
+	 * functionalities to their own library.
+	 */
+	__nsec nansec =  ukplat_monotonic_clock();
+	__nsec sec = ukarch_time_nsec_to_sec(nansec);
+	__nsec rem_usec = ukarch_time_subsec(nansec);
+
+	rem_usec = ukarch_time_nsec_to_usec(rem_usec);
+	len = uk_snprintf_isr(buf, BUFLEN, LVLC_RESET LVLC_TS
+			      "[%5" __PRInsec ".%06" __PRInsec "] ",
+			      sec, rem_usec);
+	vprint_cout_isr(cons, (char *)buf, len);
 }
 #endif /* CONFIG_LIBUKPRINT_PRINT_TIME */
 
@@ -179,6 +253,32 @@ static void print_thread(struct vprint_console *cons)
 	}
 	vprint_cout(cons, (char *)buf, len);
 }
+
+__isr static void print_thread_isr(struct vprint_console *cons)
+{
+	struct uk_thread *t;
+	char buf[BUFLEN];
+	int len;
+
+	t = uk_pcpuvar_lval(uk_pcpuvar_current_get(uk_pcpuvar_cpu_idx),
+			    __uk_sched_thread_current);
+
+	if (t) {
+		if (t->name) {
+			len = uk_snprintf_isr(buf,
+					      BUFLEN, LVLC_RESET LVLC_THREAD
+					      "<%s> ", t->name);
+		} else {
+			len = uk_snprintf_isr(buf,
+					      BUFLEN, LVLC_RESET LVLC_THREAD
+					      "<%p> ", (void *)t);
+		}
+	} else {
+		len = uk_snprintf_isr(buf, BUFLEN, LVLC_RESET LVLC_THREAD
+				      "<<n/a>> ");
+	}
+	vprint_cout_isr(cons, (char *)buf, len);
+}
 #endif /* CONFIG_LIBUKPRINT_PRINT_THREAD */
 
 #if CONFIG_LIBUKPRINT_PRINT_CALLER
@@ -190,6 +290,17 @@ static void print_caller(struct vprint_console *cons, __uptr ra, __uptr fa)
 	len = uk_snprintf(buf, BUFLEN, LVLC_RESET LVLC_CALLER
 			  "{r:%p,f:%p} ", (void *)ra, (void *)fa);
 	vprint_cout(cons, (char *)buf, len);
+}
+
+__isr static void print_caller_isr(struct vprint_console *cons, __uptr ra,
+				   __uptr fa)
+{
+	char buf[BUFLEN];
+	int len;
+
+	len = uk_snprintf_isr(buf, BUFLEN, LVLC_RESET LVLC_CALLER
+			      "{r:%p,f:%p} ", (void *)ra, (void *)fa);
+	vprint_cout_isr(cons, (char *)buf, len);
 }
 #endif /* CONFIG_LIBUKPRINT_PRINT_CALLER */
 
@@ -310,6 +421,137 @@ void uk_print_console_write(struct uk_print_msg *msg)
 		}
 		vprint_cout(cons, (char *)lptr, llen);
 		vprint_cout(cons, LVLC_RESET, sizeof(LVLC_RESET));
+
+		len -= llen;
+		lptr = nlptr ? nlptr + 1 : lptr + llen;
+	}
+}
+
+__isr void uk_print_console_write_isr(struct uk_print_msg *msg)
+{
+	char lbuf[BUFLEN];
+	int len, llen;
+	const char *msghdr = __NULL;
+	const char *lptr = __NULL;
+	const char *nlptr = __NULL;
+	const char *libname = uk_libname(msg->libid);
+	int lvl = msg->flags & UK_PRINT_KLVL_MASK;
+	int raw = msg->flags & UK_PRINT_RAW_MASK;
+	struct vprint_console *cons = &kconsole_isr;
+
+#if CONFIG_LIBUKPRINT_PRINTK_UKSTORE
+	if (lvl > (int)uk_print_console_lvl)
+		return;
+#endif /* CONFIG_LIBUKPRINT_PRINTK_UKSTORE */
+
+	/*
+	 * Note: We reset the console colors earlier in order to exclude
+	 *       background colors for trailing white spaces.
+	 */
+	switch (lvl) {
+	case UK_PRINT_KLVL_DEBUG:
+		msghdr = LVLC_RESET LVLC_DEBUG "dbg:" LVLC_RESET "  ";
+		break;
+	case UK_PRINT_KLVL_CRIT:
+		msghdr = LVLC_RESET LVLC_CRIT  "CRIT:" LVLC_RESET " ";
+		break;
+	case UK_PRINT_KLVL_ERR:
+		msghdr = LVLC_RESET LVLC_ERROR "ERR:" LVLC_RESET "  ";
+		break;
+	case UK_PRINT_KLVL_WARN:
+		msghdr = LVLC_RESET LVLC_WARN  "Warn:" LVLC_RESET " ";
+		break;
+	case UK_PRINT_KLVL_INFO:
+		msghdr = LVLC_RESET LVLC_INFO  "Info:" LVLC_RESET " ";
+		break;
+	default: /* KLVL_NONE: no header */
+		msghdr = "";
+		break;
+	}
+
+	if (lvl != cons->prevlvl) {
+		/* level changed from previous call */
+		if (cons->prevlvl != INT_MIN && !cons->newline) {
+			/* level changed without closing with '\n',
+			 * enforce printing '\n', before the new message header
+			 */
+			vprint_cout_isr(cons, "\n", 1);
+		}
+		cons->prevlvl = lvl;
+		cons->newline = 1; /* enforce printing the message header */
+	}
+
+	len = uk_vsnprintf_isr(lbuf, BUFLEN, msg->fmt,
+			       msg->ap);
+	lptr = lbuf;
+	while (len > 0) {
+		if (cons->newline && !raw) {
+#if CONFIG_LIBUKPRINT_PRINT_TIME
+			print_timestamp_isr(cons);
+#endif /* CONFIG_LIBUKPRINT_PRINT_TIME */
+			vprint_cout_isr(cons, DECONST(char *, msghdr),
+					strlen_isr(msghdr));
+#if CONFIG_LIBUKPRINT_PRINT_THREAD
+			print_thread_isr(cons);
+#endif /* CONFIG_LIBUKPRINT_PRINT_THREAD */
+#if CONFIG_LIBUKPRINT_PRINT_CALLER
+			print_caller_isr(cons, msg->retaddr, msg->frameaddr);
+#endif /* CONFIG_LIBUKPRINT_PRINT_CALLER */
+			if (libname) {
+				vprint_cout_isr(cons,
+						LVLC_RESET LVLC_LIBNAME "[",
+						sizeof(LVLC_RESET
+						       LVLC_LIBNAME));
+				vprint_cout_isr(cons, DECONST(char *, libname),
+						strlen_isr(libname));
+				vprint_cout_isr(cons, "] ", 2);
+			}
+#if CONFIG_LIBUKPRINT_PRINT_SRCNAME
+			if (msg->srcname) {
+				char lnobuf[6];
+
+				vprint_cout_isr(cons,
+						LVLC_RESET LVLC_SRCNAME "<",
+						sizeof(LVLC_RESET
+						       LVLC_SRCNAME));
+				vprint_cout_isr(cons,
+						DECONST(char *, msg->srcname),
+						strlen_isr(msg->srcname));
+				vprint_cout_isr(cons, " @ ", 3);
+				vprint_cout_isr(cons, lnobuf,
+						uk_snprintf_isr(lnobuf,
+								sizeof(lnobuf),
+								"%4u",
+								msg->srcline));
+				vprint_cout_isr(cons, "> ", 2);
+			}
+#endif /* CONFIG_LIBUKPRINT_PRINT_SRCNAME */
+			cons->newline = 0;
+		}
+
+		nlptr = memchr_isr(lptr, '\n', len);
+		if (nlptr) {
+			llen = (int)((__uptr)nlptr - (__uptr)lptr) + 1;
+			cons->newline = 1;
+		} else {
+			llen = len;
+		}
+
+		/* Message body */
+		switch (lvl) {
+		case UK_PRINT_KLVL_CRIT:
+			vprint_cout_isr(cons, LVLC_RESET LVLC_CRIT_MSG,
+					sizeof(LVLC_RESET LVLC_CRIT_MSG));
+			break;
+		case UK_PRINT_KLVL_ERR:
+			vprint_cout_isr(cons, LVLC_RESET LVLC_ERROR_MSG,
+					sizeof(LVLC_RESET LVLC_ERROR_MSG));
+			break;
+		default:
+			vprint_cout_isr(cons, LVLC_RESET, sizeof(LVLC_RESET));
+		}
+		vprint_cout_isr(cons, (char *)lptr, llen);
+		vprint_cout_isr(cons, LVLC_RESET, sizeof(LVLC_RESET));
 
 		len -= llen;
 		lptr = nlptr ? nlptr + 1 : lptr + llen;

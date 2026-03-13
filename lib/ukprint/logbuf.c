@@ -5,7 +5,11 @@
  */
 
 #include <errno.h>
+#if !__INTERRUPTSAFE__
 #include <string.h>
+#else /* __INTERRUPTSAFE__ */
+#include <uk/isr/string.h>
+#endif /* __INTERRUPTSAFE__ */
 
 #include <uk/assert.h>
 #include <uk/console.h>
@@ -18,7 +22,11 @@
 #define LOGMSG_ALIGN		16
 #define LOGMSG_SIZE(_msg_len)	(sizeof(struct uk_logbuf_msg) + (_msg_len))
 
+#if !__INTERRUPTSAFE__
 UK_LOGBUF(uk_logbuf_default);
+#else /* __INTERRUPTSAFE__ */
+extern struct uk_logbuf uk_logbuf_default;
+#endif /* __INTERRUPTSAFE__ */
 
 /* Returns the next free aligned position in the buffer, or wraps
  * around.
@@ -70,15 +78,20 @@ static void update_head(struct uk_logbuf *lb,
 	}
 }
 
+#if !__INTERRUPTSAFE__
 int uk_logbuf_write(struct uk_logbuf *lb, struct uk_print_msg *msg)
+#else /* __INTERRUPTSAFE__ */
+int uk_logbuf_write_isr(struct uk_logbuf *lb, struct uk_print_msg *msg)
+#endif /* __INTERRUPTSAFE__ */
 {
 	struct uk_logbuf_msg *logmsg;
+	unsigned long irqf;
 	va_list cp;
 
 	UK_ASSERT(lb);
 	UK_ASSERT(msg);
 
-	uk_spin_lock(&lb->lock);
+	uk_spin_lock_irqsave(&lb->lock, irqf);
 
 	va_copy(cp, msg->ap);
 
@@ -89,7 +102,7 @@ int uk_logbuf_write(struct uk_logbuf *lb, struct uk_print_msg *msg)
 	va_end(cp);
 
 	if (LOGMSG_SIZE(msg->len) > sizeof(lb->buf)) {
-		uk_spin_unlock(&lb->lock);
+		uk_spin_unlock_irqrestore(&lb->lock, irqf);
 		return -EMSGSIZE;
 	}
 
@@ -117,13 +130,21 @@ int uk_logbuf_write(struct uk_logbuf *lb, struct uk_print_msg *msg)
 	if (lb->tail)
 		lb->tail->next = logmsg;
 
+#if !__INTERRUPTSAFE__
 	memcpy(&logmsg->msg, msg, sizeof(*msg));
+#else /* __INTERRUPTSAFE__ */
+	memcpy_isr(&logmsg->msg, msg, sizeof(*msg));
+#endif /* __INTERRUPTSAFE__ */
 
 	/* Format the message now. Once the caller returns,
 	 * fmt and va_list will no longer be available.
 	 */
 	va_copy(cp, msg->ap);
+#if !__INTERRUPTSAFE__
 	uk_vsnprintf(logmsg->msg.msg, msg->len, msg->fmt, cp);
+#else /* __INTERRUPTSAFE__ */
+	uk_vsnprintf_isr(logmsg->msg.msg, msg->len, msg->fmt, cp);
+#endif /* __INTERRUPTSAFE__ */
 	va_end(cp);
 
 	if (!lb->head) {
@@ -136,29 +157,38 @@ int uk_logbuf_write(struct uk_logbuf *lb, struct uk_print_msg *msg)
 	logmsg->next = logmsg;
 	lb->tail = logmsg;
 
-	uk_spin_unlock(&lb->lock);
+	uk_spin_unlock_irqrestore(&lb->lock, irqf);
 
 	return 0;
 }
 
+#if !__INTERRUPTSAFE__
 void uk_print_dmesg(void)
+#else /* __INTERRUPTSAFE__ */
+void uk_print_dmesg_isr(void)
+#endif /* __INTERRUPTSAFE__ */
 {
 #if CONFIG_LIBUKCONSOLE
 	struct uk_logbuf_msg *lm;
 	struct uk_logbuf *lb;
+	unsigned long irqf;
 
 	lb = &uk_logbuf_default;
 
-	uk_spin_lock(&lb->lock);
+	uk_spin_lock_irqsave(&lb->lock, irqf);
 
 	if (!lb->head) {
-		uk_spin_unlock(&lb->lock);
+		uk_spin_unlock_irqrestore(&lb->lock, irqf);
 		return;
 	}
 
 	uk_logbuf_foreach(lb, lm)
+#if !__INTERRUPTSAFE__
 		uk_console_out(lm->msg.msg, lm->msg.len);
+#else /* __INTERRUPTSAFE__ */
+		uk_console_emerg_out(lm->msg.msg, lm->msg.len);
+#endif /* __INTERRUPTSAFE__ */
 
-	uk_spin_unlock(&lb->lock);
+	uk_spin_unlock_irqrestore(&lb->lock, irqf);
 #endif /* CONFIG_LIBUKCONSOLE */
 }
