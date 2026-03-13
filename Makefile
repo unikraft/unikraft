@@ -87,7 +87,7 @@ _CHECKDEPS_FLAGS += --cross-compile="$(call qstrip,$(CROSS_COMPILE))"
 endif
 _CHECKDEPS_RC := $(shell $(PYTHON) $(_CHECKDEPS_SCRIPT) $(_CHECKDEPS_FLAGS) >&2; echo $$?)
 ifneq ($(_CHECKDEPS_RC),0)
-$(error Some required build tools are missing or are old. Run: $(PYTHON) $(_CHECKDEPS_SCRIPT))
+$(error Some required build tools are missing or too old. Rerun with 'V=1' for full output, or run: $(PYTHON) $(_CHECKDEPS_SCRIPT))
 endif
 endif
 endif

@@ -81,18 +81,21 @@ TOOLS = [
     # tools that depend on compiler
     Tool(
         "gcc-ar/llvm-ar",
+        severity=Severity.RECOMMENDED,
         depends_on=["gcc/clang"],
         alts=["gcc-ar", "llvm-ar"],
         cross_prefixed=True,
     ),
     Tool(
         "gcc-nm/llvm-nm",
+        severity=Severity.RECOMMENDED,
         depends_on=["gcc/clang"],
         alts=["gcc-nm", "llvm-nm"],
         cross_prefixed=True,
     ),
     Tool(
         "as/llvm-as",
+        severity=Severity.RECOMMENDED,
         depends_on=["gcc/clang"],
         alts=["as", "llvm-as"],
         cross_prefixed=True,
@@ -351,7 +354,7 @@ def _check_tools(sorted_order, tools_by_name, cross_compile):
                 else:
                     results[name] = (Status.OK, found_ver)
             else:
-                # could'nt determine version; assume all good (maths fact:: p->q, if p false statement true )
+                # couldn't determine version; assume all good (maths fact:: p->q, if p false statement true )
                 results[name] = (Status.OK, None)
         else:
             results[name] = (Status.OK, None)
@@ -361,11 +364,11 @@ def _check_tools(sorted_order, tools_by_name, cross_compile):
 
 def _print_summary(sorted_order, tools_by_name, results, has_error, quiet, C):
     if not quiet:
-        hdr = f"  {'':4} {'Tool':<16} {'Status':<10} {'Found':<12} {'Required':<12} {'Severity'}"
+        hdr = f"  {'':4} {'Tool':<14} {'Status':<19} {'Found':<12} {'Required':<12} {'Severity'}"
         print(C.bold(hdr))
         encoding = sys.stdout.encoding or ""
         sep_char = "─" if "UTF" in encoding.upper() else "-"
-        print("  " + sep_char * 68)
+        print("  " + sep_char * (len(hdr) - 2))
 
     for name in sorted_order:
         tool = tools_by_name[name]
@@ -380,25 +383,25 @@ def _print_summary(sorted_order, tools_by_name, results, has_error, quiet, C):
 
         if status == Status.OK:
             sym = C.green("[+]")
-            stat = C.green("ok")
+            stat = "ok"
         elif status == Status.SKIPPED:
             sym = C.yellow("[~]")
-            stat = C.yellow("skipped")
+            stat = "skipped"
             dep_names = ", ".join(tool.depends_on)
             ver_str = f"(needs {dep_names})"
         elif status == Status.MISSING:
             if tool.severity == Severity.REQUIRED:
                 sym = C.red("[!]")
-                stat = C.red("MISSING")
+                stat = "MISSING"
             elif tool.severity == Severity.RECOMMENDED:
                 sym = C.yellow("[-]")
-                stat = C.yellow("missing")
+                stat = "missing"
             else:
                 sym = C.dim("[ ]")
-                stat = C.dim("absent")
+                stat = "absent"
         elif status == Status.VERSION_LOW:
             sym = C.red("[-]")
-            stat = C.red("too old")
+            stat = "too old"
         else:
             raise RuntimeError(f"Unhandled status: {status!r}")
         # todo:: replace this with switch case when python >=3.10 as min version is updated
