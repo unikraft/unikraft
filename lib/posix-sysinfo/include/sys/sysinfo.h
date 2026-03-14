@@ -24,6 +24,8 @@
  */
 /* Taken from musl-1.1.19 */
 
+#include <stddef.h>
+
 #ifndef _SYS_SYSINFO_H
 #define _SYS_SYSINFO_H
 
@@ -57,6 +59,12 @@ struct sysinfo {
  * Follows Linux conventions for the `sysinfo()` system call.
  */
 int sysinfo (struct sysinfo *);
+/* These functions are implemented in sysinfo.c but have no header declaration */
+long fpathconf(int fd, int name);
+long pathconf(const char *path, int name);
+size_t confstr(int name, char *buf, size_t len);
+int getpagesize(void);
+int getcpu(unsigned int *cpu, unsigned int *node, void *tcache);
 
 /**
  * Functions currently not implemented.
