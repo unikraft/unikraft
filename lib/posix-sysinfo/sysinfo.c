@@ -92,7 +92,7 @@ UK_SYSCALL_R_DEFINE(int, sysinfo, struct sysinfo *, info)
 	info->procs = 1; /* number of processes */
 
 #ifdef CONFIG_LIBUKPAGING
-	pt = ukplat_pt_get_active();
+	pt = uk_paging_pt_get_active();
 
 	total_memory = pt->fa->total_memory;
 	while (total_memory > __UL_MAX) {
@@ -135,15 +135,15 @@ long sysconf(int name)
 	if (name == _SC_PHYS_PAGES) {
 		struct uk_pagetable *pt;
 
-		pt = ukplat_pt_get_active();
-		return pt->fa->total_memory / PAGE_SIZE;
+		pt = uk_paging_pt_get_active();
+		return pt->fa->total_memory / UK_PAGING_PAGE_SIZE;
 	}
 
 	if (name == _SC_AVPHYS_PAGES) {
 		struct uk_pagetable *pt;
 
-		pt = ukplat_pt_get_active();
-		return pt->fa->free_memory / PAGE_SIZE;
+		pt = uk_paging_pt_get_active();
+		return pt->fa->free_memory / UK_PAGING_PAGE_SIZE;
 	}
 #endif /* CONFIG_LIBUKPAGING */
 
