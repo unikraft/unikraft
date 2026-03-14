@@ -16,10 +16,10 @@
 #include <uk/config.h>
 #include <uk/print.h>
 
-#ifdef CONFIG_HAVE_PAGING
-#include <uk/plat/paging.h>
+#ifdef CONFIG_LIBUKPAGING
+#include <uk/paging.h>
 #include <uk/falloc.h>
-#endif /* CONFIG_HAVE_PAGING */
+#endif /* CONFIG_LIBUKPAGING */
 
 UK_TESTCASE(posix_sysinfo_testsuite, posix_sysinfo_sysinfo_no_info)
 {
@@ -37,7 +37,7 @@ UK_TESTCASE(posix_sysinfo_testsuite, posix_sysinfo_sysinfo_no_paging)
 	UK_TEST_EXPECT(info.loads[0] == 0);
 	UK_TEST_EXPECT(info.loads[1] == 0);
 	UK_TEST_EXPECT(info.loads[2] == 0);
-#ifdef CONFIG_HAVE_PAGING
+#ifdef CONFIG_LIBUKPAGING
 	struct uk_pagetable *pt = ukplat_pt_get_active();
 
 	UK_TEST_EXPECT(info.totalram == (unsigned long)(pt->fa->total_memory / info.mem_unit));
@@ -55,7 +55,7 @@ UK_TESTCASE(posix_sysinfo_testsuite, posix_sysinfo_sysinfo_no_paging)
 
 UK_TESTCASE(posix_sysinfo_testsuite, posix_sysinfo_sysinfo_with_paging)
 {
-#ifdef CONFIG_HAVE_PAGING
+#ifdef CONFIG_LIBUKPAGING
 	struct uk_pagetable *pt;
 	struct sysinfo info;
 
@@ -78,7 +78,7 @@ UK_TESTCASE(posix_sysinfo_testsuite, posix_sysinfo_sysinfo_with_paging)
 	pt->fa->total_memory = original_total;
 	pt->fa->free_memory = original_free;
 
-#endif /* CONFIG_HAVE_PAGING */
+#endif /* CONFIG_LIBUKPAGING */
 }
 
 UK_TESTCASE(posix_sysinfo_testsuite, posix_sysinfo_fpathconf)
@@ -119,7 +119,7 @@ UK_TESTCASE(posix_sysinfo_testsuite, posix_sysinfo_sc_phys_pages)
 {
 	int name = _SC_PHYS_PAGES;
 
-#ifdef CONFIG_HAVE_PAGING
+#ifdef CONFIG_LIBUKPAGING
 	struct uk_pagetable *pt;
 	pt = ukplat_pt_get_active();
 
@@ -128,14 +128,14 @@ UK_TESTCASE(posix_sysinfo_testsuite, posix_sysinfo_sc_phys_pages)
 	UK_TEST_EXPECT(sysconf(name) == expected_result);
 #else
 	UK_TEST_EXPECT(sysconf(name) == 0);
-#endif /* CONFIG_HAVE_PAGING */
+#endif /* CONFIG_LIBUKPAGING */
 }
 
 UK_TESTCASE(posix_sysinfo_testsuite, posix_sysinfo_sc_avphys_pages)
 {
 	int name = _SC_AVPHYS_PAGES;
 
-#ifdef CONFIG_HAVE_PAGING
+#ifdef CONFIG_LIBUKPAGING
 	struct uk_pagetable *pt;
 	pt = ukplat_pt_get_active();
 
@@ -143,7 +143,7 @@ UK_TESTCASE(posix_sysinfo_testsuite, posix_sysinfo_sc_avphys_pages)
 	UK_TEST_EXPECT(sysconf(name) == expected_result);
 #else
 	UK_TEST_EXPECT(sysconf(name) == 0);
-#endif /* CONFIG_HAVE_PAGING */
+#endif /* CONFIG_LIBUKPAGING */
 }
 
 UK_TESTCASE(posix_sysinfo_testsuite, posix_sysinfo_sc_open_max)
