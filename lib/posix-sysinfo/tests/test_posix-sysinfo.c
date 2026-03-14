@@ -24,6 +24,7 @@
 UK_TESTCASE(posix_sysinfo_testsuite, posix_sysinfo_sysinfo_no_info)
 {
 	struct sysinfo *info = NULL;
+
 	UK_TEST_EXPECT(sysinfo(info) == -1);
 }
 
@@ -38,6 +39,7 @@ UK_TESTCASE(posix_sysinfo_testsuite, posix_sysinfo_sysinfo_no_paging)
 	UK_TEST_EXPECT(info.loads[2] == 0);
 #ifdef CONFIG_HAVE_PAGING
 	struct uk_pagetable *pt = ukplat_pt_get_active();
+
 	UK_TEST_EXPECT(info.totalram == (unsigned long)(pt->fa->total_memory / info.mem_unit));
 	UK_TEST_EXPECT(info.freeram <= info.totalram);
 #else
@@ -84,6 +86,7 @@ UK_TESTCASE(posix_sysinfo_testsuite, posix_sysinfo_fpathconf)
 	int fd __unused = 0;
 	int name __unused = 0;
 	long expected_result = 0;
+
 	UK_TEST_EXPECT(fpathconf(fd, name) == expected_result);
 }
 
@@ -92,6 +95,7 @@ UK_TESTCASE(posix_sysinfo_testsuite, posix_sysinfo_pathconf)
 	const char *path = NULL;
 	int name = 0;
 	long expected_result = 0;
+	
 	UK_TEST_EXPECT(pathconf(path, name) == expected_result);
 }
 
@@ -99,6 +103,7 @@ UK_TESTCASE(posix_sysinfo_testsuite, posix_sysinfo_sc_nprocessors_onln)
 {
 	int name = _SC_NPROCESSORS_ONLN;
 	long expected_result = 1;
+
 	UK_TEST_EXPECT(sysconf(name) == expected_result);
 }
 
@@ -106,12 +111,14 @@ UK_TESTCASE(posix_sysinfo_testsuite, posix_sysinfo_sc_pagesize)
 {
 	int name = _SC_PAGESIZE;
 	long expected_result = __PAGE_SIZE;
+
 	UK_TEST_EXPECT(sysconf(name) == expected_result);
 }
 
 UK_TESTCASE(posix_sysinfo_testsuite, posix_sysinfo_sc_phys_pages)
 {
 	int name = _SC_PHYS_PAGES;
+
 #ifdef CONFIG_HAVE_PAGING
 	struct uk_pagetable *pt;
 	pt = ukplat_pt_get_active();
@@ -127,6 +134,7 @@ UK_TESTCASE(posix_sysinfo_testsuite, posix_sysinfo_sc_phys_pages)
 UK_TESTCASE(posix_sysinfo_testsuite, posix_sysinfo_sc_avphys_pages)
 {
 	int name = _SC_AVPHYS_PAGES;
+
 #ifdef CONFIG_HAVE_PAGING
 	struct uk_pagetable *pt;
 	pt = ukplat_pt_get_active();
@@ -141,6 +149,7 @@ UK_TESTCASE(posix_sysinfo_testsuite, posix_sysinfo_sc_avphys_pages)
 UK_TESTCASE(posix_sysinfo_testsuite, posix_sysinfo_sc_open_max)
 {
 	int name = _SC_OPEN_MAX;
+
 #if CONFIG_LIBPOSIX_FDTAB
 	long expected_result = CONFIG_LIBPOSIX_FDTAB_MAXFDS;
 	UK_TEST_EXPECT(sysconf(name) == expected_result);
@@ -152,6 +161,7 @@ UK_TESTCASE(posix_sysinfo_testsuite, posix_sysinfo_sc_open_max)
 UK_TESTCASE(posix_sysinfo_testsuite, posix_sysinfo_sc_getpw_r_size_max)
 {
 	int name = _SC_GETPW_R_SIZE_MAX;
+
 #ifdef CONFIG_LIBPOSIX_USER
 	long expected_result = -1;
 	UK_TEST_EXPECT(sysconf(name) == expected_result);
@@ -164,6 +174,7 @@ UK_TESTCASE(posix_sysinfo_testsuite, posix_sysinfo_sc_unkown_name)
 {
 	int name = -1;
 	long expected_result = 0;
+
 	UK_TEST_EXPECT(sysconf(name) == expected_result);
 }
 
@@ -173,24 +184,28 @@ UK_TESTCASE(posix_sysinfo_testsuite, posix_sysinfo_confstr)
 	char *buf = NULL;
 	size_t len = 0;
 	size_t expected_result = 0;
+
 	UK_TEST_EXPECT(confstr(name, buf, len) == expected_result);
 }
 
 UK_TESTCASE(posix_sysinfo_testsuite, posix_sysinfo_getpagesize)
 {
 	int expected_result = __PAGE_SIZE;
+
 	UK_TEST_EXPECT(getpagesize() == expected_result);
 }
 
 UK_TESTCASE(posix_sysinfo_testsuite, posix_sysinfo_uname_null_buf)
 {
 	struct utsname *buf = NULL;
+
 	UK_TEST_EXPECT(uname(buf) == -1);
 }
 
 UK_TESTCASE(posix_sysinfo_testsuite, posix_sysinfo_uname_valid_buf)
 {
 	struct utsname buf;
+
 	UK_TEST_EXPECT(uname(&buf) == 0);
 	UK_TEST_EXPECT(strcmp(buf.sysname, "Unikraft") == 0);
 	UK_TEST_EXPECT(strcmp(buf.nodename, "unikraft") == 0);
@@ -209,7 +224,9 @@ UK_TESTCASE(posix_sysinfo_testsuite, posix_sysinfo_sethostname_null_name)
 {
 	const char *name = NULL;
 	size_t len = 0;
+
 	UK_TEST_EXPECT(sethostname(name, len) == -1);
+	
 	sethostname("unikraft", strlen("unikraft"));
 }
 
@@ -217,7 +234,9 @@ UK_TESTCASE(posix_sysinfo_testsuite, posix_sysinfo_sethostname_too_long_name)
 {
 	const char *name = "This name is too long for the nodename field in the utsname struct";
 	size_t len = strlen(name);
+	
 	UK_TEST_EXPECT(sethostname(name, len) == -1);
+	
 	sethostname("unikraft", strlen("unikraft"));
 }
 
@@ -230,6 +249,7 @@ UK_TESTCASE(posix_sysinfo_testsuite, posix_sysinfo_sethostname_valid_name)
 	UK_TEST_EXPECT(sethostname(name, len) == 0);
 
 	uname(&buf);
+	
 	UK_TEST_EXPECT(strcmp(buf.nodename, name) == 0);
 
 	sethostname("unikraft", strlen("unikraft"));
@@ -249,9 +269,9 @@ UK_TESTCASE(posix_sysinfo_testsuite, posix_sysinfo_gethostname_valid_case)
 
 UK_TESTCASE(posix_sysinfo_testsuite, posix_sysinfo_gethostname_buf_too_long)
 {
-	/* "unikraft" + '\0' = 9 bytes; a buffer of 4 is too small */
 	char name[4];
 	size_t len = sizeof(name);
+	
 	UK_TEST_EXPECT(gethostname(name, len) == -1);
 	UK_TEST_EXPECT(errno == ENAMETOOLONG);
 }
@@ -260,6 +280,7 @@ UK_TESTCASE(posix_sysinfo_testsuite, posix_sysinfo_getcpu_valid)
 {
 	unsigned int cpu = 99;
 	unsigned int node = 99;
+	
 	UK_TEST_EXPECT(getcpu(&cpu, &node, NULL) == 0);
 	UK_TEST_EXPECT(cpu == 0);
 	UK_TEST_EXPECT(node == 0);
@@ -273,6 +294,7 @@ UK_TESTCASE(posix_sysinfo_testsuite, posix_sysinfo_getcpu_null_args)
 UK_TESTCASE(posix_sysinfo_testsuite, posix_sysinfo_getcpu_partial)
 {
 	unsigned int cpu = 99;
+	
 	UK_TEST_EXPECT(getcpu(&cpu, NULL, NULL) == 0);
 	UK_TEST_EXPECT(cpu == 0);
 }

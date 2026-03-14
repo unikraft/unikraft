@@ -59,7 +59,10 @@ struct sysinfo {
  * Follows Linux conventions for the `sysinfo()` system call.
  */
 int sysinfo (struct sysinfo *);
-/* These functions are implemented in sysinfo.c but have no header declaration */
+/* These functions are implemented in sysinfo.c
+ * but have no header declaration
+ */
+
 long fpathconf(int fd, int name);
 long pathconf(const char *path, int name);
 size_t confstr(int name, char *buf, size_t len);
