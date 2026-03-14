@@ -95,7 +95,7 @@ UK_TESTCASE(posix_sysinfo_testsuite, posix_sysinfo_pathconf)
 	const char *path = NULL;
 	int name = 0;
 	long expected_result = 0;
-	
+
 	UK_TEST_EXPECT(pathconf(path, name) == expected_result);
 }
 
@@ -226,7 +226,7 @@ UK_TESTCASE(posix_sysinfo_testsuite, posix_sysinfo_sethostname_null_name)
 	size_t len = 0;
 
 	UK_TEST_EXPECT(sethostname(name, len) == -1);
-	
+
 	sethostname("unikraft", strlen("unikraft"));
 }
 
@@ -234,9 +234,9 @@ UK_TESTCASE(posix_sysinfo_testsuite, posix_sysinfo_sethostname_too_long_name)
 {
 	const char *name = "This name is too long for the nodename field in the utsname struct";
 	size_t len = strlen(name);
-	
+
 	UK_TEST_EXPECT(sethostname(name, len) == -1);
-	
+
 	sethostname("unikraft", strlen("unikraft"));
 }
 
@@ -271,7 +271,7 @@ UK_TESTCASE(posix_sysinfo_testsuite, posix_sysinfo_gethostname_buf_too_long)
 {
 	char name[4];
 	size_t len = sizeof(name);
-	
+
 	UK_TEST_EXPECT(gethostname(name, len) == -1);
 	UK_TEST_EXPECT(errno == ENAMETOOLONG);
 }
@@ -280,7 +280,7 @@ UK_TESTCASE(posix_sysinfo_testsuite, posix_sysinfo_getcpu_valid)
 {
 	unsigned int cpu = 99;
 	unsigned int node = 99;
-	
+
 	UK_TEST_EXPECT(getcpu(&cpu, &node, NULL) == 0);
 	UK_TEST_EXPECT(cpu == 0);
 	UK_TEST_EXPECT(node == 0);
@@ -294,7 +294,7 @@ UK_TESTCASE(posix_sysinfo_testsuite, posix_sysinfo_getcpu_null_args)
 UK_TESTCASE(posix_sysinfo_testsuite, posix_sysinfo_getcpu_partial)
 {
 	unsigned int cpu = 99;
-	
+
 	UK_TEST_EXPECT(getcpu(&cpu, NULL, NULL) == 0);
 	UK_TEST_EXPECT(cpu == 0);
 }
