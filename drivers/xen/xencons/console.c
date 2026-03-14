@@ -90,14 +90,9 @@
 #if (defined __X86_32__) || (defined __X86_64__)
 #include <xen-x86/setup.h>
 #include <xen-x86/mm.h>
-#if defined __X86_32__
-#include <xen-x86/hypercall32.h>
-#elif defined __X86_64__
-#include <xen-x86/hypercall64.h>
-#endif
 #elif (defined __ARM_32__) || (defined __ARM_64__)
+#include <xen-arm/setup.h>
 #include <xen-arm/mm.h>
-#include <xen-arm/hypercall.h>
 #endif
 
 #if (defined __aarch64__)

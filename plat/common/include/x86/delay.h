@@ -50,7 +50,7 @@ static inline void udelay(__u16 usec)
 		 * Writing to the 0x80 port has no effect, and takes
 		 * approximately 1us
 		 */
-		uk_arch_outb(DELAY_PORT, 1);
+		uk_arch_x86_64_outb(DELAY_PORT, 1);
 }
 
 static inline void mdelay(__u16 msec)

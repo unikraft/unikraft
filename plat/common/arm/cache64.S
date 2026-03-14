@@ -46,10 +46,10 @@
 ENTRY(clean_and_invalidate_dcache_range)
 	/* Get information about the caches from CTR_EL0 */
 	mrs	x4, ctr_el0
-	mov	x2, #CTR_BYTES_PER_WORD
+	mov	x2, #UK_ARCH_ARM64_CTR_BYTES_PER_WORD
 
 	/* Get minimum D cache line size */
-	ubfx	x3, x4, #CTR_DMINLINE_SHIFT, #CTR_DMINLINE_WIDTH
+	ubfx	x3, x4, #UK_ARCH_ARM64_CTR_DMINLINE_SHIFT, #UK_ARCH_ARM64_CTR_DMINLINE_WIDTH
 	lsl	x3, x2, x3
 
 	/* Align the start address to line size */
@@ -74,10 +74,10 @@ END(clean_and_invalidate_dcache_range)
 ENTRY(invalidate_dcache_range)
 	/* Get information about the caches from CTR_EL0 */
 	mrs	x4, ctr_el0
-	mov	x2, #CTR_BYTES_PER_WORD
+	mov	x2, #UK_ARCH_ARM64_CTR_BYTES_PER_WORD
 
 	/* Get minimum D cache line size */
-	ubfx	x3, x4, #CTR_DMINLINE_SHIFT, #CTR_DMINLINE_WIDTH
+	ubfx	x3, x4, #UK_ARCH_ARM64_CTR_DMINLINE_SHIFT, #UK_ARCH_ARM64_CTR_DMINLINE_WIDTH
 	lsl	x3, x2, x3
 
 	/* Align the start address to line size */
@@ -103,10 +103,10 @@ END(invalidate_dcache_range)
 ENTRY(invalidate_icache_range)
 	/* Get information about the caches from CTR_EL0 */
 	mrs	x4, ctr_el0
-	mov	x2, #CTR_BYTES_PER_WORD
+	mov	x2, #UK_ARCH_ARM64_CTR_BYTES_PER_WORD
 
 	/* Get minimum I cache line size */
-	and x3, x4, #CTR_IMINLINE_MASK
+	and x3, x4, #UK_ARCH_ARM64_CTR_IMINLINE_MASK
 	lsl	x3, x2, x3
 
 	/* Align the start address to line size */

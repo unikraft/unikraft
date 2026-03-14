@@ -13,17 +13,18 @@
 #include <string.h>
 
 #include <uk/arch/ctx.h>
+#include <uk/arch/util.h>
+#include <uk/arch/x86_64.h>
 #include <uk/ctors.h>
-#include <uk/arch.h>
 
 static void uk_arch_wrmsrgsbase(__u64 gsbase)
 {
-	uk_arch_wrmsrl(UK_ARCH_MSR_GS_BASE, gsbase);
+	uk_arch_x86_64_wrmsrl(UK_ARCH_X86_64_MSR_GS_BASE, gsbase);
 }
 
 static __u64 uk_arch_rdmsrgsbase(void)
 {
-	return uk_arch_rdmsrl(UK_ARCH_MSR_GS_BASE);
+	return uk_arch_x86_64_rdmsrl(UK_ARCH_X86_64_MSR_GS_BASE);
 }
 
 static __u64 rdgsbase_cr4fsgsbase(void)
@@ -52,17 +53,17 @@ static void wrgsbase_cr4fsgsbase(__u64 gsbase)
 
 static void uk_arch_wrmsrkgsbase(__u64 kgsbase)
 {
-	uk_arch_wrmsrl(UK_ARCH_MSR_KERNEL_GS_BASE, kgsbase);
+	uk_arch_x86_64_wrmsrl(UK_ARCH_X86_64_MSR_KERNEL_GS_BASE, kgsbase);
 }
 
 static void uk_arch_wrmsrfsbase(__u64 fsbase)
 {
-	uk_arch_wrmsrl(UK_ARCH_MSR_FS_BASE, fsbase);
+	uk_arch_x86_64_wrmsrl(UK_ARCH_X86_64_MSR_FS_BASE, fsbase);
 }
 
 static __u64 uk_arch_rdmsrfsbase(void)
 {
-	return uk_arch_rdmsrl(UK_ARCH_MSR_FS_BASE);
+	return uk_arch_x86_64_rdmsrl(UK_ARCH_X86_64_MSR_FS_BASE);
 }
 
 static __u64 rdfsbase_cr4fsgsbase(void)
@@ -99,8 +100,8 @@ static void init_fsgsbasefns(void)
 {
 	__u32 eax, ebx, ecx, edx;
 
-	uk_arch_cpuid(7, 0, &eax, &ebx, &ecx, &edx);
-	if (ebx & UK_ARCH_CPUID7_EBX_FSGSBASE) {
+	uk_arch_x86_64_cpuid(7, 0, &eax, &ebx, &ecx, &edx);
+	if (ebx & UK_ARCH_X86_64_CPUID7_EBX_FSGSBASE) {
 		wrgsbasefn = wrgsbase_cr4fsgsbase;
 		rdgsbasefn = rdgsbase_cr4fsgsbase;
 		uk_plat_native_wrfsbasefn = wrfsbase_cr4fsgsbase;

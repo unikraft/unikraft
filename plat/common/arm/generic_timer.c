@@ -31,6 +31,7 @@
  */
 
 #include <uk/arch/types.h>
+#include <uk/arch/util.h>
 #include <uk/assert.h>
 #include <uk/plat/time.h>
 #include <uk/lcpu.h>
@@ -142,7 +143,7 @@ void generic_timer_enable(void)
 	set_el0(cntv_ctl, get_el0(cntv_ctl) | GT_TIMER_ENABLE);
 
 	/* Ensure the write of sys register is visible */
-	isb();
+	uk_arch_arm64_isb();
 }
 
 static inline void generic_timer_disable(void)
@@ -150,7 +151,7 @@ static inline void generic_timer_disable(void)
 	set_el0(cntv_ctl, get_el0(cntv_ctl) & ~GT_TIMER_ENABLE);
 
 	/* Ensure the write of sys register is visible */
-	isb();
+	uk_arch_arm64_isb();
 }
 
 static inline void generic_timer_update_compare(__u64 new_val)
@@ -158,7 +159,7 @@ static inline void generic_timer_update_compare(__u64 new_val)
 	set_el0(cntv_cval, new_val);
 
 	/* Ensure the write of sys register is visible */
-	isb();
+	uk_arch_arm64_isb();
 }
 
 #ifdef CONFIG_ARM64_ERRATUM_858921

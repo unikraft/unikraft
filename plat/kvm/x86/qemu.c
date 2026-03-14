@@ -4,7 +4,6 @@
  * You may not use this file except in compliance with the License.
  */
 
-#include <uk/arch.h>
 #include <uk/arch/util.h>
 #include <uk/boot/earlytab.h>
 #include <uk/pm.h>
@@ -30,7 +29,7 @@
  */
 __isr static inline void qemu_debug_exit(int value)
 {
-	uk_arch_outw(QEMU_ISA_DEBUG_EXIT_PORT, value);
+	uk_arch_x86_64_outw(QEMU_ISA_DEBUG_EXIT_PORT, value);
 }
 
 __isr static inline void _do_qemu_acpi_shutdown(void)
@@ -42,7 +41,7 @@ __isr static inline void _do_qemu_acpi_shutdown(void)
 	 * harmless if we're not running on QEMU, especially considering we're
 	 * already shutting down, so who cares if we crash.
 	 */
-	uk_arch_outw(0x604, 0x2000);
+	uk_arch_x86_64_outw(0x604, 0x2000);
 }
 
 __isr static int qemu_exit(void)
@@ -66,7 +65,8 @@ __isr static int qemu_crash(void)
 	 * Should be also harmless and helps with automated tests.
 	 */
 	qemu_debug_exit(QEMU_ISA_DEBUG_EXIT_CRASH);
-	uk_arch_outb(QEMU_PVPANIC_EXIT_PORT, QEMU_PVPANIC_GUEST_PANICKED);
+	uk_arch_x86_64_outb(QEMU_PVPANIC_EXIT_PORT,
+			    QEMU_PVPANIC_GUEST_PANICKED);
 
 	/* Use QEMU hardcoded ACPI shutdown port/value as a fallback */
 	_do_qemu_acpi_shutdown();

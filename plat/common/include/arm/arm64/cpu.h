@@ -34,11 +34,13 @@
 #define __PLAT_COMMON_ARM64_CPU_H__
 
 #include <inttypes.h>
-#include <uk/essentials.h>
-#include <uk/plat/bootstrap.h>
-#include <uk/alloc.h>
-#include <uk/assert.h>
+
 #include <arm/smccc.h>
+
+#include <uk/alloc.h>
+#include <uk/arch/util.h>
+#include <uk/assert.h>
+#include <uk/essentials.h>
 #include <uk/lcpu.h>
 
 static inline void _init_cpufeatures(void)
@@ -79,7 +81,7 @@ static inline void save_extregs(void *ectx)
 	fpsimd_save_state((uintptr_t) ectx);
 
 	/* make sure sysreg writing takes effects */
-	isb();
+	uk_arch_arm64_isb();
 }
 
 static inline void restore_extregs(void *ectx)
@@ -87,7 +89,7 @@ static inline void restore_extregs(void *ectx)
 	fpsimd_restore_state((uintptr_t) ectx);
 
 	/* make sure sysreg writing takes effects */
-	isb();
+	uk_arch_arm64_isb();
 }
 
 #else /* !CONFIG_FPSIMD */

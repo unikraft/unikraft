@@ -30,6 +30,7 @@
 #include <xen/grant_table.h>
 #include <common/hypervisor.h>
 #include <xen-x86/mm.h>
+#include <xen-x86/hypercall.h>
 
 
 grant_entry_v1_t *gnttab_arch_init(int grant_frames_num)

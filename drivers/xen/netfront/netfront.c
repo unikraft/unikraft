@@ -39,12 +39,11 @@
 #include <uk/print.h>
 #include <uk/alloc.h>
 #include <uk/netdev_driver.h>
+#include <uk/plat/xen/except.h>
 #if defined(__i386__) || defined(__x86_64__)
 #include <xen-x86/mm.h>
-#include <xen-x86/irq.h>
 #elif defined(__aarch64__)
 #include <xen-arm/mm.h>
-#include <arm/irq.h>
 #else
 #error "Unsupported architecture"
 #endif
@@ -169,13 +168,13 @@ static int netfront_xmit(struct uk_netdev *n,
 
 	nfdev = to_netfront_dev(n);
 
-	local_irq_save(flags);
+	flags = uk_plat_xen_save_irqf();
 	if (unlikely(RING_FULL(&txq->ring))) {
 		/* try some cleanup */
 		network_tx_buf_gc(txq);
 		if (unlikely(RING_FULL(&txq->ring))) {
 			uk_pr_debug("tx queue is full\n");
-			local_irq_restore(flags);
+			uk_plat_xen_restore_irqf(flags);
 			return 0x0;
 		}
 	}
@@ -229,7 +228,7 @@ static int netfront_xmit(struct uk_netdev *n,
 	} while (more_to_do);
 
 	status |= (RING_FULL(&txq->ring)) ? 0x0 : UK_NETDEV_STATUS_MORE;
-	local_irq_restore(flags);
+	uk_plat_xen_restore_irqf(flags);
 
 	return status;
 }

@@ -10,7 +10,7 @@
 
 #include <errno.h>
 
-#include <uk/arch.h>
+#include <uk/arch/x86_64.h>
 #include <uk/assert.h>
 #include <uk/bitops.h>
 #include <uk/event.h>
@@ -29,13 +29,13 @@ static int gdb_arch_dbg_trap(int errnr, struct uk_lcpu_regs *regs)
 	eflags =  uk_lcpu_regs_get(regs, RFLAGS);
 
 	/* Unset trap flag, i.e., continue */
-	eflags &= ~UK_ARCH_RFLAGS_TF;
+	eflags &= ~UK_ARCH_X86_64_RFLAGS_TF;
 
 	r = gdb_dbg_trap(errnr, regs);
 	if (r < 0) {
 		return r;
 	} else if (r == GDB_DBG_STEP) { /* Single step */
-		eflags |= UK_ARCH_RFLAGS_TF;
+		eflags |= UK_ARCH_X86_64_RFLAGS_TF;
 	}
 
 	uk_lcpu_regs_set(regs, RFLAGS, eflags);

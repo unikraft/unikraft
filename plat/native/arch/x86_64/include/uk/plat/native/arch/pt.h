@@ -11,8 +11,8 @@
 #ifndef __UK_PLAT_NATIVE_ARCH_PT_H__
 #define __UK_PLAT_NATIVE_ARCH_PT_H__
 
-#include <uk/arch.h>
 #include <uk/arch/types.h>
+#include <uk/arch/x86_64.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -51,9 +51,9 @@ extern "C" {
 #define UK_PLAT_NATIVE_PT_Lx_PTE_INVALID(lvl)		0x0UL
 
 #define UK_PLAT_NATIVE_PT_Lx_PTE_PRESENT(pte, lvl)		\
-	((pte) & UK_ARCH_PTE_PRESENT)
+	((pte) & UK_ARCH_X86_64_PTE_PRESENT)
 #define UK_PLAT_NATIVE_PT_Lx_PTE_CLEAR_PRESENT(pte, lvl)	\
-	((pte) & ~UK_ARCH_PTE_PRESENT)
+	((pte) & ~UK_ARCH_X86_64_PTE_PRESENT)
 
 #if !__ASSEMBLY__
 
@@ -178,24 +178,24 @@ uk_plat_native_pt_pte_create(__paddr_t pt_paddr, unsigned int level __unused,
 	/* We do not apply any restrictive protections in PT PTEs but control
 	 * protections in the PTEs mapping pages only
 	 */
-	pt_pte |= (UK_ARCH_PTE_PRESENT | UK_ARCH_PTE_RW);
+	pt_pte |= (UK_ARCH_X86_64_PTE_PRESENT | UK_ARCH_X86_64_PTE_RW);
 
 	/* Do not use the PWT/PCD bits for the PT PTEs. We only use them for
 	 * page PTEs
 	 */
-	pt_pte &= ~(UK_ARCH_PTE_PWT | UK_ARCH_PTE_PCD);
+	pt_pte &= ~(UK_ARCH_X86_64_PTE_PWT | UK_ARCH_X86_64_PTE_PCD);
 
 	/* Take all other bits from template. We also keep the flags that are
 	 * ignored by the architecture. The caller might have stored custom
 	 * data in these fields
 	 */
-	pt_pte |= tmpl & (UK_ARCH_PTE_US |
-			  UK_ARCH_PTE_ACCESSED |
-			  UK_ARCH_PTE_DIRTY | /* ignored */
-			  UK_ARCH_PTE_GLOBAL | /* ignored */
-			  UK_ARCH_PTE_USER1_MASK |
-			  UK_ARCH_PTE_USER2_MASK |
-			  UK_ARCH_PTE_MPK_MASK /* ignored */
+	pt_pte |= tmpl & (UK_ARCH_X86_64_PTE_US |
+			  UK_ARCH_X86_64_PTE_ACCESSED |
+			  UK_ARCH_X86_64_PTE_DIRTY | /* ignored */
+			  UK_ARCH_X86_64_PTE_GLOBAL | /* ignored */
+			  UK_ARCH_X86_64_PTE_USER1_MASK |
+			  UK_ARCH_X86_64_PTE_USER2_MASK |
+			  UK_ARCH_X86_64_PTE_MPK_MASK /* ignored */
 			      );
 
 	return pt_pte;

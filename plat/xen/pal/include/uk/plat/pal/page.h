@@ -1,0 +1,82 @@
+/* SPDX-License-Identifier: BSD-3-Clause */
+/* Copyright (c) 2026, Unikraft GmbH and The Unikraft Authors.
+ * Licensed under the BSD-3-Clause License (the "License").
+ * You may not use this file except in compliance with the License.
+ */
+
+#ifndef __UK_PLAT_PAL_PAGE_H__
+#define __UK_PLAT_PAL_PAGE_H__
+
+#include <uk/plat/xen/page.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+#define UK_PAL_PAGE_LARGE_LEVEL		UK_PLAT_XEN_PAGE_LARGE_LEVEL
+#define UK_PAL_PAGE_LARGE_SHIFT		UK_PLAT_XEN_PAGE_LARGE_SHIFT
+#define UK_PAL_PAGE_LARGE_SIZE		UK_PLAT_XEN_PAGE_LARGE_SIZE
+#define UK_PAL_PAGE_LARGE_MASK		UK_PLAT_XEN_PAGE_LARGE_MASK
+
+#define UK_PAL_PAGE_HUGE_LEVEL		UK_PLAT_XEN_PAGE_HUGE_LEVEL
+#define UK_PAL_PAGE_HUGE_SHIFT		UK_PLAT_XEN_PAGE_HUGE_SHIFT
+#define UK_PAL_PAGE_HUGE_SIZE		UK_PLAT_XEN_PAGE_HUGE_SIZE
+#define UK_PAL_PAGE_HUGE_MASK		UK_PLAT_XEN_PAGE_HUGE_MASK
+
+#define UK_PAL_PAGE_Lx_SHIFT(lvl)	UK_PLAT_XEN_PAGE_Lx_SHIFT(lvl)
+#define UK_PAL_PAGE_SHIFT_Lx(shift)	UK_PLAT_XEN_PAGE_SHIFT_Lx(shift)
+#define UK_PAL_PAGE_Lx_SIZE(lvl)	UK_PLAT_XEN_PAGE_Lx_SIZE(lvl)
+#define UK_PAL_PAGE_Lx_MASK(lvl)	UK_PLAT_XEN_PAGE_Lx_MASK(lvl)
+
+#define UK_PAL_PAGE_Lx_ALIGN_UP(val, lvl)			\
+	UK_PLAT_XEN_PAGE_Lx_ALIGN_UP(val, lvl)
+
+#define UK_PAL_PAGE_Lx_ALIGN_DOWN(val, lvl)			\
+	UK_PLAT_XEN_PAGE_Lx_ALIGN_DOWN(val, lvl)
+
+#define UK_PAL_PAGE_Lx_ALIGNED(val, lvl)			\
+	UK_PLAT_XEN_PAGE_Lx_ALIGNED(val, lvl)
+
+#define UK_PAL_PAGE_LEVEL		UK_PLAT_XEN_PAGE_LEVEL
+#define UK_PAL_PAGE_SHIFT		UK_PLAT_XEN_PAGE_SHIFT
+#define UK_PAL_PAGE_SIZE		UK_PLAT_XEN_PAGE_SIZE
+#define UK_PAL_PAGE_MASK		UK_PLAT_XEN_PAGE_MASK
+
+#define UK_PAL_PAGE_ALIGN_UP(val)				\
+	UK_PLAT_XEN_PAGE_ALIGN_UP(val)
+#define UK_PAL_PAGE_ALIGN_DOWN(val)				\
+	UK_PLAT_XEN_PAGE_ALIGN_DOWN(val)
+#define UK_PAL_PAGE_ALIGNED(val)				\
+	UK_PLAT_XEN_PAGE_ALIGNED(val)
+
+#define UK_PAL_PAGE_LARGE_ALIGN_UP(val)				\
+	UK_PLAT_XEN_PAGE_LARGE_ALIGN_UP(val)
+#define UK_PAL_PAGE_LARGE_ALIGN_DOWN(val)			\
+	UK_PLAT_XEN_PAGE_LARGE_ALIGN_DOWN(val)
+#define UK_PAL_PAGE_LARGE_ALIGNED(val)				\
+	UK_PLAT_XEN_PAGE_LARGE_ALIGNED(val)
+
+#define UK_PAL_PAGE_HUGE_ALIGN_UP(val)				\
+	UK_PLAT_XEN_PAGE_HUGE_ALIGN_UP(val)
+#define UK_PAL_PAGE_HUGE_ALIGN_DOWN(val)			\
+	UK_PLAT_XEN_PAGE_HUGE_ALIGN_DOWN(val)
+#define UK_PAL_PAGE_HUGE_ALIGNED(val)				\
+	UK_PLAT_XEN_PAGE_HUGE_ALIGNED(val)
+
+#define UK_PAL_PAGE_ATTR_PROT_NONE	UK_PLAT_XEN_PAGE_ATTR_PROT_NONE
+#define UK_PAL_PAGE_ATTR_PROT_READ	UK_PLAT_XEN_PAGE_ATTR_PROT_READ
+#define UK_PAL_PAGE_ATTR_PROT_WRITE	UK_PLAT_XEN_PAGE_ATTR_PROT_WRITE
+#define UK_PAL_PAGE_ATTR_PROT_EXEC	UK_PLAT_XEN_PAGE_ATTR_PROT_EXEC
+
+#if !__ASSEMBLY__
+
+#define UK_PAL_PAGE_Lx_HAS(lvl)		UK_PLAT_XEN_PAGE_Lx_HAS(lvl)
+#define UK_PAL_PAGE_Lx_IS(pte, lvl)	UK_PLAT_XEN_PAGE_Lx_IS(pte, lvl)
+
+#endif /* !__ASSEMBLY__ */
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* __UK_PLAT_PAL_PAGE_H__ */

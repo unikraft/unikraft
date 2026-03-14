@@ -29,7 +29,9 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+
 #include <stdint.h>
+#include <uk/arch/util.h>
 #include <uk/plat/lcpu.h>
 #include <arm/irq.h>
 #include <arm/cpu.h>
@@ -53,7 +55,7 @@ void ukplat_lcpu_halt_irq(void)
 	 *
 	 * See Linux `cpu_do_idle(void)` implementation
 	 */
-	uk_arch_halt();
+	uk_arch_arm64_halt();
 }
 
 unsigned long ukplat_lcpu_save_irqf(void)

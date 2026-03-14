@@ -1,33 +1,8 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
-/*
- * Authors: Sharan Santhanam <sharan.santhanam@neclab.eu>
- *
- * Copyright (c) 2018, NEC Europe Ltd., NEC Corporation. All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- *
- * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- * 3. Neither the name of the copyright holder nor the names of its
- *    contributors may be used to endorse or promote products derived from
- *    this software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
- * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGE.
+/* Copyright (c) 2018, NEC Europe Ltd., NEC Corporation. All rights reserved.
+ * Copyright (c) 2025, Unikraft GmbH and The Unikraft Authors.
+ * Licensed under the BSD-3-Clause License (the "License").
+ * You may not use this file except in compliance with the License.
  */
 
 #ifndef __VIRTIO_CONFIG_H__
@@ -70,13 +45,13 @@ static inline void virtio_cwrite_bytes(const void *addr, const __u8 offset,
 		io_addr = ((unsigned long)addr) + offset + (i * type_len);
 		switch (type_len) {
 		case 1:
-			uk_arch_outb(io_addr, ((__u8 *)buf)[i * type_len]);
+			uk_arch_x86_64_outb(io_addr, ((__u8 *)buf)[i * type_len]);
 			break;
 		case 2:
-			uk_arch_outw(io_addr, ((__u16 *)buf)[i * type_len]);
+			uk_arch_x86_64_outw(io_addr, ((__u16 *)buf)[i * type_len]);
 			break;
 		case 4:
-			uk_arch_outl(io_addr, ((__u32 *)buf)[i * type_len]);
+			uk_arch_x86_64_outl(io_addr, ((__u32 *)buf)[i * type_len]);
 			break;
 		default:
 			UK_CRASH("Unsupported virtio write operation\n");
@@ -96,16 +71,16 @@ static inline void virtio_cread_bytes(const void *addr, const __u8 offset,
 		io_addr = ((unsigned long)addr) + offset + (i * type_len);
 		switch (type_len) {
 		case 1:
-			((__u8 *)buf)[i * type_len] = uk_arch_inb(io_addr);
+			((__u8 *)buf)[i * type_len] = uk_arch_x86_64_inb(io_addr);
 			break;
 		case 2:
-			((__u16 *)buf)[i * type_len] = uk_arch_inw(io_addr);
+			((__u16 *)buf)[i * type_len] = uk_arch_x86_64_inw(io_addr);
 			break;
 		case 4:
-			((__u32 *)buf)[i * type_len] = uk_arch_inl(io_addr);
+			((__u32 *)buf)[i * type_len] = uk_arch_x86_64_inl(io_addr);
 			break;
 		case 8:
-			((__u64  *)buf)[i * type_len] = uk_arch_inq(io_addr);
+			((__u64  *)buf)[i * type_len] = uk_arch_x86_64_inq(io_addr);
 			break;
 		default:
 			UK_CRASH("Unsupported virtio read operation\n");
@@ -127,13 +102,13 @@ void virtio_mmio_cwrite_bytes(const void *addr, const __u8 offset,
 			  ((const char *)addr + offset + (i * type_len));
 		switch (type_len) {
 		case 1:
-			uk_arch_writeb(io_addr, ((__u8 *)buf)[i * type_len]);
+			uk_arch_x86_64_writeb(io_addr, ((__u8 *)buf)[i * type_len]);
 			break;
 		case 2:
-			uk_arch_writew(io_addr, ((__u16 *)buf)[i * type_len]);
+			uk_arch_x86_64_writew(io_addr, ((__u16 *)buf)[i * type_len]);
 			break;
 		case 4:
-			uk_arch_writel(io_addr, ((__u32 *)buf)[i * type_len]);
+			uk_arch_x86_64_writel(io_addr, ((__u32 *)buf)[i * type_len]);
 			break;
 		default:
 			UK_CRASH("Unsupported virtio write operation\n");
@@ -155,16 +130,16 @@ void virtio_mmio_cread_bytes(const void *addr, const __u8 offset,
 			  ((const char *)addr + offset + (i * type_len));
 		switch (type_len) {
 		case 1:
-			((__u8 *)buf)[i * type_len] = uk_arch_readb(io_addr);
+			((__u8 *)buf)[i * type_len] = uk_arch_x86_64_readb(io_addr);
 			break;
 		case 2:
-			((__u16 *)buf)[i * type_len] = uk_arch_readw(io_addr);
+			((__u16 *)buf)[i * type_len] = uk_arch_x86_64_readw(io_addr);
 			break;
 		case 4:
-			((__u32 *)buf)[i * type_len] = uk_arch_readl(io_addr);
+			((__u32 *)buf)[i * type_len] = uk_arch_x86_64_readl(io_addr);
 			break;
 		case 8:
-			((__u64  *)buf)[i * type_len] = uk_arch_readq(io_addr);
+			((__u64  *)buf)[i * type_len] = uk_arch_x86_64_readq(io_addr);
 			break;
 		default:
 			UK_CRASH("Unsupported virtio read operation\n");
@@ -193,13 +168,13 @@ static inline void virtio_cwrite_bytes(const void *addr, const __u8 offset,
 		__iowmb();
 		switch (type_len) {
 		case 1:
-			ioreg_write8(io_addr, ((__u8 *)buf)[i * type_len]);
+			uk_arch_arm64_ioreg_write8(io_addr, ((__u8 *)buf)[i * type_len]);
 			break;
 		case 2:
-			ioreg_write16(io_addr, ((__u16 *)buf)[i * type_len]);
+			uk_arch_arm64_ioreg_write16(io_addr, ((__u16 *)buf)[i * type_len]);
 			break;
 		case 4:
-			ioreg_write32(io_addr, ((__u32 *)buf)[i * type_len]);
+			uk_arch_arm64_ioreg_write32(io_addr, ((__u32 *)buf)[i * type_len]);
 			break;
 		default:
 			UK_CRASH("Unsupported virtio write operation\n");
@@ -219,13 +194,13 @@ static inline void virtio_cread_bytes(const void *addr, const __u8 offset,
 		io_addr = (void *)addr + offset + (i * type_len);
 		switch (type_len) {
 		case 1:
-			((__u8 *)buf)[i * type_len] = ioreg_read8(io_addr);
+			((__u8 *)buf)[i * type_len] = uk_arch_arm64_ioreg_read8(io_addr);
 			break;
 		case 2:
-			((__u16 *)buf)[i * type_len] = ioreg_read16(io_addr);
+			((__u16 *)buf)[i * type_len] = uk_arch_arm64_ioreg_read16(io_addr);
 			break;
 		case 4:
-			((__u32 *)buf)[i * type_len] = ioreg_read32(io_addr);
+			((__u32 *)buf)[i * type_len] = uk_arch_arm64_ioreg_read32(io_addr);
 			break;
 		default:
 			UK_CRASH("Unsupported virtio read operation\n");

@@ -29,6 +29,8 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <uk/arch/util.h>
 #include <uk/config.h>
 #include <uk/plat/common/cpu.h>
 #include <uk/plat/common/irq.h>
@@ -45,7 +47,7 @@
  */
 void halt(void)
 {
-	__asm__ __volatile__("wfi");
+	uk_arch_arm64_halt();
 }
 
 /* Systems support PSCI >= 0.2 can do system reset from PSCI */

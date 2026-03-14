@@ -23,7 +23,6 @@
 /* Taken from solo5 platform_intr.c */
 
 #include <uk/asm/pic.h>
-#include <uk/arch.h>
 #include <uk/arch/util.h>
 #include <uk/essentials.h>
 #include <uk/intctlr.h>
@@ -48,26 +47,26 @@ static void PIC_remap(int offset1, int offset2)
 	unsigned char a1, a2;
 
 	/* save masks */
-	a1 = uk_arch_inb(PIC1_DATA);
-	a2 = uk_arch_inb(PIC2_DATA);
+	a1 = uk_arch_x86_64_inb(PIC1_DATA);
+	a2 = uk_arch_x86_64_inb(PIC2_DATA);
 
 	/* start init seq (cascade) */
-	uk_arch_outb(PIC1_COMMAND, ICW1_INIT + ICW1_ICW4);
-	uk_arch_outb(PIC2_COMMAND, ICW1_INIT + ICW1_ICW4);
+	uk_arch_x86_64_outb(PIC1_COMMAND, ICW1_INIT + ICW1_ICW4);
+	uk_arch_x86_64_outb(PIC2_COMMAND, ICW1_INIT + ICW1_ICW4);
 	/* ICW2: Master PIC vector off */
-	uk_arch_outb(PIC1_DATA, offset1);
+	uk_arch_x86_64_outb(PIC1_DATA, offset1);
 	/* ICW2: Slave PIC vector off */
-	uk_arch_outb(PIC2_DATA, offset2);
+	uk_arch_x86_64_outb(PIC2_DATA, offset2);
 	/* ICW3: tell Master PIC there is a slave PIC at IRQ2 (0000 0100) */
-	uk_arch_outb(PIC1_DATA, 4);
+	uk_arch_x86_64_outb(PIC1_DATA, 4);
 	/* ICW3: tell Slave PIC its cascade identity (0000 0010) */
-	uk_arch_outb(PIC2_DATA, 2);
+	uk_arch_x86_64_outb(PIC2_DATA, 2);
 
-	uk_arch_outb(PIC1_DATA, ICW4_8086);
-	uk_arch_outb(PIC2_DATA, ICW4_8086);
+	uk_arch_x86_64_outb(PIC1_DATA, ICW4_8086);
+	uk_arch_x86_64_outb(PIC2_DATA, ICW4_8086);
 
-	uk_arch_outb(PIC1_DATA, a1); /* restore saved masks. */
-	uk_arch_outb(PIC2_DATA, a2);
+	uk_arch_x86_64_outb(PIC1_DATA, a1); /* restore saved masks. */
+	uk_arch_x86_64_outb(PIC2_DATA, a2);
 }
 
 int pic_init(struct uk_intctlr_driver_ops **ops)
@@ -82,9 +81,9 @@ int pic_init(struct uk_intctlr_driver_ops **ops)
 void pic_ack_irq(unsigned int irq)
 {
 	if (!IRQ_ON_MASTER(irq))
-		uk_arch_outb(PIC2_COMMAND, PIC_EOI);
+		uk_arch_x86_64_outb(PIC2_COMMAND, PIC_EOI);
 
-	uk_arch_outb(PIC1_COMMAND, PIC_EOI);
+	uk_arch_x86_64_outb(PIC1_COMMAND, PIC_EOI);
 }
 
 static void pic_mask_irq(unsigned int irq)
@@ -92,7 +91,7 @@ static void pic_mask_irq(unsigned int irq)
 	__u16 port;
 
 	port = IRQ_PORT(irq);
-	uk_arch_outb(port, uk_arch_inb(port) | (1 << IRQ_OFFSET(irq)));
+	uk_arch_x86_64_outb(port, uk_arch_x86_64_inb(port) | (1 << IRQ_OFFSET(irq)));
 }
 
 static void pic_clear_irq(unsigned int irq)
@@ -100,6 +99,6 @@ static void pic_clear_irq(unsigned int irq)
 	__u16 port;
 
 	port = IRQ_PORT(irq);
-	uk_arch_outb(port, uk_arch_inb(port) & ~(1 << IRQ_OFFSET(irq)));
+	uk_arch_x86_64_outb(port, uk_arch_x86_64_inb(port) & ~(1 << IRQ_OFFSET(irq)));
 }
 

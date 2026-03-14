@@ -118,7 +118,7 @@ struct uk_random_driver_ops *device_init(void)
 
 	__asm__ __volatile__("mrs %x0, ID_AA64ISAR0_EL1\n" : "=r"(isar));
 
-	rndr = (isar >> ID_AA64ISAR0_EL1_RNDR_SHIFT) & ID_AA64ISAR0_EL1_RNDR_MASK;
+	rndr = (isar >> UK_ARCH_ARM64_ID_AA64ISAR0_EL1_RNDR_SHIFT) & UK_ARCH_ARM64_ID_AA64ISAR0_EL1_RNDR_MASK;
 	if (unlikely(!rndr)) {
 		uk_pr_debug("FEAT_RNG not available on this CPU\n");
 		return ERR2PTR(-ENOTSUP);

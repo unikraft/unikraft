@@ -6,6 +6,7 @@
 
 #include "../../vmem.h"
 
+#include <uk/arch/x86_64.h>
 #include <uk/assert.h>
 #include <uk/arch/types.h>
 #include <uk/event.h>
@@ -26,16 +27,16 @@ static int vmem_arch_pagefault(void *data)
 	int rc, error_code;
 
 	error_code = uk_lcpu_x86_64_except_err_ctx_get_error_code(ctx);
-	if (error_code & UK_ARCH_PF_EC_WR)
+	if (error_code & UK_ARCH_X86_64_PF_EC_WR)
 		faulttype = UK_VMA_FAULT_WRITE;
-	else if (error_code & UK_ARCH_PF_EC_ID)
+	else if (error_code & UK_ARCH_X86_64_PF_EC_ID)
 		faulttype = UK_VMA_FAULT_EXEC;
 	else
 		faulttype = UK_VMA_FAULT_READ;
 
-	if (!(error_code & UK_ARCH_PF_EC_P))
+	if (!(error_code & UK_ARCH_X86_64_PF_EC_P))
 		faulttype |= UK_VMA_FAULT_NONPRESENT;
-	else if (error_code & UK_ARCH_PF_EC_RSVD)
+	else if (error_code & UK_ARCH_X86_64_PF_EC_RSVD)
 		faulttype |= UK_VMA_FAULT_MISCONFIG;
 
 	rc = vmem_pagefault(vaddr, faulttype,

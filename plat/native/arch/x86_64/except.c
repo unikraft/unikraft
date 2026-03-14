@@ -1,35 +1,17 @@
 /* SPDX-License-Identifier: ISC */
-/*
- * Authors: Dan Williams
- *          Martin Lucina
- *          Felipe Huici <felipe.huici@neclab.eu>
- *          Florian Schmidt <florian.schmidt@neclab.eu>
- *
- * Copyright (c) 2015-2017 IBM
+/* Copyright (c) 2015-2017 IBM
  * Copyright (c) 2016-2017 Docker, Inc.
  * Copyright (c) 2017 NEC Europe Ltd., NEC Corporation
  * Copyright (c) 2025, Unikraft GmbH and The Unikraft Authors.
- *
- * Permission to use, copy, modify, and/or distribute this software
- * for any purpose with or without fee is hereby granted, provided
- * that the above copyright notice and this permission notice appear
- * in all copies.
- *
- * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL
- * WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED
- * WARRANTIES OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE
- * AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR
- * CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS
- * OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT,
- * NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN
- * CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+ * Licensed under the ISC License (the "License").
+ * You may not use this file except in compliance with the License.
  */
 
 #include <errno.h>
 
 #include <uk/asm.h>
 #include <uk/essentials.h>
-#include <uk/arch.h>
+#include <uk/arch/x86_64.h>
 #include <uk/arch/util.h>
 #include <uk/arch/ctx.h>
 #include <uk/arch/limits.h>
@@ -84,8 +66,8 @@
  */
 
 static __align(8)
-struct uk_arch_seg_gate_desc64
-cpu_idt[CONFIG_UKPLAT_CPU_MAXCOUNT][UK_ARCH_IDT_NUM_ENTRIES];
+struct uk_arch_x86_64_seg_gate_desc64
+cpu_idt[CONFIG_UKPLAT_CPU_MAXCOUNT][UK_ARCH_X86_64_IDT_NUM_ENTRIES];
 
 static __u8 idt_ist_disable_nesting[CONFIG_UKPLAT_CPU_MAXCOUNT];
 
@@ -93,30 +75,30 @@ static __align(UKARCH_SP_ALIGN) /* IST{1, 2, 3} */
 __u8 lcpu_except_stack[CONFIG_UKPLAT_CPU_MAXCOUNT][3 * CPU_EXCEPT_STACK_SIZE];
 
 static __align(8)
-struct uk_arch_tss64 cpu_tss[CONFIG_UKPLAT_CPU_MAXCOUNT];
+struct uk_arch_x86_64_tss64 cpu_tss[CONFIG_UKPLAT_CPU_MAXCOUNT];
 
 static __align(8)
-struct uk_arch_seg_desc32
-cpu_gdt64[CONFIG_UKPLAT_CPU_MAXCOUNT][UK_ARCH_GDT_NUM_ENTRIES];
+struct uk_arch_x86_64_seg_desc32
+cpu_gdt64[CONFIG_UKPLAT_CPU_MAXCOUNT][UK_ARCH_X86_64_GDT_NUM_ENTRIES];
 
 static void gdt_init(__u32 idx)
 {
-	struct uk_arch_desc_table_ptr64 gdtptr;
+	struct uk_arch_x86_64_desc_table_ptr64 gdtptr;
 
-	cpu_gdt64[idx][UK_ARCH_GDT_DESC_CODE].raw = UK_ARCH_GDT_DESC_CODE64_VAL;
-	cpu_gdt64[idx][UK_ARCH_GDT_DESC_DATA].raw = UK_ARCH_GDT_DESC_DATA64_VAL;
+	cpu_gdt64[idx][UK_ARCH_X86_64_GDT_DESC_CODE].raw = UK_ARCH_X86_64_GDT_DESC_CODE64_VAL;
+	cpu_gdt64[idx][UK_ARCH_X86_64_GDT_DESC_DATA].raw = UK_ARCH_X86_64_GDT_DESC_DATA64_VAL;
 
 	gdtptr.limit = sizeof(cpu_gdt64[idx]) - 1;
 	gdtptr.base = (__u64)&cpu_gdt64[idx];
 
-	uk_arch_lgdt(&gdtptr);
-	uk_arch_set_segs(UK_ARCH_GDT_DESC_OFFSET(UK_ARCH_GDT_DESC_CODE),
-			 UK_ARCH_GDT_DESC_OFFSET(UK_ARCH_GDT_DESC_DATA));
+	uk_arch_x86_64_lgdt(&gdtptr);
+	uk_arch_x86_64_set_segs(UK_ARCH_X86_64_GDT_DESC_OFFSET(UK_ARCH_X86_64_GDT_DESC_CODE),
+				UK_ARCH_X86_64_GDT_DESC_OFFSET(UK_ARCH_X86_64_GDT_DESC_DATA));
 }
 
 static void tss_init(__u32 idx)
 {
-	struct uk_arch_seg_desc64 *tss_desc;
+	struct uk_arch_x86_64_seg_desc64 *tss_desc;
 
 	cpu_tss[idx].ist[0] =
 		(__u64)&lcpu_except_stack[idx][CPU_EXCEPT_STACK_SIZE * 3];
@@ -125,14 +107,14 @@ static void tss_init(__u32 idx)
 	cpu_tss[idx].ist[2] =
 		(__u64)&lcpu_except_stack[idx][CPU_EXCEPT_STACK_SIZE];
 
-	tss_desc = (void *)&cpu_gdt64[idx][UK_ARCH_GDT_DESC_TSS_LO];
+	tss_desc = (void *)&cpu_gdt64[idx][UK_ARCH_X86_64_GDT_DESC_TSS_LO];
 	tss_desc->limit_lo	= sizeof(cpu_tss[idx]);
 	tss_desc->base_lo	= (__u64)&(cpu_tss[idx]);
 	tss_desc->base_hi	= (__u64)&(cpu_tss[idx]) >> 24;
-	tss_desc->type		= UK_ARCH_GDT_DESC_TYPE_TSS_AVAIL;
+	tss_desc->type		= UK_ARCH_X86_64_GDT_DESC_TYPE_TSS_AVAIL;
 	tss_desc->p		= 1;
 
-	uk_arch_ltr((__u16)(UK_ARCH_GDT_DESC_OFFSET(UK_ARCH_GDT_DESC_TSS_LO)));
+	uk_arch_x86_64_ltr((__u16)(UK_ARCH_X86_64_GDT_DESC_OFFSET(UK_ARCH_X86_64_GDT_DESC_TSS_LO)));
 }
 
 #define IDT_IST_SAVE_LEN 32
@@ -141,8 +123,8 @@ static __u8 idt_ist_saved[CONFIG_UKPLAT_CPU_MAXCOUNT][IDT_IST_SAVE_LEN];
 
 void uk_plat_native_except_push_nested(void)
 {
-	struct uk_arch_seg_gate_desc64 *desc;
-	struct uk_arch_seg_gate_desc64 *idt;
+	struct uk_arch_x86_64_seg_gate_desc64 *desc;
+	struct uk_arch_x86_64_seg_gate_desc64 *idt;
 	__u8 *disable_nesting;
 	__u8 *ist_saved;
 	unsigned int i;
@@ -169,8 +151,8 @@ void uk_plat_native_except_push_nested(void)
 
 void uk_plat_native_except_pop_nested(void)
 {
-	struct uk_arch_seg_gate_desc64 *desc;
-	struct uk_arch_seg_gate_desc64 *idt;
+	struct uk_arch_x86_64_seg_gate_desc64 *desc;
+	struct uk_arch_x86_64_seg_gate_desc64 *idt;
 	__u8 *disable_nesting;
 	__u8 *ist_saved;
 	unsigned int i;
@@ -242,45 +224,45 @@ static const char *x86_exception_table[] = {
 };
 
 static struct uk_event *trap_event_table[] = {
-	[UK_ARCH_TRAPNUM_DIVIDE_ERROR] =
+	[UK_ARCH_X86_64_TRAPNUM_DIVIDE_ERROR] =
 		UK_EVENT_PTR(UK_PLAT_NATIVE_EXCEPT_EVENT_ERR_MATH),
-	[UK_ARCH_TRAPNUM_DEBUG] =
+	[UK_ARCH_X86_64_TRAPNUM_DEBUG] =
 		UK_EVENT_PTR(UK_PLAT_NATIVE_EXCEPT_EVENT_DEBUG),
-	[UK_ARCH_TRAPNUM_NMI] =
+	[UK_ARCH_X86_64_TRAPNUM_NMI] =
 		UK_EVENT_PTR(UK_PLAT_NATIVE_X86_64_EXCEPT_EVENT_NMI),
-	[UK_ARCH_TRAPNUM_INT3] =
+	[UK_ARCH_X86_64_TRAPNUM_INT3] =
 		UK_EVENT_PTR(UK_PLAT_NATIVE_EXCEPT_EVENT_DEBUG),
-	[UK_ARCH_TRAPNUM_OVERFLOW] =
+	[UK_ARCH_X86_64_TRAPNUM_OVERFLOW] =
 		UK_EVENT_PTR(UK_PLAT_NATIVE_EXCEPT_EVENT_UNHANDLED),
-	[UK_ARCH_TRAPNUM_BOUNDS] =
+	[UK_ARCH_X86_64_TRAPNUM_BOUNDS] =
 		UK_EVENT_PTR(UK_PLAT_NATIVE_EXCEPT_EVENT_UNHANDLED),
-	[UK_ARCH_TRAPNUM_INVALID_OP] =
+	[UK_ARCH_X86_64_TRAPNUM_INVALID_OP] =
 		UK_EVENT_PTR(UK_PLAT_NATIVE_EXCEPT_EVENT_ERR_INVALID_OP),
-	[UK_ARCH_TRAPNUM_NO_DEVICE] =
+	[UK_ARCH_X86_64_TRAPNUM_NO_DEVICE] =
 		UK_EVENT_PTR(UK_PLAT_NATIVE_EXCEPT_EVENT_ERR_MATH),
-	[UK_ARCH_TRAPNUM_DOUBLE_FAULT] =
+	[UK_ARCH_X86_64_TRAPNUM_DOUBLE_FAULT] =
 		UK_EVENT_PTR(UK_PLAT_NATIVE_EXCEPT_EVENT_UNHANDLED),
-	[UK_ARCH_TRAPNUM_INVALID_TSS] =
+	[UK_ARCH_X86_64_TRAPNUM_INVALID_TSS] =
 		UK_EVENT_PTR(UK_PLAT_NATIVE_EXCEPT_EVENT_UNHANDLED),
-	[UK_ARCH_TRAPNUM_NO_SEGMENT] =
+	[UK_ARCH_X86_64_TRAPNUM_NO_SEGMENT] =
 		UK_EVENT_PTR(UK_PLAT_NATIVE_EXCEPT_EVENT_ERR_BUS_ERROR),
-	[UK_ARCH_TRAPNUM_STACK_ERROR] =
+	[UK_ARCH_X86_64_TRAPNUM_STACK_ERROR] =
 		UK_EVENT_PTR(UK_PLAT_NATIVE_EXCEPT_EVENT_ERR_BUS_ERROR),
-	[UK_ARCH_TRAPNUM_GP_FAULT] =
+	[UK_ARCH_X86_64_TRAPNUM_GP_FAULT] =
 		UK_EVENT_PTR(UK_PLAT_NATIVE_X86_64_EXCEPT_EVENT_ERR_GP_FAULT),
-	[UK_ARCH_TRAPNUM_PAGE_FAULT] =
+	[UK_ARCH_X86_64_TRAPNUM_PAGE_FAULT] =
 		UK_EVENT_PTR(UK_PLAT_NATIVE_EXCEPT_EVENT_ERR_PAGE_FAULT),
-	[UK_ARCH_TRAPNUM_COPROC_ERROR] =
+	[UK_ARCH_X86_64_TRAPNUM_COPROC_ERROR] =
 		UK_EVENT_PTR(UK_PLAT_NATIVE_EXCEPT_EVENT_ERR_MATH),
-	[UK_ARCH_TRAPNUM_ALIGNMENT_CHECK] =
+	[UK_ARCH_X86_64_TRAPNUM_ALIGNMENT_CHECK] =
 		UK_EVENT_PTR(UK_PLAT_NATIVE_EXCEPT_EVENT_ERR_BUS_ERROR),
-	[UK_ARCH_TRAPNUM_MACHINE_CHECK] =
+	[UK_ARCH_X86_64_TRAPNUM_MACHINE_CHECK] =
 		UK_EVENT_PTR(UK_PLAT_NATIVE_EXCEPT_EVENT_UNHANDLED),
-	[UK_ARCH_TRAPNUM_SIMD_ERROR] =
+	[UK_ARCH_X86_64_TRAPNUM_SIMD_ERROR] =
 		UK_EVENT_PTR(UK_PLAT_NATIVE_EXCEPT_EVENT_ERR_MATH),
-	[UK_ARCH_TRAPNUM_VIRT_ERROR] =
+	[UK_ARCH_X86_64_TRAPNUM_VIRT_ERROR] =
 		UK_EVENT_PTR(UK_PLAT_NATIVE_EXCEPT_EVENT_UNHANDLED),
-	[UK_ARCH_TRAPNUM_SECURITY_ERROR] =
+	[UK_ARCH_X86_64_TRAPNUM_SECURITY_ERROR] =
 		UK_EVENT_PTR(UK_PLAT_NATIVE_EXCEPT_EVENT_ERR_SECURITY),
 };
 
@@ -297,7 +279,7 @@ void uk_plat_native_except_err_handler(int trapnr,
 		.str = x86_exception_table[trapnr],
 		.error_code = error_code,
 		.handler_err = 0,
-		.cr2 = uk_arch_rdcr2(),
+		.cr2 = uk_arch_x86_64_rdcr2(),
 	};
 
 	rc = uk_raise_event_ptr(trap_event_table[trapnr], &ctx);
@@ -351,12 +333,12 @@ void uk_plat_native_except_irq_handler(struct uk_plat_native_regs *regs,
 #endif /* CONFIG_LIBUKPLAT_NATIVE_ECTX_ISR_ASSERTIONS */
 }
 
-static struct uk_arch_desc_table_ptr64 idtptr;
+static struct uk_arch_x86_64_desc_table_ptr64 idtptr;
 
 static inline void idt_fillgate(unsigned int num, void *fun, unsigned int ist,
 				__u32 idx)
 {
-	struct uk_arch_seg_gate_desc64 *desc;
+	struct uk_arch_x86_64_seg_gate_desc64 *desc;
 
 	desc = &cpu_idt[idx][num];
 
@@ -365,10 +347,10 @@ static inline void idt_fillgate(unsigned int num, void *fun, unsigned int ist,
 	 */
 	desc->offset_hi	= (__u64)fun >> 16;
 	desc->offset_lo	= (__u64)fun & 0xffff;
-	desc->selector	= UK_ARCH_IDT_DESC_OFFSET(UK_ARCH_IDT_DESC_CODE);
+	desc->selector	= UK_ARCH_X86_64_IDT_DESC_OFFSET(UK_ARCH_X86_64_IDT_DESC_CODE);
 	desc->ist	= ist;
-	desc->type	= UK_ARCH_IDT_DESC_TYPE_INTR;
-	desc->dpl	= UK_ARCH_IDT_DESC_DPL_KERNEL;
+	desc->type	= UK_ARCH_X86_64_IDT_DESC_TYPE_INTR;
+	desc->dpl	= UK_ARCH_X86_64_IDT_DESC_DPL_KERNEL;
 	desc->p		= 1;
 }
 
@@ -377,7 +359,7 @@ static void idt_init(void)
 	/* Ensure that traps_table_init has been called */
 	UK_ASSERT(idtptr.limit != 0);
 
-	uk_arch_lidt(&idtptr);
+	uk_arch_x86_64_lidt(&idtptr);
 }
 
 static void traps_table_init(__u32 idx)
@@ -677,24 +659,28 @@ static inline int x2apic_enable(void)
 	__u32 eax, ebx, ecx, edx;
 
 	/* Check for x2APIC support */
-	uk_arch_cpuid(1, 0, &eax, &ebx, &ecx, &edx);
-	if (!(ecx & UK_ARCH_CPUID1_ECX_X2APIC))
+	uk_arch_x86_64_cpuid(1, 0, &eax, &ebx, &ecx, &edx);
+	if (!(ecx & UK_ARCH_X86_64_CPUID1_ECX_X2APIC))
 		return -ENOTSUP;
 
 	/* Check if APIC is active */
-	uk_arch_rdmsr(UK_ARCH_APIC_MSR_BASE, &eax, &edx);
-	if (!(eax & UK_ARCH_APIC_BASE_EN))
+	uk_arch_x86_64_rdmsr(UK_ARCH_X86_64_APIC_MSR_BASE,
+			     &eax, &edx);
+	if (!(eax & UK_ARCH_X86_64_APIC_BASE_EN))
 		return -ENOTSUP;
 
 	/* Switch to x2APIC mode */
-	eax |= UK_ARCH_APIC_BASE_EXTD;
-	uk_arch_wrmsr(UK_ARCH_APIC_MSR_BASE, eax, edx);
+	eax |= UK_ARCH_X86_64_APIC_BASE_EXTD;
+	uk_arch_x86_64_wrmsr(UK_ARCH_X86_64_APIC_MSR_BASE,
+			     eax, edx);
 
 	/* Set APIC software enable flag if necessary */
-	uk_arch_rdmsr(UK_ARCH_APIC_MSR_SVR, &eax, &edx);
-	if ((eax & UK_ARCH_APIC_SVR_EN) == 0) {
-		eax |= UK_ARCH_APIC_SVR_EN;
-		uk_arch_wrmsr(UK_ARCH_APIC_MSR_SVR, eax, edx);
+	uk_arch_x86_64_rdmsr(UK_ARCH_X86_64_APIC_MSR_SVR,
+					    &eax, &edx);
+	if ((eax & UK_ARCH_X86_64_APIC_SVR_EN) == 0) {
+		eax |= UK_ARCH_X86_64_APIC_SVR_EN;
+		uk_arch_x86_64_wrmsr(UK_ARCH_X86_64_APIC_MSR_SVR,
+				     eax, edx);
 	}
 
 	/*
@@ -712,11 +698,12 @@ static inline void x2apic_send_ipi(int irqno, int dest)
 
 	UK_ASSERT(((32 + irqno) & 0xff) == (32 + irqno));
 
-	eax = UK_ARCH_APIC_ICR_TRIGGER_LEVEL | UK_ARCH_APIC_ICR_LEVEL_ASSERT |
-	      UK_ARCH_APIC_ICR_DESTMODE_PHYSICAL |
-	      UK_ARCH_APIC_ICR_DMODE_FIXED | (32 + irqno);
+	eax = UK_ARCH_X86_64_APIC_ICR_TRIGGER_LEVEL |
+	      UK_ARCH_X86_64_APIC_ICR_LEVEL_ASSERT |
+	      UK_ARCH_X86_64_APIC_ICR_DESTMODE_PHYSICAL |
+	      UK_ARCH_X86_64_APIC_ICR_DMODE_FIXED | (32 + irqno);
 
-	uk_arch_wrmsr(UK_ARCH_APIC_MSR_ICR, eax, dest);
+	uk_arch_x86_64_wrmsr(UK_ARCH_X86_64_APIC_MSR_ICR, eax, dest);
 }
 
 #define apic_enable		x2apic_enable

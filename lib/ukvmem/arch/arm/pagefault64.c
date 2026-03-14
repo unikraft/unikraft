@@ -25,16 +25,16 @@ static int vmem_arch_pagefault(void *data)
 	struct uk_vas *vas;
 	int rc;
 
-	if (ctx->esr & ESR_ISS_ABRT_WnR_SHIFT)
+	if (ctx->esr & UK_ARCH_ARM64_ESR_ISS_ABRT_WnR_MASK)
 		faulttype = UK_VMA_FAULT_WRITE;
-	else if (ctx->esr & ESR_ISS_ABRT_ISV_MASK)
+	else if (ctx->esr & UK_ARCH_ARM64_ESR_ISS_ABRT_ISV_MASK)
 		faulttype = UK_VMA_FAULT_EXEC;
 	else
 		faulttype = UK_VMA_FAULT_READ;
 
-	dfsc = ctx->esr & ESR_ISS_ABRT_FSC_MASK;
-	if (dfsc >= ESR_ISS_ABRT_FSC_TRANS_L0 &&
-	    dfsc <= ESR_ISS_ABRT_FSC_TRANS_L3)
+	dfsc = ctx->esr & UK_ARCH_ARM64_ESR_ISS_ABRT_FSC_MASK;
+	if (dfsc >= UK_ARCH_ARM64_ESR_ISS_ABRT_FSC_TRANS_L0 &&
+	    dfsc <= UK_ARCH_ARM64_ESR_ISS_ABRT_FSC_TRANS_L3)
 		faulttype |= UK_VMA_FAULT_NONPRESENT;
 	else
 		faulttype |= UK_VMA_FAULT_MISCONFIG;

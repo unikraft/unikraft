@@ -125,9 +125,9 @@
 		" * happened.\n\t"					\
 		" */\n\t"						\
 		"mov	x23, xzr\n\t"					\
-		"add	x23, x23, #" STRINGIFY(ESR_EL1_EC_SVC64) "\n\t"	\
-		"orr	x23, xzr, x23, lsl #" STRINGIFY(ESR_EC_SHIFT) "\n\t"\
-		"orr	x23, x23, #" STRINGIFY(ESR_IL) "\n\t"		\
+		"add	x23, x23, #" STRINGIFY(UK_ARCH_ARM64_ESR_EL1_EC_SVC64) "\n\t"\
+		"orr	x23, xzr, x23, lsl #" STRINGIFY(UK_ARCH_ARM64_ESR_EC_SHIFT) "\n\t"\
+		"orr	x23, x23, #" STRINGIFY(UK_ARCH_ARM64_ESR_IL) "\n\t"\
 		"stp	x22, x23, [sp, #16 * 16]\n\t"			\
 		"/* ECTX at slot w.r.t. `struct ukarch_execenv` */\n\t"	\
 		"mov	x0, sp\n\t"					\

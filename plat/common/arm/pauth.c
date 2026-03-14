@@ -9,7 +9,9 @@
 
 #include <errno.h>
 
+#include <uk/arch/arm64.h>
 #include <uk/arch/types.h>
+#include <uk/arch/util.h>
 #include <uk/assert.h>
 #include <uk/essentials.h>
 #include <uk/random.h>
@@ -24,14 +26,19 @@ static inline __bool pauth_supported(void)
 	__u64 apa3, apa, api;
 	__u64 reg;
 
-	reg = SYSREG_READ(ID_AA64ISAR1_EL1);
-	apa = (reg >> ID_AA64ISAR1_EL1_APA_SHIFT) & ID_AA64ISAR1_EL1_APA_MASK;
-	api = (reg >> ID_AA64ISAR1_EL1_API_SHIFT) & ID_AA64ISAR1_EL1_API_MASK;
+	reg = UK_ARCH_ARM64_SYSREG_READ(ID_AA64ISAR1_EL1);
+	apa = (reg >> UK_ARCH_ARM64_ID_AA64ISAR1_EL1_APA_SHIFT) &
+	      UK_ARCH_ARM64_ID_AA64ISAR1_EL1_APA_MASK;
+	api = (reg >> UK_ARCH_ARM64_ID_AA64ISAR1_EL1_API_SHIFT) &
+	      UK_ARCH_ARM64_ID_AA64ISAR1_EL1_API_MASK;
+
 	if (apa || api)
 		return __true;
 
-	reg = SYSREG_READ(ID_AA64ISAR2_EL1);
-	apa3 = (reg >> ID_AA64ISAR2_EL1_APA3_SHIFT) & ID_AA64ISAR2_EL1_APA3_MASK;
+	reg = UK_ARCH_ARM64_SYSREG_READ(ID_AA64ISAR2_EL1);
+	apa3 = (reg >> UK_ARCH_ARM64_ID_AA64ISAR2_EL1_APA3_SHIFT) &
+	       UK_ARCH_ARM64_ID_AA64ISAR2_EL1_APA3_MASK;
+
 	if (apa3)
 		return __true;
 
@@ -55,21 +62,21 @@ int __no_pauth ukplat_pauth_init(void)
 		uk_pr_err("Could not generate APIAKey (%d)\n", rc);
 		return rc;
 	}
-	SYSREG_WRITE64(APIAKeyHi_EL1, key_hi);
+	UK_ARCH_ARM64_SYSREG_WRITE64(APIAKeyHi_EL1, key_hi);
 
 	rc = uk_random_fill_buffer(&key_lo, sizeof(key_lo));
 	if (unlikely(rc)) {
 		uk_pr_err("Could not generate APIAKey (%d)\n", rc);
 		return rc;
 	}
-	SYSREG_WRITE64(APIAKeyLo_EL1, key_lo);
+	UK_ARCH_ARM64_SYSREG_WRITE64(APIAKeyLo_EL1, key_lo);
 
 	/* Enable pointer authentication */
-	reg = SYSREG_READ64(sctlr_el1);
-	reg |= SCTLR_EL1_EnIA_BIT;
-	SYSREG_WRITE64(sctlr_el1, reg);
+	reg = UK_ARCH_ARM64_SYSREG_READ64(sctlr_el1);
+	reg |= UK_ARCH_ARM64_SCTLR_EL1_EnIA_BIT;
+	UK_ARCH_ARM64_SYSREG_WRITE64(sctlr_el1, reg);
 
-	isb();
+	uk_arch_arm64_isb();
 
 	return 0;
 }

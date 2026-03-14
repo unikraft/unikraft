@@ -23,15 +23,16 @@
  */
 /* Taken from Mini-OS */
 
-#include <uk/arch/types.h>
+#include <uk/arch/x86_64.h>
 #include <uk/arch/limits.h>
-#include <uk/arch/lcpu.h>
-#include <x86/traps.h>
+#include <uk/lcpu.h>
+#include <xen-x86/traps.h>
 #include <uk/config.h>
 #include <xen/xen.h>
 #include <xen/elfnote.h>
 #include <uk/asm.h>
 #include <uk/reloc.h>
+#include <uk/pcpuvar.h>
 
 #define ELFNOTE(name, type, desc)           \
     .pushsection .note.name               ; \
@@ -81,12 +82,12 @@ _libxenplat_start:
 	movq %cr4, %rdi
 	/* FPU and SSE are part of base x86-64, so no need to check for their
 	 * availability before enabling and initializing. */
-	andl $(~(X86_CR0_EM | X86_CR0_TS)), %esi
-	orl $(X86_CR0_MP | X86_CR0_NE), %esi
+	andl $(~(UK_ARCH_X86_64_CR0_EM | UK_ARCH_X86_64_CR0_TS)), %esi
+	orl $(UK_ARCH_X86_64_CR0_MP | UK_ARCH_X86_64_CR0_NE), %esi
 	movq %rsi, %cr0
 	fninit
 #if __SSE__
-	orl $(X86_CR4_OSFXSR | X86_CR4_OSXMMEXCPT), %edi
+	orl $(UK_ARCH_X86_64_CR4_OSFXSR | UK_ARCH_X86_64_CR4_OSXMMEXCPT), %edi
 	movq %rdi, %cr4
 
 	leaq mxcsr_ptr(%rip),%r9
@@ -100,18 +101,18 @@ _libxenplat_start:
 	/* ecx and edx now contain capability information, so we can now
 	 * enable capabilities based on the indicated features */
 	/* note: OSXSAVE needs to be enabled before AVX and PKU */
-	testl $(X86_CPUID1_ECX_XSAVE), %ecx
+	testl $(UK_ARCH_X86_64_CPUID1_ECX_XSAVE), %ecx
 	jz noxsave
-	orl $(X86_CR4_OSXSAVE), %edi
+	orl $(UK_ARCH_X86_64_CR4_OSXSAVE), %edi
 	movq %rdi, %cr4
 #if __AVX__
 	/* now enable AVX. This needs to be last checking cpuid features from
 	 * the eax=1 cpuid call, because it clobbers ecx */
-	testl $(X86_CPUID1_ECX_AVX), %ecx
+	testl $(UK_ARCH_X86_64_CPUID1_ECX_AVX), %ecx
 	jz noavx
 	xorl %ecx, %ecx
 	xgetbv
-	orl $(X86_XCR0_SSE | X86_XCR0_AVX), %eax
+	orl $(UK_ARCH_X86_64_XCR0_SSE | UK_ARCH_X86_64_XCR0_AVX), %eax
 	xsetbv
 noavx:
 #endif /* __AVX__ */
@@ -124,31 +125,32 @@ noxsave:
 	cpuid
 	/* ebx, ecx, edx now contain extended capabilities information. */
 	/* check for and enable FS/GSBASE */
-	testl $(X86_CPUID7_EBX_FSGSBASE), %ebx
+	testl $(UK_ARCH_X86_64_CPUID7_EBX_FSGSBASE), %ebx
 	jz nofsgsbase
-	orl $(X86_CR4_FSGSBASE), %edi
+	orl $(UK_ARCH_X86_64_CR4_FSGSBASE), %edi
 	movq %rdi, %cr4
 nofsgsbase:
 #if CONFIG_HAVE_X86PKU
 	/* check for Memory Protection Keys (PKU) */
-	testl $(X86_CPUID7_ECX_PKU), %ecx
+	testl $(UK_ARCH_X86_64_CPUID7_ECX_PKU), %ecx
 	jz nopku
 	/* only enable PKU if we support XSAVE */
-	testl $(X86_CR4_OSXSAVE), %edi
+	testl $(UK_ARCH_X86_64_CR4_OSXSAVE), %edi
 	jz nopku
 	/* PKU is supported, enable it via CR4 */
-	orl $(X86_CR4_PKE), %edi
+	orl $(UK_ARCH_X86_64_CR4_PKE), %edi
 	movq %rdi, %cr4
 	/* also enable XSAVE for the PKRU */
 	xorl %ecx, %ecx
 	xgetbv
-	orl $(X86_XCR0_PKRU), %eax
+	orl $(UK_ARCH_X86_64_XCR0_PKRU), %eax
 	xsetbv
 nopku:
 #endif /* CONFIG_HAVE_X86PKU */
 	/* Done setting up CPU capabilities, hand over to C entry point. */
 	movq %r8, %rdi /* pass pointer to start_info page to C entry */
-	call _libxenplat_x86entry
+	call _libxenplat_x86entry /* should not return */
+	ud2 /* trap in case it does */
 
 .type mxcsr_ptr, @object
 mxcsr_ptr:
@@ -185,73 +187,63 @@ KERNEL_CS_MASK = 0xfc
 .macro SAVE_PARAVIRT
 #ifdef XEN_PARAVIRT
 	pop %rcx
-	pop %r11 /* rsp points to the error code */
+	pop %r11 /* rsp now points to the error code */
 #endif
 .endm
 
-.macro zeroentry sym
-	SAVE_PARAVIRT
-	pushq $0	/* push error code/oldrax */
-	pushq %rax	/* push real oldrax to the rdi slot */
-	leaq  \sym(%rip),%rax
-	jmp error_entry
-.endm
+#define TRAP_ENTRY(name, has_ec) \
+	_TRAP_ENTRY name, UK_ARCH_X86_64_TRAPNUM_##name, has_ec
 
-.macro errorentry sym
-	SAVE_PARAVIRT
-	pushq %rax
-	leaq  \sym(%rip),%rax
-	jmp error_entry
-.endm
-
-.macro TRAP_ENTRY trapname, has_ec
+.macro _TRAP_ENTRY trapname, trapnum, has_ec
 ENTRY(ASM_TRAP_SYM(\trapname))
-.if \has_ec
-	errorentry do_\trapname
-.else
-	zeroentry  do_\trapname
+	SAVE_PARAVIRT
+.if !\has_ec
+	pushq	$0 /* push fake error code on stack */
 .endif
+	pushq	%rax /* push old rax */
+	movq	$\trapnum, %rax
+	jmp error_entry
 .endm
 
 .macro RESTORE_ALL
-	movq __REGS_OFFSETOF_R15(%rsp), %r15
-	movq __REGS_OFFSETOF_R14(%rsp), %r14
-	movq __REGS_OFFSETOF_R13(%rsp), %r13
-	movq __REGS_OFFSETOF_R12(%rsp), %r12
-	movq __REGS_OFFSETOF_RBP(%rsp), %rbp
-	movq __REGS_OFFSETOF_RBX(%rsp), %rbx
-	movq __REGS_OFFSETOF_R11(%rsp), %r11
-	movq __REGS_OFFSETOF_R10(%rsp), %r10
-	movq __REGS_OFFSETOF_R9(%rsp),  %r9
-	movq __REGS_OFFSETOF_R8(%rsp),  %r8
-	movq __REGS_OFFSETOF_RAX(%rsp), %rax
-	movq __REGS_OFFSETOF_RCX(%rsp), %rcx
-	movq __REGS_OFFSETOF_RDX(%rsp), %rdx
-	movq __REGS_OFFSETOF_RSI(%rsp), %rsi
-	movq __REGS_OFFSETOF_RDI(%rsp), %rdi
-	addq $__REGS_OFFSETOF_RIP,%rsp
+	movq UK_LCPU_X86_64_REGS_OFFSETOF_R15(%rsp), %r15
+	movq UK_LCPU_X86_64_REGS_OFFSETOF_R14(%rsp), %r14
+	movq UK_LCPU_X86_64_REGS_OFFSETOF_R13(%rsp), %r13
+	movq UK_LCPU_X86_64_REGS_OFFSETOF_R12(%rsp), %r12
+	movq UK_LCPU_X86_64_REGS_OFFSETOF_RBP(%rsp), %rbp
+	movq UK_LCPU_X86_64_REGS_OFFSETOF_RBX(%rsp), %rbx
+	movq UK_LCPU_X86_64_REGS_OFFSETOF_R11(%rsp), %r11
+	movq UK_LCPU_X86_64_REGS_OFFSETOF_R10(%rsp), %r10
+	movq UK_LCPU_X86_64_REGS_OFFSETOF_R9(%rsp),  %r9
+	movq UK_LCPU_X86_64_REGS_OFFSETOF_R8(%rsp),  %r8
+	movq UK_LCPU_X86_64_REGS_OFFSETOF_RAX(%rsp), %rax
+	movq UK_LCPU_X86_64_REGS_OFFSETOF_RCX(%rsp), %rcx
+	movq UK_LCPU_X86_64_REGS_OFFSETOF_RDX(%rsp), %rdx
+	movq UK_LCPU_X86_64_REGS_OFFSETOF_RSI(%rsp), %rsi
+	movq UK_LCPU_X86_64_REGS_OFFSETOF_RDI(%rsp), %rdi
+	addq $UK_LCPU_X86_64_REGS_OFFSETOF_RIP,%rsp
 .endm
 
 .macro SAVE_ALL
 	/* rdi slot contains rax, oldrax contains error code */
 	cld
-	subq $__REGS_OFFSETOF_RDI, %rsp
-	movq %rsi, __REGS_OFFSETOF_RSI(%rsp)
-	movq __REGS_OFFSETOF_RDI(%rsp), %rsi    /* load rax from rdi slot */
-	movq %rdx, __REGS_OFFSETOF_RDX(%rsp)
-	movq %rcx, __REGS_OFFSETOF_RCX(%rsp)
-	movq %rsi, __REGS_OFFSETOF_RAX(%rsp)    /* store rax */
-	movq %r8,  __REGS_OFFSETOF_R8(%rsp)
-	movq %r9,  __REGS_OFFSETOF_R9(%rsp)
-	movq %r10, __REGS_OFFSETOF_R10(%rsp)
-	movq %r11, __REGS_OFFSETOF_R11(%rsp)
-	movq %rbx, __REGS_OFFSETOF_RBX(%rsp)
-	movq %rbp, __REGS_OFFSETOF_RBP(%rsp)
-	movq %r12, __REGS_OFFSETOF_R12(%rsp)
-	movq %r13, __REGS_OFFSETOF_R13(%rsp)
-	movq %r14, __REGS_OFFSETOF_R14(%rsp)
-	movq %r15, __REGS_OFFSETOF_R15(%rsp)
-	movq %rdi, __REGS_OFFSETOF_RDI(%rsp)    /* put rdi into the slot */
+	subq $UK_LCPU_X86_64_REGS_OFFSETOF_RDI, %rsp
+	movq %rsi, UK_LCPU_X86_64_REGS_OFFSETOF_RSI(%rsp)
+	movq UK_LCPU_X86_64_REGS_OFFSETOF_RDI(%rsp), %rsi    /* load rax from rdi slot */
+	movq %rdx, UK_LCPU_X86_64_REGS_OFFSETOF_RDX(%rsp)
+	movq %rcx, UK_LCPU_X86_64_REGS_OFFSETOF_RCX(%rsp)
+	movq %rsi, UK_LCPU_X86_64_REGS_OFFSETOF_RAX(%rsp)    /* store rax */
+	movq %r8,  UK_LCPU_X86_64_REGS_OFFSETOF_R8(%rsp)
+	movq %r9,  UK_LCPU_X86_64_REGS_OFFSETOF_R9(%rsp)
+	movq %r10, UK_LCPU_X86_64_REGS_OFFSETOF_R10(%rsp)
+	movq %r11, UK_LCPU_X86_64_REGS_OFFSETOF_R11(%rsp)
+	movq %rbx, UK_LCPU_X86_64_REGS_OFFSETOF_RBX(%rsp)
+	movq %rbp, UK_LCPU_X86_64_REGS_OFFSETOF_RBP(%rsp)
+	movq %r12, UK_LCPU_X86_64_REGS_OFFSETOF_R12(%rsp)
+	movq %r13, UK_LCPU_X86_64_REGS_OFFSETOF_R13(%rsp)
+	movq %r14, UK_LCPU_X86_64_REGS_OFFSETOF_R14(%rsp)
+	movq %r15, UK_LCPU_X86_64_REGS_OFFSETOF_R15(%rsp)
+	movq %rdi, UK_LCPU_X86_64_REGS_OFFSETOF_RDI(%rsp)    /* put rdi into the slot */
 .endm
 
 .macro HYPERVISOR_IRET
@@ -281,10 +273,10 @@ ENTRY(ASM_TRAP_SYM(\trapname))
 error_entry:
 	SAVE_ALL
 
-	movq %rsp,%rdi
-	movq __REGS_OFFSETOF_ORIG_RAX(%rsp),%rsi	# get error code
-	movq $-1,__REGS_OFFSETOF_ORIG_RAX(%rsp)
-	call *%rax
+	movq	%rax, %rdi /* Load trap number */
+	movq	%rsp, %rsi /* Load regs ptr */
+	movq UK_LCPU_X86_64_REGS_OFFSETOF_ORIG_RAX(%rsp),%rdx /* Load error code */
+	call uk_plat_xen_except_err_handler
 	jmp error_exit
 
 
@@ -292,14 +284,21 @@ error_entry:
 /*
  * Xen event (virtual interrupt) entry point.
  */
-ENTRY(ASM_TRAP_SYM(hypervisor_callback))
-	zeroentry hypervisor_callback2
+ENTRY(ASM_TRAP_SYM(HYPERVISOR_CALLBACK))
+	SAVE_PARAVIRT
+	pushq	$0	/* push fake error code */
+	pushq	%rax	/* push real oldrax to the rdi slot */
+	SAVE_ALL
+	movq	%rsp, %rdi /* Load regs ptr */
+	movq	UK_LCPU_X86_64_REGS_OFFSETOF_ORIG_RAX(%rsp), %rsi /* Load err */
+	call	hypervisor_callback2
+	jmp error_exit
 
 hypervisor_callback2:
 	movq %rdi, %rsp
 
 	/* check against event re-entrant */
-	movq __REGS_OFFSETOF_RIP(%rsp),%rax
+	movq UK_LCPU_X86_64_REGS_OFFSETOF_RIP(%rsp),%rax
 	leaq scrit(%rip),%r9
 	cmpq %r9,%rax
 	jb 11f
@@ -307,16 +306,20 @@ hypervisor_callback2:
 	cmpq %r9,%rax
 	jb  critical_region_fixup
 
-11:	movq %gs:8,%rax
-	incl %gs:0
-	cmovzq %rax,%rsp
-	pushq %rdi
+11:
+	/* Switch stack iff we're not in nested exception AND auxsp is set */
+	xor %eax, %eax
+	incl UK_PCPUVAR_X86_64_GSREL(xen_irqcount)
+	cmovzq UK_PCPUVAR_X86_64_GSREL(uk_plat_xen_auxsp), %rax
+	test %rax, %rax
+	cmovnzq %rax, %rsp
+	mov %rdi, %rbx
 	call do_hypervisor_callback
-	popq %rsp
-	decl %gs:0
+	mov %rbx, %rsp
+	decl UK_PCPUVAR_X86_64_GSREL(xen_irqcount)
 
 error_exit:
-	movl __REGS_OFFSETOF_EFLAGS(%rsp), %eax
+	movl UK_LCPU_X86_64_REGS_OFFSETOF_RFLAGS(%rsp), %eax
 	shr $9, %eax			# EAX[0] == IRET_RFLAGS.IF
 	XEN_GET_VCPU_INFO(%rsi)
 	andb evtchn_upcall_mask(%rsi),%al
@@ -350,7 +353,7 @@ ecrit:  /**** END OF CRITICAL REGION ****/
 hypervisor_prologue:
 	pushq %r11
 	pushq %rcx
-	jmp ASM_TRAP_SYM(hypervisor_callback)
+	jmp ASM_TRAP_SYM(HYPERVISOR_CALLBACK)
 
 # [How we do the fixup]. We want to merge the current stack frame with the
 # just-interrupted frame. How we do this depends on where in the critical
@@ -362,11 +365,11 @@ hypervisor_prologue:
 
 critical_region_fixup:
 	# Set up source and destination region pointers
-	leaq __REGS_OFFSETOF_RIP(%rsp),%rsi   # esi points at end of src region
+	leaq UK_LCPU_X86_64_REGS_OFFSETOF_RIP(%rsp),%rsi   # esi points at end of src region
 	# Acquire interrupted rsp which was saved-on-stack. This points to
 	# the end of dst region. Note that it is not necessarily current rsp
 	# plus 0xb0, because the second interrupt might align the stack frame.
-	movq __REGS_OFFSETOF_RSP(%rsp),%rdi   # edi points at end of dst region
+	movq UK_LCPU_X86_64_REGS_OFFSETOF_RSP(%rsp),%rdi   # edi points at end of dst region
 
 	leaq restore_end(%rip),%r9
 	cmpq %r9,%rax
@@ -375,11 +378,11 @@ critical_region_fixup:
 	# If interrupted rip is before restore_end
 	# then rax hasn't been restored yet
 	movq (%rdi),%rax
-	movq %rax, __REGS_OFFSETOF_RAX(%rsp)  # save rax
+	movq %rax, UK_LCPU_X86_64_REGS_OFFSETOF_RAX(%rsp)  # save rax
 	addq $RSP_OFFSET,%rdi
 
 	# Set up the copy
-13:	movq $__REGS_OFFSETOF_RIP,%rcx
+13:	movq $UK_LCPU_X86_64_REGS_OFFSETOF_RIP,%rcx
 	shr  $3,%rcx          # convert bytes into count of 64-bit entities
 15:	subq $8,%rsi          # pre-decrementing copy loop
 	subq $8,%rdi
@@ -387,7 +390,7 @@ critical_region_fixup:
 	movq %rax,(%rdi)
 	loop 15b
 16:	movq %rdi,%rsp        # final rdi is top of merged stack
-	andb $KERNEL_CS_MASK,__REGS_OFFSETOF_CS(%rsp)  # CS might have changed
+	andb $KERNEL_CS_MASK,UK_LCPU_X86_64_REGS_OFFSETOF_CS(%rsp)  # CS might have changed
 	jmp  11b
 #endif
 
@@ -399,27 +402,28 @@ ENTRY(asm_failsafe_callback)
         iretq
 
 
-TRAP_ENTRY divide_error,        0
-TRAP_ENTRY debug,               0
+TRAP_ENTRY(DIVIDE_ERROR,        0)
+TRAP_ENTRY(DEBUG,               0)
 /* no NMI */
-TRAP_ENTRY int3,                0
-TRAP_ENTRY overflow,            0
-TRAP_ENTRY bounds,              0
-TRAP_ENTRY invalid_op,          0
-TRAP_ENTRY no_device,           0
+TRAP_ENTRY(INT3,                0)
+TRAP_ENTRY(OVERFLOW,            0)
+TRAP_ENTRY(BOUNDS,              0)
+TRAP_ENTRY(INVALID_OP,          0)
+TRAP_ENTRY(NO_DEVICE,           0)
 /* no Double Fault */
-TRAP_ENTRY coproc_seg_overrun,  0
-TRAP_ENTRY invalid_tss,         1
-TRAP_ENTRY no_segment,          1
-TRAP_ENTRY stack_error,         1 /* runs on exception stack */
-TRAP_ENTRY gp_fault,            1
-TRAP_ENTRY page_fault,          1
-TRAP_ENTRY spurious_int,        1
-TRAP_ENTRY coproc_error,        0
-TRAP_ENTRY alignment_check,     1
+TRAP_ENTRY(COPROC_SEG_OVERRUN,  0)
+TRAP_ENTRY(INVALID_TSS,         1)
+TRAP_ENTRY(NO_SEGMENT,          1)
+TRAP_ENTRY(STACK_ERROR,         1) /* runs on exception stack */
+TRAP_ENTRY(GP_FAULT,            1)
+TRAP_ENTRY(PAGE_FAULT,          1)
+TRAP_ENTRY(SPURIOUS_INT,        1)
+TRAP_ENTRY(COPROC_ERROR,        0)
+TRAP_ENTRY(ALIGNMENT_CHECK,     1)
 /* no Machine Check */
-TRAP_ENTRY simd_error,          0
+TRAP_ENTRY(SIMD_ERROR,          0)
 /* no Virtualization Exception */
+TRAP_ENTRY(SECURITY_ERROR,      0)
 
 /*
  * We do not want to unmap anything.

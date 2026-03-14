@@ -49,8 +49,8 @@ ENTRY(lcpu_start)
 	msr	contextidr_el1, xzr
 
 	/* Setup exception vector table address before enable MMU */
-	ur_ldr  x29, vector_table
-	msr     VBAR_EL1, x29
+	ur_addr	x29, vector_table
+	msr	VBAR_EL1, x29
 
 	/* Enable the mmu */
 	bl	start_mmu

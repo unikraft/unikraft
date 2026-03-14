@@ -59,9 +59,9 @@
  * thread exit handler.
  */
 ENTRY(asm_thread_starter)
-	mov x2, sp
-	ldp x0, x1, [x2]			/* x1 = func, x0 = args */
-	ur_ldr  x30, uk_sched_thread_exit	/* Set thread exit handler */
+	mov	x2, sp
+	ldp	x0, x1, [x2]			/* x1 = func, x0 = args */
+	ur_addr	x30, uk_sched_thread_exit	/* Set thread exit handler */
 	br  x1					/* Jump to thread main func */
 ENDPROC(asm_thread_starter)
 
@@ -96,7 +96,7 @@ ENTRY(asm_ctx_switch)
 	 * Record the restore point for switch out thread to restore
 	 * its called-saved registers in next switch to time.
 	 */
-	ur_ldr  x30, restore_point
+	ur_addr  x30, restore_point
 
 	/* Save sp and restore point to previous context */
 	stp x2, x30, [x0]

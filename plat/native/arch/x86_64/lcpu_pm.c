@@ -9,6 +9,7 @@
  */
 
 #include <uk/arch/util.h>
+#include <uk/arch/x86_64.h>
 #include <uk/essentials.h>
 #include <uk/lcpu/pm.h>
 #include <uk/pcpuvar.h>
@@ -27,23 +28,27 @@ static inline void x2apic_send_sipi(__vaddr_t addr, int dest)
 	__u32 eax;
 
 	UK_ASSERT((addr &
-		   (UK_ARCH_APIC_ICR_VECTOR_MASK << __PAGE_SHIFT)) == addr);
+		   (UK_ARCH_X86_64_APIC_ICR_VECTOR_MASK << __PAGE_SHIFT)) == addr);
 
-	eax = UK_ARCH_APIC_ICR_TRIGGER_LEVEL | UK_ARCH_APIC_ICR_LEVEL_ASSERT |
-	      UK_ARCH_APIC_ICR_DESTMODE_PHYSICAL | UK_ARCH_APIC_ICR_DMODE_SUP |
+	eax = UK_ARCH_X86_64_APIC_ICR_TRIGGER_LEVEL |
+	      UK_ARCH_X86_64_APIC_ICR_LEVEL_ASSERT |
+	      UK_ARCH_X86_64_APIC_ICR_DESTMODE_PHYSICAL |
+	      UK_ARCH_X86_64_APIC_ICR_DMODE_SUP |
 	      (addr >> __PAGE_SHIFT);
 
-	uk_arch_wrmsr(UK_ARCH_APIC_MSR_ICR, eax, dest);
+	uk_arch_x86_64_wrmsr(UK_ARCH_X86_64_APIC_MSR_ICR, eax, dest);
 }
 
 static inline void x2apic_send_iipi(int dest)
 {
 	__u32 eax;
 
-	eax = UK_ARCH_APIC_ICR_TRIGGER_LEVEL | UK_ARCH_APIC_ICR_LEVEL_ASSERT |
-	      UK_ARCH_APIC_ICR_DESTMODE_PHYSICAL | UK_ARCH_APIC_ICR_DMODE_INIT;
+	eax = UK_ARCH_X86_64_APIC_ICR_TRIGGER_LEVEL |
+	      UK_ARCH_X86_64_APIC_ICR_LEVEL_ASSERT |
+	      UK_ARCH_X86_64_APIC_ICR_DESTMODE_PHYSICAL |
+	      UK_ARCH_X86_64_APIC_ICR_DMODE_INIT;
 
-	uk_arch_wrmsr(UK_ARCH_APIC_MSR_ICR, eax, dest);
+	uk_arch_x86_64_wrmsr(UK_ARCH_X86_64_APIC_MSR_ICR, eax, dest);
 }
 
 /* Deassert only supported on Pentium and P6 familiy processors */
@@ -213,7 +218,7 @@ static int plat_native_lcpu_post_start(const __u64 lcpuidx[], unsigned int *num)
 
 static void plat_native_lcpu_halt(void)
 {
-	uk_arch_halt();
+	uk_arch_x86_64_halt();
 }
 
 static void plat_native_lcpu_halt_irq(void)

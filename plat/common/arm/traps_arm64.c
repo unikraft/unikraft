@@ -55,13 +55,13 @@ static enum arm64_exception esr_to_exception(__u64 esr)
 	__u8 fsc, trap;
 
 	/* We expect Unikraft to run in EL1. So do not catch traps from EL0. */
-	switch (ESR_EC_FROM(esr)) {
-	case ESR_EL1_EC_SVC64:
+	switch (UK_ARCH_ARM64_ESR_EC_FROM(esr)) {
+	case UK_ARCH_ARM64_ESR_EL1_EC_SVC64:
 		return ARM64_EXCEPTION_SYSCALL;
 
-	case ESR_EL1_EC_MMU_IABRT_EL1:
-	case ESR_EL1_EC_MMU_DABRT_EL1:
-		fsc = ESR_ISS_ABRT_FSC_FROM(ESR_ISS_FROM(esr));
+	case UK_ARCH_ARM64_ESR_EL1_EC_MMU_IABRT_EL1:
+	case UK_ARCH_ARM64_ESR_EL1_EC_MMU_DABRT_EL1:
+		fsc = UK_ARCH_ARM64_ESR_ISS_ABRT_FSC_FROM(UK_ARCH_ARM64_ESR_ISS_FROM(esr));
 		UK_ASSERT(fsc < ARRAY_SIZE(arm64_exception_map));
 
 		trap = arm64_exception_map[fsc];
@@ -70,27 +70,27 @@ static enum arm64_exception esr_to_exception(__u64 esr)
 
 		return trap;
 
-	case ESR_EL1_EC_PC_ALIGN:
-	case ESR_EL1_EC_SP_ALIGN:
+	case UK_ARCH_ARM64_ESR_EL1_EC_PC_ALIGN:
+	case UK_ARCH_ARM64_ESR_EL1_EC_SP_ALIGN:
 		return ARM64_EXCEPTION_BUS_ERROR;
 
-	case ESR_EL1_EC_SVE_ASIMD_FP_ACC:
-	case ESR_EL1_EC_SVE_ACC:
-	case ESR_EL1_EC_FP64:
+	case UK_ARCH_ARM64_ESR_EL1_EC_SVE_ASIMD_FP_ACC:
+	case UK_ARCH_ARM64_ESR_EL1_EC_SVE_ACC:
+	case UK_ARCH_ARM64_ESR_EL1_EC_FP64:
 		return ARM64_EXCEPTION_MATH;
 
-	case ESR_EL1_EC_UNKNOWN:
-	case ESR_EL1_EC_ILL:
+	case UK_ARCH_ARM64_ESR_EL1_EC_UNKNOWN:
+	case UK_ARCH_ARM64_ESR_EL1_EC_ILL:
 		return ARM64_EXCEPTION_INVALID_OP;
 
-	case ESR_EL1_EC_BTI:
-	case ESR_EL1_EC_FPAC:
+	case UK_ARCH_ARM64_ESR_EL1_EC_BTI:
+	case UK_ARCH_ARM64_ESR_EL1_EC_FPAC:
 		return ARM64_EXCEPTION_SECURITY;
 
-	case ESR_EL1_EC_BRK_EL1:
-	case ESR_EL1_EC_STEP_EL1:
-	case ESR_EL1_EC_WATCHP_EL1:
-	case ESR_EL1_EC_BRK64:
+	case UK_ARCH_ARM64_ESR_EL1_EC_BRK_EL1:
+	case UK_ARCH_ARM64_ESR_EL1_EC_STEP_EL1:
+	case UK_ARCH_ARM64_ESR_EL1_EC_WATCHP_EL1:
+	case UK_ARCH_ARM64_ESR_EL1_EC_BRK64:
 		return ARM64_EXCEPTION_DEBUG;
 	}
 

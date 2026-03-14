@@ -1,37 +1,12 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
-/*
- * Authors: Marc Rittinghaus <marc.rittinghaus@kit.edu>
- *          Michalis Pappas <michalis.pappas@opensynergy.com>
- *
- * Copyright (c) 2021, Karlsruhe Institute of Technology (KIT).
+/* Copyright (c) 2021, Karlsruhe Institute of Technology (KIT).
  *                     All rights reserved.
  * Copyright (c) 2022, OpenSynergy GmbH. All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- *
- * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- * 3. Neither the name of the copyright holder nor the names of its
- *    contributors may be used to endorse or promote products derived from
- *    this software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
- * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGE.
+ * Copyright (c) 2025, Unikraft GmbH and The Unikraft Authors.
+ * Licensed under the BSD-3-Clause License (the "License").
+ * You may not use this file except in compliance with the License.
  */
+
 #include <uk/config.h>
 #include <uk/paging.h>
 #include <uk/plat/memory.h>
@@ -39,6 +14,7 @@
 
 #ifdef CONFIG_ARCH_ARM_64
 #include <arm/arm64/cpu.h>
+#include <uk/arch/util.h>
 #endif /* CONFIG_ARCH_ARM_64 */
 
 #ifdef CONFIG_UKPLAT_MEMRNAME
@@ -48,12 +24,12 @@
 #endif /* CONFIG_UKPLAT_MEMRNAME */
 
 #ifdef CONFIG_ARCH_ARM_64
-#define enable_wxn() ({				\
-	__u64 reg;				\
-	reg = SYSREG_READ64(SCTLR_EL1);		\
-	reg |= SCTLR_EL1_WXN_BIT;		\
-	SYSREG_WRITE64(SCTLR_EL1, reg);		\
-	isb();					\
+#define enable_wxn() ({					\
+	__u64 reg;					\
+	reg = UK_ARCH_ARM64_SYSREG_READ64(SCTLR_EL1);	\
+	reg |= UK_ARCH_ARM64_SCTLR_EL1_WXN_BIT;		\
+	UK_ARCH_ARM64_SYSREG_WRITE64(SCTLR_EL1, reg);	\
+	uk_arch_arm64_isb();				\
 })
 #endif /* CONFIG_ARCH_ARM_64 */
 

@@ -4,6 +4,7 @@
  * You may not use this file except in compliance with the License.
  */
 
+#include <uk/arch/x86_64.h>
 #include <uk/crash.h>
 #include <uk/essentials.h>
 #include <uk/lcpu.h>
@@ -23,7 +24,7 @@ void uk_crash_populate_descr(struct uk_lcpu_except_err_ctx *ctx,
 	}
 
 	if (uk_lcpu_x86_64_except_err_ctx_get_trapnr(ctx) ==
-		UK_ARCH_TRAPNUM_PAGE_FAULT) {
+		UK_ARCH_X86_64_TRAPNUM_PAGE_FAULT) {
 		descr->reason = UK_CRASH_REASON_PAGE_FAULT;
 		descr->uk_err = uk_lcpu_except_err_ctx_get_handler_err(ctx);
 		descr->arg1 = uk_lcpu_except_err_ctx_get_fault_addr(ctx);

@@ -21,6 +21,12 @@ menuconfig PLAT_XEN
        imply LIBBLKFRONT if LIBUKBLKDEV
        imply LIBXENCONS if LIBUKCONSOLE
        imply LIBXENEMGCONS if ARCH_ARM_32
+       select LIBUKPLAT_NATIVE
+       select LIBUKPLAT_NATIVE_ADDR
+       select LIBUKPLAT_NATIVE_ECTX
+       select LIBUKPLAT_NATIVE_PAGE
+       select LIBUKPLAT_NATIVE_PT
+       select LIBUKPLAT_NATIVE_SYSCTX
        help
                 Create a Unikraft image that runs as a Xen guest
 

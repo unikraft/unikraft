@@ -54,6 +54,7 @@
 
 #include <stdint.h>
 
+#include <uk/arch/util.h>
 #include <uk/lcpu.h>
 #include <uk/plat/time.h>
 #include <uk/timeconv.h>
@@ -125,9 +126,9 @@ static unsigned int i8254_gettick(void)
 {
 	__u16 rdval;
 
-	uk_arch_outb(TIMER_MODE, TIMER_SEL0 | TIMER_LATCH);
-	rdval  = uk_arch_inb(TIMER_CNTR);
-	rdval |= (uk_arch_inb(TIMER_CNTR) << 8);
+	uk_arch_x86_64_outb(TIMER_MODE, TIMER_SEL0 | TIMER_LATCH);
+	rdval  = uk_arch_x86_64_inb(TIMER_CNTR);
+	rdval |= (uk_arch_x86_64_inb(TIMER_CNTR) << 8);
 	return rdval;
 }
 
@@ -160,8 +161,8 @@ static void i8254_delay(unsigned int n)
  */
 static inline __u8 rtc_read(__u8 reg)
 {
-	uk_arch_outb(RTC_COMMAND, reg | RTC_NMI_DISABLE);
-	return uk_arch_inb(RTC_DATA);
+	uk_arch_x86_64_outb(RTC_COMMAND, reg | RTC_NMI_DISABLE);
+	return uk_arch_x86_64_inb(RTC_DATA);
 }
 
 /*
@@ -204,11 +205,11 @@ __u64 tscclock_monotonic(void)
 	/*
 	 * Update time_base (monotonic time) and tsc_base (TSC time).
 	 */
-	tsc_now = uk_arch_rdtsc();
+	tsc_now = uk_arch_x86_64_rdtsc();
 	tsc_delta = tsc_now - tsc_base;
 	if (tsc_delta >= UINT64_MAX / 2)
 		tsc_delta = 1;
-	time_base += uk_arch_mul64_32(tsc_delta, tsc_mult);
+	time_base += uk_arch_x86_64_mul64_32(tsc_delta, tsc_mult);
 	tsc_base = tsc_now;
 
 	return time_base;
@@ -223,9 +224,10 @@ int tscclock_init(void)
 	__u32 eax, ebx, ecx, edx;
 
 	/* Initialise i8254 timer channel 0 to mode 2 at CONFIG_HZ frequency */
-	uk_arch_outb(TIMER_MODE, TIMER_SEL0 | TIMER_RATEGEN | TIMER_16BIT);
-	uk_arch_outb(TIMER_CNTR, (TIMER_HZ / CONFIG_HZ) & 0xff);
-	uk_arch_outb(TIMER_CNTR, (TIMER_HZ / CONFIG_HZ) >> 8);
+	uk_arch_x86_64_outb(TIMER_MODE,
+			    TIMER_SEL0 | TIMER_RATEGEN | TIMER_16BIT);
+	uk_arch_x86_64_outb(TIMER_CNTR, (TIMER_HZ / CONFIG_HZ) & 0xff);
+	uk_arch_x86_64_outb(TIMER_CNTR, (TIMER_HZ / CONFIG_HZ) >> 8);
 
 	/*
 	 * Read RTC "time at boot". This must be done just before tsc_base is
@@ -239,11 +241,11 @@ int tscclock_init(void)
 	 * frequency in kHz, or 0 if the feature is not supported by the
 	 * hypervisor.
 	 */
-	uk_arch_cpuid(0x40000000, 0, &eax, &ebx, &ecx, &edx);
+	uk_arch_x86_64_cpuid(0x40000000, 0, &eax, &ebx, &ecx, &edx);
 	if (eax >= 0x40000010) {
 		uk_pr_info("Retrieving TSC clock frequency from hypervisor\n");
-		tsc_base = uk_arch_rdtsc();
-		uk_arch_cpuid(0x40000010, 0, &eax, &ebx, &ecx, &edx);
+		tsc_base = uk_arch_x86_64_rdtsc();
+		uk_arch_x86_64_cpuid(0x40000010, 0, &eax, &ebx, &ecx, &edx);
 		tsc_freq = eax * 1000;
 	}
 
@@ -254,9 +256,9 @@ int tscclock_init(void)
 	 */
 	if (!tsc_freq) {
 		uk_pr_info("Calibrating TSC clock against i8254 timer\n");
-		tsc_base = uk_arch_rdtsc();
+		tsc_base = uk_arch_x86_64_rdtsc();
 		i8254_delay(100000);
-		tsc_freq = (uk_arch_rdtsc() - tsc_base) * 10;
+		tsc_freq = (uk_arch_x86_64_rdtsc() - tsc_base) * 10;
 	}
 
 	/*
@@ -292,9 +294,10 @@ int tscclock_init(void)
 	/*
 	 * Initialise i8254 timer channel 0 to mode 4 (one shot).
 	 */
-	uk_arch_outb(TIMER_MODE, TIMER_SEL0 | TIMER_ONESHOT | TIMER_16BIT);
-	uk_arch_outb(TIMER_CNTR, 0);
-	uk_arch_outb(TIMER_CNTR, 0);
+	uk_arch_x86_64_outb(TIMER_MODE,
+			    TIMER_SEL0 | TIMER_ONESHOT | TIMER_16BIT);
+	uk_arch_x86_64_outb(TIMER_CNTR, 0);
+	uk_arch_x86_64_outb(TIMER_CNTR, 0);
 
 	return 0;
 }
@@ -340,7 +343,7 @@ static void tscclock_cpu_block(__u64 until)
 	 * the timeout.
 	 */
 	delta_ns = until - now;
-	delta_ticks = uk_arch_mul64_32(delta_ns, pit_mult);
+	delta_ticks = uk_arch_x86_64_mul64_32(delta_ns, pit_mult);
 	if (delta_ticks < PIT_MIN_DELTA) {
 		/*
 		 * Since we are "spinning", quickly enable interrupts in
@@ -348,7 +351,7 @@ static void tscclock_cpu_block(__u64 until)
 		 * else than spin.
 		 */
 		uk_lcpu_enable_irq();
-		uk_arch_nop(); /* ints are enabled 1 instr after sti */
+		uk_arch_x86_64_nop(); /* ints are enabled 1 instr after sti */
 		uk_lcpu_disable_irq();
 		return;
 	}
@@ -367,8 +370,8 @@ static void tscclock_cpu_block(__u64 until)
 	 * interrupt is actually delivered in N + 1 ticks.
 	 */
 	ticks -= 1;
-	uk_arch_outb(TIMER_CNTR, ticks & 0xff);
-	uk_arch_outb(TIMER_CNTR, ticks >> 8);
+	uk_arch_x86_64_outb(TIMER_CNTR, ticks & 0xff);
+	uk_arch_x86_64_outb(TIMER_CNTR, ticks >> 8);
 
 	/*
 	 * Wait for any interrupt. If we got an interrupt then just

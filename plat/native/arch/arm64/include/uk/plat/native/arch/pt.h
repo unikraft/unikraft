@@ -25,10 +25,10 @@ extern "C" {
 #define UK_PLAT_NATIVE_PT_Lx_PTES(lvl)	UK_PLAT_NATIVE_PTES_PER_LEVEL
 
 #define UK_PLAT_NATIVE_PT_Lx_PTE_PRESENT(pte, lvl)	    \
-	(((pte) & PTE_VALID_BIT))
+	(((pte) & UK_ARCH_ARM64_PTE_VALID_BIT))
 
 #define UK_PLAT_NATIVE_PT_Lx_PTE_CLEAR_PRESENT(pte, lvl)    \
-	((pte) & ~PTE_VALID_BIT)
+	((pte) & ~UK_ARCH_ARM64_PTE_VALID_BIT)
 
 #define __ARM64_PT_MAP_LEVEL_MAX			    \
 	(UK_PLAT_NATIVE_PT_LEVELS - 2)
@@ -67,9 +67,9 @@ __paddr_t UK_PLAT_NATIVE_PT_Lx_PTE_PADDR(__pte_t pte, unsigned int lvl)
 {
 	__paddr_t paddr;
 	static __u64 pte_lx_map_paddr_mask[] = {
-		PTE_L0_PAGE_PADDR_MASK,
-		PTE_L1_BLOCK_PADDR_MASK,
-		PTE_L2_BLOCK_PADDR_MASK
+		UK_ARCH_ARM64_PTE_L0_PAGE_PADDR_MASK,
+		UK_ARCH_ARM64_PTE_L1_BLOCK_PADDR_MASK,
+		UK_ARCH_ARM64_PTE_L2_BLOCK_PADDR_MASK
 	};
 
 	if (UK_PLAT_NATIVE_PAGE_Lx_IS(pte, lvl)) {
@@ -78,7 +78,7 @@ __paddr_t UK_PLAT_NATIVE_PT_Lx_PTE_PADDR(__pte_t pte, unsigned int lvl)
 	} else {
 		UK_ASSERT(lvl > UK_PLAT_NATIVE_PAGE_LEVEL &&
 			  lvl < UK_PLAT_NATIVE_PT_LEVELS);
-		paddr = pte & PTE_Lx_TABLE_PADDR_MASK;
+		paddr = pte & UK_ARCH_ARM64_PTE_Lx_TABLE_PADDR_MASK;
 	}
 	return paddr;
 }
@@ -88,9 +88,9 @@ __paddr_t UK_PLAT_NATIVE_PT_Lx_PTE_SET_PADDR(__pte_t pte, unsigned int lvl,
 					     __paddr_t paddr)
 {
 	static __u64 pte_lx_map_paddr_mask[] = {
-		PTE_L0_PAGE_PADDR_MASK,
-		PTE_L1_BLOCK_PADDR_MASK,
-		PTE_L2_BLOCK_PADDR_MASK
+		UK_ARCH_ARM64_PTE_L0_PAGE_PADDR_MASK,
+		UK_ARCH_ARM64_PTE_L1_BLOCK_PADDR_MASK,
+		UK_ARCH_ARM64_PTE_L2_BLOCK_PADDR_MASK
 	};
 
 	if (UK_PLAT_NATIVE_PAGE_Lx_IS(pte, lvl)) {
@@ -100,8 +100,8 @@ __paddr_t UK_PLAT_NATIVE_PT_Lx_PTE_SET_PADDR(__pte_t pte, unsigned int lvl,
 	} else {
 		UK_ASSERT(lvl > UK_PLAT_NATIVE_PAGE_LEVEL &&
 			  lvl < UK_PLAT_NATIVE_PT_LEVELS);
-		paddr &= PTE_Lx_TABLE_PADDR_MASK;
-		pte &= ~PTE_Lx_TABLE_PADDR_MASK;
+		paddr &= UK_ARCH_ARM64_PTE_Lx_TABLE_PADDR_MASK;
+		pte &= ~UK_ARCH_ARM64_PTE_Lx_TABLE_PADDR_MASK;
 	}
 	return pte | paddr;
 }
@@ -141,8 +141,8 @@ int uk_plat_native_pte_write(__vaddr_t pt_vaddr, unsigned int lvl,
 	UK_ASSERT(idx < UK_PLAT_NATIVE_PT_Lx_PTES(lvl));
 
 	*((__pte_t *)pt_vaddr + idx) = pte;
-	dsb(ishst);
-	isb();
+	uk_arch_arm64_dsb(ishst);
+	uk_arch_arm64_isb();
 
 	return 0;
 }
@@ -161,7 +161,7 @@ __paddr_t uk_plat_native_pt_read_base(void)
 
 	__asm__ __volatile__("mrs %x0, ttbr0_el1\n" : "=r" (reg));
 
-	return (reg & TTBR0_EL1_BADDR_MASK);
+	return (reg & UK_ARCH_ARM64_TTBR0_EL1_BADDR_MASK);
 }
 
 /**
@@ -177,7 +177,7 @@ __paddr_t uk_plat_native_pt_read_base(void)
 static inline
 int uk_plat_native_pt_write_base(__paddr_t pt_paddr)
 {
-	__paddr_t reg = (pt_paddr & TTBR0_EL1_BADDR_MASK);
+	__paddr_t reg = (pt_paddr & UK_ARCH_ARM64_TTBR0_EL1_BADDR_MASK);
 
 	__asm__ __volatile__("msr ttbr0_el1, %x0\n"
 			     "isb\n"
@@ -206,9 +206,9 @@ uk_plat_native_pt_pte_create(__paddr_t pt_paddr, unsigned int level __unused,
 {
 	__pte_t pt_pte;
 
-	pt_pte = pt_paddr & PTE_Lx_TABLE_PADDR_MASK;
+	pt_pte = pt_paddr & UK_ARCH_ARM64_PTE_Lx_TABLE_PADDR_MASK;
 
-	pt_pte |= PTE_TYPE_TABLE;
+	pt_pte |= UK_ARCH_ARM64_PTE_TYPE_TABLE;
 
 	return pt_pte;
 }

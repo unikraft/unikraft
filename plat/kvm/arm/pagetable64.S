@@ -46,7 +46,7 @@ ENTRY(start_mmu)
 	dsb sy
 
 	/* Load ttbr0, pagetable starts from _end */
-	ur_ldr  x27, arm64_bpt_l3_pt0
+	ur_addr  x27, arm64_bpt_l3_pt0
 	msr ttbr0_el1, x27
 	isb
 
@@ -69,7 +69,7 @@ ENTRY(start_mmu)
 #else /* !CONFIG_HAVE_PAGING */
 	/* Get VIRT_BITS from id_aa64mmfr0_el1.PARange */
 	mrs x3, id_aa64mmfr0_el1
-	ur_ldr  x5, tcr_ips_bits
+	ur_addr  x5, tcr_ips_bits
 	ubfx x4, x3, #0, #4
 	ldrb w4, [x5, x4]
 	cmp x4, #52
@@ -85,7 +85,7 @@ setup_tcr_el1:
 	mov x5, #64
 	sub x5, x5, x4
 	mov x4, x5
-	lsl x5, x5, #TCR_EL1_T1SZ_SHIFT
+	lsl x5, x5, #UK_ARCH_ARM64_TCR_EL1_T1SZ_SHIFT
 	orr x5, x4, x5
 	ldr x2, =TCR_INIT_FLAGS
 	orr x2, x5, x2

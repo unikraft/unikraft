@@ -9,16 +9,16 @@
 
 #if !__ASSEMBLY__
 #include <uk/essentials.h>
-#include <uk/arch.h>
+#include <uk/arch/x86_64.h>
 
 /**
  * Read stack pointer
  *
  * @return Current stack pointer value
  */
-static inline unsigned long uk_arch_read_sp(void)
+static inline __u64 uk_arch_x86_64_read_sp(void)
 {
-	unsigned long sp;
+	__u64 sp;
 
 	asm volatile (
 		"mov	%%rsp, %0"
@@ -31,7 +31,7 @@ static inline unsigned long uk_arch_read_sp(void)
 /**
  * Spin-wait hint
  */
-static inline void uk_arch_spinwait(void)
+static inline void uk_arch_x86_64_spinwait(void)
 {
 	asm volatile (
 		"pause"
@@ -51,9 +51,9 @@ static inline void uk_arch_spinwait(void)
  * @param ecx Pointer to store ECX output
  * @param edx Pointer to store EDX output
  */
-static inline void uk_arch_cpuid(__u32 fn, __u32 subfn,
-				 __u32 *eax, __u32 *ebx,
-				 __u32 *ecx, __u32 *edx)
+static inline void uk_arch_x86_64_cpuid(__u32 fn, __u32 subfn,
+					__u32 *eax, __u32 *ebx,
+					__u32 *ecx, __u32 *edx)
 {
 	asm volatile (
 		"cpuid"
@@ -67,9 +67,9 @@ static inline void uk_arch_cpuid(__u32 fn, __u32 subfn,
  *
  * @return Current RFLAGS value
  */
-static inline unsigned long uk_arch_rflags_get(void)
+static inline __u64 uk_arch_x86_64_rflags_get(void)
 {
-	unsigned long flags;
+	__u64 flags;
 
 	asm volatile (
 		"pushfq\n\t"
@@ -85,7 +85,7 @@ static inline unsigned long uk_arch_rflags_get(void)
 /**
  * Enable interrupts
  */
-static inline void uk_arch_enable_irq(void)
+static inline void uk_arch_x86_64_enable_irq(void)
 {
 	asm volatile (
 		"sti"
@@ -98,7 +98,7 @@ static inline void uk_arch_enable_irq(void)
 /**
  * Disable interrupts
  */
-static inline void uk_arch_disable_irq(void)
+static inline void uk_arch_x86_64_disable_irq(void)
 {
 	asm volatile (
 		"cli"
@@ -111,7 +111,7 @@ static inline void uk_arch_disable_irq(void)
 /**
  * Halt processor
  */
-static inline void uk_arch_halt(void)
+static inline void uk_arch_x86_64_halt(void)
 {
 	asm volatile (
 		"hlt"
@@ -124,7 +124,7 @@ static inline void uk_arch_halt(void)
 /**
  * Full memory barrier
  */
-static inline void uk_arch_mb(void)
+static inline void uk_arch_x86_64_mb(void)
 {
 	asm volatile (
 		"mfence"
@@ -137,7 +137,7 @@ static inline void uk_arch_mb(void)
 /**
  * Read memory barrier
  */
-static inline void uk_arch_rmb(void)
+static inline void uk_arch_x86_64_rmb(void)
 {
 	asm volatile (
 		"lfence"
@@ -150,7 +150,7 @@ static inline void uk_arch_rmb(void)
 /**
  * Write memory barrier
  */
-static inline void uk_arch_wmb(void)
+static inline void uk_arch_x86_64_wmb(void)
 {
 	asm volatile (
 		"sfence"
@@ -163,7 +163,7 @@ static inline void uk_arch_wmb(void)
 /**
  * No operation
  */
-static inline void uk_arch_nop(void)
+static inline void uk_arch_x86_64_nop(void)
 {
 	asm volatile (
 		"nop"
@@ -178,9 +178,9 @@ static inline void uk_arch_nop(void)
  *
  * @return Current CR2 value
  */
-static inline unsigned long uk_arch_rdcr2(void)
+static inline __u64 uk_arch_x86_64_rdcr2(void)
 {
-	unsigned long cr2;
+	__u64 cr2;
 
 	asm volatile (
 		"mov %%cr2, %0"
@@ -195,7 +195,7 @@ static inline unsigned long uk_arch_rdcr2(void)
  *
  * @param cr3 Value to write
  */
-static inline void uk_arch_wrcr3(unsigned long cr3)
+static inline void uk_arch_x86_64_wrcr3(__u64 cr3)
 {
 	asm volatile (
 		"mov	%0, %%cr3"
@@ -210,7 +210,7 @@ static inline void uk_arch_wrcr3(unsigned long cr3)
  *
  * @param va Virtual address
  */
-static inline void uk_arch_invlpg(unsigned long va)
+static inline void uk_arch_x86_64_invlpg(__u64 va)
 {
 	asm volatile (
 		"invlpg	%0"
@@ -227,7 +227,7 @@ static inline void uk_arch_invlpg(unsigned long va)
  * @param lo Pointer to store lower 32 bits
  * @param hi Pointer to store upper 32 bits
  */
-static inline void uk_arch_rdmsr(unsigned int msr, __u32 *lo, __u32 *hi)
+static inline void uk_arch_x86_64_rdmsr(unsigned int msr, __u32 *lo, __u32 *hi)
 {
 	asm volatile (
 		"rdmsr"
@@ -242,11 +242,11 @@ static inline void uk_arch_rdmsr(unsigned int msr, __u32 *lo, __u32 *hi)
  * @param msr MSR address
  * @return 64-bit MSR value
  */
-static inline __u64 uk_arch_rdmsrl(unsigned int msr)
+static inline __u64 uk_arch_x86_64_rdmsrl(unsigned int msr)
 {
 	__u32 lo, hi;
 
-	uk_arch_rdmsr(msr, &lo, &hi);
+	uk_arch_x86_64_rdmsr(msr, &lo, &hi);
 	return ((__u64)lo | (__u64)hi << 32);
 }
 
@@ -257,7 +257,7 @@ static inline __u64 uk_arch_rdmsrl(unsigned int msr)
  * @param lo Lower 32 bits
  * @param hi Upper 32 bits
  */
-static inline void uk_arch_wrmsr(unsigned int msr, __u32 lo, __u32 hi)
+static inline void uk_arch_x86_64_wrmsr(unsigned int msr, __u32 lo, __u32 hi)
 {
 	asm volatile (
 		"wrmsr"
@@ -272,9 +272,11 @@ static inline void uk_arch_wrmsr(unsigned int msr, __u32 lo, __u32 hi)
  * @param msr MSR address
  * @param val 64-bit value
  */
-static inline void uk_arch_wrmsrl(unsigned int msr, __u64 val)
+static inline void uk_arch_x86_64_wrmsrl(unsigned int msr, __u64 val)
 {
-	uk_arch_wrmsr(msr, (__u32)(val & 0xffffffffULL), (__u32)(val >> 32));
+	uk_arch_x86_64_wrmsr(msr,
+			     (__u32)(val & 0xffffffffULL),
+			     (__u32)(val >> 32));
 }
 
 /**
@@ -282,7 +284,7 @@ static inline void uk_arch_wrmsrl(unsigned int msr, __u64 val)
  *
  * @return 64-bit TSC value
  */
-static inline __u64 uk_arch_rdtsc(void)
+static inline __u64 uk_arch_x86_64_rdtsc(void)
 {
 	__u64 l, h;
 
@@ -299,7 +301,7 @@ static inline __u64 uk_arch_rdtsc(void)
  * @param addr Memory address
  * @return 8-bit value
  */
-static inline __u8 uk_arch_readb(const volatile void *addr)
+static inline __u8 uk_arch_x86_64_readb(const volatile void *addr)
 {
 	__u8 v;
 
@@ -317,7 +319,7 @@ static inline __u8 uk_arch_readb(const volatile void *addr)
  * @param addr Memory address
  * @return 16-bit value
  */
-static inline __u16 uk_arch_readw(const volatile void *addr)
+static inline __u16 uk_arch_x86_64_readw(const volatile void *addr)
 {
 	__u16 v;
 
@@ -335,7 +337,7 @@ static inline __u16 uk_arch_readw(const volatile void *addr)
  * @param addr Memory address
  * @return 32-bit value
  */
-static inline __u32 uk_arch_readl(const volatile void *addr)
+static inline __u32 uk_arch_x86_64_readl(const volatile void *addr)
 {
 	__u32 v;
 
@@ -353,7 +355,7 @@ static inline __u32 uk_arch_readl(const volatile void *addr)
  * @param addr Memory address
  * @return 64-bit value
  */
-static inline __u64 uk_arch_readq(const volatile void *addr)
+static inline __u64 uk_arch_x86_64_readq(const volatile void *addr)
 {
 	__u64 v;
 
@@ -371,7 +373,7 @@ static inline __u64 uk_arch_readq(const volatile void *addr)
  * @param addr Memory address
  * @param v Value to write
  */
-static inline void uk_arch_writeb(volatile void *addr, __u8 v)
+static inline void uk_arch_x86_64_writeb(volatile void *addr, __u8 v)
 {
 	asm volatile (
 		"movb	%0, %1"
@@ -386,7 +388,7 @@ static inline void uk_arch_writeb(volatile void *addr, __u8 v)
  * @param addr Memory address
  * @param v Value to write
  */
-static inline void uk_arch_writew(volatile void *addr, __u16 v)
+static inline void uk_arch_x86_64_writew(volatile void *addr, __u16 v)
 {
 	asm volatile (
 		"movw	%0, %1"
@@ -401,7 +403,7 @@ static inline void uk_arch_writew(volatile void *addr, __u16 v)
  * @param addr Memory address
  * @param v Value to write
  */
-static inline void uk_arch_writel(volatile void *addr, __u32 v)
+static inline void uk_arch_x86_64_writel(volatile void *addr, __u32 v)
 {
 	asm volatile (
 		"movl	%0, %1"
@@ -416,7 +418,7 @@ static inline void uk_arch_writel(volatile void *addr, __u32 v)
  * @param addr Memory address
  * @param v Value to write
  */
-static inline void uk_arch_writeq(volatile void *addr, __u64 v)
+static inline void uk_arch_x86_64_writeq(volatile void *addr, __u64 v)
 {
 	asm volatile (
 		"movq	%0, %1"
@@ -431,7 +433,7 @@ static inline void uk_arch_writeq(volatile void *addr, __u64 v)
  * @param port I/O port address
  * @return 8-bit value
  */
-static inline __u8 uk_arch_inb(__u16 port)
+static inline __u8 uk_arch_x86_64_inb(__u16 port)
 {
 	__u8 v;
 
@@ -449,7 +451,7 @@ static inline __u8 uk_arch_inb(__u16 port)
  * @param port I/O port address
  * @return 16-bit value
  */
-static inline __u16 uk_arch_inw(__u16 port)
+static inline __u16 uk_arch_x86_64_inw(__u16 port)
 {
 	__u16 v;
 
@@ -467,7 +469,7 @@ static inline __u16 uk_arch_inw(__u16 port)
  * @param port I/O port address
  * @return 32-bit value
  */
-static inline __u32 uk_arch_inl(__u16 port)
+static inline __u32 uk_arch_x86_64_inl(__u16 port)
 {
 	__u32 v;
 
@@ -485,7 +487,7 @@ static inline __u32 uk_arch_inl(__u16 port)
  * @param port_lo Lower I/O port address
  * @return 64-bit value
  */
-static inline __u64 uk_arch_inq(__u16 port_lo)
+static inline __u64 uk_arch_x86_64_inq(__u16 port_lo)
 {
 	__u16 port_hi = port_lo + 4;
 	__u32 lo, hi;
@@ -510,7 +512,7 @@ static inline __u64 uk_arch_inq(__u16 port_lo)
  * @param port I/O port address
  * @param v Value to write
  */
-static inline void uk_arch_outb(__u16 port, __u8 v)
+static inline void uk_arch_x86_64_outb(__u16 port, __u8 v)
 {
 	asm volatile (
 		"outb	%0, %1"
@@ -525,7 +527,7 @@ static inline void uk_arch_outb(__u16 port, __u8 v)
  * @param port I/O port address
  * @param v Value to write
  */
-static inline void uk_arch_outw(__u16 port, __u16 v)
+static inline void uk_arch_x86_64_outw(__u16 port, __u16 v)
 {
 	asm volatile (
 		"outw	%0, %1"
@@ -541,7 +543,7 @@ static inline void uk_arch_outw(__u16 port, __u16 v)
  * @param port I/O port address
  * @param v Value to write
  */
-static inline void uk_arch_outl(__u16 port, __u32 v)
+static inline void uk_arch_x86_64_outl(__u16 port, __u32 v)
 {
 	asm volatile (
 		"outl	%0, %1"
@@ -557,7 +559,7 @@ static inline void uk_arch_outl(__u16 port, __u32 v)
  * @param b 32-bit multiplier
  * @return (a * b) >> 32
  */
-static inline __u64 uk_arch_mul64_32(__u64 a, __u32 b)
+static inline __u64 uk_arch_x86_64_mul64_32(__u64 a, __u32 b)
 {
 	__u64 prod;
 
@@ -598,7 +600,7 @@ static inline __u64 uk_arch_mul64_32(__u64 a, __u32 b)
  * @param val Value to write
  * @param offset Offset from GS base
  */
-static inline void uk_arch_wrgsbase8(__u8 val, __off offset)
+static inline void uk_arch_x86_64_wrgsbase8(__u8 val, __off offset)
 {
 	asm volatile (
 		"movb	%1, %%gs:%0\n"
@@ -614,7 +616,7 @@ static inline void uk_arch_wrgsbase8(__u8 val, __off offset)
  * @param val Value to write
  * @param offset Offset from GS base
  */
-static inline void uk_arch_wrgsbase16(__u16 val, __off offset)
+static inline void uk_arch_x86_64_wrgsbase16(__u16 val, __off offset)
 {
 	asm volatile (
 		"movw	%1, %%gs:%0\n"
@@ -630,7 +632,7 @@ static inline void uk_arch_wrgsbase16(__u16 val, __off offset)
  * @param val Value to write
  * @param offset Offset from GS base
  */
-static inline void uk_arch_wrgsbase32(__u32 val, __off offset)
+static inline void uk_arch_x86_64_wrgsbase32(__u32 val, __off offset)
 {
 	asm volatile (
 		"movl	%1, %%gs:%0\n"
@@ -646,7 +648,7 @@ static inline void uk_arch_wrgsbase32(__u32 val, __off offset)
  * @param val Value to write
  * @param offset Offset from GS base
  */
-static inline void uk_arch_wrgsbase64(__u64 val, __off offset)
+static inline void uk_arch_x86_64_wrgsbase64(__u64 val, __off offset)
 {
 	asm volatile (
 		"movq	%1, %%gs:%0\n"
@@ -662,7 +664,7 @@ static inline void uk_arch_wrgsbase64(__u64 val, __off offset)
  * @param offset Offset from GS base
  * @return 8-bit value
  */
-static inline __u8 uk_arch_rdgsbase8(__off offset)
+static inline __u8 uk_arch_x86_64_rdgsbase8(__off offset)
 {
 	__u8 val;
 
@@ -682,7 +684,7 @@ static inline __u8 uk_arch_rdgsbase8(__off offset)
  * @param offset Offset from GS base
  * @return 16-bit value
  */
-static inline __u16 uk_arch_rdgsbase16(__off offset)
+static inline __u16 uk_arch_x86_64_rdgsbase16(__off offset)
 {
 	__u16 val;
 
@@ -702,7 +704,7 @@ static inline __u16 uk_arch_rdgsbase16(__off offset)
  * @param offset Offset from GS base
  * @return 32-bit value
  */
-static inline __u32 uk_arch_rdgsbase32(__off offset)
+static inline __u32 uk_arch_x86_64_rdgsbase32(__off offset)
 {
 	__u32 val;
 
@@ -722,7 +724,7 @@ static inline __u32 uk_arch_rdgsbase32(__off offset)
  * @param offset Offset from GS base
  * @return 64-bit value
  */
-static inline __u64 uk_arch_rdgsbase64(__off offset)
+static inline __u64 uk_arch_x86_64_rdgsbase64(__off offset)
 {
 	__u64 val;
 
@@ -742,7 +744,7 @@ static inline __u64 uk_arch_rdgsbase64(__off offset)
  * @param val Value to write
  * @param offset Offset from FS base
  */
-static inline void uk_arch_wrfsbase8(__u8 val, __off offset)
+static inline void uk_arch_x86_64_wrfsbase8(__u8 val, __off offset)
 {
 	asm volatile (
 		"movb	%1, %%fs:%0\n"
@@ -758,7 +760,7 @@ static inline void uk_arch_wrfsbase8(__u8 val, __off offset)
  * @param val Value to write
  * @param offset Offset from FS base
  */
-static inline void uk_arch_wrfsbase16(__u16 val, __off offset)
+static inline void uk_arch_x86_64_wrfsbase16(__u16 val, __off offset)
 {
 	asm volatile (
 		"movw	%1, %%fs:%0\n"
@@ -774,7 +776,7 @@ static inline void uk_arch_wrfsbase16(__u16 val, __off offset)
  * @param val Value to write
  * @param offset Offset from FS base
  */
-static inline void uk_arch_wrfsbase32(__u32 val, __off offset)
+static inline void uk_arch_x86_64_wrfsbase32(__u32 val, __off offset)
 {
 	asm volatile (
 		"movl	%1, %%fs:%0\n"
@@ -790,7 +792,7 @@ static inline void uk_arch_wrfsbase32(__u32 val, __off offset)
  * @param val Value to write
  * @param offset Offset from FS base
  */
-static inline void uk_arch_wrfsbase64(__u64 val, __off offset)
+static inline void uk_arch_x86_64_wrfsbase64(__u64 val, __off offset)
 {
 	asm volatile (
 		"movq	%1, %%fs:%0\n"
@@ -806,7 +808,7 @@ static inline void uk_arch_wrfsbase64(__u64 val, __off offset)
  * @param offset Offset from FS base
  * @return 8-bit value
  */
-static inline __u8 uk_arch_rdfsbase8(__off offset)
+static inline __u8 uk_arch_x86_64_rdfsbase8(__off offset)
 {
 	__u8 val;
 
@@ -826,7 +828,7 @@ static inline __u8 uk_arch_rdfsbase8(__off offset)
  * @param offset Offset from FS base
  * @return 16-bit value
  */
-static inline __u16 uk_arch_rdfsbase16(__off offset)
+static inline __u16 uk_arch_x86_64_rdfsbase16(__off offset)
 {
 	__u16 val;
 
@@ -846,7 +848,7 @@ static inline __u16 uk_arch_rdfsbase16(__off offset)
  * @param offset Offset from FS base
  * @return 32-bit value
  */
-static inline __u32 uk_arch_rdfsbase32(__off offset)
+static inline __u32 uk_arch_x86_64_rdfsbase32(__off offset)
 {
 	__u32 val;
 
@@ -866,7 +868,7 @@ static inline __u32 uk_arch_rdfsbase32(__off offset)
  * @param offset Offset from FS base
  * @return 64-bit value
  */
-static inline __u64 uk_arch_rdfsbase64(__off offset)
+static inline __u64 uk_arch_x86_64_rdfsbase64(__off offset)
 {
 	__u64 val;
 
@@ -886,7 +888,8 @@ static inline __u64 uk_arch_rdfsbase64(__off offset)
  *
  * @param gdtptr Pointer to GDT descriptor structure
  */
-static inline void uk_arch_lgdt(const struct uk_arch_desc_table_ptr64 *gdtptr)
+static inline
+void uk_arch_x86_64_lgdt(const struct uk_arch_x86_64_desc_table_ptr64 *gdtptr)
 {
 	asm volatile (
 		"lgdt	%0\n"
@@ -901,7 +904,7 @@ static inline void uk_arch_lgdt(const struct uk_arch_desc_table_ptr64 *gdtptr)
  *
  * @param tss_selector TSS segment selector (GDT offset)
  */
-static inline void uk_arch_ltr(__u16 tss_selector)
+static inline void uk_arch_x86_64_ltr(__u16 tss_selector)
 {
 	asm volatile (
 		"ltr	%0\n"
@@ -915,7 +918,8 @@ static inline void uk_arch_ltr(__u16 tss_selector)
  *
  * @param idtptr Pointer to IDT descriptor structure
  */
-static inline void uk_arch_lidt(const struct uk_arch_desc_table_ptr64 *idtptr)
+static inline
+void uk_arch_x86_64_lidt(const struct uk_arch_x86_64_desc_table_ptr64 *idtptr)
 {
 	asm volatile (
 		"lidt	%0\n"
@@ -935,7 +939,7 @@ static inline void uk_arch_lidt(const struct uk_arch_desc_table_ptr64 *idtptr)
  * @param cs_offset Code segment descriptor offset
  * @param ds_offset Data segment descriptor offset
  */
-static inline void uk_arch_set_segs(__u32 cs_offset, __u32 ds_offset)
+static inline void uk_arch_x86_64_set_segs(__u32 cs_offset, __u32 ds_offset)
 {
 	asm volatile (
 		/* Perform a far return to enable the new CS */
@@ -965,7 +969,7 @@ static inline void uk_arch_set_segs(__u32 cs_offset, __u32 ds_offset)
  * @param sp Stack pointer to switch to before jumping
  * @param ip The place to jump to
  */
-static inline void __noreturn uk_arch_jump_to(__u64 sp, __u64 ip)
+static inline void __noreturn uk_arch_x86_64_jump_to(__u64 sp, __u64 ip)
 {
 	asm volatile (
 		"movq	%0, %%rsp\n"
@@ -1008,8 +1012,8 @@ static inline void __noreturn uk_arch_jump_to(__u64 sp, __u64 ip)
  * @param ip  The place to jump to
  * @param arg The argument to pass to the target function
  */
-static inline void __noreturn uk_arch_jump_to_with_arg(__u64 sp, __u64 ip,
-						       __u64 arg)
+static inline
+void __noreturn uk_arch_x86_64_jump_to_with_arg(__u64 sp, __u64 ip, __u64 arg)
 {
 	asm volatile (
 		"movq	%0, %%rsp\n"
