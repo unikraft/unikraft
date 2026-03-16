@@ -40,7 +40,8 @@ UK_TESTCASE(posix_sysinfo_testsuite, posix_sysinfo_sysinfo_no_paging)
 #ifdef CONFIG_LIBUKPAGING
 	struct uk_pagetable *pt = ukplat_pt_get_active();
 
-	UK_TEST_EXPECT(info.totalram == (unsigned long)(pt->fa->total_memory / info.mem_unit));
+	UK_TEST_EXPECT(info.totalram ==
+		       (unsigned long)(pt->fa->total_memory / info.mem_unit));
 	UK_TEST_EXPECT(info.freeram <= info.totalram);
 #else
 	UK_TEST_EXPECT(info.totalram == 0);
@@ -227,7 +228,7 @@ UK_TESTCASE(posix_sysinfo_testsuite, posix_sysinfo_sethostname_null_name)
 
 	UK_TEST_EXPECT(sethostname(name, len) == -1);
 
-	sethostname("unikraft", strlen("unikraft"));
+	sethostname("unikraft", sizeof("unikraft") - 1);
 }
 
 UK_TESTCASE(posix_sysinfo_testsuite, posix_sysinfo_sethostname_too_long_name)
@@ -237,7 +238,7 @@ UK_TESTCASE(posix_sysinfo_testsuite, posix_sysinfo_sethostname_too_long_name)
 
 	UK_TEST_EXPECT(sethostname(name, len) == -1);
 
-	sethostname("unikraft", strlen("unikraft"));
+	sethostname("unikraft", sizeof("unikraft") - 1);
 }
 
 UK_TESTCASE(posix_sysinfo_testsuite, posix_sysinfo_sethostname_valid_name)
@@ -249,7 +250,7 @@ UK_TESTCASE(posix_sysinfo_testsuite, posix_sysinfo_sethostname_valid_name)
 	UK_TEST_EXPECT(sethostname(name, len) == 0);
 
 	uname(&buf);
-	
+
 	UK_TEST_EXPECT(strcmp(buf.nodename, name) == 0);
 
 	sethostname("unikraft", strlen("unikraft"));
