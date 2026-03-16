@@ -233,8 +233,10 @@ UK_TESTCASE(posix_sysinfo_testsuite, posix_sysinfo_sethostname_null_name)
 
 UK_TESTCASE(posix_sysinfo_testsuite, posix_sysinfo_sethostname_too_long_name)
 {
-	const char *name = "This name is too long for the nodename field in the utsname struct";
-	size_t len = strlen(name);
+	static const char name[] =
+	 "This name is too long for the nodename field in the utsname struct";
+
+	size_t len = sizeof(name) - 1;
 
 	UK_TEST_EXPECT(sethostname(name, len) == -1);
 
@@ -243,8 +245,8 @@ UK_TESTCASE(posix_sysinfo_testsuite, posix_sysinfo_sethostname_too_long_name)
 
 UK_TESTCASE(posix_sysinfo_testsuite, posix_sysinfo_sethostname_valid_name)
 {
-	const char *name = "valid-name";
-	size_t len = strlen(name);
+	static const char name[] = "valid-name";
+	size_t len = sizeof(name) - 1;
 	struct utsname buf;
 
 	UK_TEST_EXPECT(sethostname(name, len) == 0);
@@ -253,7 +255,7 @@ UK_TESTCASE(posix_sysinfo_testsuite, posix_sysinfo_sethostname_valid_name)
 
 	UK_TEST_EXPECT(strcmp(buf.nodename, name) == 0);
 
-	sethostname("unikraft", strlen("unikraft"));
+	sethostname("unikraft", sizeof("unikraft") - 1);
 }
 
 UK_TESTCASE(posix_sysinfo_testsuite, posix_sysinfo_gethostname_valid_case)
