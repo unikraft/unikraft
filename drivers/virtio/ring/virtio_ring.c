@@ -239,7 +239,7 @@ void virtqueue_host_notify(struct virtqueue *vq)
 	uk_arch_mb();
 
 	if (vq->vq_notify_host && virtqueue_notify_enabled(vq)) {
-		uk_pr_debug("notify queue %d\n", vq->queue_id);
+		uk_pr_debug_isr("notify queue %d\n", vq->queue_id);
 		vrq->last_notified_idx = vrq->vring.avail->idx;
 		vq->vq_notify_host(vq->vdev, vq->queue_id);
 	}
@@ -395,12 +395,12 @@ int virtqueue_buffer_enqueue(struct virtqueue *vq, void *cookie,
 	vrq = to_virtqueue_vring(vq);
 	total_desc = read_bufs + write_bufs;
 	if (unlikely(total_desc < 1 || total_desc > vrq->vring.num)) {
-		uk_pr_err("%"__PRIu32" invalid number of descriptor\n",
-			  total_desc);
+		uk_pr_err_isr("%"__PRIu32" invalid number of descriptor\n",
+			      total_desc);
 		return -EINVAL;
 	} else if (vrq->desc_avail < total_desc) {
-		uk_pr_debug("Available descriptor:%"__PRIu16", Requested descriptor:%"__PRIu32"\n",
-			  vrq->desc_avail, total_desc);
+		uk_pr_debug_isr("Available descriptor:%"__PRIu16", Requested descriptor:%"__PRIu32"\n",
+				vrq->desc_avail, total_desc);
 		return -ENOSPC;
 	}
 	/* Get the head of free descriptor */
@@ -419,8 +419,8 @@ int virtqueue_buffer_enqueue(struct virtqueue *vq, void *cookie,
 	vrq->head_free_desc = idx;
 	vrq->desc_avail -= total_desc;
 
-	uk_pr_debug("Old head:%d, new head:%d, total_desc:%d\n",
-		    head_idx, idx, total_desc);
+	uk_pr_debug_isr("Old head:%d, new head:%d, total_desc:%d\n",
+			head_idx, idx, total_desc);
 
 	virtqueue_ring_update_avail(vrq, head_idx);
 	return vrq->desc_avail;
@@ -460,7 +460,7 @@ struct virtqueue *virtqueue_create(__u16 queue_id, __u16 nr_descs, __u16 align,
 	vrq = uk_malloc(a, sizeof(*vrq) +
 			nr_descs * sizeof(struct virtqueue_desc_info));
 	if (!vrq) {
-		uk_pr_err("Allocation of virtqueue failed\n");
+		uk_pr_err_isr("Allocation of virtqueue failed\n");
 		rc = -ENOMEM;
 		goto err_exit;
 	}
@@ -513,7 +513,7 @@ struct virtqueue *virtqueue_create(__u16 queue_id, __u16 nr_descs, __u16 align,
 	return vq;
 
 err_freevq:
-	uk_pr_err("Allocation of vring failed\n");
+	uk_pr_err_isr("Allocation of vring failed\n");
 	uk_free(a, vrq);
 err_exit:
 	return ERR2PTR(rc);
