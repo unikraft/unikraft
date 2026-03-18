@@ -165,3 +165,20 @@ __noreturn __isr void uk_pm_shutdown(enum uk_pm_shutdown_op op)
 		uk_pm_syscrash();
 	}
 }
+
+UK_EVENT(UK_PM_EVENT_SYSMIGRATION);
+
+int uk_pm_sysmigration(void)
+{
+	int rc;
+
+	rc = uk_raise_event(UK_PM_EVENT_SYSMIGRATION, __NULL);
+	if (unlikely(rc < 0)) {
+		uk_pr_err("Failed system migration event raising: %d\n", rc);
+		return rc;
+	}
+
+	UK_ASSERT(rc != UK_EVENT_HANDLED);
+
+	return 0;
+}

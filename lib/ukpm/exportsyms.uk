@@ -5,3 +5,4 @@ uk_pm_sysrestart
 uk_pm_syssuspend
 uk_pm_raise_shutdown_event
 uk_pm_shutdown
+uk_pm_sysmigration

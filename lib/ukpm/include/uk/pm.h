@@ -128,6 +128,8 @@ int uk_pm_ops_register(const struct uk_pm_ops *ops) __isr;
 
 #define UK_PM_EVENT_SHUTDOWN_REQ		uk_pm_event_shutdown_req
 
+#define UK_PM_EVENT_SYSMIGRATION		uk_pm_event_sysmigration
+
 /**
  * Halts system.
  */
@@ -158,6 +160,12 @@ void uk_pm_syscrash(void) __noreturn __isr;
  *	     Invalid operations are mapped to UK_PM_SHUTDOWN_OP_SYSCRASH
  */
 void uk_pm_raise_shutdown_event(enum uk_pm_shutdown_op op) __isr;
+
+/**
+ * Guest migration event.
+ * @return 0 after guest migration, <0 on errors
+ */
+int uk_pm_sysmigration(void);
 
 /**
  * Shutdown this guest and raise the corresponding shutdown operation's event.
@@ -193,6 +201,12 @@ void uk_pm_shutdown(enum uk_pm_shutdown_op op __unused)
 {
 	_uk_pm_syshalt_fallback();
 }
+
+static inline int uk_pm_sysmigration(void)
+{
+	return -ENOTSUP;
+}
+
 #endif /* !CONFIG_LIBUKPM */
 
 #ifdef __cplusplus
