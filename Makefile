@@ -68,11 +68,14 @@ endif
 # Strip quotes and then whitespaces
 qstrip = $(strip $(subst ",,$(1)))
 
+# Determine source tree root based on this Makefile's location
+MAKEFILE_PATH := $(realpath $(lastword $(MAKEFILE_LIST)))
+SRCTREE := $(patsubst %/,%,$(dir $(MAKEFILE_PATH)))
 
 # Check for required build dependencies
 # skipped for `help`, `print-version`, `print-vars`, `properclean`, `distclean`
 PYTHON ?= python3
-_CHECKDEPS_SCRIPT := $(CURDIR)/support/scripts/check-deps.py
+_CHECKDEPS_SCRIPT := $(SRCTREE)/support/scripts/check-deps.py
 _CHECKDEPS_SKIP_TARGETS := help print-version print-vars properclean distclean
 ifneq ($(filter-out $(_CHECKDEPS_SKIP_TARGETS),$(or $(MAKECMDGOALS),default)),)
 ifneq ($(wildcard $(_CHECKDEPS_SCRIPT)),)
