@@ -129,30 +129,18 @@ void uk_plat_xen_irqs_handle_pending(void);
 
 /* Auxiliary stack management for exception handling */
 
-static inline __uptr uk_plat_xen_except_get_except_stack_base(void)
-{
-	/* no exception stack */
-	return 0;
-}
+__uptr uk_plat_xen_except_get_except_stack_base(void);
 
 /* Nested exception support */
 
-static inline void uk_plat_xen_except_push_nested(void)
-{
-	/* no exception stack */
-}
+void uk_plat_xen_except_push_nested(void);
+void uk_plat_xen_except_pop_nested(void);
 
-static inline void uk_plat_xen_except_pop_nested(void)
-{
-	/* no exception stack */
-}
+int uk_plat_xen_except_init(void);
 
-static inline int uk_plat_xen_except_init(void)
-{
-	/* Stub */
-	return 0;
+#ifdef __cplusplus
 }
-
+#endif
 #endif /* !__ASSEMBLY__ */
 
 #endif /* __UK_PLAT_XEN_EXCEPT_H__ */

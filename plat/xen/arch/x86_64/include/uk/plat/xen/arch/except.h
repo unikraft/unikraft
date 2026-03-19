@@ -256,6 +256,30 @@ int uk_plat_xen_irqs_disabled(void)
 	return !!vcpu->evtchn_upcall_mask;
 }
 
+static inline __uptr uk_plat_xen_except_get_except_stack_base(void)
+{
+	/* no exception stack */
+	return 0;
+}
+
+/* Nested exception support */
+
+static inline void uk_plat_xen_except_push_nested(void)
+{
+	/* no exception stack */
+}
+
+static inline void uk_plat_xen_except_pop_nested(void)
+{
+	/* no exception stack */
+}
+
+static inline int uk_plat_xen_except_init(void)
+{
+	/* Stub */
+	return 0;
+}
+
 #endif /* XEN_PARAVIRT */
 
 #ifdef __cplusplus

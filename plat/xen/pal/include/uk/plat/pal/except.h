@@ -34,8 +34,6 @@
 extern "C" {
 #endif
 
-/* Exception and IRQ context getters and setters are identical to native */
-
 struct uk_pal_except_err_ctx;
 
 static inline
