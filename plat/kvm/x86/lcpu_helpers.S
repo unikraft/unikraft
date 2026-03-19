@@ -109,6 +109,27 @@ ldmxcsr_rval_addr:
 .endm
 
 /**
+ * Enable Advanced Vector Extensions 512 (AVX512). Jump to the fail label if not
+ * successful.
+ *
+ * @in: EBX according to cpuid(eax=0x7, ecx=0)
+ * @clobbers: RAX, RDI
+ */
+.macro LCPU_ENABLE_AVX512 fail_label
+	testl	$(UK_ARCH_X86_64_CPUID7_EBX_AVX512F), %ebx
+	jz	\fail_label
+
+	movq	%rcx, %rdi
+	xorl	%ecx, %ecx
+	xgetbv
+	orl	$(UK_ARCH_X86_64_XCR0_AVX512_OPMASK |			\
+		  UK_ARCH_X86_64_XCR0_AVX512_ZMM_HI256 |		\
+		  UK_ARCH_X86_64_XCR0_AVX512_HI16_ZMM), %eax
+	xsetbv
+	movq	%rdi, %rcx
+.endm
+
+/**
  * Enable FS/GSBASE. Jump to the fail label if not successful.
  *
  * @in: EBX according to uk_arch_x86_64_cpuid(eax=7, ecx=0)

@@ -363,6 +363,14 @@ no_fsgsbase:
 no_pku:
 #endif /* CONFIG_HAVE_X86PKU */
 
+#if __AVX512F__
+	/* Enable AVX512 */
+	LCPU_ENABLE_AVX512 fail
+#else /* !__AVX512F__ */
+	LCPU_ENABLE_AVX512 no_avx512
+no_avx512:
+#endif /* !__AVX512F__ */
+
 	movq	UK_PCPUVAR_X86_64_GSREL(UK_LCPU_SARG_SYM), %rdi
 	movq	UK_PCPUVAR_X86_64_GSREL(UK_LCPU_SENTRY_SYM), %rax
 	movq	UK_PCPUVAR_X86_64_GSREL(UK_LCPU_SSTACKP_SYM), %rsp
