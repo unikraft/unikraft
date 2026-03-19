@@ -40,6 +40,9 @@ struct x86_xsave_hdr {
 #define X86_XSAVE_HDR_XSTATE_BV_X87F			(1UL <<  0)
 #define X86_XSAVE_HDR_XSTATE_BV_SSEF			(1UL <<  1)
 #define X86_XSAVE_HDR_XSTATE_BV_AVXF			(1UL <<  2)
+#define X86_XSAVE_HDR_XSTATE_BV_AVX512_OPMASKF		(1UL <<  5)
+#define X86_XSAVE_HDR_XSTATE_BV_AVX512_ZMM_HI256F	(1UL <<  6)
+#define X86_XSAVE_HDR_XSTATE_BV_AVX512_HI16_ZMMF	(1UL <<  7)
 	__u64 xstate_bv;
 #define X86_XSAVE_HDR_XCOMP_BV_COMPF			(1UL << 63)
 	__u64 xcomp_bv;
@@ -65,6 +68,29 @@ struct x86_xsave_ctx {
 	 * for YMM8_H–YMM15_H.
 	 */
 	__u8 avx_state[256];
+
+	/* AVX-512 state components */
+	struct {
+		/*
+		 * AVX-512 opmask registers (k0-k7)
+		 * 64 bytes (8 registers × 8 bytes each)
+		 */
+		__u8 opmask[64];
+
+		/*
+		 * AVX-512 ZMM_Hi256 state (ZMM0-ZMM15 upper 256 bits)
+		 * 512 bytes (16 registers × 32 bytes each)
+		 * Bits 511:256 of ZMM0-ZMM15
+		 */
+		__u8 zmm_hi256[512];
+
+		/*
+		 * AVX-512 Hi16_ZMM state (ZMM16-ZMM31)
+		 * 1024 bytes (16 registers × 64 bytes each)
+		 * Full 512-bit ZMM16-ZMM31 registers
+		 */
+		__u8 hi16_zmm[1024];
+	} __packed avx512_state;
 } __packed __align(64);
 
 static enum x86_save_method ectx_method;
@@ -97,7 +123,9 @@ static void _init_ectx_store(void)
 
 		UK_ASSERT(ectx_size == sizeof(struct x86_xsave_ctx) ||
 			  ectx_size == __offsetof(struct x86_xsave_ctx,
-						  avx_state));
+						  avx_state) ||
+			  ectx_size == __offsetof(struct x86_xsave_ctx,
+						  avx512_state));
 	} else if (edx & UK_ARCH_X86_64_CPUID1_EDX_FXSR) {
 		ectx_method = X86_SAVE_FXSAVE;
 		ectx_size = sizeof(struct x86_fxsave_ctx);
@@ -239,6 +267,30 @@ static inline int x86_xsave_substate_memcmp(const struct x86_xsave_ctx *ctx1,
 			return rc;
 		}
 		break;
+	case X86_XSAVE_HDR_XSTATE_BV_AVX512_OPMASKF:
+		if ((rc = memcmp_isr(ctx1->avx512_state.opmask,
+				     ctx2->avx512_state.opmask,
+				     sizeof(ctx1->avx512_state.opmask)))) {
+			uk_pr_debug("AVX-512 opmask state differs!\n");
+			return rc;
+		}
+		break;
+	case X86_XSAVE_HDR_XSTATE_BV_AVX512_ZMM_HI256F:
+		if ((rc = memcmp_isr(ctx1->avx512_state.zmm_hi256,
+				     ctx2->avx512_state.zmm_hi256,
+				     sizeof(ctx1->avx512_state.zmm_hi256)))) {
+			uk_pr_debug("AVX-512 ZMM upper 256 bits state differs!\n");
+			return rc;
+		}
+		break;
+	case X86_XSAVE_HDR_XSTATE_BV_AVX512_HI16_ZMMF:
+		if ((rc = memcmp_isr(ctx1->avx512_state.hi16_zmm,
+				     ctx2->avx512_state.hi16_zmm,
+				     sizeof(ctx1->avx512_state.hi16_zmm)))) {
+			uk_pr_debug("AVX-512 Hi16 ZMM state differs!\n");
+			return rc;
+		}
+		break;
 	default:
 		UK_CRASH("Unknown XSAVE substate: %lu\n", substate);
 	}
@@ -270,6 +322,15 @@ static inline __bool x86_xsave_substate_isinit(const struct x86_xsave_ctx *ctx,
 		return mem_iszero(ctx->sse_state, sizeof(ctx->sse_state));
 	case X86_XSAVE_HDR_XSTATE_BV_AVXF:
 		return mem_iszero(ctx->avx_state, sizeof(ctx->avx_state));
+	case X86_XSAVE_HDR_XSTATE_BV_AVX512_OPMASKF:
+		return mem_iszero(ctx->avx512_state.opmask,
+				  sizeof(ctx->avx512_state.opmask));
+	case X86_XSAVE_HDR_XSTATE_BV_AVX512_ZMM_HI256F:
+		return mem_iszero(ctx->avx512_state.zmm_hi256,
+				  sizeof(ctx->avx512_state.zmm_hi256));
+	case X86_XSAVE_HDR_XSTATE_BV_AVX512_HI16_ZMMF:
+		return mem_iszero(ctx->avx512_state.hi16_zmm,
+				  sizeof(ctx->avx512_state.hi16_zmm));
 	default:
 		UK_CRASH("Unknown XSAVE substate: %lu\n", substate);
 	}
@@ -308,7 +369,10 @@ static inline __bool x86_xsave_hdr_isvalid(const struct x86_xsave_ctx *ctx)
 {
 	const __u64 xhdr_supp_mask = X86_XSAVE_HDR_XSTATE_BV_X87F |
 				     X86_XSAVE_HDR_XSTATE_BV_SSEF |
-				     X86_XSAVE_HDR_XSTATE_BV_AVXF;
+				     X86_XSAVE_HDR_XSTATE_BV_AVXF |
+				     X86_XSAVE_HDR_XSTATE_BV_AVX512_OPMASKF |
+				     X86_XSAVE_HDR_XSTATE_BV_AVX512_ZMM_HI256F |
+				     X86_XSAVE_HDR_XSTATE_BV_AVX512_HI16_ZMMF;
 	const struct x86_xsave_hdr *xhdr = &ctx->xsave_hdr;
 
 	/*
@@ -371,19 +435,26 @@ void uk_plat_native_ectx_assert_equal(struct uk_plat_native_ectx *state)
 	{
 		struct x86_xsave_ctx *xsave1 = (struct x86_xsave_ctx *)state;
 		struct x86_xsave_ctx *xsave2 = (struct x86_xsave_ctx *)current;
+		const __u64 xbv_flags[] = {
+			X86_XSAVE_HDR_XSTATE_BV_X87F,
+			X86_XSAVE_HDR_XSTATE_BV_SSEF,
+			X86_XSAVE_HDR_XSTATE_BV_AVXF,
+			X86_XSAVE_HDR_XSTATE_BV_AVX512_OPMASKF,
+			X86_XSAVE_HDR_XSTATE_BV_AVX512_ZMM_HI256F,
+			X86_XSAVE_HDR_XSTATE_BV_AVX512_HI16_ZMMF,
+		};
 
 		if (unlikely(!x86_xsave_hdr_isvalid(xsave2)))
 			UK_CRASH("Error in saving current ectx\n");
 
 		if (unlikely(!x86_xsave_hdr_isvalid(xsave1) ||
-			     !x86_xsave_mxcsr_iseq(xsave1, xsave2) ||
-			     !x86_xsave_substate_iseq(xsave1, xsave2,
-						X86_XSAVE_HDR_XSTATE_BV_X87F) ||
-			     !x86_xsave_substate_iseq(xsave1, xsave2,
-						X86_XSAVE_HDR_XSTATE_BV_SSEF) ||
-			     !x86_xsave_substate_iseq(xsave1, xsave2,
-						X86_XSAVE_HDR_XSTATE_BV_AVXF)))
+			     !x86_xsave_mxcsr_iseq(xsave1, xsave2)))
 			goto ectx_corrupted;
+
+		for (__sz i = 0; i < ARRAY_SIZE(xbv_flags); i++)
+			if (unlikely(!x86_xsave_substate_iseq(xsave1, xsave2,
+							      xbv_flags[i])))
+				goto ectx_corrupted;
 		break;
 	}
 	default:

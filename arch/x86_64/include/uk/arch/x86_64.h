@@ -44,6 +44,8 @@ extern "C" {
 #define UK_ARCH_X86_64_CPUID7_ECX_OSPKE			(1 << 4)
 /** 5-level paging */
 #define UK_ARCH_X86_64_CPUID7_ECX_LA57			(1 << 16)
+/** AVX-512 Foundation feature bit */
+#define UK_ARCH_X86_64_CPUID7_EBX_AVX512F		(1 << 16)
 /** RDSEED instruction */
 #define UK_ARCH_X86_64_CPUID7_EBX_RDSEED		(1 << 18)
 
@@ -132,6 +134,12 @@ extern "C" {
 #define UK_ARCH_X86_64_XCR0_SSE				(1 << 1)
 /** AVX state */
 #define UK_ARCH_X86_64_XCR0_AVX				(1 << 2)
+/** State of opmask registers k0-k7 */
+#define UK_ARCH_X86_64_XCR0_AVX512_OPMASK		(1 << 5)
+/** State of upper halves of lower ZMM registers */
+#define UK_ARCH_X86_64_XCR0_AVX512_ZMM_HI256		(1 << 6)
+/** State of upper ZMM registers */
+#define UK_ARCH_X86_64_XCR0_AVX512_HI16_ZMM		(1 << 7)
 /** Protection key state */
 #define UK_ARCH_X86_64_XCR0_PKRU			(1 << 9)
 

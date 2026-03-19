@@ -23,9 +23,9 @@
  *   - XSAVE Header:                64 bytes (XSTATE_BV bitmap, must be zeroed!)
  *   - AVX (YMM_H):                256 bytes (upper 128 bits of YMM0-YMM15)
  *   - MPX_BNDREGS/BNDCSR:         128 bytes (not enabled)
- *   - AVX-512 (KMASK/ZMM_H/ZMM): 1600 bytes (not enabled)
+ *   - AVX-512 (KMASK/ZMM_H/ZMM): 1600 bytes
  *
- * Current size: 160 + 352 + 64 + 256 = 832 bytes
+ * Current size: 160 + 352 + 64 + 256 + 1600 = 2432 bytes
  *
  * NOTE: Actual size queried via CPUID.0Dh at runtime may be smaller (e.g.,
  * 576 bytes without AVX). Increase UK_PLAT_NATIVE_ECTX_SIZE if enabling
@@ -33,7 +33,7 @@
  */
 
 /* Maximum size for currently enabled XSAVE components */
-#define UK_PLAT_NATIVE_ECTX_SIZE			832
+#define UK_PLAT_NATIVE_ECTX_SIZE			2432
 
 /* XSAVE/XRSTOR required alignment */
 #define UK_PLAT_NATIVE_ECTX_ALIGN			64
