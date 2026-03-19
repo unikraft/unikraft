@@ -2,6 +2,8 @@ menuconfig PLAT_XEN
 	bool "Xen guest image"
 	default n
 	depends on (ARCH_X86_64 || ARCH_ARM_64)
+	select PLAT_XEN_X86_64 if ARCH_X86_64
+	select PLAT_XEN_ARM64 if ARCH_ARM_64
 	select HAVE_XENBUS
 	imply XEN_PV_BUILD_P2M
 	select LIBXENHEADERS
@@ -31,6 +33,27 @@ menuconfig PLAT_XEN
 		Create a Unikraft image that runs as a Xen guest
 
 if (PLAT_XEN)
+# Hidden options for pulling platform dependencies depending on arch
+config PLAT_XEN_X86_64
+	bool
+	select LIBUKPLAT_NATIVE
+	select LIBUKPLAT_NATIVE_ADDR
+	select LIBUKPLAT_NATIVE_ECTX
+	select LIBUKPLAT_NATIVE_PAGE
+	select LIBUKPLAT_NATIVE_PT
+	select LIBUKPLAT_NATIVE_SYSCTX
+
+config PLAT_XEN_ARM64
+	bool
+	select LIBUKPLAT_NATIVE
+	select LIBUKPLAT_NATIVE_ADDR
+	select LIBUKPLAT_NATIVE_AUXSP
+	select LIBUKPLAT_NATIVE_ECTX
+	select LIBUKPLAT_NATIVE_EXCEPT
+	select LIBUKPLAT_NATIVE_PAGE
+	select LIBUKPLAT_NATIVE_PT
+	select LIBUKPLAT_NATIVE_SYSCTX
+
 # Invisible option to switch between PV and PVH mode
 config XEN_HVMLITE
 	bool
