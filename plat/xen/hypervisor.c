@@ -39,6 +39,7 @@
 
 #include <xen/memory.h>
 #include <xen/hvm/hvm_op.h>
+#include <uk/arch.h>
 #include <uk/lcpu.h>
 #include <uk/atomic.h>
 #include <uk/bitops/bitscan.h>
@@ -62,7 +63,7 @@ void do_hypervisor_callback(struct uk_lcpu_regs *regs)
 /* NB x86. No need for a barrier here -- XCHG is a barrier on x86. */
 #if !(defined __X86_32__ || defined __X86_64__)
 	/* Clear master flag /before/ clearing selector flag. */
-	wmb();
+	uk_arch_wmb();
 #endif
 	l1 = uk_exchange_n(&vcpu_info->evtchn_pending_sel, 0);
 	while (l1 != 0) {
