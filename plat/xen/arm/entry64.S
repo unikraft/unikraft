@@ -24,8 +24,8 @@
  */
 /* Taken from Mini-OS */
 
-#include <uk/arch/lcpu.h>
 #include <uk/asm.h>
+#include <uk/asm/lcpu.h>
 #include <xen/xen.h>
 #include <xen/elfnote.h>
 
@@ -46,7 +46,6 @@ ELFNOTE(Xen, XEN_ELFNOTE_LOADER, .asciz "generic")
 ELFNOTE(Xen, XEN_ELFNOTE_XEN_VERSION, .asciz "xen-3.0")
 
 #include <uk/asm.h>
-#include <uk/arch/lcpu.h>
 #include <uk/arch/limits.h>
 #include <xen-arm/mm.h>
 

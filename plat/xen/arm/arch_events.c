@@ -30,13 +30,13 @@
 #include <uk/assert.h>
 #include <uk/essentials.h>
 #include <uk/intctlr.h>
-#include <uk/plat/lcpu.h>
+#include <uk/lcpu.h>
 
 //TODO read it from device tree
 #define EVENT_IRQ 31
 
 static void virq_debug(evtchn_port_t port __unused,
-		       struct __regs *regs __unused,
+		       struct uk_lcpu_regs *regs __unused,
 		       void *params __unused)
 {
 	uk_pr_debug("Received a virq_debug event\n");
@@ -46,7 +46,7 @@ static evtchn_port_t debug_port = -1;
 
 static int arch_events_irq_handler(void *args __unused)
 {
-	ukplat_lcpu_irqs_handle_pending();
+	uk_lcpu_irqs_handle_pending();
 	return 1;
 }
 

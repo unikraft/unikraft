@@ -39,7 +39,7 @@
 #include <libfdt.h>
 #include <xen-arm/setup.h>
 #include <uk/arch.h>
-#include <uk/plat/common/lcpu.h>
+#include <uk/lcpu.h>
 #include <uk/plat/common/bootinfo.h>
 
 /*
@@ -392,7 +392,7 @@ void _libxenplat_armentry(void *dtb_pointer, paddr_t physical_offset)
 	init_events();
 
 	/* Initialize logical boot CPU */
-	r = lcpu_init(lcpu_get_bsp());
+	r = uk_lcpu_init(uk_lcpu_get_bsp());
 	if (unlikely(r))
 		UK_CRASH("Failed to initialize bootstrapping CPU: %d\n", r);
 
