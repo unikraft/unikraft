@@ -17,12 +17,6 @@ extern "C" {
 /* On x86 reading the segment registers is done as on native */
 
 __isr static inline
-void uk_plat_xen_sysctx_store(struct uk_plat_native_sysctx *sysctx)
-{
-	uk_plat_native_sysctx_store(sysctx);
-}
-
-__isr static inline
 __uptr uk_plat_xen_tlsp_get(void)
 {
 	return uk_plat_native_tlsp_get();
