@@ -56,13 +56,11 @@ typedef unsigned long u_long;
 
 #include <xen-arm/hypercall.h>
 #include <xen/event_channel.h>
-#include <xen-arm/traps.h>
 
 #define STACK_SIZE_PAGE_ORDER __STACK_SIZE_PAGE_ORDER
 #define STACK_SIZE            __STACK_SIZE
 
 void arch_fini(void);
-void timer_handler(evtchn_port_t port, struct pt_regs *regs, void *ign);
 
 #define BUG() do { asm volatile (".word 0xe7f000f0\n"); } while (1)
 
