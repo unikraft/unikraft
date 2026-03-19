@@ -33,6 +33,7 @@
  */
 
 #include <errno.h>
+#include <stdint.h>
 
 #include <uk/config.h>
 #include <uk/pm.h>

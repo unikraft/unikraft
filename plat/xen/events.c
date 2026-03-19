@@ -44,6 +44,11 @@
 #include <uk/bitops/bitmap.h>
 #include <uk/arch/util.h>
 #include <uk/lcpu.h>
+#if (defined __X86_32__) || (defined __X86_64__)
+#include <xen-x86/smp.h>
+#elif (defined __ARM_32__) || (defined __ARM_64__)
+#include <xen-arm/smp.h>
+#endif
 
 #define NR_EVS 1024
 
