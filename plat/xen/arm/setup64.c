@@ -25,7 +25,7 @@
 /* Ported from Mini-OS */
 
 #include <stdio.h>
-#include <arm/smccc.h>
+#include <uk/smccc.h>
 #include <xen-arm/os.h>
 #include <xen-arm/mm.h>
 #include <common/events.h>
@@ -67,7 +67,7 @@ void *HYPERVISOR_dtb;
  */
 paddr_t _libxenplat_paddr_offset;
 
-smccc_conduit_fn_t smccc_psci_call;
+uk_smccc_conduit_func smccc_psci_call;
 
 static int hvm_get_parameter(int idx, uint64_t *value)
 {

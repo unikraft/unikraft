@@ -53,6 +53,7 @@ config PLAT_XEN_ARM64
 	select LIBUKPLAT_NATIVE_PAGE
 	select LIBUKPLAT_NATIVE_PT
 	select LIBUKPLAT_NATIVE_SYSCTX
+	select LIBUKSMCCC
 
 # Invisible option to switch between PV and PVH mode
 config XEN_HVMLITE
