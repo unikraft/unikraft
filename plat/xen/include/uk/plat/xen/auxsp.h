@@ -7,26 +7,6 @@
 #ifndef __UK_PLAT_XEN_AUXSP_H__
 #define __UK_PLAT_XEN_AUXSP_H__
 
-#include <uk/arch/types.h>
-#include <uk/pcpuvar.h>
-
-#define UK_PLAT_XEN_AUXSP_SYM	uk_plat_xen_auxsp
-
-#if !__ASSEMBLY__
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-extern __uk_pcpuvar __uptr uk_plat_xen_auxsp;
-
-static inline void uk_plat_xen_set_auxsp(__uptr auxsp)
-{
-	uk_pcpuvar_current_set(uk_plat_xen_auxsp, auxsp);
-}
-
-#ifdef __cplusplus
-}
-#endif
-#endif /* !__ASSEMBLY__ */
+#include <uk/plat/xen/arch/auxsp.h>
 
 #endif /* __UK_PLAT_XEN_AUXSP_H__ */
