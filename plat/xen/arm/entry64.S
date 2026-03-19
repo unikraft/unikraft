@@ -146,9 +146,9 @@ ENTRY(_libxenplat_zimageboot)
  *
  *   u32 code0;                     // Executable code
  *   u32 code1;                     // Executable code
- *   u64 text_offset;               // Image load offset
- *   u64 res0 = 0;                  // reserved
- *   u64 res1 = 0;                  // reserved
+ *   u64 text_offset;               // Image load offset, little endian
+ *   u64 image_size;                // Effective image size, little endian
+ *   u64 flags;                     // Kernel flags, little endian
  *   u64 res2 = 0;                  // reserved
  *   u64 res3 = 0;                  // reserved
  *   u64 res4 = 0;                  // reserved
@@ -602,7 +602,7 @@ END(vector_table)
 el1_sync:
 	trap_entry 1
 	mov     x0, sp
-	bl      trap_el1_sync
+	bl      uk_plat_native_except_err_handler
 	trap_exit 1
 	eret
 ENDPROC(el1_sync)
@@ -611,7 +611,7 @@ ENDPROC(el1_sync)
 el1_irq:
 	trap_entry 1
 	mov     x0, sp
-	bl      trap_el1_irq
+	bl      uk_plat_native_except_irq_handler
 	trap_exit 1
 	eret
 ENDPROC(el1_irq)
@@ -620,7 +620,7 @@ ENDPROC(el1_irq)
 el0_sync:
 	trap_entry 0
 	mov     x0, sp
-	bl      trap_el1_sync
+	bl      uk_plat_native_except_err_handler
 	trap_exit 0
 	eret
 ENDPROC(el0_sync)
@@ -629,7 +629,7 @@ ENDPROC(el0_sync)
 el0_irq:
 	trap_entry 0
 	mov     x0, sp
-	bl      trap_el1_irq
+	bl      uk_plat_native_except_irq_handler
 	trap_exit 0
 	eret
 ENDPROC(el0_irq)
@@ -645,7 +645,7 @@ ENDPROC(el0_irq)
 	.macro invalid, reason
 	mov     x0, sp
 	mov     x1, #\reason
-	b       invalid_trap_handler
+	b       uk_plat_native_except_inv_handler
 	.endm
 
 el0_sync_invalid:
