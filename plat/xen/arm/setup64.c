@@ -38,6 +38,7 @@
 #include <xen/hvm/params.h>
 #include <libfdt.h>
 #include <xen-arm/setup.h>
+#include <uk/arch.h>
 #include <uk/plat/common/lcpu.h>
 #include <uk/plat/common/bootinfo.h>
 
@@ -204,7 +205,7 @@ int uk_intctlr_plat_probe(void *arg)
 						L2_OFFSET));
 #endif
 	/* Setting memory barrier to get access to mapped pages */
-	wmb();
+	uk_arch_wmb();
 	return 0;
 }
 

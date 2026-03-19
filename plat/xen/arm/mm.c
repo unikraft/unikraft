@@ -27,6 +27,7 @@
 #include <xen-arm/os.h>
 #include <xen-arm/mm.h>
 #include <libfdt.h>
+#include <uk/arch/util.h>
 
 #if defined(__aarch64__)
 extern char stack[];
@@ -41,8 +42,8 @@ paddr_t physical_address_offset;
 inline void set_pgt_entry(lpae_t *ptr, lpae_t val)
 {
 	*ptr = val;
-	dsb(ishst);
-	isb();
+	uk_arch_arm64_dsb(ishst);
+	uk_arch_arm64_isb();
 }
 
 static void alloc_init_pud(lpae_t *pgd, unsigned long vaddr,
