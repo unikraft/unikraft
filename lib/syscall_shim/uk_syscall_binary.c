@@ -132,11 +132,12 @@ static void binary_syscall_debug_handler(struct uk_syscall_enter_ctx *enter_ctx)
 	_uk_printk(UK_PRINT_KLVL_DEBUG,
 		   uk_libid_self(), __STR_BASENAME__, __LINE__,
 		   "Binary system call request \"%s\" (%lu) at ip:%p (arg0=0x%lx, arg1=0x%lx, ...)\n",
-		   uk_syscall_name(execenv->regs.__syscall_rsyscall),
-		   execenv->regs.__syscall_rsyscall,
-		   (void *)execenv->regs.__syscall_rip,
-		   execenv->regs.__syscall_rarg0,
-		   execenv->regs.__syscall_rarg1);
+		   uk_syscall_name(_UK_EXECENV_REGS_GET(execenv,
+							__syscall_rsyscall)),
+		   _UK_EXECENV_REGS_GET(execenv, __syscall_rsyscall),
+		   (void *)_UK_EXECENV_REGS_GET(execenv, __syscall_rip),
+		   _UK_EXECENV_REGS_GET(execenv, __syscall_rarg0),
+		   _UK_EXECENV_REGS_GET(execenv, __syscall_rarg1));
 }
 
 uk_syscall_entertab_prio(binary_syscall_debug_handler, UK_PRIO_EARLIEST);
