@@ -36,6 +36,16 @@ extern __uk_pcpuvar __u64 uk_pcpuvar_cpu_id;
 extern __uk_pcpuvar __u64 uk_pcpuvar_cpu_idx;
 
 /**
+ * Indirect pointer to the per-CPU section template size absolute symbol.
+ * This is important to have as whenever we are linked to exist at a very
+ * high address, the position-relative instructions that would otherwise be
+ * used to access the absolute symbol directly would need to use a very
+ * large immediate which does not fit the instruction encoding so use
+ * an indirect pointer instead.
+ */
+extern char *const volatile _uk_pcpuvar_tmpl_size_ptr;
+
+/**
  * Get lvalue reference to a specific CPU's copy of a per-CPU variable.
  *
  * @param _idx
@@ -47,7 +57,7 @@ extern __uk_pcpuvar __u64 uk_pcpuvar_cpu_idx;
  */
 #define __uk_pcpuvar_lval(_idx, _sym)					\
 	(*(__typeof__(_sym) *)						\
-	 ((__u8 *)&(_sym) + (((__sz)&_uk_pcpuvar_tmpl_size) * (_idx))))
+	 ((__u8 *)&(_sym) + (((__sz)_uk_pcpuvar_tmpl_size_ptr) * (_idx))))
 
 #define _uk_pcpuvar_lval(_idx, _sym)					\
 	__uk_pcpuvar_lval(_idx, _sym)

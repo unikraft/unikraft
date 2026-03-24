@@ -11,3 +11,5 @@ __uk_pcpuvar __u64 uk_pcpuvar_cpu_id;
 
 /** Linear index of the current CPU in the per-CPU array */
 __uk_pcpuvar __u64 uk_pcpuvar_cpu_idx;
+
+char *const volatile _uk_pcpuvar_tmpl_size_ptr = _uk_pcpuvar_tmpl_size;

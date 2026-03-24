@@ -135,6 +135,7 @@ The benefit is concrete and architecture-specific:
 
 - **arm64**: Even when the value is accessed via a literal pool (`ldr reg, =_uk_pcpuvar_tmpl_size`) which are generally unsafe in pre-relocation code, `ABSOLUTE()` still matters: an absolute symbol causes the assembler to resolve its entry in the literal pool to a plain integer at assemble/link time rather than emitting an `R_AARCH64_ABS64` relocation that needs runtime relocation.
   The net effect is the same zero-relocation property as on x86_64, again safe for early boot use.
+  An important note in the case of position-relative instructions that reference this symbol is that if we are linked at very high addresses, then the immediate would be too large for the instruction encoding and therefore the macros make use of an indirect pointer to this symbol, `_uk_pcpuvar_tmpl_size_ptr`.
 
 For a new architecture, as long as the per-CPU slot offset can be expressed as `idx * _uk_pcpuvar_tmpl_size` and that size is an absolute link-time constant, this same property will hold.
 
