@@ -13,10 +13,16 @@
 extern "C" {
 #endif
 
-/* FIXME: Hardcode for now. In practice this can be
- *        variable, define per platform instead.
+/**
+ * Use the compiler's knowledge of the target CPU cache line size if available.
+ * __GCC_DESTRUCTIVE_SIZE is set by GCC 12+ and Clang 15+ based on the
+ * -march/-mcpu flags. Falls back to previous hard-coded value of 64 bytes.
  */
+#ifdef __GCC_DESTRUCTIVE_SIZE
+#define UK_ARCH_CACHE_LINE_SIZE		__GCC_DESTRUCTIVE_SIZE
+#else
 #define UK_ARCH_CACHE_LINE_SIZE		64
+#endif
 
 #if !__ASSEMBLY__
 
