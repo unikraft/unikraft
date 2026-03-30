@@ -160,7 +160,7 @@ struct uk_plat_native_except_irq_ctx {
 	/* CPU registers at IRQ time */
 	struct uk_plat_native_regs *regs;
 	/* x86 interrupt vector number */
-	__u64 irq;
+	__u32 irq;
 };
 
 /* IRQ context accessors */
@@ -179,7 +179,7 @@ uk_plat_native_except_irq_ctx_set_regs(
 	ctx->regs = regs;
 }
 
-__isr static inline __u64
+__isr static inline __u32
 uk_plat_native_except_irq_ctx_get_irq(
 	const struct uk_plat_native_except_irq_ctx *ctx)
 {
@@ -189,7 +189,7 @@ uk_plat_native_except_irq_ctx_get_irq(
 __isr static inline void
 uk_plat_native_except_irq_ctx_set_irq(
 	struct uk_plat_native_except_irq_ctx *ctx,
-	__u64 irq)
+	__u32 irq)
 {
 	ctx->irq = irq;
 }
@@ -298,7 +298,7 @@ __isr void uk_plat_native_except_pop_nested(void);
  * @param irq The IRQ to send to the CPU
  * @return 0 on success, negative errno on failure
  */
-int uk_plat_native_except_send_ipi(__u64 id, unsigned long irq);
+int uk_plat_native_except_send_ipi(__u64 id, __u32 irq);
 #endif /* CONFIG_HAVE_SMP */
 #endif /* CONFIG_LIBUKPLAT_NATIVE_EXCEPT */
 

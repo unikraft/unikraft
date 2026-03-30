@@ -108,7 +108,7 @@ __u64 uk_plat_xen_except_irq_ctx_get_irq(
 
 void uk_plat_xen_except_irq_ctx_set_irq(
 	struct uk_plat_xen_except_irq_ctx *ctx,
-	__u64 irq);
+	__u32 irq);
 
 /* IRQ control */
 

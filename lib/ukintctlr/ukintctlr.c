@@ -152,7 +152,7 @@ extern unsigned long sched_have_pending_events;
 void uk_intctlr_irq_handle(struct uk_lcpu_except_irq_ctx *ctx)
 {
 	struct irq_handler *h;
-	unsigned long irq;
+	__u32 irq;
 	int i;
 
 	irq = uk_lcpu_except_irq_ctx_get_irq(ctx);

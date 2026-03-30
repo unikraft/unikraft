@@ -103,12 +103,12 @@ __isr void uk_plat_native_except_irq_ctx_set_regs(
 	struct uk_plat_native_except_irq_ctx *ctx,
 	struct uk_plat_native_regs *regs);
 
-__isr __u64 uk_plat_native_except_irq_ctx_get_irq(
+__isr __u32 uk_plat_native_except_irq_ctx_get_irq(
 	const struct uk_plat_native_except_irq_ctx *ctx);
 
 __isr void uk_plat_native_except_irq_ctx_set_irq(
 	struct uk_plat_native_except_irq_ctx *ctx,
-	__u64 irq);
+	__u32 irq);
 
 #if CONFIG_LIBUKPLAT_NATIVE_EXCEPT
 /* IRQ control */

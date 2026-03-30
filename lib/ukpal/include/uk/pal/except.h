@@ -122,7 +122,7 @@ __isr __u64 uk_pal_except_irq_ctx_get_irq(
 
 __isr void uk_pal_except_irq_ctx_set_irq(
 	struct uk_pal_except_irq_ctx *ctx,
-	__u64 irq);
+	__u32 irq);
 
 /* Nested exception support */
 
@@ -203,7 +203,7 @@ __isr int uk_pal_except_init(void);
  * @param irq The IRQ to send to the CPU
  * @return 0 on success, negative errno on failure
  */
-int uk_pal_except_send_ipi(__u64 id, unsigned long irq);
+int uk_pal_except_send_ipi(__u64 id, __u32 irq);
 #endif /* CONFIG_HAVE_SMP */
 
 #ifdef __cplusplus

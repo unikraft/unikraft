@@ -309,7 +309,7 @@ trap_halt:
 UK_EVENT(UK_PLAT_NATIVE_EXCEPT_EVENT_IRQ);
 
 void uk_plat_native_except_irq_handler(struct uk_plat_native_regs *regs,
-				       unsigned long irq)
+				       __u32 irq)
 {
 	struct uk_plat_native_except_irq_ctx ctx;
 #if CONFIG_LIBUKPLAT_NATIVE_ECTX_ISR_ASSERTIONS
@@ -692,7 +692,7 @@ static inline int x2apic_enable(void)
 	return 0;
 }
 
-static inline void x2apic_send_ipi(int irqno, int dest)
+static inline void x2apic_send_ipi(__u32 irqno, __u64 dest)
 {
 	__u32 eax;
 
@@ -709,7 +709,7 @@ static inline void x2apic_send_ipi(int irqno, int dest)
 #define apic_enable		x2apic_enable
 #define apic_send_ipi		x2apic_send_ipi
 
-int uk_plat_native_except_send_ipi(__u64 id, unsigned long irq)
+int uk_plat_native_except_send_ipi(__u64 id, __u32 irq)
 {
 	apic_send_ipi(irq, id);
 	return 0;

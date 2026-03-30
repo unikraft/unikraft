@@ -153,7 +153,7 @@ struct uk_plat_xen_except_irq_ctx {
 	/* CPU registers at IRQ time */
 	struct uk_plat_native_regs *regs;
 	/* x86 interrupt vector number */
-	__u64 irq;
+	__u32 irq;
 };
 
 /* IRQ context accessors */
@@ -181,7 +181,7 @@ __u64 uk_plat_xen_except_irq_ctx_get_irq(
 
 __isr static inline
 void uk_plat_xen_except_irq_ctx_set_irq(
-	struct uk_plat_xen_except_irq_ctx *ctx, __u64 irq)
+	struct uk_plat_xen_except_irq_ctx *ctx, __u32 irq)
 {
 	ctx->irq = irq;
 }

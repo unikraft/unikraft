@@ -125,7 +125,7 @@ uk_pal_except_irq_ctx_get_irq(const struct uk_pal_except_irq_ctx *ctx)
 
 __isr static inline void
 uk_pal_except_irq_ctx_set_irq(struct uk_pal_except_irq_ctx *ctx,
-			      __u64 irq)
+			      __u32 irq)
 {
 	uk_plat_native_except_irq_ctx_set_irq(
 		(struct uk_plat_native_except_irq_ctx *)ctx, irq);
@@ -182,7 +182,7 @@ __isr static inline int uk_pal_except_init(void)
 }
 
 #if CONFIG_HAVE_SMP
-static inline int uk_pal_except_send_ipi(__u64 id, unsigned long irq)
+static inline int uk_pal_except_send_ipi(__u64 id, __u32 irq)
 {
 	return uk_plat_native_except_send_ipi(id, irq);
 }

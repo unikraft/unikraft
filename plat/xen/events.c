@@ -58,7 +58,7 @@ typedef struct _ev_action_t {
 
 struct uk_event_irq_data {
 	struct uk_lcpu_regs *regs;
-	unsigned long irq;
+	__u32 irq;
 };
 
 static ev_action_t ev_actions[NR_EVS];

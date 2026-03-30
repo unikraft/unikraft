@@ -131,7 +131,7 @@ __u64 uk_pal_except_irq_ctx_get_irq(const struct uk_pal_except_irq_ctx *ctx)
 
 static inline
 void uk_pal_except_irq_ctx_set_irq(struct uk_pal_except_irq_ctx *ctx,
-				__u64 irq)
+				__u32 irq)
 {
 	uk_plat_xen_except_irq_ctx_set_irq(
 		(struct uk_plat_xen_except_irq_ctx *)ctx, irq);

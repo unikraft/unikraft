@@ -126,7 +126,7 @@ uk_lcpu_except_irq_ctx_get_irq(const struct uk_lcpu_except_irq_ctx *ctx)
 
 __isr static inline void
 uk_lcpu_except_irq_ctx_set_irq(struct uk_lcpu_except_irq_ctx *ctx,
-			       __u64 irq)
+			       __u32 irq)
 {
 	uk_pal_except_irq_ctx_set_irq((struct uk_pal_except_irq_ctx *)ctx, irq);
 }

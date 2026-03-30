@@ -75,7 +75,7 @@ static int configure_irq(struct uk_intctlr_irq *irq __unused)
 static int uk_intctlr_xpic_handle_irq(void *data)
 {
 	struct uk_lcpu_except_irq_ctx *ctx;
-	unsigned long irq;
+	__u32 irq;
 
 	ctx = data;
 	uk_intctlr_irq_handle(ctx);
