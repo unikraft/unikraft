@@ -24,7 +24,8 @@ static int vmem_arch_pagefault(void *data)
 	};
 	unsigned int faulttype;
 	struct uk_vas *vas;
-	int rc, error_code;
+	__u64 error_code;
+	int rc;
 
 	error_code = uk_lcpu_x86_64_except_err_ctx_get_error_code(ctx);
 	if (error_code & UK_ARCH_X86_64_PF_EC_WR)
@@ -46,7 +47,7 @@ static int vmem_arch_pagefault(void *data)
 		vas = uk_vas_get_active();
 		if (unlikely(vas && !(vas->flags & UK_VAS_FLAG_NO_PAGING)))
 			uk_pr_debug("Cannot handle %s page fault at 0x%"
-				    __PRIvaddr " (ec: 0x%x): %s (%d).\n",
+				    __PRIvaddr " (ec: 0x%lx): %s (%d).\n",
 				    faultstr[faulttype &
 					    UK_VMA_FAULT_ACCESSTYPE],
 				    vaddr,

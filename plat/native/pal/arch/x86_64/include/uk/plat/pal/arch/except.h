@@ -35,7 +35,7 @@ uk_pal_x86_64_except_err_ctx_set_trapnr(struct uk_pal_except_err_ctx *ctx,
 		(struct uk_plat_native_except_err_ctx *)ctx, trapnr);
 }
 
-__isr static inline int
+__isr static inline __u64
 uk_pal_x86_64_except_err_ctx_get_error_code(
 		const struct uk_pal_except_err_ctx *ctx)
 {
@@ -45,7 +45,7 @@ uk_pal_x86_64_except_err_ctx_get_error_code(
 
 __isr static inline void
 uk_pal_x86_64_except_err_ctx_set_error_code(struct uk_pal_except_err_ctx *ctx,
-					    int error_code)
+					    __u64 error_code)
 {
 	uk_plat_native_x86_64_except_err_ctx_set_error_code(
 		(struct uk_plat_native_except_err_ctx *)ctx, error_code);

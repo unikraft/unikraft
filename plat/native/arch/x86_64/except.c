@@ -268,7 +268,7 @@ static struct uk_event *trap_event_table[] = {
 
 void uk_plat_native_except_err_handler(int trapnr,
 				       struct uk_plat_native_regs *regs,
-				       unsigned long error_code)
+				       __u64 error_code)
 {
 	struct uk_plat_native_except_err_ctx ctx;
 	int rc;

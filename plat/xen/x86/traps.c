@@ -177,7 +177,7 @@ static unsigned long read_cr2(void)
 
 void uk_plat_xen_except_err_handler(unsigned int trapnr,
 				    struct uk_lcpu_regs *regs,
-				    unsigned long error_code)
+				    __u64 error_code)
 {
 	struct uk_plat_xen_except_err_ctx ctx;
 	int rc;

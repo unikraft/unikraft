@@ -50,7 +50,7 @@ struct uk_plat_xen_except_err_ctx {
 	/* x86 exception vector number (0-31) */
 	__u32 trapnr;
 	/* Hardware error code (only valid for #PF, #GP, #TS, etc.) */
-	int error_code;
+	__u64 error_code;
 	/* Set by handler if exception unrecoverable */
 	int handler_err;
 	/* CPU registers at exception time */
@@ -89,7 +89,7 @@ void uk_plat_xen_x86_64_except_err_ctx_set_trapnr(
 }
 
 __isr static inline
-int uk_plat_xen_x86_64_except_err_ctx_get_error_code(
+__u64 uk_plat_xen_x86_64_except_err_ctx_get_error_code(
 	const struct uk_plat_xen_except_err_ctx *ctx)
 {
 	return ctx->error_code;
@@ -97,21 +97,7 @@ int uk_plat_xen_x86_64_except_err_ctx_get_error_code(
 
 __isr static inline
 void uk_plat_xen_x86_64_except_err_ctx_set_error_code(
-	struct uk_plat_xen_except_err_ctx *ctx, int error_code)
-{
-	ctx->error_code = error_code;
-}
-
-__isr static inline
-int uk_plat_xen_except_err_ctx_get_error_code(
-	const struct uk_plat_xen_except_err_ctx *ctx)
-{
-	return ctx->error_code;
-}
-
-__isr static inline
-void uk_plat_xen_except_err_ctx_set_error_code(
-	struct uk_plat_xen_except_err_ctx *ctx, int error_code)
+	struct uk_plat_xen_except_err_ctx *ctx, __u64 error_code)
 {
 	ctx->error_code = error_code;
 }

@@ -85,11 +85,6 @@ DECLARE_ASM_TRAP(HYPERVISOR_CALLBACK);
 /* Trap init routine; to be called at startup */
 void xen_traps_init(void);
 
-/* Generic trap handler */
-void uk_plat_xen_except_err_handler(unsigned int num,
-				    struct uk_lcpu_regs *regs,
-				    unsigned long errcode);
-
 /* Failsafe trap handler that pops the stack and returns */
 void asm_failsafe_callback(void);
 
