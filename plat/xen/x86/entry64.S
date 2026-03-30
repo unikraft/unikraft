@@ -147,6 +147,21 @@ nofsgsbase:
 	xsetbv
 nopku:
 #endif /* CONFIG_HAVE_X86PKU */
+#if __AVX512F__
+	/* check for and enable AVX-512 Foundation */
+	testl $(UK_ARCH_X86_64_CPUID7_EBX_AVX512F), %ebx
+	jz noavx512
+	/* AVX-512 requires XSAVE/OSXSAVE; skip if not active */
+	testl $(UK_ARCH_X86_64_CR4_OSXSAVE), %edi
+	jz noavx512
+	xorl %ecx, %ecx
+	xgetbv
+	orl $(UK_ARCH_X86_64_XCR0_AVX512_OPMASK |			\
+	      UK_ARCH_X86_64_XCR0_AVX512_ZMM_HI256 |			\
+	      UK_ARCH_X86_64_XCR0_AVX512_HI16_ZMM), %eax
+	xsetbv
+noavx512:
+#endif /* __AVX512F__ */
 	/* Done setting up CPU capabilities, hand over to C entry point. */
 	movq %r8, %rdi /* pass pointer to start_info page to C entry */
 	call _libxenplat_x86entry /* should not return */
