@@ -47,11 +47,18 @@ ENTRY(lcpu_start)
 	/* Disable interrupts */
 	msr	daifset, #2
 
-	/* Set the context id */
-	msr	contextidr_el1, xzr
-
 	/* Preserve CPU index across start_mmu (x19 is not clobbered) */
 	mov	x19, x0
+
+#if CONFIG_FPSIMD
+	/* Enable fp/simd support */
+	ldr	x0, =(3 << 20)
+	msr	cpacr_el1, x0
+	isb
+#endif /* CONFIG_FPSIMD */
+
+	/* Set the context id */
+	msr	contextidr_el1, xzr
 
 	/* Setup exception vector table address before enable MMU */
 	ur_addr	x29, vector_table
