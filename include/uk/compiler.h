@@ -28,64 +28,64 @@ extern "C" {
 
 #ifdef __GNUC__
 #ifndef __packed
-#define __packed               __attribute__((packed))
+#define __packed               __attribute__((__packed__))
 #endif
 #ifndef __bitwise
 #define __bitwise               __attribute__((bitwise))
 #endif
 #ifndef __noreturn
-#define __noreturn             __attribute__((noreturn))
+#define __noreturn             __attribute__((__noreturn__))
 #endif
 #ifndef __weak
-#define __weak                 __attribute__((weak))
+#define __weak                 __attribute__((__weak__))
 #endif
 #ifndef __used
-#define __used                 __attribute__((used))
+#define __used                 __attribute__((__used__))
 #endif
 #ifndef __maybe_unused
-#define __maybe_unused         __attribute__((unused))
+#define __maybe_unused         __attribute__((__unused__))
 #endif
 #ifndef __unused
-#define __unused               __attribute__((unused))
+#define __unused               __attribute__((__unused__))
 #endif
 #ifndef __section
-#define __section(s)           __attribute__((section(s)))
+#define __section(s)           __attribute__((__section__(s)))
 #endif
 #ifndef __nonnull
-#define __nonnull              __attribute__((nonnull))
+#define __nonnull              __attribute__((__nonnull__))
 #endif
 #ifndef __nonstring
-#define __nonstring            __attribute__((nonstring))
+#define __nonstring            __attribute__((__nonstring__))
 #endif
 #ifndef __printf
-#define __printf(fmt, args)    __attribute__((format(printf, (fmt), (args))))
+#define __printf(fmt, args)    __attribute__((__format__(__printf__, (fmt), (args))))
 #endif
 #ifndef __scanf
-#define __scanf(fmt, args)     __attribute__((format(scanf, (fmt), (args))))
+#define __scanf(fmt, args)     __attribute__((__format__(__scanf__, (fmt), (args))))
 #endif
 #ifndef __align
-#define __align(bytes)         __attribute__((aligned(bytes)))
+#define __align(bytes)         __attribute__((__aligned__(bytes)))
 #endif
 #ifndef __unalign
 #define __unalign              __align(1)
 #endif
 #ifndef __noinline
-#define __noinline             __attribute__((noinline))
+#define __noinline             __attribute__((__noinline__))
 #endif
 #ifndef __check_result
-#define __check_result         __attribute__((warn_unused_result))
+#define __check_result         __attribute__((__warn_unused_result__))
 #endif
 #ifndef __may_alias
-#define __may_alias            __attribute__((may_alias))
+#define __may_alias            __attribute__((__may_alias__))
 #endif
 #ifndef __fallthrough
-#define __fallthrough          __attribute__((fallthrough))
+#define __fallthrough          __attribute__((__fallthrough__))
 #endif
 /* NOTE: naked attribute is not yet defined for AArch64 and would generate a
  * warning.
  */
 #ifndef __naked
-#define __naked                __attribute__((naked))
+#define __naked                __attribute__((__naked__))
 #endif
 
 #ifndef __barrier
@@ -94,7 +94,7 @@ extern "C" {
 
 #ifndef __alias
 #define __alias(old, new) \
-	extern __typeof(old) new __attribute__((alias(#old)))
+	extern __typeof(old) new __attribute__((__alias__(#old)))
 #endif
 /* NOTE: weak aliasing does not work well with link-time optimization
  * currently. Hopefully this will be fixed in gcc 9. The problem is,
@@ -104,7 +104,7 @@ extern "C" {
  */
 #ifndef __weak_alias
 #define __weak_alias(old, new) \
-	extern __typeof(old) new __attribute__((weak, alias(#old)))
+	extern __typeof(old) new __attribute__((__weak__, __alias__(#old)))
 #endif
 
 #ifndef likely
@@ -121,7 +121,7 @@ extern "C" {
   * to the init_array section
   */
 #ifndef __constructor
-#define __constructor __attribute__ ((constructor))
+#define __constructor __attribute__((__constructor__))
 #endif
 
 /**
@@ -135,7 +135,7 @@ extern "C" {
   *   Priority level (101 (earliest)...onwards (latest))
   */
 #ifndef __constructor_prio
-#define __constructor_prio(lvl) __attribute__ ((constructor (lvl)))
+#define __constructor_prio(lvl) __attribute__((__constructor__(lvl)))
 #endif
 
 #else
