@@ -198,6 +198,33 @@ void __noreturn uk_arch_arm64_jump_to(__u64 sp, __u64 entry)
 	__builtin_unreachable();
 }
 
+/**
+ * Set current instruction pointer to a custom place by jumping to it while
+ * switching the stack pointer to a custom value beforehand, and passing a
+ * single argument to the target function.
+ *
+ * This function does not return!
+ *
+ * @param sp    Stack pointer to switch to before jumping
+ * @param entry The place to jump to
+ * @param arg   The argument to pass to the target function
+ */
+static inline
+void __noreturn uk_arch_arm64_jump_to_with_arg(__u64 sp, __u64 entry, __u64 arg)
+{
+	__asm__ __volatile__ (
+			"mov	x29, xzr\n" /* reset frame pointer */
+			"mov	x30, xzr\n" /* reset link register */
+			"mov	sp, %0\n"   /* set the sp  */
+			"mov	x0, %2\n"   /* set x0 to args */
+			"br	%1\n"       /* branch to the entry func */
+			:
+			: "r"(sp), "r"(entry), "r"(arg)
+			: /* sp not needed */);
+
+	__builtin_unreachable();
+}
+
 static inline
 void uk_arch_arm64_halt(void)
 {

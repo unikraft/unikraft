@@ -57,6 +57,18 @@ void uk_arch_spinwait(void);
  */
 void __noreturn uk_arch_jump_to(__u64 sp, __u64 addr);
 
+/**
+ * Switch stack pointer to given value, jump to address,
+ * and pass a single argument to the target function.
+ *
+ * This function does not return.
+ *
+ * @param sp  Stack pointer to switch to before jumping
+ * @param ip  The address to jump to
+ * @param arg The argument to pass to the target function
+ */
+void __noreturn uk_arch_jump_to_with_arg(__u64 sp, __u64 ip, __u64 arg);
+
 #endif /* !__ASSEMBLY__ */
 
 #ifdef __cplusplus

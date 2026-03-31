@@ -49,6 +49,12 @@ void __noreturn uk_arch_jump_to(__u64 sp, __u64 entry)
 	uk_arch_x86_64_jump_to(sp, entry);
 }
 
+static inline
+void __noreturn uk_arch_jump_to_with_arg(__u64 sp, __u64 ip, __u64 arg)
+{
+	uk_arch_x86_64_jump_to_with_arg(sp, ip, arg);
+}
+
 #endif /* !__ASSEMBLY__ */
 
 #ifdef __cplusplus
