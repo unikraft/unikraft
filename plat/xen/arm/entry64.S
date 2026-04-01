@@ -26,6 +26,7 @@
 
 #include <uk/asm.h>
 #include <uk/asm/lcpu.h>
+#include <uk/reloc.h>
 #include <xen/xen.h>
 #include <xen/elfnote.h>
 
@@ -267,6 +268,12 @@ ENTRY(_libxenplat_start)
 	br      x0
 
 mmu_on:
+	/* Set TPIDR_EL1 for BSP (idx=0):
+	 * _uk_pcpuvar_base + idx * _uk_pcpuvar_tmpl_size = _uk_pcpuvar_base
+	 */
+	ur_addr x0, _uk_pcpuvar_base
+	msr     tpidr_el1, x0
+
 	/* Setup stack */
 	VPRINT("- Setup stack -\n")
 	ldr     x0, =stack
