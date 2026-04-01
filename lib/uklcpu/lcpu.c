@@ -300,7 +300,7 @@ int uk_lcpu_start(const __u64 lcpuidx[], unsigned int *num,
 	__u64 this_cpu_id = uk_pcpuvar_current_get(uk_pcpuvar_cpu_id);
 	const int new = UK_LCPU_STATE_INIT;
 	struct uk_lcpu *lcpu;
-	int old, rc = 0, rc2;
+	int old, rc = 0, rc2 __maybe_unused;
 	unsigned int i, n;
 
 	UK_ASSERT(lcpuidx);
