@@ -33,8 +33,8 @@ struct uk_lcpu_pm_ops {
 	/**
 	 * Starts a secondary logical CPU.
 	 *
-	 * @param lcpu
-	 *   The secondary logical CPU to start
+	 * @param idx
+	 *   The logical index of the CPU to start
 	 * @return
 	 *   0 on success, !=0 on error
 	 */
