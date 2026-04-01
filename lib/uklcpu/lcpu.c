@@ -285,7 +285,10 @@ void __weak __noreturn uk_lcpu_entry_default(struct uk_lcpu *this_lcpu)
 			/* Besides interrupts in general, the halt can be
 			 * interrupted by calls to uk_lcpu_run().
 			 */
-			uk_lcpu_halt();
+			if (!pm_ops || !pm_ops->halt)
+				uk_arch_spinwait();
+			else
+				pm_ops->halt();
 		}
 	}
 }
