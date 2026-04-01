@@ -1,5 +1,5 @@
 menuconfig LIBVFSCORE
-	bool "vfscore: VFS Core Interface"
+	bool "vfscore: VFS Core Interface (DEPRECATED)"
 	default n
 	select LIBNOLIBC if !HAVE_LIBC
 	select LIBUKDEBUG
@@ -14,6 +14,9 @@ menuconfig LIBVFSCORE
 	select LIBPOSIX_PIPE
 	select LIBPOSIX_TTY
 	select HAVE_VFS
+	help
+		This legacy unikraft VFS stack is deprecated and will be removed
+		in a future version. Consider migrating workloads to posix-vfs.
 
 if LIBVFSCORE
 config LIBVFSCORE_NONLARGEFILE
