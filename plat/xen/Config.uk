@@ -1,34 +1,34 @@
 menuconfig PLAT_XEN
-       bool "Xen guest image"
-       default n
-       depends on (ARCH_X86_64 || ARCH_ARM_64)
-       select HAVE_XENBUS
-       imply XEN_PV_BUILD_P2M
-       select LIBXENHEADERS
-       select LIBUKDEBUG
-       select LIBUKBOOT
-       select LIBUKBITOPS
-       select LIBNOLIBC if !HAVE_LIBC
-       select HAVE_FDT if ARCH_ARM_64
-       imply LIBUKPM
-       imply LIBFDT if (ARCH_ARM_32 || ARCH_ARM_64)
-       select LIBUKRELOC if OPTIMIZE_PIE
-       imply LIBUKOFW if ARCH_ARM_64
-       select HAVE_INTCTLR if ARCH_ARM_64
-       imply LIBUKINTCTLR_GICV3 if ARCH_ARM_64
-       imply LIBNETFRONT if LIBUKNETDEV
-       imply LIB9PFRONT if LIBUK9P
-       imply LIBBLKFRONT if LIBUKBLKDEV
-       imply LIBXENCONS if LIBUKCONSOLE
-       imply LIBXENEMGCONS if ARCH_ARM_32
-       select LIBUKPLAT_NATIVE
-       select LIBUKPLAT_NATIVE_ADDR
-       select LIBUKPLAT_NATIVE_ECTX
-       select LIBUKPLAT_NATIVE_PAGE
-       select LIBUKPLAT_NATIVE_PT
-       select LIBUKPLAT_NATIVE_SYSCTX
-       help
-                Create a Unikraft image that runs as a Xen guest
+	bool "Xen guest image"
+	default n
+	depends on (ARCH_X86_64 || ARCH_ARM_64)
+	select HAVE_XENBUS
+	imply XEN_PV_BUILD_P2M
+	select LIBXENHEADERS
+	select LIBUKDEBUG
+	select LIBUKBOOT
+	select LIBUKBITOPS
+	select LIBNOLIBC if !HAVE_LIBC
+	select HAVE_FDT if ARCH_ARM_64
+	imply LIBUKPM
+	imply LIBFDT if (ARCH_ARM_32 || ARCH_ARM_64)
+	select LIBUKRELOC if OPTIMIZE_PIE
+	imply LIBUKOFW if ARCH_ARM_64
+	select HAVE_INTCTLR if ARCH_ARM_64
+	imply LIBUKINTCTLR_GICV3 if ARCH_ARM_64
+	imply LIBNETFRONT if LIBUKNETDEV
+	imply LIB9PFRONT if LIBUK9P
+	imply LIBBLKFRONT if LIBUKBLKDEV
+	imply LIBXENCONS if LIBUKCONSOLE
+	imply LIBXENEMGCONS if ARCH_ARM_32
+	select LIBUKPLAT_NATIVE
+	select LIBUKPLAT_NATIVE_ADDR
+	select LIBUKPLAT_NATIVE_ECTX
+	select LIBUKPLAT_NATIVE_PAGE
+	select LIBUKPLAT_NATIVE_PT
+	select LIBUKPLAT_NATIVE_SYSCTX
+	help
+		Create a Unikraft image that runs as a Xen guest
 
 if (PLAT_XEN)
 # Invisible option to switch between PV and PVH mode
