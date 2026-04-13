@@ -1,0 +1,6 @@
+{
+  "analyze": [
+	  "--disable=clang-diagnostic-reserved-identifier",
+	  "--disable=clang-diagnostic-reserved-macro-identifier"
+  ]
+}
