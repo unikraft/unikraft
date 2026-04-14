@@ -178,10 +178,14 @@ int uk_sys_clock_getres(clockid_t clk_id, struct timespec *tp)
 
 	switch (clk_id) {
 	case CLOCK_MONOTONIC:
+	case CLOCK_MONOTONIC_RAW:
 	case CLOCK_MONOTONIC_COARSE:
 	case CLOCK_REALTIME:
 	case CLOCK_REALTIME_COARSE:
 	case CLOCK_BOOTTIME:
+#if CONFIG_HAVE_SCHED
+	case CLOCK_THREAD_CPUTIME_ID:
+#endif /* CONFIG_HAVE_SCHED */
 		if (tp) {
 			tp->tv_sec = 0;
 			tp->tv_nsec = UKPLAT_TIME_TICK_NSEC;
