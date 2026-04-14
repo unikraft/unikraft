@@ -7,10 +7,10 @@
 #include <string.h>
 #include <errno.h>
 
-#include <uk/arch/paging.h>
-#include <uk/virtio_fs.h>
+#include <uk/paging.h>
 #include <uk/sched.h>
 #include <uk/thread.h>
+#include <uk/virtio_fs.h>
 
 #include <virtio/virtio_bus.h>
 #include <virtio/virtio_fs.h>
