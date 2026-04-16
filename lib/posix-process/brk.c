@@ -7,6 +7,7 @@
 #include <string.h>
 #include <uk/alloc.h>
 #include <uk/event.h>
+#include <uk/paging.h>
 #include <uk/print.h>
 #include <uk/prio.h>
 #include <uk/process.h>
@@ -20,16 +21,16 @@
 #define HEAP_PAGES							\
 	(1UL << CONFIG_LIBPOSIX_PROCESS_BRK_PAGE_ORDER)
 #define HEAP_LEN							\
-	(PAGE_SIZE * HEAP_PAGES)
+	(UK_PAGING_PAGE_SIZE * HEAP_PAGES)
 
 #if CONFIG_LIBUKVMEM
 static inline int pprocess_brk_init_zone(struct posix_process *pprocess)
 {
-	__vaddr_t va = __VADDR_ANY;
+	__vaddr_t va = UK_PAGING_VADDR_ANY;
 	int rc;
 
-	rc = uk_vma_map_anon(uk_vas_get_active(), &va,
-			     HEAP_LEN, PAGE_ATTR_PROT_RW, 0, "brk VMA");
+	rc = uk_vma_map_anon(uk_vas_get_active(), &va, HEAP_LEN,
+			     UK_PAGING_PAGE_ATTR_PROT_RW, 0, "brk VMA");
 	if (unlikely(rc))
 		return rc;
 
@@ -181,13 +182,13 @@ static inline int memzero_brk_inrange(__uptr cur_brk, __uptr addr)
 		 * Zero out the part of the bump that is still wthin the same
 		 * page.
 		 */
-		if (addr > PAGE_ALIGN_UP(cur_brk)) {
+		if (addr > UK_PAGING_PAGE_ALIGN_UP(cur_brk)) {
 			/*
 			 * If addr is beyond the page cur_brk is in then zero
 			 * out starting from cur_brk to the start of the next
 			 * page.
 			 */
-			zlen = PAGE_ALIGN_UP(cur_brk) - cur_brk;
+			zlen = UK_PAGING_PAGE_ALIGN_UP(cur_brk) - cur_brk;
 		} else {
 			/* If addr is within the page cur_brk is in then zero
 			 * out starting from cur_brk to addr.
@@ -205,8 +206,8 @@ static inline int memzero_brk_inrange(__uptr cur_brk, __uptr addr)
 	 */
 
 	/* Align boundaries to identify full pages */
-	free_start = PAGE_ALIGN_UP(addr);
-	free_end = PAGE_ALIGN_UP(cur_brk);
+	free_start = UK_PAGING_PAGE_ALIGN_UP(addr);
+	free_end = UK_PAGING_PAGE_ALIGN_UP(cur_brk);
 
 	/* Check if we have at least one full page to free */
 	if (!(free_start < free_end))
@@ -214,7 +215,7 @@ static inline int memzero_brk_inrange(__uptr cur_brk, __uptr addr)
 
 	uk_pr_debug("Freeing up brk range 0x%lx-0x%lx (%lu pages)\n",
 		    free_start, free_end,
-		    (free_end - free_start) >> __PAGE_SHIFT);
+		    (free_end - free_start) >> UK_PAGING_PAGE_SHIFT);
 
 	rc = uk_vma_advise(uk_vas_get_active(), free_start,
 			   free_end - free_start, UK_VMA_ADV_DONTNEED, 0);
