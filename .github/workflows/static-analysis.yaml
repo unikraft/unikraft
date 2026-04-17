@@ -19,7 +19,7 @@ jobs:
       - name: "Fetch clang"
         uses: KyleMayes/install-llvm-action@v2
         with:
-          arch: 'x64'
+          arch: 'arm64'
           version: '21'
 
       - name: "Fetch elfloader"
@@ -35,7 +35,7 @@ jobs:
           loglevel: debug
           workdir: _elfloader
           plat: 'qemu'
-          arch: 'x86_64'
+          arch: 'arm64'
           execute: false
           toolchain: "CC=/github/workspace/llvm/bin/clang"
           kraftfile: |
@@ -157,7 +157,7 @@ jobs:
               version: staging
             targets:
               - platform: 'qemu'
-                architecture: 'x86_64'
+                architecture: 'arm64'
 
       - name: "Create link"
         run: |
