@@ -59,6 +59,15 @@ static int pprocess_brk_init(void *arg)
 	UK_ASSERT(arg);
 
 	event_data = (struct posix_process_clone_event_data *)arg;
+
+	/**
+	 * Handler is meant to just initialize per-process brk once, at the
+	 * beginning. If this is not a process creation-related clone call
+	 * then ignore.
+	 */
+	if (!(event_data->cl_args->flags & CLONE_VFORK))
+		return 0;
+
 	pprocess = pid2pprocess(event_data->pid);
 
 	UK_ASSERT(!pprocess->brk_ctx.base);
