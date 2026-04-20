@@ -10,6 +10,7 @@
 #include <uk/list.h>
 #include <uk/console.h>
 #include <uk/console/driver.h>
+#include <uk/spinlock.h>
 #include <errno.h>
 
 #if CONFIG_LIBUKDEBUG_PRINTK
@@ -17,7 +18,8 @@
 #endif /* CONFIG_LIBUKDEBUG_PRINTK */
 
 /* List of dynamically registered devices */
-static UK_LIST_HEAD(uk_console_device_list);
+static struct uk_spinlock cons_dev_list_lock = UK_SPINLOCK_INITIALIZER();
+static UK_LIST_HEAD(cons_dev_list);
 static __u16 uk_console_device_count;
 
 static __bool uk_console_set_stdout_once;
@@ -28,10 +30,14 @@ struct uk_console *uk_console_get(__u16 id)
 {
 	struct uk_console *dev = __NULL;
 
-	uk_list_for_each_entry(dev, &uk_console_device_list, _list) {
-		if (dev->id == id)
+	uk_spin_lock(&cons_dev_list_lock);
+	uk_list_for_each_entry(dev, &cons_dev_list, _list) {
+		if (dev->id == id) {
+			uk_spin_unlock(&cons_dev_list_lock);
 			return dev;
+		}
 	}
+	uk_spin_unlock(&cons_dev_list_lock);
 
 	return __NULL;
 }
@@ -52,10 +58,12 @@ __ssz uk_console_out(const char *buf, __sz len)
 		return -EINVAL;
 
 	/* Output to all STDOUT devices */
-	uk_list_for_each_entry(dev, &uk_console_device_list, _list) {
+	uk_spin_lock(&cons_dev_list_lock);
+	uk_list_for_each_entry(dev, &cons_dev_list, _list) {
 		if ((dev->flags & UK_CONSOLE_FLAG_STDOUT) && dev->ops->out)
 			uk_console_out_direct(dev, buf, len);
 	}
+	uk_spin_unlock(&cons_dev_list_lock);
 
 	return len;
 }
@@ -82,7 +90,8 @@ __ssz uk_console_in(char *buf, __sz len)
 	 *        We could solve this by remembering the iteration
 	 *        point between calls.
 	 */
-	uk_list_for_each_entry(dev, &uk_console_device_list, _list) {
+	uk_spin_lock(&cons_dev_list_lock);
+	uk_list_for_each_entry(dev, &cons_dev_list, _list) {
 		UK_ASSERT(dev->ops);
 		if ((dev->flags & UK_CONSOLE_FLAG_STDIN) && dev->ops->in) {
 			rc = uk_console_in_direct(dev, buf, leftover);
@@ -94,6 +103,7 @@ __ssz uk_console_in(char *buf, __sz len)
 				break;
 		}
 	}
+	uk_spin_unlock(&cons_dev_list_lock);
 
 	return len - leftover;
 }
@@ -109,11 +119,13 @@ __isr __ssz uk_console_emerg_out(const char *buf, __sz len)
 		return -EINVAL;
 
 	/* Output to all EMERG_STDOUT devices */
-	uk_list_for_each_entry(dev, &uk_console_device_list, _list) {
+	uk_spin_lock(&cons_dev_list_lock);
+	uk_list_for_each_entry(dev, &cons_dev_list, _list) {
 		if ((dev->flags & UK_CONSOLE_FLAG_EMERG_STDOUT) &&
 		    dev->ops->emerg_out)
 			uk_console_emerg_out_direct(dev, buf, len);
 	}
+	uk_spin_unlock(&cons_dev_list_lock);
 
 	return len;
 }
@@ -262,8 +274,10 @@ void uk_console_register(struct uk_console *dev)
 	UK_ASSERT(dev->ops);
 
 #if CONFIG_LIBUKDEBUG_ENABLE_ASSERT
-	uk_list_for_each_entry(known_dev, &uk_console_device_list, _list)
+	uk_spin_lock(&cons_dev_list_lock);
+	uk_list_for_each_entry(known_dev, &cons_dev_list, _list)
 		UK_ASSERT(dev != known_dev);
+	uk_spin_unlock(&cons_dev_list_lock);
 #endif /* CONFIG_LIBUKDEBUG_ENABLE_ASSERT */
 
 	/* We want to make sure that one of the registered devices has the
@@ -305,7 +319,10 @@ void uk_console_register(struct uk_console *dev)
 		dev->flags |= UK_CONSOLE_FLAG_EMERG_STDOUT;
 	}
 
-	uk_list_add_tail(&dev->_list, &uk_console_device_list);
+	uk_spin_lock(&cons_dev_list_lock);
+	uk_list_add_tail(&dev->_list, &cons_dev_list);
+	uk_spin_unlock(&cons_dev_list_lock);
+
 	dev->id = uk_console_device_count++;
 
 #if CONFIG_LIBUKDEBUG_PRINTK
