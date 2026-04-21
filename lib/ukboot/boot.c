@@ -489,7 +489,7 @@ int do_main(int argc, char *argv[])
 		(*ctorfn)(argc, argv);
 	}
 
-#if CONFIG_LIBUKDEBUG_PRINTK_INFO
+#if CONFIG_LIBUKPRINT_KLVL_INFO
 #if CONFIG_LIBPOSIX_ENVIRON
 	envp = environ;
 	if (envp) {
@@ -508,7 +508,7 @@ int do_main(int argc, char *argv[])
 			uk_pr_info(", ");
 	}
 	uk_pr_info("])\n");
-#endif /* CONFIG_LIBUKDEBUG_PRINTK_INFO */
+#endif /* CONFIG_LIBUKPRINT_KLVL_INFO */
 
 	ret = main(argc, argv);
 	uk_pr_info("main returned %d\n", ret);
