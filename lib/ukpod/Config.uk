@@ -1,5 +1,6 @@
 menuconfig LIBUKPOD
 	bool "ukpod: Pages-on-Demand"
+	select LIBUKDEBUG
 
 if LIBUKPOD
 

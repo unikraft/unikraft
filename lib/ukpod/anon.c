@@ -7,6 +7,7 @@
 /* Page I/O ops for anonymous memory */
 
 #include <uk/pod/anon.h>
+#include <uk/assert.h>
 
 /**
  * Page-in function for anonymous memory; fills pages with zeros.
