@@ -1,0 +1,249 @@
+name: static-analysis
+
+on:
+  workflow_dispatch:
+
+  workflow_run:
+    workflows: [integration]
+    types: [completed]
+
+  schedule:
+    - cron: '0 0 * * *'
+
+permissions:
+  statuses: write
+
+jobs:
+  analyze:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'schedule' ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Set commit status: pending"
+        if: ${{ github.event_name == 'workflow_run' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh api repos/${{ github.repository }}/statuses/${{ github.event.workflow_run.head_sha }} \
+            -f state=pending \
+            -f context="static analysis" \
+            -f description="Running static analysis..." \
+            -f target_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || 'staging' }}
+          submodules: recursive
+
+      - name: "Fetch clang"
+        uses: KyleMayes/install-llvm-action@v2
+        with:
+          arch: 'x64'
+          version: '21'
+
+      - name: "Fetch elfloader"
+        uses: actions/checkout@v4
+        with:
+          repository: unikraft/app-elfloader
+          fetch-depth: 1
+          path: _elfloader
+
+      - name: "Build elfloader"
+        uses: unikraft/kraftkit@staging
+        with:
+          loglevel: debug
+          workdir: _elfloader
+          plat: 'qemu'
+          arch: 'x86_64'
+          execute: false
+          toolchain: "CC=/github/workspace/llvm/bin/clang"
+          kraftfile: |
+            specification: '0.5'
+            name: elfloader
+            unikraft:
+              source: ../
+              kconfig:
+                CONFIG_APPELFLOADER_BRK: 'y'
+                CONFIG_APPELFLOADER_CUSTOMAPPNAME: 'y'
+                CONFIG_APPELFLOADER_STACK_NBPAGES: 128
+                CONFIG_APPELFLOADER_VFSEXEC_EXECBIT: 'n'
+                CONFIG_APPELFLOADER_VFSEXEC: 'y'
+                CONFIG_APPELFLOADER_AUTOGEN_REPLACEEXIST: 'y'
+                # Unikraft options
+                CONFIG_HAVE_PAGING_DIRECTMAP: 'y'
+                CONFIG_HAVE_PAGING: 'y'
+                CONFIG_LIBPOSIX_ENVIRON_ENVP0: "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+                CONFIG_LIBPOSIX_ENVIRON_ENVP1: "LD_LIBRARY_PATH=/usr/local/lib:/usr/lib:/lib"
+                CONFIG_LIBPOSIX_ENVIRON_ENVP2: "LOGNAME=root"
+                CONFIG_LIBPOSIX_ENVIRON_ENVP3: "HOME=/root"
+                CONFIG_LIBPOSIX_ENVIRON_ENVP4: "PWD=/root"
+                CONFIG_LIBPOSIX_ENVIRON: 'y'
+                CONFIG_LIBPOSIX_ENVIRON_LIBPARAM: 'y'
+                CONFIG_LIBPOSIX_ENVIRON_LIBPARAM_MAXCOUNT: '64'
+                CONFIG_LIBPOSIX_TTY: 'y'
+                CONFIG_LIBPOSIX_TTY_SERIAL: 'y'
+                CONFIG_LIBPOSIX_TTY_STDIN_VOID: 'y'
+                CONFIG_LIBPOSIX_TTY_STDOUT_SERIAL: 'y'
+                CONFIG_LIBPOSIX_EVENTFD: 'y'
+                CONFIG_LIBPOSIX_FDIO: 'y'
+                CONFIG_LIBPOSIX_FDTAB: 'y'
+                CONFIG_LIBPOSIX_FUTEX: 'y'
+                CONFIG_LIBPOSIX_MMAP: 'y'
+                CONFIG_LIBPOSIX_NETLINK: 'y'
+                CONFIG_LIBPOSIX_PIPE: 'y'
+                CONFIG_LIBPOSIX_POLL: 'y'
+                CONFIG_LIBPOSIX_PROCESS: 'y'
+                CONFIG_LIBPOSIX_PROCESS_MULTITHREADING: 'y'
+                CONFIG_LIBPOSIX_PROCESS_ARCH_PRCTL: 'y'
+                CONFIG_LIBPOSIX_PROCESS_MAX_PID: '511'
+                CONFIG_LIBPOSIX_SOCKET: 'y'
+                CONFIG_LIBPOSIX_SYSINFO: 'y'
+                CONFIG_LIBPOSIX_TIME: 'y'
+                CONFIG_LIBPOSIX_TIMERFD: 'y'
+                CONFIG_LIBPOSIX_UNIXSOCKET: 'y'
+                CONFIG_LIBPOSIX_USER_GID: 0
+                CONFIG_LIBPOSIX_USER_GROUPNAME: "root"
+                CONFIG_LIBPOSIX_USER_UID: 0
+                CONFIG_LIBPOSIX_USER_USERNAME: "root"
+                CONFIG_LIBPOSIX_USER: 'y'
+                CONFIG_LIBSYSCALL_SHIM_HANDLER_ULTLS: 'y'
+                CONFIG_LIBSYSCALL_SHIM_HANDLER: 'y'
+                CONFIG_LIBSYSCALL_SHIM_LEGACY_VERBOSE: 'y'
+                CONFIG_LIBSYSCALL_SHIM: 'y'
+                CONFIG_LIBUKALLOCPOOL: 'y'
+                CONFIG_LIBUKBLKDEV_MAXNBQUEUES: '1'
+                CONFIG_LIBUKBLKDEV_DISPATCHERTHREADS: 'y'
+                CONFIG_LIBUKBLKDEV_SYNC_IO_BLOCKED_WAITING: 'y'
+                CONFIG_LIBUKBLKDEV: 'y'
+                CONFIG_LIBUKBOOT_BANNER_MINIMAL: 'y'
+                CONFIG_LIBUKBOOT_HEAP_BASE: '0x400000000'
+                CONFIG_LIBUKBOOT_MAINTHREAD: 'y'
+                CONFIG_LIBUKBOOT_SHUTDOWNREQ_HANDLER: 'y'
+                CONFIG_LIBUKCPIO: 'y'
+                CONFIG_LIBUKDEBUG_CRASH_SCREEN: 'y'
+                CONFIG_LIBUKDEBUG_ENABLE_ASSERT: 'y'
+                CONFIG_LIBUKDEBUG: 'y'
+                CONFIG_LIBUKFALLOC: 'y'
+                CONFIG_LIBUKMPI: 'n'
+                CONFIG_LIBUKSIGNAL: 'y'
+                CONFIG_LIBUKRANDOM_DEVFS: 'y'
+                CONFIG_LIBUKRANDOM: 'y'
+                CONFIG_LIBUKRANDOM_GETRANDOM: 'y'
+                CONFIG_LIBUKVMEM_PFR: 'y'
+                CONFIG_LIBUKVMEM_DEFAULT_BASE: '0x0000001000000000'
+                CONFIG_LIBUKVMEM_DEMAND_PAGE_IN_SIZE: 12
+                CONFIG_LIBUKVMEM_PAGEFAULT_HANDLER_PRIO: 4
+                CONFIG_LIBUKVMEM: 'y'
+                CONFIG_ELF_PHDRS_IN_PT_LOAD: 'y'
+                CONFIG_PAGING: 'y'
+                CONFIG_STACK_SIZE_PAGE_ORDER: 4 # 128 * 4K = 512K
+                CONFIG_UKPLAT_MEMREGION_MAX_COUNT: 64
+                # VFS stack & fstab
+                CONFIG_LIBVFSCORE: 'n'
+                CONFIG_LIBUKFILE_PSEUDO: 'y'
+                CONFIG_LIBPOSIX_VFS: 'y'
+                CONFIG_LIBPOSIX_VFS_SYSCALLS: 'y'
+                CONFIG_LIBPOSIX_VFS_FSTAB: 'y'
+                CONFIG_LIBPOSIX_VFS_FSTAB_MOUNT_DEV: 'y'
+                CONFIG_LIBPOSIX_VFS_FSTAB_BUILTIN: 'y'
+                #CONFIG_LIBPOSIX_VFS_FSTAB_BUILTIN_EINITRD: 'y'
+                # Volume support + runtime fstab
+                CONFIG_LIBPOSIX_VFS_FSTAB_USER: 'y'
+                CONFIG_LIBUKFS_VIRTIOFS: 'y'
+            libraries:
+              lwip:
+                version: staging
+                kconfig:
+                  CONFIG_LWIP_TCP: 'y'
+                  CONFIG_LWIP_UDP: 'y'
+                  CONFIG_LWIP_RAW: 'y'
+                  CONFIG_LWIP_WND_SCALE: 'y'
+                  CONFIG_LWIP_TCP_KEEPALIVE: 'y'
+                  CONFIG_LWIP_THREADS: 'y'
+                  CONFIG_LWIP_HEAP: 'y'
+                  CONFIG_LWIP_SOCKET: 'y'
+                  CONFIG_LWIP_AUTOIFACE: 'y'
+                  CONFIG_LWIP_NUM_TCPCON: 64
+                  CONFIG_LWIP_NUM_TCPLISTENERS: 64
+                  CONFIG_LWIP_ICMP: 'y'
+                  CONFIG_LWIP_DHCP: 'n'
+                  CONFIG_LWIP_DNS: 'n'
+              libelf:
+                version: staging
+                kconfig:
+                  CONFIG_LIBELF: 'y'
+            compiler-rt:
+              version: staging
+            targets:
+              - platform: 'qemu'
+                architecture: 'x86_64'
+
+      - name: "Create link"
+        run: |
+          sudo mkdir /github
+          sudo ln -s "${{ github.workspace }}" /github/workspace
+
+      - name: Run static analysis
+        uses: whisperity/codechecker-analysis-action@v1
+        id: codechecker
+        with:
+          version: 'master'
+          llvm-version: 'ignore' # already installed
+          ignore-analyze-crashes: false
+          config: "${{ github.workspace }}/.codechecker.json"
+          logfile: "${{ github.workspace }}/_elfloader/.unikraft/build/compile_commands.json"
+
+          store: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
+          store-url: 'https://codechecker.unikraft.org/unikraft'
+          store-run-name: 'app-elfloader-qemu-x86_64'
+          store-username: ${{ secrets.CODECHECKER_STORE_USER }}
+          store-password: ${{ secrets.CODECHECKER_STORE_PASS }}
+
+          diff: ${{ github.event_name == 'workflow_run' }}
+          diff-url: 'https://codechecker.unikraft.org/unikraft'
+          diff-run-name: 'app-elfloader-qemu-x86_64'
+          diff-username: ${{ secrets.CODECHECKER_STORE_USER }}
+          diff-password: ${{ secrets.CODECHECKER_STORE_PASS }}
+
+      - name: "Check results store status"
+        if: ${{ steps.codechecker.outputs.store-successful == 'false' }}
+        run: exit 1
+
+      - name: "Fail the job if new findings are introduced"
+        if: ${{ steps.codechecker.outputs.warnings-in-diff == 'true' }}
+        run: exit 1
+
+      - name: "Set commit status: success"
+        if: ${{ always() && github.event_name == 'workflow_run' && !failure() && !cancelled() }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh api repos/${{ github.repository }}/statuses/${{ github.event.workflow_run.head_sha }} \
+            -f state=success \
+            -f context="static analysis" \
+            -f description="Passed" \
+            -f target_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+      - name: "Set commit status: failure"
+        if: ${{ always() && github.event_name == 'workflow_run' && failure() }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh api repos/${{ github.repository }}/statuses/${{ github.event.workflow_run.head_sha }} \
+            -f state=failure \
+            -f context="static analysis" \
+            -f description="Failed" \
+            -f target_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+      - name: "Set commit status: canceled"
+        if: ${{ always() && github.event_name == 'workflow_run' && cancelled() }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh api repos/${{ github.repository }}/statuses/${{ github.event.workflow_run.head_sha }} \
+            -f state=failure \
+            -f context="static analysis" \
+            -f description="Canceled" \
+            -f target_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
