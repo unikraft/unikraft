@@ -472,7 +472,7 @@ struct virtqueue *virtqueue_create(__u16 queue_id, __u16 nr_descs, __u16 align,
 	vrq->vring_mem = NULL;
 
 	ring_size = vring_size(nr_descs, align);
-#ifdef CONFIG_LIBUKVMEM
+#if CONFIG_LIBUKVMEM
 	struct uk_pagetable *pt = uk_paging_pt_get_active();
 	__paddr_t paddr = UK_PAGING_PADDR_ANY;
 	__vaddr_t vaddr = UK_PAGING_VADDR_ANY;
@@ -491,7 +491,7 @@ struct virtqueue *virtqueue_create(__u16 queue_id, __u16 nr_descs, __u16 align,
 		goto err_freevq;
 
 	vrq->vring_mem = (void *)vaddr;
-#else /* CONFIG_LIBUKVMEM */
+#else /* !CONFIG_LIBUKVMEM */
 	if (uk_posix_memalign(a, &vrq->vring_mem,
 			      __PAGE_SIZE, ring_size) != 0) {
 		rc = -ENOMEM;
@@ -519,16 +519,28 @@ err_exit:
 	return ERR2PTR(rc);
 }
 
-void virtqueue_destroy(struct virtqueue *vq, struct uk_alloc *a)
+void virtqueue_destroy(__u16 align __maybe_unused,
+		       struct virtqueue *vq, struct uk_alloc *a)
 {
+	__sz ring_size __maybe_unused;
 	struct virtqueue_vring *vrq;
+	int rc __maybe_unused;
 
 	UK_ASSERT(vq);
 
 	vrq = to_virtqueue_vring(vq);
 
 	/* Free the ring */
+#if CONFIG_LIBUKVMEM
+	ring_size = UK_PAGING_PAGE_ALIGN_UP(vring_size(vrq->vring.num, align));
+	rc = uk_vma_unmap(uk_vas_get_active(), (__vaddr_t)vrq->vring_mem,
+			  ring_size, 0);
+	if (unlikely(rc < 0))
+		uk_pr_err("Failed to unmap virtio ring %p: %d\n",
+			  vrq->vring_mem, rc);
+#else /* !CONFIG_LIBUKVMEM */
 	uk_free(a, vrq->vring_mem);
+#endif /* !CONFIG_LIBUKVMEM */
 
 	/* Free the virtqueue metadata */
 	uk_free(a, vrq);

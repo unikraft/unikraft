@@ -208,7 +208,7 @@ static void vpci_legacy_vq_release(struct virtio_dev *vdev,
 	UK_TAILQ_REMOVE(&vpdev->vdev.vqs, vq, next);
 	uk_lcpu_restore_irqf(flags);
 
-	virtqueue_destroy(vq, a);
+	virtqueue_destroy(VIRTIO_PCI_VRING_ALIGN, vq, a);
 }
 
 static int vpci_legacy_pci_vq_find(struct virtio_dev *vdev, __u16 num_vqs,

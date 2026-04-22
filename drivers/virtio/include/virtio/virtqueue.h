@@ -234,8 +234,10 @@ int virtqueue_hasdata(struct virtqueue *vq);
  *	A reference to the virtual queue
  * @param a
  *	Reference to the memory allocator
+ * @param align
+ *	The memory alignment for the ring memory.
  */
-void virtqueue_destroy(struct virtqueue *vq, struct uk_alloc *a);
+void virtqueue_destroy(__u16 align, struct virtqueue *vq, struct uk_alloc *a);
 
 /**
  * Disable interrupts on the virtqueue.
