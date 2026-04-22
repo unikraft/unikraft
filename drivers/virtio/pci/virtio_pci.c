@@ -138,7 +138,8 @@ static int virtio_pci_handle(void *arg)
 
 	if (isr_status & VIRTIO_PCI_ISR_CONFIG) {
 		/* We don't support configuration interrupt on the device */
-		uk_pr_warn("Unsupported config change interrupt received on virtio-pci device %p\n", d);
+		uk_pr_warn_isr("Unsupported config change interrupt received on virtio-pci device %p\n",
+			       d);
 	}
 
 	if (isr_status & VIRTIO_PCI_ISR_HAS_INTR)

@@ -284,8 +284,8 @@ static int vm_interrupt(void *opaque)
 				     status);
 
 	if (unlikely(status & VIRTIO_MMIO_INT_CONFIG)) {
-		uk_pr_warn("Unsupported config change interrupt received on virtio-mmio device %p\n",
-			   vm_dev);
+		uk_pr_warn_isr("Unsupported config change interrupt received on virtio-mmio device %p\n",
+			       vm_dev);
 	}
 
 	if (likely(status & VIRTIO_MMIO_INT_VRING)) {
