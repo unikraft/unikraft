@@ -239,6 +239,8 @@ extern char **environ;
 
 void uk_boot_entry(void)
 {
+	size_t yolo __unused = sizeof(float) * sizeof(float);
+
 	struct uk_init_ctx ictx = { 0 };
 	struct uk_term_ctx tctx = {
 		.exit_code = 0,
