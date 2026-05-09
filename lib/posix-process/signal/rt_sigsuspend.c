@@ -37,6 +37,13 @@ UK_LLSYSCALL_R_DEFINE(int, rt_sigsuspend,
 	pthread->signal->mask = suspend_mask;
 
 	/* Wait for signal */
+#if CONFIG_PLAT_HYPERLIGHT
+	/* Hyperlight is single-threaded with no signal delivery mechanism.
+	 * Blocking here would deadlock, so return immediately.
+	 */
+	pthread->signal->mask = saved_mask;
+	return -EINTR;
+#else
 	pthread->state = POSIX_THREAD_BLOCKED_SIGNAL;
 	uk_semaphore_down(&pthread->signal->deliver_semaphore);
 
@@ -44,6 +51,7 @@ UK_LLSYSCALL_R_DEFINE(int, rt_sigsuspend,
 	pthread->signal->mask = saved_mask;
 
 	return -EINTR;
+#endif
 }
 #else /* !CONFIG_LIBPOSIX_PROCESS_SIGNAL */
 UK_LLSYSCALL_R_DEFINE(int, rt_sigsuspend,

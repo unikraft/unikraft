@@ -102,6 +102,18 @@ static int futex_wait(uint32_t *uaddr, uint32_t val, const __nsec *timeout)
 	struct uk_thread *current = uk_thread_current();
 	struct uk_futex f = {.uaddr = uaddr, .thread = current};
 
+#if CONFIG_PLAT_HYPERLIGHT
+	/*
+	 * Hyperlight uses cooperative scheduling.  If a thread is
+	 * waiting for another thread to modify the futex value, we
+	 * must yield so that thread can run.  Yield first, then let
+	 * the normal blocking path handle it (the scheduler will
+	 * switch to other runnable threads while we're blocked).
+	 */
+	if (!timeout && uk_load_n(uaddr) == val)
+		uk_sched_yield();
+#endif
+
 	if (uk_load_n(uaddr) != val) {
 		uk_pr_debug("FUTEX_WAIT: Condition not met (*uaddr != %"PRIu32", uaddr: %p)\n",
 			    val, uaddr);
@@ -203,7 +215,7 @@ static int futex_wake(uint32_t *uaddr, uint32_t val)
 }
 
 /**
- * Requeue waiters from uaddr to uaddr2.
+ * Requeue waiters from uaddr to uaddr2 (internal helper).
  *
  * Requeue waiters on uaddr to uaddr2. Wakes up a maximum of val waiters that
  * are waiting on the futex at uaddr.  If there are more than val waiters, then
@@ -216,23 +228,19 @@ static int futex_wake(uint32_t *uaddr, uint32_t val)
  * @param val		Number of waiters to wake
  * @param val2		Number of waiters to requeue (0-INT_MAX)
  * @param uaddr2	Target futex user address
- * @param val3		uaddr expected value
  *
  * @return
  *	>=0: on success, the number of tasks requeued or woken;
  *	<0: on error
  */
-static int futex_cmp_requeue(uint32_t *uaddr, uint32_t val, uint32_t val2,
-			     uint32_t *uaddr2, uint32_t val3)
+static int futex_requeue_internal(uint32_t *uaddr, uint32_t val, uint32_t val2,
+				  uint32_t *uaddr2)
 {
 	unsigned long irqf;
 	struct uk_list_head *itr, *tmp;
 	struct uk_futex *f;
 	int woken_uaddr1;
 	uint32_t waiters_uaddr2 = 0;
-
-	if (!((uint32_t)val3 == uk_load_n(uaddr)))
-		return -EAGAIN;
 
 	/* Wake up val waiters on uaddr */
 	woken_uaddr1 = futex_wake(uaddr, val);
@@ -263,6 +271,51 @@ static int futex_cmp_requeue(uint32_t *uaddr, uint32_t val, uint32_t val2,
 	uk_lcpu_restore_irqf(irqf);
 
 	return woken_uaddr1 + waiters_uaddr2;
+}
+
+/**
+ * Requeue waiters from uaddr to uaddr2 (deprecated, use CMP_REQUEUE).
+ *
+ * This is the same as futex_requeue_internal without the compare check.
+ * It's deprecated but still used by some applications.
+ *
+ * @param uaddr		Source futex user address
+ * @param val		Number of waiters to wake
+ * @param val2		Number of waiters to requeue (0-INT_MAX)
+ * @param uaddr2	Target futex user address
+ *
+ * @return
+ *	>=0: on success, the number of tasks requeued or woken;
+ *	<0: on error
+ */
+static inline int futex_requeue(uint32_t *uaddr, uint32_t val, uint32_t val2,
+				uint32_t *uaddr2)
+{
+	return futex_requeue_internal(uaddr, val, val2, uaddr2);
+}
+
+/**
+ * Requeue waiters from uaddr to uaddr2 with compare check.
+ *
+ * Like futex_requeue but first checks that *uaddr == val3.
+ *
+ * @param uaddr		Source futex user address
+ * @param val		Number of waiters to wake
+ * @param val2		Number of waiters to requeue (0-INT_MAX)
+ * @param uaddr2	Target futex user address
+ * @param val3		uaddr expected value
+ *
+ * @return
+ *	>=0: on success, the number of tasks requeued or woken;
+ *	<0: on error
+ */
+static int futex_cmp_requeue(uint32_t *uaddr, uint32_t val, uint32_t val2,
+			     uint32_t *uaddr2, uint32_t val3)
+{
+	if (!((uint32_t)val3 == uk_load_n(uaddr)))
+		return -EAGAIN;
+
+	return futex_requeue_internal(uaddr, val, val2, uaddr2);
 }
 
 /**
@@ -332,8 +385,11 @@ UK_LLSYSCALL_R_DEFINE(int, futex, uint32_t *, uaddr, int, futex_op,
 		return futex_wake(uaddr, val);
 
 	case FUTEX_FD:
-	case FUTEX_REQUEUE:
 		return -ENOSYS;
+
+	case FUTEX_REQUEUE:
+		return futex_requeue(uaddr, val, (unsigned long)timeout,
+				     uaddr2);
 
 	case FUTEX_CMP_REQUEUE:
 		return futex_cmp_requeue(uaddr, val, (unsigned long)timeout,

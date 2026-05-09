@@ -89,6 +89,18 @@ static int init_posix_fdtab(struct uk_init_ctx *ictx __unused)
 	return 0;
 }
 
+#if CONFIG_PLAT_HYPERLIGHT && CONFIG_LIBPOSIX_FDTAB_MULTITAB
+/**
+ * Restore active_fdtab for the current thread to the init fdtab.
+ * Called from dispatch context where TLS may not have the correct
+ * active_fdtab set (e.g., after snapshot/restore).
+ */
+void hyperlight_fdtab_restore_active(void)
+{
+	active_fdtab = &init_fdtab;
+}
+#endif /* CONFIG_PLAT_HYPERLIGHT && CONFIG_LIBPOSIX_FDTAB_MULTITAB */
+
 /* Encode flags in entry pointer using the least significant bits */
 /* made available by the open file structure's alignment */
 struct fdval {
@@ -389,6 +401,12 @@ POSIX_PROCESS_EXECVE_HANDLER_PRIO(fdtab_handle_execve, UK_PRIO_EARLIEST);
 /* Cleanup all leftover open fds in the initial fdtab */
 static void term_posix_fdtab(struct uk_term_ctx *tctx __unused)
 {
+#if CONFIG_PLAT_HYPERLIGHT
+	/* On Hyperlight, the snapshot is taken during shutdown.
+	 * Do NOT close fds — they must survive into dispatch/call.
+	 */
+	return;
+#endif
 	fdtab_cleanup(&init_fdtab, 1);
 }
 

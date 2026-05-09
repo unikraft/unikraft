@@ -69,6 +69,7 @@
 #define LIBVFSCORE_EXTRACT_DEV_INITRD0				"initrd0"
 #define LIBVFSCORE_EXTRACT_DEV_EMBEDDED				"embedded"
 
+
 #define LIBVFSCORE_UKOPT_MKMP					(0x1 << 0)
 #define LIBVFSCORE_UKOPT_IFINITRD0				(0x1 << 1)
 #define LIBVFSCORE_UKOPT_IFNOINITRD0				(0x1 << 2)
@@ -555,8 +556,6 @@ static int vfscore_extract_volume(const struct vfscore_volume *vv)
 		}
 	}
 
-	uk_pr_info("Extracting initrd @ %p (%"__PRIsz" bytes, source: \"%s\") to %s...\n",
-		   vbase, vlen, vv->sdev, vv->path);
 	rc = ukcpio_extract(vv->path, vbase, vlen);
 	if (unlikely(rc)) {
 		uk_pr_crit("Failed to extract cpio archive to %s: %d\n",

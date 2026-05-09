@@ -213,8 +213,15 @@ int uk_clone(struct clone_args *cl_args, size_t cl_args_len,
 #endif /* !CONFIG_LIBPOSIX_PROCESS_MULTIPROCESS */
 
 	if (unlikely(!(flags & CLONE_VM))) {
-		uk_pr_err("CLONE_VM not set: Multiple address spaces are not supported\n");
-		return -ENOTSUP;
+		/* Unikraft is a single-address-space OS: fork-style clones
+		 * (without CLONE_VM) are promoted to vfork semantics
+		 * (CLONE_VM | CLONE_VFORK) since we cannot duplicate the
+		 * address space. The parent blocks until the child calls
+		 * execve() or _exit().
+		 */
+		uk_pr_debug("No CLONE_VM: promoting to vfork semantics\n");
+		flags |= CLONE_VM | CLONE_VFORK;
+		cl_args->flags |= CLONE_VM | CLONE_VFORK;
 	}
 
 	if (unlikely(flags & CLONE_CHILD_SETTID && !cl_args->child_tid))
@@ -297,13 +304,13 @@ int uk_clone(struct clone_args *cl_args, size_t cl_args_len,
 		ret = (PTR2ERR(child) != 0) ? PTR2ERR(child) : -ENOMEM;
 		goto err_out;
 	}
-#ifdef CONFIG_LIBUKDEBUG_ENABLE_ASSERT
+#if defined(CONFIG_LIBUKDEBUG_ENABLE_ASSERT) && !defined(CONFIG_PLAT_HYPERLIGHT)
 	/* Sanity check that the UKTLS of the child is really a Unikraft TLS:
 	 * Do we find our magic on the TLS, is Bobo's banana there?
 	 */
 	UK_ASSERT(uk_thread_uktls_var(child, cl_uktls_magic)
 		  == CL_UKTLS_SANITY_MAGIC);
-#endif /* CONFIG_LIBUKDEBUG_ENABLE_ASSERT */
+#endif /* CONFIG_LIBUKDEBUG_ENABLE_ASSERT && !CONFIG_PLAT_HYPERLIGHT */
 
 	if (flags & CLONE_VFORK) {
 #if CONFIG_LIBPOSIX_PROCESS_MULTIPROCESS

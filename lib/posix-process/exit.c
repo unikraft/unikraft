@@ -12,6 +12,9 @@
 #include <uk/process.h>
 #include <uk/sched.h>
 #include <uk/syscall.h>
+#if CONFIG_PLAT_HYPERLIGHT
+#include <uk/pm.h>
+#endif
 
 #if CONFIG_LIBPOSIX_PROCESS_SIGNAL
 #include "signal/signal.h"
@@ -240,6 +243,9 @@ void pprocess_exit(struct posix_process *pprocess,
  */
 UK_LLSYSCALL_R_DEFINE(int, exit, int, status)
 {
+#if CONFIG_PLAT_HYPERLIGHT
+	uk_pm_shutdown(UK_PM_SHUTDOWN_OP_SYSHALT);
+#else
 	struct posix_thread *this_pthread;
 	struct uk_thread *this_thread;
 
@@ -258,10 +264,18 @@ UK_LLSYSCALL_R_DEFINE(int, exit, int, status)
 
 	pprocess_exit_pthread(this_pthread, POSIX_THREAD_EXITED, status);
 	uk_sched_thread_exit();
+#endif
 }
 
 UK_LLSYSCALL_R_DEFINE(int, exit_group, int, status)
 {
+#if CONFIG_PLAT_HYPERLIGHT
+	/* On Hyperlight, go directly to ukplat_terminate to ensure
+	 * the void result is pushed to the output buffer before halt.
+	 * The scheduler's idle path would do a bare hlt instead.
+	 */
+	uk_pm_shutdown(UK_PM_SHUTDOWN_OP_SYSHALT);
+#else
 	struct posix_process *pprocess;
 
 	pprocess = uk_pprocess_current();
@@ -269,6 +283,7 @@ UK_LLSYSCALL_R_DEFINE(int, exit_group, int, status)
 
 	pprocess_exit(pprocess, POSIX_PROCESS_EXITED, status);
 	uk_sched_thread_exit();
+#endif
 }
 #else /* !CONFIG_LIBPOSIX_PROCESS_MULTITHREADING */
 __noreturn void pprocess_exit_stub(int status)

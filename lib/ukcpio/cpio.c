@@ -466,6 +466,7 @@ ukcpio_extract(const char *dest, const void *buf, size_t buflen)
 	struct uk_alloc *a;
 	void *region_base;
 
+
 	if (dest == NULL)
 		return -UKCPIO_NODEST;
 
@@ -478,6 +479,7 @@ ukcpio_extract(const char *dest, const void *buf, size_t buflen)
 	}
 
 	a = uk_alloc_get_default();
+
 
 	/*
 	 * Since we cannot know how many CPIO entries with nlink > 1 are in

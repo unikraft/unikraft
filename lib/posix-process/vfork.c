@@ -16,7 +16,7 @@
 
 #include "process.h"
 
-UK_LLSYSCALL_R_E_DEFINE(pid_t, vfork)
+static pid_t do_vfork(struct ukarch_execenv *execenv)
 {
 	struct clone_args cl_args = {0};
 	pid_t pid; /* child */
@@ -31,4 +31,18 @@ UK_LLSYSCALL_R_E_DEFINE(pid_t, vfork)
 	}
 
 	return pid;
+}
+
+UK_LLSYSCALL_R_E_DEFINE(pid_t, vfork)
+{
+	return do_vfork(execenv);
+}
+
+/* Unikraft is a single-address-space OS: fork() cannot duplicate
+ * the address space, so it is implemented as vfork(). The parent
+ * blocks until the child calls execve() or _exit().
+ */
+UK_LLSYSCALL_R_E_DEFINE(pid_t, fork)
+{
+	return do_vfork(execenv);
 }
