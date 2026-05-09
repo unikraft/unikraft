@@ -1,0 +1,1 @@
+# No public symbols — the filesystem is reached via mount()/POSIX.

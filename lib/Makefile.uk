@@ -6,6 +6,7 @@
 
 $(eval $(call import_lib,$(CONFIG_UK_BASE)/lib/9pfs))
 $(eval $(call import_lib,$(CONFIG_UK_BASE)/lib/devfs))
+$(eval $(call import_lib,$(CONFIG_UK_BASE)/lib/hostfs))
 $(eval $(call import_lib,$(CONFIG_UK_BASE)/lib/fdt))
 $(eval $(call import_lib,$(CONFIG_UK_BASE)/lib/ukgcov))
 $(eval $(call import_lib,$(CONFIG_UK_BASE)/lib/isrlib))

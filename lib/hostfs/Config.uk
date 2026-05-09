@@ -1,0 +1,32 @@
+config LIBHOSTFS
+	bool "hostfs: host-mediated filesystem for Hyperlight guests"
+	default n
+	depends on LIBVFSCORE
+	depends on PLAT_HYPERLIGHT
+	select HYPERLIGHT_HCALL
+	help
+	  Mounts a VFS that forwards POSIX file operations to the
+	  Hyperlight host via the __dispatch interface. Every operation
+	  is scoped to the directory the host passed through
+	  `hyperlight-unikraft --mount`; path resolution and sandbox
+	  enforcement happen host-side. See lib/hostfs/README.md.
+
+if LIBHOSTFS
+
+config LIBHOSTFS_AUTOMOUNT
+	bool "Auto-mount hostfs at boot"
+	default y
+	help
+	  Mounts hostfs automatically at LIBHOSTFS_MOUNTPOINT during
+	  vfscore init. Without this the application must call mount()
+	  itself.
+
+config LIBHOSTFS_MOUNTPOINT
+	string "Mount point"
+	default "/host"
+	depends on LIBHOSTFS_AUTOMOUNT
+	help
+	  Path where hostfs is auto-mounted. The directory is created if
+	  it does not already exist.
+
+endif

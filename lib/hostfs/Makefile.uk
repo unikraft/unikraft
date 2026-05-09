@@ -1,0 +1,9 @@
+$(eval $(call addlib_s,libhostfs,$(CONFIG_LIBHOSTFS)))
+
+# Pull in hyperlight-x86/hcall.h for hyperlight_hcall().
+LIBHOSTFS_CINCLUDES-y += -I$(CONFIG_UK_BASE)/plat/hyperlight/include
+
+LIBHOSTFS_SRCS-y += $(LIBHOSTFS_BASE)/hostfs_vfsops.c
+LIBHOSTFS_SRCS-y += $(LIBHOSTFS_BASE)/hostfs_vnops.c
+LIBHOSTFS_SRCS-y += $(LIBHOSTFS_BASE)/hostfs_rpc.c
+LIBHOSTFS_SRCS-y += $(LIBHOSTFS_BASE)/hostfs_b64.c
