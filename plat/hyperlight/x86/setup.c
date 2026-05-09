@@ -67,6 +67,10 @@ static inline void _check_ospke(void)
 #define HYPERLIGHT_MOUNT_MAGIC "HLHSMNT\0"
 #define HYPERLIGHT_MOUNT_MAGIC_LEN 8
 
+/* Magic for the optional wall-clock-at-boot TLV (u64 ns since epoch). */
+#define HYPERLIGHT_WALL_MAGIC "HLWALL0\0"
+#define HYPERLIGHT_WALL_MAGIC_LEN 8
+
 /* Maximum combined cmdline length */
 #define HYPERLIGHT_MAX_CMDLINE 1024
 
@@ -100,6 +104,17 @@ static char hyperlight_hostfs_mountpoint[HYPERLIGHT_MAX_MOUNT_PATH];
 const char *hyperlight_hostfs_mountpoint_from_host(void)
 {
 	return hyperlight_hostfs_mountpoint[0] ? hyperlight_hostfs_mountpoint : 0;
+}
+
+/* Host-provided wall clock at VM boot, in ns since the Unix epoch.
+ * Read once from init_data, then added to monotonic time by the
+ * platform clock (plat/hyperlight/x86/time.c).
+ */
+static __u64 hyperlight_wall_boot_ns;
+
+__u64 hyperlight_wall_boot_ns_from_host(void)
+{
+	return hyperlight_wall_boot_ns;
 }
 
 /* Base cmdline with random seed (kernel args) */
@@ -165,6 +180,19 @@ static const char *extract_cmdline_from_initrd(__u64 *init_ptr, __u64 *init_size
 			unpadded += HYPERLIGHT_MOUNT_MAGIC_LEN + 4
 				+ mount_len + 1;
 		}
+	}
+
+	/* Optional HLWALL0 TLV: 8-byte payload = wall ns since epoch. */
+	if (unpadded + HYPERLIGHT_WALL_MAGIC_LEN + 4 + 8 <= size
+	    && memcmp(data + unpadded, HYPERLIGHT_WALL_MAGIC,
+		      HYPERLIGHT_WALL_MAGIC_LEN) == 0) {
+		const unsigned char *p = (const unsigned char *)
+			(data + unpadded + HYPERLIGHT_WALL_MAGIC_LEN + 4);
+		__u64 v = 0;
+		for (int i = 0; i < 8; i++)
+			v |= ((__u64)p[i]) << (i * 8);
+		hyperlight_wall_boot_ns = v;
+		unpadded += HYPERLIGHT_WALL_MAGIC_LEN + 4 + 8;
 	}
 
 	/* Pad whole TLV block to page boundary. */

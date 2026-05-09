@@ -11,6 +11,7 @@
 #include <uk/assert.h>
 #include <uk/atomic.h>
 #include <uk/arch/x86_64.h>
+#include <hyperlight-x86/setup.h>
 
 /* TSC frequency in Hz - will be calibrated at init */
 static __u64 tsc_freq;
@@ -32,11 +33,18 @@ __nsec ukplat_monotonic_clock(void)
 	return (tsc_delta * 1000000000ULL) / tsc_freq;
 }
 
-/* return wall time in nsecs */
+/* Wall time in ns since the Unix epoch.
+ *
+ * Hyperlight guests have no real-time clock — we get the wall time
+ * from the host at VM boot (init_data HLWALL0 TLV) and add our own
+ * monotonic delta on top. After a snapshot/restore both components
+ * roll back, so the guest sees the same "epoch" on every warm run;
+ * that's fine for things like xlsx timestamps (>=1980) and logging
+ * deltas within a run, but it is NOT a real-time wall clock.
+ */
 __nsec ukplat_wall_clock(void)
 {
-	/* For now, just return monotonic time since we don't have RTC */
-	return ukplat_monotonic_clock();
+	return hyperlight_wall_boot_ns_from_host() + ukplat_monotonic_clock();
 }
 
 static int timer_handler(void *arg __unused)

@@ -37,4 +37,11 @@ const struct hyperlight_entry_args *hyperlight_get_entry_args(void);
  */
 const char *hyperlight_hostfs_mountpoint_from_host(void);
 
+/**
+ * Host-provided wall time at VM boot, in ns since the Unix epoch.
+ * Zero if the host didn't advertise one (old builds). Callers should
+ * add the monotonic delta since boot to obtain "now".
+ */
+__u64 hyperlight_wall_boot_ns_from_host(void);
+
 #endif /* __HYPERLIGHT_X86_SETUP_H__ */
