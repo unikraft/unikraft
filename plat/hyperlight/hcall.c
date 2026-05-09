@@ -35,6 +35,8 @@
 #include <hyperlight-x86/peb.h>
 #include <hyperlight-x86/setup.h>
 #include <hyperlight-x86/outb.h>
+#include <hyperlight-x86/hcall.h>
+#include <hyperlight-x86/fb.h>
 
 /* Maximum payload size for host calls */
 #define HCALL_MAX_PAYLOAD 65536
@@ -184,64 +186,9 @@ static __sz hcall_encode(__u8 *buf, __sz buf_sz,
  *   }
  */
 
-static inline __u32 fb_u32(const __u8 *buf, __sz off)
-{
-	return buf[off] | ((__u32)buf[off + 1] << 8) |
-	       ((__u32)buf[off + 2] << 16) | ((__u32)buf[off + 3] << 24);
-}
-
-static inline __u16 fb_u16(const __u8 *buf, __sz off)
-{
-	return buf[off] | ((__u16)buf[off + 1] << 8);
-}
-
-static inline __s32 fb_i32(const __u8 *buf, __sz off)
-{
-	return (__s32)fb_u32(buf, off);
-}
-
-/* Get vtable position for a table at tbl */
-static inline __sz fb_vtable(const __u8 *buf, __sz tbl)
-{
-	__s32 soff = fb_i32(buf, tbl);
-
-	return tbl - soff;
-}
-
-/* Get field offset from vtable (returns 0 if field not present) */
-static inline __u16 fb_field(const __u8 *buf, __sz tbl, __u16 vt_off)
-{
-	__sz vt = fb_vtable(buf, tbl);
-	__u16 vt_size = fb_u16(buf, vt);
-
-	if (vt_off >= vt_size)
-		return 0;
-	return fb_u16(buf, vt + vt_off);
-}
-
-/* Follow a UOffset field to its target */
-static inline __sz fb_follow(const __u8 *buf, __sz tbl, __u16 vt_off)
-{
-	__u16 foff = fb_field(buf, tbl, vt_off);
-
-	if (foff == 0)
-		return 0;
-
-	__sz field_pos = tbl + foff;
-
-	return field_pos + fb_u32(buf, field_pos);
-}
-
-/* Read u8 scalar field with default */
-static inline __u8 fb_u8f(const __u8 *buf, __sz tbl,
-			   __u16 vt_off, __u8 defval)
-{
-	__u16 foff = fb_field(buf, tbl, vt_off);
-
-	if (foff == 0)
-		return defval;
-	return buf[tbl + foff];
-}
+/* FlatBuffer reader helpers (hl_fb_*) live in include/hyperlight-x86/fb.h
+ * so plat code outside this file (e.g. dispatch.c) can share them.
+ */
 
 /* Union discriminant values for decoding */
 #define FCR_RESULT_TYPE_RVBOX     1   /* FunctionCallResultType::ReturnValueBox */
@@ -263,40 +210,40 @@ static int hcall_decode(const __u8 *buf, __sz buf_len,
 		return -1;
 
 	/* Root table (size-prefixed: skip 4-byte prefix) */
-	__u32 root_off = fb_u32(buf, 4);
+	__u32 root_off = hl_fb_u32(buf, 4);
 	__sz fcr = 4 + root_off;
 
 	/* FunctionCallResult.result_type (VT=4) == ReturnValueBox(1)? */
-	__u8 result_type = fb_u8f(buf, fcr, 4, 0);
+	__u8 result_type = hl_fb_u8f(buf, fcr, 4, 0);
 
 	if (result_type != FCR_RESULT_TYPE_RVBOX)
 		return -2;
 
 	/* Follow result (VT=6) -> ReturnValueBox */
-	__sz rvb = fb_follow(buf, fcr, 6);
+	__sz rvb = hl_fb_follow(buf, fcr, 6);
 
 	if (rvb == 0)
 		return -3;
 
 	/* ReturnValueBox.value_type (VT=4) == hlsizeprefixedbuffer(10)? */
-	__u8 value_type = fb_u8f(buf, rvb, 4, 0);
+	__u8 value_type = hl_fb_u8f(buf, rvb, 4, 0);
 
 	if (value_type != RV_TYPE_SIZEPREFIXEDBUF)
 		return -4;
 
 	/* Follow value (VT=6) -> hlsizeprefixedbuffer */
-	__sz spb = fb_follow(buf, rvb, 6);
+	__sz spb = hl_fb_follow(buf, rvb, 6);
 
 	if (spb == 0)
 		return -5;
 
 	/* Follow value vector (VT=6) -> byte vector */
-	__sz vec = fb_follow(buf, spb, 6);
+	__sz vec = hl_fb_follow(buf, spb, 6);
 
 	if (vec == 0)
 		return -6;
 
-	__u32 vec_len = fb_u32(buf, vec);
+	__u32 vec_len = hl_fb_u32(buf, vec);
 
 	*out_data = buf + vec + 4;
 	*out_len = vec_len;
@@ -396,23 +343,18 @@ static int hcall_pop(__u8 *stack, __u64 stack_size,
 }
 
 /* ========================================================================
- * /dev/hcall Device Driver
- * ======================================================================== */
-
-/* Static buffers */
-static __u8 hcall_req_buf[HCALL_MAX_PAYLOAD];
-static __sz hcall_req_len;
-
-static __u8 hcall_result_buf[HCALL_MAX_PAYLOAD];
-static __sz hcall_result_len;
-static __sz hcall_result_pos;
-
+ * Public API: hyperlight_hcall()
+ * ========================================================================
+ *
+ * One shared FlatBuffer encode buffer (static; request payloads are
+ * bounded by HCALL_MAX_PAYLOAD). Callers provide their own request and
+ * response buffers so the API is stateless across calls — a single
+ * thread running one dispatch at a time is the expected use.
+ */
 static __u8 hcall_encode_buf[HCALL_MAX_PAYLOAD + 256];
 
-/**
- * Execute the __dispatch host function call.
- */
-static int hcall_dispatch(void)
+int hyperlight_hcall(const __u8 *req, __sz req_len,
+		     __u8 *resp, __sz resp_cap, __sz *resp_len)
 {
 	struct hyperlight_peb *peb = hyperlight_get_peb();
 	__u8 *output_stack;
@@ -440,7 +382,7 @@ static int hcall_dispatch(void)
 
 	/* 1. Encode FlatBuffer */
 	fb_len = hcall_encode(hcall_encode_buf, sizeof(hcall_encode_buf),
-			      hcall_req_buf, hcall_req_len);
+			      req, req_len);
 	if (fb_len == 0)
 		return -3;
 
@@ -465,14 +407,42 @@ static int hcall_dispatch(void)
 	if (rc < 0)
 		return -6;
 
-	/* 6. Store result for read() */
-	if (payload_len > HCALL_MAX_PAYLOAD)
-		payload_len = HCALL_MAX_PAYLOAD;
-	memcpy(hcall_result_buf, payload_data, payload_len);
-	hcall_result_len = payload_len;
-	hcall_result_pos = 0;
+	/* 6. Copy into caller's buffer */
+	if (payload_len > resp_cap)
+		return -7;
+	memcpy(resp, payload_data, payload_len);
+	if (resp_len)
+		*resp_len = payload_len;
 
 	return 0;
+}
+
+/* ========================================================================
+ * /dev/hcall Device Driver
+ * ======================================================================== */
+
+/* Static buffers — user-space device tracks the last response across
+ * read() calls (see dev_hcall_read for the pos/len state machine).
+ */
+static __u8 hcall_req_buf[HCALL_MAX_PAYLOAD];
+static __sz hcall_req_len;
+
+static __u8 hcall_result_buf[HCALL_MAX_PAYLOAD];
+static __sz hcall_result_len;
+static __sz hcall_result_pos;
+
+/**
+ * Execute the __dispatch host function call (/dev/hcall internal wrapper).
+ */
+static int hcall_dispatch(void)
+{
+	int rc;
+
+	rc = hyperlight_hcall(hcall_req_buf, hcall_req_len,
+			      hcall_result_buf, sizeof(hcall_result_buf),
+			      &hcall_result_len);
+	hcall_result_pos = 0;
+	return rc;
 }
 
 /**
