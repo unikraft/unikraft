@@ -11,6 +11,7 @@
 #ifndef __UK_PLAT_NATIVE_ARCH_ADDR_H__
 #define __UK_PLAT_NATIVE_ARCH_ADDR_H__
 
+#include <uk/config.h>
 #include <uk/arch/types.h>
 
 #ifdef __cplusplus
@@ -64,8 +65,14 @@ extern __paddr_t uk_plat_native_x86_64_pg_maxphysaddr;
 #define __X86_64_PG_VALID_PADDR(paddr)	\
 	((paddr) <= uk_plat_native_x86_64_pg_maxphysaddr)
 
+#ifdef CONFIG_PLAT_HYPERLIGHT
+/* Hyperlight uses identity mapping (vaddr == paddr) */
+#define UK_PLAT_NATIVE_DIRECTMAP_AREA_START 0x0000000000000000
+#define UK_PLAT_NATIVE_DIRECTMAP_AREA_END   0x0000007fffffffff /* 32 GiB */
+#else
 #define UK_PLAT_NATIVE_DIRECTMAP_AREA_START 0xffffff8000000000 /* -512 GiB */
 #define UK_PLAT_NATIVE_DIRECTMAP_AREA_END   0xffffffffffffffff
+#endif
 
 /**
  * Tests if a certain range of virtual addresses is valid on the current

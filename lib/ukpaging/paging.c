@@ -248,6 +248,18 @@ int uk_paging_pt_init(struct uk_pagetable *pt, __paddr_t start, __sz len)
 	 */
 	memset(pt, 0, sizeof(struct uk_pagetable));
 
+#ifdef CONFIG_PLAT_HYPERLIGHT
+	/* Hyperlight: adopt the host-provided page tables.
+	 * Read CR3 to get the PML4 physical address.
+	 * Identity mapping: vbase == pbase.
+	 * Skip pgarch_pt_init which uses the directmap address
+	 * (Hyperlight has identity mapping, not a high-address directmap).
+	 */
+	pt->pt_pbase = uk_pal_pt_read_base() & ~0xFFFUL;
+	pt->pt_vbase = pt->pt_pbase;
+	return 0;
+#endif
+
 	rc = pgarch_pt_init(pt, start, len);
 	if (unlikely(rc))
 		return rc;
@@ -1519,6 +1531,18 @@ int uk_paging_init(void)
 
 	if (unlikely(!kernel_pt.fa))
 		return rc;
+
+#ifdef CONFIG_PLAT_HYPERLIGHT
+	/* Hyperlight: memory is already identity-mapped by the host.
+	 * Restore FREE regions' vbase (set to __U64_MAX above) to their
+	 * physical addresses. Skip mapping and page table activation.
+	 */
+	ukplat_memregion_foreach(&mrd, UKPLAT_MEMRT_FREE, 0, 0) {
+		mrd->vbase = mrd->pbase;
+	}
+	pg_active_pt = &kernel_pt;
+	return 0;
+#endif
 
 	/* Perform mappings */
 	ukplat_memregion_foreach(&mrd, 0, 0, 0) {

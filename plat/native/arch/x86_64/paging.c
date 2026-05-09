@@ -24,6 +24,17 @@ int uk_plat_native_paging_init(void)
 	__u32 max_addr_bit;
 	__u64 efer;
 
+#ifdef CONFIG_PLAT_HYPERLIGHT
+	/* Hyperlight: Skip CPUID checks and MSR writes.
+	 * Hyperlight sets EFER via SREGS; guest wrmsr to EFER causes #GP.
+	 * Assume 48-bit physical addresses (standard for x86-64 VMs).
+	 */
+	(void)eax; (void)ebx; (void)ecx; (void)edx;
+	(void)max_addr_bit; (void)efer;
+	uk_plat_native_x86_64_pg_maxphysaddr = (1UL << 48) - 1;
+	return 0;
+#endif
+
 	/* Check for availability of extended features */
 	uk_arch_x86_64_cpuid(0x80000000, 0, &eax, &ebx, &ecx, &edx);
 	if (eax < 0x80000008)

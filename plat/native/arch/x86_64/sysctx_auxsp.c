@@ -117,6 +117,19 @@ __isr void uk_plat_native_sysctx_store(struct uk_plat_native_sysctx *sysctx)
 
 	sysctx->gsbase = rdgsbasefn();
 	sysctx->fsbase = uk_plat_native_rdfsbasefn();
+
+#if CONFIG_PLAT_HYPERLIGHT
+	/* Restore kernel FS_BASE so syscall handlers can access
+	 * kernel TLS (fd tables, thread-locals, etc.).
+	 * The guest's FS_BASE is saved in sysctx and will be
+	 * restored by uk_plat_native_sysctx_load on syscall exit.
+	 */
+	{
+		extern __uptr hyperlight_kernel_fsbase;
+		if (hyperlight_kernel_fsbase)
+			uk_plat_native_wrfsbasefn(hyperlight_kernel_fsbase);
+	}
+#endif
 }
 
 __isr void uk_plat_native_sysctx_load(struct uk_plat_native_sysctx *sysctx)
