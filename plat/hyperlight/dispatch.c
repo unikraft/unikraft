@@ -5,9 +5,11 @@
  * Copyright (c) 2024 Microsoft Corporation
  */
 
+#include <string.h>
 #include <uk/arch/types.h>
 #include <hyperlight-x86/outb.h>
 #include <hyperlight-x86/peb.h>
+#include <hyperlight-x86/fb.h>
 
 static const __u8 HL_VOID_RESULT[] = {
 	0x2c,0x00,0x00,0x00,0x04,0x00,0x00,0x00,
@@ -47,8 +49,64 @@ static void hl_buffer_pop(volatile void *buf_ptr)
 __uptr hyperlight_kernel_fsbase;
 
 typedef void (*hl_run_fn)(void);
+typedef void (*hl_dispatch_fn)(const __u8 *fc_bytes, __sz fc_len);
+
+/* Two dispatch paths coexist:
+ *
+ *   g_run_callback:     legacy no-args callback — used when the loaded
+ *                       ELF only exposes main()/_start and runs the
+ *                       whole app from scratch on every dispatch,
+ *                       ignoring the FunctionCall name.
+ *
+ *   g_dispatch_callback: multi-function callback — receives the raw
+ *                       FunctionCall FlatBuffer bytes. The ELF exports
+ *                       a `__hl_guest_dispatch(fc_bytes, fc_len)`
+ *                       symbol, app-elfloader finds it and registers
+ *                       it via hyperlight_dispatch_register_v2(); the
+ *                       ELF does its own name-based routing using the
+ *                       hl_fb_* helpers in fb.h.
+ *
+ * If both are set, the FC-aware callback wins.
+ */
 static volatile hl_run_fn g_run_callback;
+static volatile hl_dispatch_fn g_dispatch_callback;
 static struct hyperlight_peb g_dispatch_peb;
+
+/* Current in-flight FunctionCall bytes. Populated by hyperlight_dispatch_inner
+ * before any callback runs; readable from user-mode code via the pair
+ * of accessors below. Separately-loaded ELFs (e.g. a dynamically-linked
+ * driver that embeds libpython) can't link against our static globals,
+ * so app-elfloader exposes the ADDRESS of this pair to the driver via
+ * an env var (HL_FC_BYTES_PTR, HL_FC_LEN_PTR) — the driver reads the
+ * addresses once at init and then pulls the current bytes out on each
+ * dispatch by dereferencing.
+ */
+static const __u8 *g_current_fc_bytes;
+static __sz g_current_fc_len;
+
+const __u8 *hyperlight_dispatch_current_fc_bytes(void)
+{
+	return g_current_fc_bytes;
+}
+__sz hyperlight_dispatch_current_fc_len(void)
+{
+	return g_current_fc_len;
+}
+
+/**
+ * Expose the addresses of the current-FC globals. Used by app-elfloader
+ * at boot to stuff the pointers into the loaded ELF's environment so
+ * the driver can read them back at dispatch time without needing
+ * symbol-level linkage to the kernel.
+ */
+const __u8 **hyperlight_dispatch_fc_bytes_slot(void)
+{
+	return &g_current_fc_bytes;
+}
+__sz *hyperlight_dispatch_fc_len_slot(void)
+{
+	return &g_current_fc_len;
+}
 
 /* MSR helpers */
 #define MSR_KERNEL_GS_BASE 0xC0000102
@@ -74,6 +132,17 @@ static __u64 g_saved_sfmask;
 static __u64 g_saved_kernel_gs_base;
 
 void hyperlight_dispatch_register(hl_run_fn fn) { g_run_callback = fn; }
+
+/**
+ * Register an FC-aware dispatch callback. The callback receives the
+ * raw FunctionCall FlatBuffer bytes that the host pushed onto the input
+ * stack; it pulls its own name + parameters out with the hl_fb_*
+ * helpers in fb.h.
+ */
+void hyperlight_dispatch_register_v2(hl_dispatch_fn fn)
+{
+	g_dispatch_callback = fn;
+}
 void hyperlight_dispatch_init(const struct hyperlight_peb *peb) {
 	__builtin_memcpy(&g_dispatch_peb, peb, sizeof(g_dispatch_peb));
 }
@@ -230,12 +299,70 @@ hyperlight_dispatch_function(void)
 	__builtin_unreachable();
 }
 
+/**
+ * Pull the top item off the shared-memory input stack without mutating
+ * the stack pointer. The returned pointer lives inside the shared
+ * region and is valid until the next push/pop pair touches this slot —
+ * which in practice means it is stable for the duration of the current
+ * dispatch call.
+ *
+ * Stack layout (matches hcall.c and hyperlight-host io.rs):
+ *   [sp:u64] [item0_bytes] [back_ptr:u64] [item1_bytes] [back_ptr:u64] ...
+ * where `sp` lives at offset 0 and always points one past the last
+ * back_ptr. Each back_ptr stores the value `sp` had before that item
+ * was pushed, which is also the offset to the item's first byte.
+ *
+ * Returns 0 on success, -1 if the stack is empty or malformed.
+ */
+static int hl_dispatch_peek_input(const __u8 **out_data, __sz *out_len)
+{
+	volatile __u8 *stack = (volatile __u8 *)g_dispatch_peb.input_stack.ptr;
+	volatile __u64 *sp_ptr = (volatile __u64 *)stack;
+	__u64 sp = *sp_ptr;
+
+	if (sp < 16)
+		return -1;
+
+	__u64 back_ptr = *(volatile __u64 *)(stack + sp - 8);
+	if (back_ptr < 8 || back_ptr >= sp - 8)
+		return -1;
+
+	*out_data = (const __u8 *)(stack + back_ptr);
+	*out_len = (__sz)(sp - 8 - back_ptr);
+	return 0;
+}
+
 void __attribute__((used))
 hyperlight_dispatch_inner(void)
 {
 	hyperlight_dispatch_prepare();
+
+	/* Peek the FunctionCall bytes first. hl_buffer_pop() rewinds the
+	 * stack pointer but doesn't overwrite the bytes themselves, so
+	 * the pointer we record here stays valid throughout the callback.
+	 * Both dispatch paths benefit: v2 gets them as args, legacy can
+	 * fetch them through hyperlight_dispatch_current_fc_*().
+	 */
+	const __u8 *fc_bytes = NULL;
+	__sz fc_len = 0;
+	int peeked = hl_dispatch_peek_input(&fc_bytes, &fc_len);
+
 	hl_buffer_pop((void *)g_dispatch_peb.input_stack.ptr);
-	if (g_run_callback)
+
+	if (peeked == 0) {
+		g_current_fc_bytes = fc_bytes;
+		g_current_fc_len = fc_len;
+	} else {
+		g_current_fc_bytes = NULL;
+		g_current_fc_len = 0;
+	}
+
+	if (g_dispatch_callback) {
+		if (peeked == 0)
+			g_dispatch_callback(fc_bytes, fc_len);
+	} else if (g_run_callback) {
 		g_run_callback();
+	}
+
 	hyperlight_dispatch_push_void_result();
 }
