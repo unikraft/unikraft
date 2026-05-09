@@ -1,0 +1,3 @@
+$(eval $(call addlib_s,libcpiovfs,$(CONFIG_LIBCPIOVFS)))
+
+LIBCPIOVFS_SRCS-y += $(LIBCPIOVFS_BASE)/cpiovfs.c

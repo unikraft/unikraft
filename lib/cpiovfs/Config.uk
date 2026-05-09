@@ -1,0 +1,5 @@
+config LIBCPIOVFS
+	bool "cpiovfs: Read-only CPIO archive filesystem"
+	default n
+	depends on LIBVFSCORE
+	select LIBUKCPIO
