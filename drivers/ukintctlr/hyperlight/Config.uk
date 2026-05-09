@@ -1,0 +1,7 @@
+config LIBUKINTCTLR_HYPERLIGHT
+	bool "Hyperlight null interrupt controller"
+	depends on (HAVE_INTCTLR && PLAT_HYPERLIGHT)
+	select LIBUKINTCTLR
+	help
+	  Null interrupt controller for Hyperlight platform.
+	  Does not touch any legacy hardware (8259 PIC).
