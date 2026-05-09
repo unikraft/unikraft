@@ -339,6 +339,50 @@ ramfs_readlink(struct vnode *vp, struct uio *uio)
 	return vfscore_uiomove(np->rn_buf + uio->uio_offset, len, uio);
 }
 
+/* Fast-path accessor: return the raw underlying ramfs buffer for a
+ * regular file so callers (lib/ukmmap's file-backed mmap hot path on
+ * Hyperlight) can memcpy directly from it instead of walking the
+ * vfscore pread → preadv → do_preadv → sys_read → ramfs_read →
+ * vfscore_uiomove chain on every mapping.
+ *
+ * Returns 0 and populates out_buf / out_size on success, -1 for
+ * anything that isn't a regular ramfs file.
+ */
+int ramfs_get_file_buffer(struct vnode *vp, const void **out_buf,
+			  size_t *out_size)
+{
+	extern struct vnops ramfs_vnops;
+	struct ramfs_node *np;
+
+	if (!vp || vp->v_type != VREG)
+		return -1;
+
+	/* Verify the vnode actually belongs to ramfs before casting
+	 * v_data to struct ramfs_node *. The caller (ukmmap's file-
+	 * backed fast path) hands any regular-file vnode here, including
+	 * cpiovfs/hostfs/devfs files — each stores its own private type
+	 * in v_data, so a blind cast silently misreads.
+	 *
+	 * Without this check the fast path happily accepted cpiovfs
+	 * vnodes and returned (buf, size=0) because the byte at the
+	 * cpiovfs node's rn_size-equivalent offset is always 0. mmap
+	 * then memcpy'd 0 bytes into a zero-filled page and handed the
+	 * user a mapping with no file content, breaking every .so load
+	 * that doesn't come from ramfs (powershell, any cpiovfs-rooted
+	 * image that tries to dlopen a library).
+	 */
+	if (!vp->v_mount || vp->v_mount->m_op->vfs_vnops != &ramfs_vnops)
+		return -1;
+
+	np = (struct ramfs_node *)vp->v_data;
+	if (!np || !np->rn_buf)
+		return -1;
+
+	*out_buf = np->rn_buf;
+	*out_size = np->rn_size;
+	return 0;
+}
+
 /* Remove a directory */
 static int
 ramfs_rmdir(struct vnode *dvp, struct vnode *vp, const char *name __unused)

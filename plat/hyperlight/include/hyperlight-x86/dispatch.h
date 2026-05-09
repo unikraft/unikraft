@@ -73,4 +73,24 @@ __sz hyperlight_dispatch_current_fc_len(void);
 const __u8 **hyperlight_dispatch_fc_bytes_slot(void);
 __sz *hyperlight_dispatch_fc_len_slot(void);
 
+/**
+ * Address of the FC-aware dispatch callback pointer. A user-mode
+ * driver writes its own function into `*slot` during its one-time
+ * init (from the initial deferred_run / main() dispatch). Every
+ * subsequent call goes through that callback, bypassing the legacy
+ * deferred-main path entirely.
+ */
+hl_dispatch_fn *hyperlight_dispatch_v2_slot(void);
+
+/**
+ * Per-syscall count + cumulative-ns profiler. Populated via
+ * syscall_shim enter/exit hooks.
+ *
+ * Call `dump` to print the top syscalls by total time to stderr, and
+ * `reset` to clear the counters (useful to isolate call-phase cost
+ * from evolve-time noise).
+ */
+void hyperlight_syscall_profile_dump(void);
+void hyperlight_syscall_profile_reset(void);
+
 #endif /* __HYPERLIGHT_X86_DISPATCH_H__ */

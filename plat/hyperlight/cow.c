@@ -191,9 +191,18 @@ int cow_handle_fault(__u64 fault_addr, unsigned long error_code,
  * Used by mmap to back virtual-only PROT_NONE reservations when Go
  * commits sub-regions with MAP_FIXED.
  *
+ * When `zero_data` is non-zero the freshly allocated data page is
+ * memset to 0 — required for anonymous mappings where the caller
+ * expects zero-initialised memory. When it's 0 the memset is skipped:
+ * useful for file-backed mmaps where the caller is about to `pread`
+ * the file content right over the page anyway, and zeroing is a
+ * pure waste of memory bandwidth. Intermediate page-table pages are
+ * always zeroed because the MMU treats unused slots as PTE_PRESENT=0
+ * via a zero-valued entry.
+ *
  * Returns 1 on success, 0 if CoW is not initialized.
  */
-int cow_demand_map_page(__u64 gva)
+int cow_demand_map_page_ex(__u64 gva, int zero_data)
 {
 	__u64 cr3, addr;
 	__u64 pml4_idx, pdpt_idx, pd_idx, pt_idx;
@@ -253,10 +262,13 @@ int cow_demand_map_page(__u64 gva)
 	/* PT → Data page */
 	entry_addr = next_base + pt_idx * 8;
 	entry_val = cow_read_pte(entry_addr);
-	if (!(entry_val & PTE_PRESENT)) {
+	int was_absent = !(entry_val & PTE_PRESENT);
+	if (was_absent) {
 		__u64 pg = cow_alloc_phys_pages(1);
-		__u64 va = cow_phys_to_virt(pg);
-		__builtin_memset((void *)va, 0, HL_PAGE_SIZE);
+		if (zero_data) {
+			__u64 va = cow_phys_to_virt(pg);
+			__builtin_memset((void *)va, 0, HL_PAGE_SIZE);
+		}
 		cow_write_pte(entry_addr, pg | PTE_PRESENT | PTE_RW);
 	}
 	/* If already present+RW, nothing to do.
@@ -264,10 +276,159 @@ int cow_demand_map_page(__u64 gva)
 	 * will resolve it on the first write.
 	 */
 
-	/* Flush TLB for this page */
-	{
+	/* TLB flush only when transitioning an existing (present)
+	 * mapping — x86-64 CPUs don't cache not-present translations,
+	 * so the fresh PTE we just wrote for a previously-absent slot
+	 * gets loaded on first access without a flush. On the Python-
+	 * import hot path this is every page, 50k+ pages per
+	 * `import pandas`; skipping invlpg there cuts a big chunk of
+	 * the per-page cow_demand_map_page_ex cost.
+	 */
+	if (!was_absent) {
 		__u64 page_start = gva & ~(HL_PAGE_SIZE - 1);
 		__asm__ volatile("invlpg (%0)" : : "r"(page_start) : "memory");
+	}
+
+	return 1;
+}
+
+/* Back-compat wrapper — always zeros the data page. */
+int cow_demand_map_page(__u64 gva)
+{
+	return cow_demand_map_page_ex(gva, 1);
+}
+
+/* Map `n_pages` contiguous 4 KiB pages starting at `gva_base` using a
+ * single physical-memory allocation and a single (optional) memset.
+ *
+ * Replaces the per-page cow_demand_map_page loop in ukmmap's hot
+ * path:
+ *
+ *   N x alloc + N x memset(4 KiB)  →  1 x alloc + 1 x memset(N*4 KiB)
+ *
+ * Same total bytes zero'd for anonymous mappings, but the coalesced
+ * memset hits memory cache-linearly and skips N-1 atomic allocator
+ * operations. For the ~30 000 anonymous pages the Python import hot
+ * path creates, this cuts pgloop time by a large factor.
+ *
+ * Still walks PTs per page because the hardware has no batched PTE
+ * write — but the per-page work drops to just the 4-level walk +
+ * writing one 64-bit PTE. No alloc, no memset inside the loop.
+ *
+ * Caller guarantees gva_base..gva_base+n_pages*4KiB doesn't overlap
+ * an existing present PTE.
+ */
+/* Walk PML4 → PDPT → PD for `gva`, returning the GPA of the PT that
+ * backs it. Creates upper levels on demand (same logic the original
+ * per-page path had), but stops at the PT so the caller can splice
+ * many PTEs into it without re-walking.
+ */
+static __u64 cow_walk_to_pt(__u64 gva)
+{
+	__u64 cr3 = cow_read_cr3();
+	__u64 addr = gva & ((1ULL << 48) - 1);
+	__u64 pml4_idx = (addr >> 39) & 0x1FF;
+	__u64 pdpt_idx = (addr >> 30) & 0x1FF;
+	__u64 pd_idx   = (addr >> 21) & 0x1FF;
+	__u64 entry_addr, entry_val, next_base;
+
+	/* PML4 → PDPT */
+	entry_addr = cr3 + pml4_idx * 8;
+	entry_val = cow_read_pte(entry_addr);
+	if (!(entry_val & PTE_PRESENT)) {
+		__u64 pg = cow_alloc_phys_pages(1);
+		__u64 va = cow_phys_to_virt(pg);
+		__builtin_memset((void *)va, 0, HL_PAGE_SIZE);
+		cow_write_pte(entry_addr, pg | PTE_PRESENT | PTE_RW);
+		next_base = pg;
+	} else {
+		next_base = entry_val & PTE_ADDR_MASK;
+	}
+
+	/* PDPT → PD */
+	entry_addr = next_base + pdpt_idx * 8;
+	entry_val = cow_read_pte(entry_addr);
+	if (!(entry_val & PTE_PRESENT)) {
+		__u64 pg = cow_alloc_phys_pages(1);
+		__u64 va = cow_phys_to_virt(pg);
+		__builtin_memset((void *)va, 0, HL_PAGE_SIZE);
+		cow_write_pte(entry_addr, pg | PTE_PRESENT | PTE_RW);
+		next_base = pg;
+	} else {
+		next_base = entry_val & PTE_ADDR_MASK;
+	}
+
+	/* PD → PT */
+	entry_addr = next_base + pd_idx * 8;
+	entry_val = cow_read_pte(entry_addr);
+	if (!(entry_val & PTE_PRESENT)) {
+		__u64 pg = cow_alloc_phys_pages(1);
+		__u64 va = cow_phys_to_virt(pg);
+		__builtin_memset((void *)va, 0, HL_PAGE_SIZE);
+		cow_write_pte(entry_addr, pg | PTE_PRESENT | PTE_RW);
+		return pg;
+	}
+	return entry_val & PTE_ADDR_MASK;
+}
+
+int cow_map_contiguous(__u64 gva_base, __sz n_pages, int zero_data)
+{
+	if (!cow_initialized || !n_pages)
+		return 0;
+
+	/* One big physical allocation for the whole range. */
+	__u64 phys_base = cow_alloc_phys_pages(n_pages);
+
+	/* Honour the caller's zero_data request. Earlier revisions of
+	 * this function ignored it on the theory that the Hyperlight
+	 * scratch region is born zeroed and cow_alloc_phys_pages never
+	 * recycles pages, so every returned page must already be zero.
+	 *
+	 * That turned out to be unsafe in practice: heavier runtimes
+	 * (powershell / .NET) mmap anonymous regions, write to them,
+	 * munmap, and later do a fresh mmap that lands on a *different*
+	 * phys range but is accessed through VA ranges that had been
+	 * paged in earlier. The non-zeroed tail on larger mmap requests
+	 * also surfaced the same bug. For a trustworthy mmap contract
+	 * we just zero when the caller asks for it.
+	 *
+	 * Cost: ~3-5 ms per `import pandas` on the anonymous-heavy hot
+	 * path, measured. Cheap compared to the correctness footgun.
+	 * A future optimisation could track a high-water mark of
+	 * known-never-touched phys pages and skip the memset only for
+	 * that tail — left for later.
+	 */
+	if (zero_data) {
+		__u64 virt = cow_phys_to_virt(phys_base);
+		__builtin_memset((void *)virt, 0, n_pages * HL_PAGE_SIZE);
+	}
+
+	/* Fill PTs by spans, not pages — one PT covers 512 pages (2 MiB).
+	 * Walk to the PT for gva once, then splice a contiguous run of
+	 * PTEs into it with direct writes to the PT's VA. Collapses the
+	 * per-page 4-level walk down to one walk per PT, which is a
+	 * huge win when a single mmap spans hundreds of pages inside
+	 * one PT (typical for dlopen's full-file initial mmap).
+	 */
+	__sz done = 0;
+	while (done < n_pages) {
+		__u64 gva = gva_base + done * HL_PAGE_SIZE;
+		__u64 pt_gpa = cow_walk_to_pt(gva);
+		__u64 pt_va = cow_phys_to_virt(pt_gpa);
+		__u64 pt_idx = (gva >> 12) & 0x1FF;
+		__sz pt_span = 512 - pt_idx;
+		__sz remain = n_pages - done;
+		__sz batch = pt_span < remain ? pt_span : remain;
+		volatile __u64 *slot =
+			(volatile __u64 *)(pt_va + pt_idx * 8);
+
+		for (__sz k = 0; k < batch; k++) {
+			__u64 phys = phys_base +
+				     (done + k) * HL_PAGE_SIZE;
+			slot[k] = phys | PTE_PRESENT | PTE_RW;
+		}
+
+		done += batch;
 	}
 
 	return 1;

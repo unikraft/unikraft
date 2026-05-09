@@ -36,6 +36,15 @@ config HYPERLIGHT_DEBUG_PRINT
 	  Enable debug print output via Hyperlight DebugPrint port.
 	  This can be useful for early boot debugging.
 
+config HYPERLIGHT_SYSCALL_PROFILE
+	bool "Enable per-syscall TSC profiler + dump"
+	default n
+	help
+	  Record a per-syscall count + cumulative-ns table and dump it
+	  to the host console on every exit/exit_group. Handy for
+	  profiling the syscall hot path in the guest, but it spams
+	  the user-visible output — keep off for production images.
+
 config HYPERLIGHT_HCALL
 	bool "Enable /dev/hcall host function call device"
 	default n

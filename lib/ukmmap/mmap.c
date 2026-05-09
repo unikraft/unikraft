@@ -40,7 +40,33 @@
 #include <uk/config.h>
 #if CONFIG_PLAT_HYPERLIGHT
 #include <unistd.h>
+#include <uk/plat/time.h>
+#include <vfscore/file.h>
+#include <vfscore/vnode.h>
+#include <vfscore/dentry.h>
+struct vfscore_file;
+extern int fget(int fd, struct vfscore_file **out_fp);
+extern int fdrop(struct vfscore_file *fp);
+extern int ramfs_get_file_buffer(struct vnode *vp,
+				 const void **out_buf, size_t *out_size);
+
+/* Finer-grained mmap timing: break the Hyperlight mmap hot path into
+ * VMA bookkeeping, the per-page demand-map loop, and the pread of the
+ * file content. Populated on every mmap call, exported with default
+ * visibility so plat/hyperlight/syscall_profile.c can read them out
+ * at dump time.
+ */
+#define MMAP_TIMING_EXPORT \
+	__attribute__((visibility("default"))) __attribute__((used))
+
+MMAP_TIMING_EXPORT __u64 mmap_timing_calls;
+MMAP_TIMING_EXPORT __u64 mmap_timing_bookkeep_ns;
+MMAP_TIMING_EXPORT __u64 mmap_timing_pgloop_ns;
+MMAP_TIMING_EXPORT __u64 mmap_timing_pread_ns;
+MMAP_TIMING_EXPORT __u64 mmap_timing_pgloop_pages;
+MMAP_TIMING_EXPORT __u64 mmap_timing_pread_bytes;
 #endif
+
 
 #if CONFIG_PLAT_HYPERLIGHT
 /*
@@ -55,6 +81,8 @@
 static __u64 mmap_virt_next = 0x800000000ULL; /* 32 GiB — above any heap */
 
 extern int cow_demand_map_page(__u64 gva);
+extern int cow_demand_map_page_ex(__u64 gva, int zero_data);
+extern int cow_map_contiguous(__u64 gva_base, __sz n_pages, int zero_data);
 #endif
 
 struct mmap_addr {
@@ -183,6 +211,7 @@ UK_SYSCALL_DEFINE(void*, mmap, void*, addr, size_t, len, int, prot,
 			return MAP_FAILED;
 		}
 
+		__u64 _t0 = ukplat_monotonic_clock();
 		new->begin = mem;
 		new->end = mem + len;
 		new->num_pages = 0; /* virtual-only: no buddy pages to free */
@@ -191,16 +220,127 @@ UK_SYSCALL_DEFINE(void*, mmap, void*, addr, size_t, len, int, prot,
 			mmap_addr = new;
 		else
 			last->next = new;
+		__u64 _t1 = ukplat_monotonic_clock();
+		mmap_timing_bookkeep_ns += (_t1 - _t0);
+		mmap_timing_calls++;
 
-		/* For non-PROT_NONE, eagerly demand-map all pages */
+		/* For non-PROT_NONE, eagerly demand-map all pages. For
+		 * file-backed mappings, skip the per-page zero-fill — the
+		 * pread below overwrites every byte anyway, so the memset
+		 * is pure memory-bandwidth waste. Saves ~0.4 us/page on a
+		 * Python-import hot path that averages 40+ pages/mmap and
+		 * 700+ mmaps per `import pandas`.
+		 */
 		if (prot != PROT_NONE) {
-			size_t pg_off;
-			for (pg_off = 0; pg_off < aligned_len;
-			     pg_off += __PAGE_SIZE)
-				cow_demand_map_page((__u64)mem + pg_off);
-			/* File-backed: read content into the mapped pages */
-			if (fildes != -1)
-				pread(fildes, mem, len, off);
+			/* Always zero the freshly-mapped pages. The earlier
+			 * "skip zero-fill for file-backed mmaps" optimisation
+			 * turned out to have two holes:
+			 *   1) len past EOF had to be zeroed per POSIX (fixed
+			 *      with a tail memset below), and
+			 *   2) physical pages recycled from recently-munmapped
+			 *      mappings still had the previous mapping's data,
+			 *      producing non-zero bytes in the middle of the
+			 *      new mapping where pread() never wrote.
+			 * (2) was the root cause of powershell crashing during
+			 * startup. Reverting to always-zero costs ~3-5 ms per
+			 * `import pandas` (measured) which is cheap compared
+			 * to the bugs it prevents. A future optimisation could
+			 * zero only the physical pages not sourced from a clean
+			 * pool, but for now correctness wins.
+			 */
+			int zero_data = 1;
+			/* One contiguous physical allocation + single
+			 * memset (for anonymous) + per-page PTE writes —
+			 * replaces the N-per-page (alloc + memset + PTE
+			 * write) that the naive loop was doing. Giant
+			 * win on anonymous mmaps where the memset alone
+			 * was eating 120+ ms per Python startup.
+			 */
+			cow_map_contiguous((__u64)mem,
+					   aligned_len / __PAGE_SIZE,
+					   zero_data);
+			__u64 _t2 = ukplat_monotonic_clock();
+			mmap_timing_pgloop_ns += (_t2 - _t1);
+			mmap_timing_pgloop_pages +=
+				aligned_len / __PAGE_SIZE;
+			/* File-backed: read content into the mapped pages.
+			 * Fast path: if the backing is a ramfs regular
+			 * file (the overwhelming case for initrd-extracted
+			 * .so files on Hyperlight), grab the raw rn_buf
+			 * pointer and memcpy directly, skipping the
+			 * vfscore pread → preadv → do_preadv → sys_read →
+			 * ramfs_read → vfscore_uiomove chain. Falls back
+			 * to plain pread() for anything that isn't a
+			 * ramfs vnode.
+			 *
+			 * Tried non-temporal stores (movnti) to avoid
+			 * write-allocate on the fresh scratch pages —
+			 * didn't help; the copy is bandwidth-limited on
+			 * memcpy's own throughput, not write-allocate.
+			 * The remaining speedup in this path would come
+			 * from zero-copy mapping of ramfs pages directly
+			 * into the process VA, which needs page-aligned
+			 * ramfs buffers.
+			 */
+			if (fildes != -1) {
+				struct vfscore_file *fp = NULL;
+				/* Bytes actually filled from the file. Any
+				 * remaining [written, len) MUST be zeroed to
+				 * satisfy POSIX — mmap regions past a file's
+				 * EOF must read back as zero. We skipped the
+				 * up-front per-page zero-fill for files (to
+				 * save memory bandwidth on the common Python-
+				 * import hot path), so the tail needs an
+				 * explicit memset here. Missing this was the
+				 * root cause of powershell and other heavy
+				 * runtimes crashing with bogus pointer
+				 * dereferences after mmap'ing a .so whose
+				 * request length exceeds the file size.
+				 */
+				size_t written = 0;
+#if CONFIG_LIBRAMFS
+				const void *src = NULL;
+				size_t src_size = 0;
+				if (fget(fildes, &fp) == 0 && fp
+				    && fp->f_dentry
+				    && fp->f_dentry->d_vnode
+				    && ramfs_get_file_buffer(
+					    fp->f_dentry->d_vnode,
+					    &src, &src_size) == 0) {
+					size_t avail = (off >= (off_t)src_size)
+						? 0
+						: src_size - off;
+					size_t n = len < avail ? len : avail;
+					if (n)
+						memcpy(mem,
+						       (const char *)src + off,
+						       n);
+					written = n;
+					fdrop(fp);
+				} else {
+					if (fp)
+						fdrop(fp);
+					ssize_t r = pread(fildes, mem, len, off);
+					written = r > 0 ? (size_t)r : 0;
+				}
+#else
+				/* No ramfs direct-buffer fast path available;
+				 * fall back to pread() through whatever vfs
+				 * (cpiovfs, hostfs, …) the image enables.
+				 */
+				(void)fp;
+				{
+					ssize_t r = pread(fildes, mem, len, off);
+					written = r > 0 ? (size_t)r : 0;
+				}
+#endif /* CONFIG_LIBRAMFS */
+				if (written < len)
+					memset((char *)mem + written, 0,
+					       len - written);
+				mmap_timing_pread_bytes += len;
+			}
+			__u64 _t3 = ukplat_monotonic_clock();
+			mmap_timing_pread_ns += (_t3 - _t2);
 		}
 
 		return mem;

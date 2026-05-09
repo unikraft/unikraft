@@ -7,9 +7,11 @@
 
 #include <string.h>
 #include <uk/arch/types.h>
+#include <uk/print.h>
 #include <hyperlight-x86/outb.h>
 #include <hyperlight-x86/peb.h>
 #include <hyperlight-x86/fb.h>
+#include <hyperlight-x86/dispatch.h>
 
 static const __u8 HL_VOID_RESULT[] = {
 	0x2c,0x00,0x00,0x00,0x04,0x00,0x00,0x00,
@@ -106,6 +108,20 @@ const __u8 **hyperlight_dispatch_fc_bytes_slot(void)
 __sz *hyperlight_dispatch_fc_len_slot(void)
 {
 	return &g_current_fc_len;
+}
+
+/**
+ * Expose the address of the FC-aware dispatch callback pointer so a
+ * user-mode driver ELF can install itself as the post-first-call
+ * handler without needing kernel-symbol linkage. The driver just
+ * writes its own function pointer into `*slot` from its main() and
+ * every subsequent dispatch goes through that callback instead of
+ * the legacy deferred_run path. See
+ * examples/python-agent-driver/hl_pydriver.c for a user.
+ */
+hl_dispatch_fn *hyperlight_dispatch_v2_slot(void)
+{
+	return (hl_dispatch_fn *)&g_dispatch_callback;
 }
 
 /* MSR helpers */
@@ -363,6 +379,28 @@ hyperlight_dispatch_inner(void)
 	} else if (g_run_callback) {
 		g_run_callback();
 	}
+
+	/* After the callback returns, FS_BASE still points at user TLS
+	 * (glibc/musl set it during Py_Initialize / __libc_start_main).
+	 * Kernel services that dereference TLS (uk_printk uses locks +
+	 * per-CPU state, …) fault on that pointer. Restore the kernel's
+	 * FS_BASE before touching any of those. hyperlight_kernel_fsbase
+	 * is populated by app-elfloader right before it halts post-boot.
+	 */
+	if (hyperlight_kernel_fsbase) {
+		__u32 lo = (__u32)hyperlight_kernel_fsbase;
+		__u32 hi = (__u32)(hyperlight_kernel_fsbase >> 32);
+		__asm__ volatile("wrmsr"
+				 : : "c"(0xC0000100), "a"(lo), "d"(hi));
+	}
+
+#if CONFIG_HYPERLIGHT_SYSCALL_PROFILE
+	/* Dump syscall profile at the end of every dispatch. Only compiled
+	 * in when CONFIG_HYPERLIGHT_SYSCALL_PROFILE is on — diagnostic
+	 * output, too noisy for production images. */
+	hyperlight_syscall_profile_dump();
+	hyperlight_syscall_profile_reset();
+#endif
 
 	hyperlight_dispatch_push_void_result();
 }

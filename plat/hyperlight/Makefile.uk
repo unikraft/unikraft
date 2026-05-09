@@ -49,6 +49,7 @@ LIBHYPERLIGHTPLAT_SRCS-y                          += $(LIBHYPERLIGHTPLAT_BASE)/m
 # io.c removed: ukplat_virt_to_phys replaced by uk_paging_virt_to_phys in lib/ukpaging
 LIBHYPERLIGHTPLAT_SRCS-y                          += $(LIBHYPERLIGHTPLAT_BASE)/console.c
 LIBHYPERLIGHTPLAT_SRCS-y                          += $(LIBHYPERLIGHTPLAT_BASE)/dispatch.c
+LIBHYPERLIGHTPLAT_SRCS-$(CONFIG_HYPERLIGHT_SYSCALL_PROFILE) += $(LIBHYPERLIGHTPLAT_BASE)/syscall_profile.c
 LIBHYPERLIGHTPLAT_SRCS-y                          += $(UK_PLAT_COMMON_BASE)/memory.c|common
 LIBHYPERLIGHTPLAT_SRCS-y                          += $(UK_PLAT_HYPERLIGHT_DEF_LDS)
 

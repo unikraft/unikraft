@@ -3,3 +3,9 @@ munmap
 madvise
 mremap
 mprotect
+mmap_timing_calls
+mmap_timing_bookkeep_ns
+mmap_timing_pgloop_ns
+mmap_timing_pread_ns
+mmap_timing_pgloop_pages
+mmap_timing_pread_bytes

@@ -1,1 +1,3 @@
-# No public symbols
+# No public symbols (ramfs_get_file_buffer is a Hyperlight mmap fast-
+# path shortcut exposed to lib/ukmmap)
+ramfs_get_file_buffer
