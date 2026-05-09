@@ -171,12 +171,10 @@ int cow_handle_fault(__u64 fault_addr, unsigned long error_code,
 	memcpy((void *)new_page_gva, (void *)page_start, HL_PAGE_SIZE);
 
 	/* Build new PTE: writable, no CoW bit, new physical address.
-	 * Clear NX: Hyperlight sets NX=1 on all pages, but with EFER.NXE=1
-	 * this would prevent execution from CoW-copied code pages. In a
-	 * kernel-only unikernel there is no user/kernel privilege separation,
-	 * so all pages are potentially executable.
+	 * Preserve the original NX setting — only pages that were
+	 * executable before CoW should remain executable after.
 	 */
-	old_flags = pte & ~(PTE_ADDR_MASK | PTE_AVL_COW | PTE_NX);
+	old_flags = pte & ~(PTE_ADDR_MASK | PTE_AVL_COW);
 	new_pte = new_page_gpa | old_flags | PTE_RW;
 
 	cow_write_pte(pte_addr, new_pte);
@@ -276,6 +274,98 @@ int cow_demand_map_page(__u64 gva)
 }
 
 /*
+ * Mapped file region for demand-paging.
+ * Set by the guest when it discovers a map_file_cow mapping.
+ */
+static __u64 mapped_file_base;
+static __u64 mapped_file_size;
+
+void cow_register_mapped_file(__u64 base, __u64 size)
+{
+	mapped_file_base = base;
+	mapped_file_size = size;
+}
+
+/*
+ * Demand-page a file-mapped region: create page table entries pointing
+ * to the identity-mapped physical address (GVA == GPA).
+ * The KVM memory slot already has the file data; we just need PTEs.
+ * Maps read-only (the file data should not be modified).
+ */
+static int cow_demand_map_file_page(__u64 gva)
+{
+	__u64 cr3, addr;
+	__u64 pml4_idx, pdpt_idx, pd_idx, pt_idx;
+	__u64 entry_addr, entry_val;
+	__u64 next_base;
+	__u64 page_gpa;
+
+	if (!cow_initialized)
+		return 0;
+	if (!mapped_file_base || !mapped_file_size)
+		return 0;
+	if (gva < mapped_file_base || gva >= mapped_file_base + mapped_file_size)
+		return 0;
+
+	/* Identity mapping: GPA == GVA */
+	page_gpa = gva & ~(HL_PAGE_SIZE - 1);
+
+	cr3 = cow_read_cr3();
+	addr = gva & ((1ULL << 48) - 1);
+
+	pml4_idx = (addr >> 39) & 0x1FF;
+	pdpt_idx = (addr >> 30) & 0x1FF;
+	pd_idx   = (addr >> 21) & 0x1FF;
+	pt_idx   = (addr >> 12) & 0x1FF;
+
+	/* Walk/create PML4 → PDPT → PD → PT, allocating table pages as needed */
+	entry_addr = cr3 + pml4_idx * 8;
+	entry_val = cow_read_pte(entry_addr);
+	if (!(entry_val & PTE_PRESENT)) {
+		__u64 pg = cow_alloc_phys_pages(1);
+		__u64 va = cow_phys_to_virt(pg);
+		__builtin_memset((void *)va, 0, HL_PAGE_SIZE);
+		cow_write_pte(entry_addr, pg | PTE_PRESENT | PTE_RW);
+		next_base = pg;
+	} else {
+		next_base = entry_val & PTE_ADDR_MASK;
+	}
+
+	entry_addr = next_base + pdpt_idx * 8;
+	entry_val = cow_read_pte(entry_addr);
+	if (!(entry_val & PTE_PRESENT)) {
+		__u64 pg = cow_alloc_phys_pages(1);
+		__u64 va = cow_phys_to_virt(pg);
+		__builtin_memset((void *)va, 0, HL_PAGE_SIZE);
+		cow_write_pte(entry_addr, pg | PTE_PRESENT | PTE_RW);
+		next_base = pg;
+	} else {
+		next_base = entry_val & PTE_ADDR_MASK;
+	}
+
+	entry_addr = next_base + pd_idx * 8;
+	entry_val = cow_read_pte(entry_addr);
+	if (!(entry_val & PTE_PRESENT)) {
+		__u64 pg = cow_alloc_phys_pages(1);
+		__u64 va = cow_phys_to_virt(pg);
+		__builtin_memset((void *)va, 0, HL_PAGE_SIZE);
+		cow_write_pte(entry_addr, pg | PTE_PRESENT | PTE_RW);
+		next_base = pg;
+	} else {
+		next_base = entry_val & PTE_ADDR_MASK;
+	}
+
+	/* Map the data page: read-only, pointing to the file's physical page */
+	entry_addr = next_base + pt_idx * 8;
+	entry_val = cow_read_pte(entry_addr);
+	if (!(entry_val & PTE_PRESENT)) {
+		cow_write_pte(entry_addr, page_gpa | PTE_PRESENT);
+	}
+
+	return 1;
+}
+
+/*
  * Event handler for page faults (new ukpal/uklcpu API).
  *
  * After the C exception handlers are installed, CoW faults are dispatched
@@ -297,8 +387,14 @@ static int hyperlight_cow_pf_handler(void *data)
 	fault_addr = (__vaddr_t)uk_lcpu_except_err_ctx_get_fault_addr(ctx);
 	error_code = uk_lcpu_x86_64_except_err_ctx_get_error_code(ctx);
 
+	/* Try CoW resolution first (present + write faults) */
 	if (cow_handle_fault(fault_addr, (__u64)error_code, 0))
 		return UK_EVENT_HANDLED;
+
+	/* Try demand-paging for file-mapped regions (not-present faults) */
+	if (!(error_code & 1) && cow_demand_map_file_page(fault_addr))
+		return UK_EVENT_HANDLED;
+
 	return UK_EVENT_NOT_HANDLED;
 }
 

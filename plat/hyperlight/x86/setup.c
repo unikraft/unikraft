@@ -202,7 +202,44 @@ static void hyperlight_init_mem(struct ukplat_bootinfo *bi,
 		if (unlikely(rc < 0))
 			UK_CRASH("Unable to add init data region");
 	} else {
-		uk_pr_warn("Hyperlight: No initrd provided\n");
+		uk_pr_warn("Hyperlight: No initrd in init_data\n");
+	}
+
+	/* Check for initrd mapped via map_file_cow.
+	 * When the host uses map_file_cow, init_data contains only the
+	 * cmdline header with the mapped file size in the last 8 bytes.
+	 * After cmdline extraction, init_data.size == 0 but the original
+	 * init_data had the size at (ptr + original_size - 8).
+	 */
+#define INITRD_MAP_BASE 0xC0000000ULL  /* Must match host INITRD_MAP_BASE */
+	if (peb->init_data.size == 0 && g_peb->init_data.size >= 8) {
+		__u64 mapped_size = *(__u64 *)(
+			(__u8 *)g_peb->init_data.ptr + g_peb->init_data.size - 8
+		);
+		if (mapped_size > 0) {
+			uk_pr_info("Hyperlight: initrd mapped at 0x%lx, size 0x%lx (zero-copy)\n",
+				   (unsigned long)INITRD_MAP_BASE,
+				   (unsigned long)mapped_size);
+
+			/* Register with demand-paging handler */
+			extern void cow_register_mapped_file(__u64, __u64);
+			cow_register_mapped_file(INITRD_MAP_BASE, mapped_size);
+
+			/* Register as INITRD region for VFS */
+			mrd.pbase = INITRD_MAP_BASE;
+			mrd.vbase = INITRD_MAP_BASE;
+			mrd.pg_off = 0;
+			mrd.len = mapped_size;
+			mrd.pg_count = UK_PAGING_PAGE_COUNT(mrd.len);
+			mrd.type = UKPLAT_MEMRT_INITRD;
+			mrd.flags = UKPLAT_MEMRF_READ;
+#ifdef CONFIG_UKPLAT_MEMRNAME
+			memcpy(mrd.name, "initrd", sizeof("initrd"));
+#endif
+			rc = ukplat_memregion_list_insert(&bi->mrds, &mrd);
+			if (unlikely(rc < 0))
+				UK_CRASH("Unable to add mapped initrd region");
+		}
 	}
 }
 
