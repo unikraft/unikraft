@@ -51,7 +51,7 @@ static struct vfscore_fs_type fs_hostfs = {
 UK_FS_REGISTER(fs_hostfs);
 
 static int
-hostfs_mount(struct mount *mp, const char *dev __unused,
+hostfs_mount(struct mount *mp, const char *dev,
 	     int flags __unused, const void *data __unused)
 {
 	struct hostfs_node *np;
@@ -59,8 +59,21 @@ hostfs_mount(struct mount *mp, const char *dev __unused,
 	np = malloc(sizeof(*np));
 	if (!np)
 		return ENOMEM;
-	/* Root has empty path (mount root). */
-	np->path[0] = '\0';
+	/* The root vnode's `path` is the absolute guest mount path
+	 * (e.g. "/host", "/input"). Every RPC the vnops issue prepends
+	 * the parent's path and passes the full guest path to the host,
+	 * which picks the matching preopen by prefix.
+	 */
+	if (dev && *dev) {
+		strlcpy(np->path, dev, sizeof(np->path));
+	} else {
+		/* Legacy / kconfig-default path: fall back to the compile
+		 * time LIBHOSTFS_MOUNTPOINT so the host-side router still
+		 * has a prefix to match against.
+		 */
+		strlcpy(np->path, CONFIG_LIBHOSTFS_MOUNTPOINT,
+			sizeof(np->path));
+	}
 	mp->m_root->d_vnode->v_data = np;
 	mp->m_root->d_vnode->v_type = VDIR;
 	return 0;
@@ -74,32 +87,40 @@ hostfs_unmount(struct mount *mp, int flags __unused)
 }
 
 #ifdef CONFIG_LIBHOSTFS_AUTOMOUNT
-static int hostfs_automount(struct uk_init_ctx *ictx __unused)
+static int hostfs_mount_one(const char *mountpoint)
 {
-	/* Prefer the runtime mountpoint advertised by the Hyperlight host
-	 * via the HLHSMNT TLV (set by `hyperlight-unikraft --mount H:/G`).
-	 * If absent, fall back to the compile-time kconfig default.
-	 */
-	const char *runtime = hyperlight_hostfs_mountpoint_from_host();
-	const char *mountpoint = runtime ? runtime : CONFIG_LIBHOSTFS_MOUNTPOINT;
-	int ret;
-
-	uk_pr_info("Mount hostfs to %s%s...\n", mountpoint,
-		   runtime ? " (from host --mount)" : "");
-
-	ret = mkdir(mountpoint, S_IRWXU);
+	int ret = mkdir(mountpoint, S_IRWXU);
 	if (ret != 0 && errno != EEXIST) {
 		uk_pr_err("Failed to create %s: %d\n", mountpoint, errno);
 		return -1;
 	}
-
-	ret = mount("", mountpoint, "hostfs", 0, NULL);
+	/* Pass the absolute guest mount path as the `dev` argument so the
+	 * hostfs_mount callback can stash it as the per-mount prefix.
+	 */
+	ret = mount(mountpoint, mountpoint, "hostfs", 0, NULL);
 	if (ret != 0) {
 		uk_pr_err("Failed to mount hostfs on %s: %d\n",
 			  mountpoint, errno);
 		return -1;
 	}
+	uk_pr_info("Mounted hostfs at %s\n", mountpoint);
+	return 0;
+}
 
+static int hostfs_automount(struct uk_init_ctx *ictx __unused)
+{
+	unsigned int n = hyperlight_hostfs_preopen_count();
+	if (n == 0) {
+		/* No host-provided preopens — use the kconfig default. */
+		return hostfs_mount_one(CONFIG_LIBHOSTFS_MOUNTPOINT);
+	}
+	for (unsigned int i = 0; i < n; i++) {
+		const char *mp = hyperlight_hostfs_preopen(i);
+		if (!mp || !*mp)
+			continue;
+		if (hostfs_mount_one(mp) != 0)
+			return -1;
+	}
 	return 0;
 }
 

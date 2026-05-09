@@ -76,6 +76,8 @@ static inline void _check_ospke(void)
 
 /* Maximum hostfs mount path advertised by the host. */
 #define HYPERLIGHT_MAX_MOUNT_PATH 256
+/* Maximum number of host preopens we accept. */
+#define HYPERLIGHT_MAX_PREOPENS 8
 
 /* Forward declaration for console init */
 void _ukplat_init_console(void);
@@ -92,18 +94,27 @@ extern struct hyperlight_entry_args hyperlight_entry_args;
 /* Static buffer for combined cmdline */
 static char hyperlight_cmdline_buf[HYPERLIGHT_MAX_CMDLINE];
 
-/* Static buffer for an optional hostfs mount path advertised by the host
- * via the HLHSMNT TLV. Empty string means "unset" (use kconfig default).
- */
-static char hyperlight_hostfs_mountpoint[HYPERLIGHT_MAX_MOUNT_PATH];
+/* Host-provided preopen mount paths (HLHSMNT TLV). Empty = none. */
+static char hyperlight_preopens[HYPERLIGHT_MAX_PREOPENS]
+				[HYPERLIGHT_MAX_MOUNT_PATH];
+static unsigned int hyperlight_preopen_count;
 
 /**
- * Return the runtime-configured hostfs mount path, or NULL if the host
- * didn't advertise one. Callable from lib/hostfs at auto-mount time.
+ * Number of host-provided preopens.
  */
-const char *hyperlight_hostfs_mountpoint_from_host(void)
+unsigned int hyperlight_hostfs_preopen_count(void)
 {
-	return hyperlight_hostfs_mountpoint[0] ? hyperlight_hostfs_mountpoint : 0;
+	return hyperlight_preopen_count;
+}
+
+/**
+ * Return the guest mount path for preopen `i`, or NULL if out of range.
+ */
+const char *hyperlight_hostfs_preopen(unsigned int i)
+{
+	if (i >= hyperlight_preopen_count)
+		return 0;
+	return hyperlight_preopens[i];
 }
 
 /* Host-provided wall clock at VM boot, in ns since the Unix epoch.
@@ -160,26 +171,34 @@ static const char *extract_cmdline_from_initrd(__u64 *init_ptr, __u64 *init_size
 	__u64 unpadded =
 		HYPERLIGHT_CMDLINE_MAGIC_LEN + 4 + cmdline_len + 1;
 
-	/* Optional HLHSMNT TLV immediately after the cmdline NUL. */
+	/* Optional HLHSMNT TLV immediately after the cmdline NUL.
+	 * Layout: magic + u32 count + (u32 len + path + NUL) x count.
+	 */
 	if (unpadded + HYPERLIGHT_MOUNT_MAGIC_LEN + 4 <= size
 	    && memcmp(data + unpadded, HYPERLIGHT_MOUNT_MAGIC,
 		      HYPERLIGHT_MOUNT_MAGIC_LEN) == 0) {
-		const unsigned char *ml_ptr = (const unsigned char *)
-			(data + unpadded + HYPERLIGHT_MOUNT_MAGIC_LEN);
-		__u32 mount_len = ml_ptr[0] | (ml_ptr[1] << 8) |
-				  (ml_ptr[2] << 16) | (ml_ptr[3] << 24);
-
-		if (mount_len < HYPERLIGHT_MAX_MOUNT_PATH &&
-		    unpadded + HYPERLIGHT_MOUNT_MAGIC_LEN + 4
-		    + mount_len + 1 <= size) {
-			const char *mount = data + unpadded
-				+ HYPERLIGHT_MOUNT_MAGIC_LEN + 4;
-			memcpy(hyperlight_hostfs_mountpoint, mount,
-			       mount_len);
-			hyperlight_hostfs_mountpoint[mount_len] = '\0';
-			unpadded += HYPERLIGHT_MOUNT_MAGIC_LEN + 4
-				+ mount_len + 1;
+		__u64 p = unpadded + HYPERLIGHT_MOUNT_MAGIC_LEN;
+		const unsigned char *cp = (const unsigned char *)(data + p);
+		__u32 count = cp[0] | (cp[1] << 8) | (cp[2] << 16) | (cp[3] << 24);
+		p += 4;
+		if (count > HYPERLIGHT_MAX_PREOPENS)
+			count = HYPERLIGHT_MAX_PREOPENS;
+		unsigned int ok = 0;
+		for (__u32 i = 0; i < count; i++) {
+			if (p + 4 > size)
+				break;
+			const unsigned char *lp = (const unsigned char *)(data + p);
+			__u32 plen = lp[0] | (lp[1] << 8) | (lp[2] << 16) | (lp[3] << 24);
+			p += 4;
+			if (plen >= HYPERLIGHT_MAX_MOUNT_PATH || p + plen + 1 > size)
+				break;
+			memcpy(hyperlight_preopens[ok], data + p, plen);
+			hyperlight_preopens[ok][plen] = '\0';
+			p += plen + 1;
+			ok++;
 		}
+		hyperlight_preopen_count = ok;
+		unpadded = p;
 	}
 
 	/* Optional HLWALL0 TLV: 8-byte payload = wall ns since epoch. */

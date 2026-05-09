@@ -31,11 +31,16 @@ struct hyperlight_peb *hyperlight_get_peb(void);
 const struct hyperlight_entry_args *hyperlight_get_entry_args(void);
 
 /**
- * Get the hostfs mount path advertised by the Hyperlight host via the
- * HLHSMNT TLV in init_data, or NULL when the host didn't specify one
- * (in which case callers should fall back to their kconfig default).
+ * Number of host-provided preopens advertised by the Hyperlight host
+ * via the HLHSMNT TLV. Zero when the host didn't pass any.
  */
-const char *hyperlight_hostfs_mountpoint_from_host(void);
+unsigned int hyperlight_hostfs_preopen_count(void);
+
+/**
+ * Guest mount path of preopen `i`, or NULL if out of range. Callable
+ * from lib/hostfs at auto-mount time to iterate over the preopens.
+ */
+const char *hyperlight_hostfs_preopen(unsigned int i);
 
 /**
  * Host-provided wall time at VM boot, in ns since the Unix epoch.
