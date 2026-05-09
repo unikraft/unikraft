@@ -11,6 +11,15 @@
 
 #include <uk/lcpu.h>
 
+/*
+ * Common GDT descriptor indices used across all x86 platforms
+ * (KVM, Xen, Hyperlight, etc.)
+ */
+#define GDT_DESC_NULL           0
+#define GDT_DESC_CODE           1
+#define GDT_DESC_DATA           2
+#define GDT_DESC_OFFSET(n)      ((n) * 0x8)
+
 #define TRAP_divide_error        0
 #define TRAP_debug               1
 #define TRAP_nmi                 2

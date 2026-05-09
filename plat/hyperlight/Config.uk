@@ -1,0 +1,49 @@
+menuconfig PLAT_HYPERLIGHT
+	bool "Hyperlight guest"
+	default n
+	depends on ARCH_X86_64
+	select LIBUKDEBUG
+	select LIBUKBOOT
+	select LIBUKBITOPS
+	select LIBUKALLOC
+	select LIBUKTIMECONV
+	select LIBNOLIBC if !HAVE_LIBC
+	select LIBUKATOMIC
+	select LIBUKRELOC if OPTIMIZE_PIE
+	select HAVE_PAGING
+	select LIBUKPLAT_NATIVE_PAL
+	select LIBUKPLAT_NATIVE_PAGING if LIBUKPAGING
+	select LIBUKPLAT_NATIVE_LCPU_PM if LIBUKLCPU
+	select HAVE_INTCTLR
+	select LIBUKINTCTLR_HYPERLIGHT
+	help
+	  Create a Unikraft image that runs as a Hyperlight guest.
+	  Hyperlight is a lightweight Virtual Machine Manager (VMM)
+	  designed to be embedded within applications.
+
+if (PLAT_HYPERLIGHT)
+
+config HYPERLIGHT_MAX_GUEST_LOG_LEVEL
+	int "Maximum guest log level (0=Off, 1=Error, 2=Warn, 3=Info, 4=Debug, 5=Trace)"
+	default 3
+	range 0 5
+	help
+	  Maximum log level that will be sent to the host.
+	  0 = Off, 1 = Error, 2 = Warn, 3 = Info, 4 = Debug, 5 = Trace
+
+config HYPERLIGHT_DEBUG_PRINT
+	bool "Enable debug print to host"
+	default n
+	help
+	  Enable debug print output via Hyperlight DebugPrint port.
+	  This can be useful for early boot debugging.
+
+config HYPERLIGHT_HCALL
+	bool "Enable /dev/hcall host function call device"
+	default n
+	depends on LIBDEVFS
+	help
+	  Provides /dev/hcall for user-space to call host-registered
+	  functions via the Hyperlight dispatch protocol.
+
+endif

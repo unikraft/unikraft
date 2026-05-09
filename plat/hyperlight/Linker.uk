@@ -1,0 +1,68 @@
+ifeq (x86_64,$(CONFIG_UK_ARCH))
+HYPERLIGHT_LDFLAGS-y += -Wl,--entry=_hyperlight_entry
+HYPERLIGHT_LDFLAGS-y += -Wl,-m,elf_x86_64
+endif
+
+##
+## Link image
+##
+ifneq ($(UK_IMAGE_NAME_OVERWRITE),)
+HYPERLIGHT_IMAGE := $(BUILD_DIR)/$(UK_IMAGE_NAME_OVERWRITE)
+else
+HYPERLIGHT_IMAGE := $(BUILD_DIR)/$(CONFIG_UK_NAME)_hyperlight-$(CONFIG_UK_ARCH)
+endif
+HYPERLIGHT_DEBUG_IMAGE := $(HYPERLIGHT_IMAGE).dbg
+
+HYPERLIGHT_LD_SCRIPT_FLAGS := $(addprefix -Wl$(comma)-dT$(comma),\
+			 $(UK_PLAT_HYPERLIGHT_DEF_LDS))
+HYPERLIGHT_LD_SCRIPT_FLAGS += $(addprefix -Wl$(comma)-T$(comma),\
+			$(HYPERLIGHT_LD_SCRIPT-y) $(EXTRA_LD_SCRIPT-y))
+
+$(HYPERLIGHT_DEBUG_IMAGE): $(HYPERLIGHT_ALIBS) $(HYPERLIGHT_ALIBS-y) $(HYPERLIGHT_OLIBS) $(HYPERLIGHT_OLIBS-y) \
+		    $(UK_ALIBS) $(UK_ALIBS-y) $(UK_OLIBS) $(UK_OLIBS-y) \
+		    $(HYPERLIGHT_LD_SCRIPT-y) $(EXTRA_LD_SCRIPT-y) \
+		    $(UK_PLAT_HYPERLIGHT_DEF_LDS) $(UK_LDEPS)
+	$(call build_cmd,LD,,$@,\
+	       $(LD) \
+			$(HYPERLIGHT_LDFLAGS) $(HYPERLIGHT_LDFLAGS-y) \
+			$(HYPERLIGHT_OLIBS) $(HYPERLIGHT_OLIBS-y) \
+			$(UK_OLIBS) $(UK_OLIBS-y) \
+			-Wl$(comma)--start-group \
+			$(HYPERLIGHT_ALIBS) $(HYPERLIGHT_ALIBS-y) \
+			$(UK_ALIBS) $(UK_ALIBS-y) \
+			-Wl$(comma)--end-group \
+			$(HYPERLIGHT_LDLIBS) $(HYPERLIGHT_LDLIBS-y) \
+			$(LDFLAGS) $(LDFLAGS-y) \
+			$(HYPERLIGHT_LD_SCRIPT_FLAGS) \
+			-o $@)
+ifeq ($(CONFIG_OPTIMIZE_PIE),y)
+	$(call build_uk_reloc,$@)
+endif
+
+$(HYPERLIGHT_IMAGE): $(HYPERLIGHT_IMAGE).dbg
+	$(call build_cmd,SCSTRIP,,$@,\
+		$(STRIP) -s \
+			$(SECT_STRIP_FLAGS) $(SECT_STRIP_FLAGS-y) \
+			$(HYPERLIGHT_STRIPFLAGS) \
+			$< -o $@ 2>&1 | \
+			{ $(GREP) -Ev \
+				"Empty loadable segment detected|section.*lma.*adjusted to.*" || \
+				true; })
+	$(call build_bootinfo,$@)
+
+$(HYPERLIGHT_IMAGE).sym: $(HYPERLIGHT_DEBUG_IMAGE)
+	$(call build_cmd,NM,,$@, $(NM) -n $< > $@)
+
+$(HYPERLIGHT_IMAGE).gz: $(HYPERLIGHT_IMAGE)
+	$(call build_cmd,GZ,,$@, $(GZIP) -f -9 -c $< >$@)
+
+# register images to the build
+ifeq ($(CONFIG_PLAT_HYPERLIGHT),y)
+UK_DEBUG_IMAGES-y                     += $(HYPERLIGHT_DEBUG_IMAGE)
+UK_IMAGES-y                           += $(HYPERLIGHT_IMAGE)
+UK_IMAGES-$(CONFIG_OPTIMIZE_SYMFILE)  += $(HYPERLIGHT_IMAGE).sym
+UK_IMAGES-$(CONFIG_OPTIMIZE_COMPRESS) += $(HYPERLIGHT_IMAGE).gz
+endif
+
+# ...for cleaning:
+LIBHYPERLIGHTPLAT_CLEAN += $(call build_clean,$(HYPERLIGHT_DEBUG_IMAGE).bootinfo)

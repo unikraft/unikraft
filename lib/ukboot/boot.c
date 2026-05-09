@@ -267,7 +267,9 @@ void uk_boot_entry(void)
 	 * the cmdline. We should expect at minimum one arg,
 	 * CONFIG_UK_NAME.
 	 */
+
 	UK_ASSERT(boot_argc);
+
 
 #if CONFIG_LIBUKBOOT_MAINTHREAD
 	/* Initialize main thread semaphore */
@@ -275,6 +277,7 @@ void uk_boot_entry(void)
 	/* Initialize shutdown control structure */
 	uk_boot_shutdown_ctl_init();
 #endif /* CONFIG_LIBUKBOOT_MAINTHREAD */
+
 
 	uk_pr_info("Unikraft constructor table at %p - %p\n",
 		   &uk_ctortab_start[0], &uk_ctortab_end);
@@ -284,10 +287,13 @@ void uk_boot_entry(void)
 		(*ctorfn)();
 	}
 
+
 #if CONFIG_LIBUKBOOT_INITALLOC
 	uk_pr_info("Initialize memory allocator...\n");
 
+
 	a = heap_init();
+
 	if (unlikely(!a))
 		UK_CRASH("Failed to initialize memory allocator\n");
 	else {
@@ -314,6 +320,7 @@ void uk_boot_entry(void)
 				   );
 	if (unlikely(!auxsa))
 		UK_CRASH("Could not initialize auxiliary stack allocator\n");
+
 
 	/* Allocate a TLS for this execution context */
 	tls = uk_memalign(a,
@@ -343,26 +350,35 @@ void uk_boot_entry(void)
 	uk_lcpu_set_auxsp(auxsp);
 #endif /* CONFIG_LIBUKBOOT_INITALLOC */
 
+
 #if CONFIG_LIBUKINTCTLR
 	uk_pr_info("Initialize the IRQ subsystem...\n");
 	rc = uk_intctlr_init(a);
 	if (unlikely(rc))
 		UK_CRASH("Could not initialize the IRQ subsystem\n");
+
 #endif /* CONFIG_LIBUKINTCTLR */
 
 	/* On most platforms the timer depend on an initialized IRQ subsystem */
 	uk_pr_info("Initialize platform time...\n");
+
 	ukplat_time_init();
+
 
 #if CONFIG_LIBUKBOOT_INITSCHED
 	uk_pr_info("Initialize scheduling...\n");
 #if CONFIG_LIBUKBOOT_INITSCHEDCOOP
+
 	s = uk_schedcoop_create(a, sa, auxsa, a);
+
 #endif
 	if (unlikely(!s))
 		UK_CRASH("Failed to initialize scheduling\n");
+
 	uk_sched_start(s);
+
 #endif /* CONFIG_LIBUKBOOT_INITSCHED */
+
 
 	ictx.cmdline.argc = boot_argc;
 	ictx.cmdline.argv = boot_argv;
@@ -376,20 +392,24 @@ void uk_boot_entry(void)
 				       false, false,
 				       "main", NULL,
 				       main_thread_dtor);
+
 	if (unlikely(!m || PTRISERR(m)))
 		UK_CRASH("Failed to launch application's main()\n");
 
 	ictx.tmain = m;
 #endif /* CONFIG_LIBUKBOOT_MAINTHREAD */
 
+
 	/* Enable interrupts before starting the application */
 	uk_lcpu_enable_irq();
+
 
 	/**
 	 * Run init table
 	 */
 	uk_pr_info("Init Table @ %p - %p\n",
 		   &uk_inittab_start[0], &uk_inittab_end);
+
 	uk_inittab_foreach(init_entry, uk_inittab_start, uk_inittab_end) {
 		UK_ASSERT(init_entry);
 
@@ -410,6 +430,7 @@ void uk_boot_entry(void)
 	uk_stack_chk_guard_setup();
 #endif
 
+
 	print_banner(stdout);
 	fflush(stdout);
 
@@ -417,8 +438,10 @@ void uk_boot_entry(void)
 	tctx.exit_code = do_main(ictx.cmdline.argc, ictx.cmdline.argv);
 	tctx.target = UK_PM_SHUTDOWN_OP_SYSHALT;
 #else /* CONFIG_LIBUKBOOT_MAINTHREAD */
+
 	/* Unblock main thread (will execute main()) */
 	uk_semaphore_up(&main_sema);
+
 
 	/* Block execution of "init" until we receive the first request.
 	 * The exit code will be set by the main thread.

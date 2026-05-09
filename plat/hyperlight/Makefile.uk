@@ -1,0 +1,59 @@
+##
+## Hyperlight platform registration
+##
+$(eval $(call addplat_s,hyperlight,$(CONFIG_PLAT_HYPERLIGHT)))
+
+##
+## Hyperlight platform library registration
+##
+$(eval $(call addplatlib,hyperlight,libhyperlightplat))
+
+##
+## Platform library definitions
+##
+LIBHYPERLIGHTPLAT_ASINCLUDES-y        += -I$(LIBHYPERLIGHTPLAT_BASE)/include
+LIBHYPERLIGHTPLAT_ASINCLUDES-y        += -I$(UK_PLAT_COMMON_BASE)/include
+LIBHYPERLIGHTPLAT_CINCLUDES-y         += -I$(LIBHYPERLIGHTPLAT_BASE)/include
+LIBHYPERLIGHTPLAT_CINCLUDES-y         += -I$(UK_PLAT_COMMON_BASE)/include
+LIBHYPERLIGHTPLAT_CINCLUDES-y         += -I$(UK_PLAT_DRIVERS_BASE)/include
+
+LIBHYPERLIGHTPLAT_ASFLAGS             += -DHYPERLIGHTPLAT -DUK_USE_SECTION_SEGMENTS
+LIBHYPERLIGHTPLAT_CFLAGS              += -DHYPERLIGHTPLAT -DUK_USE_SECTION_SEGMENTS
+LIBHYPERLIGHTPLAT_CXXFLAGS            += -DHYPERLIGHTPLAT -DUK_USE_SECTION_SEGMENTS
+
+##
+## Default Linker script
+##
+UK_PLAT_HYPERLIGHT_DEF_LDS            := $(CONFIG_UK_BASE)/plat/hyperlight/x86/link64.lds.S
+
+##
+## Architecture library definitions for x86_64
+## (traps, cpu_native, lcpu, tls, paging moved to lib/uklcpu, lib/ukpaging, etc.)
+##
+ifeq ($(CONFIG_HAVE_SYSCALL),y)
+LIBHYPERLIGHTPLAT_SRCS-$(CONFIG_ARCH_X86_64) += $(UK_PLAT_COMMON_BASE)/x86/syscall.S|common
+endif
+
+## Hyperlight-specific sources
+LIBHYPERLIGHTPLAT_SRCS-$(CONFIG_ARCH_X86_64) += $(LIBHYPERLIGHTPLAT_BASE)/cow.c
+LIBHYPERLIGHTPLAT_SRCS-$(CONFIG_ARCH_X86_64) += $(LIBHYPERLIGHTPLAT_BASE)/x86/entry64.S|x86
+LIBHYPERLIGHTPLAT_SRCS-$(CONFIG_ARCH_X86_64) += $(LIBHYPERLIGHTPLAT_BASE)/x86/pagetable64.S
+LIBHYPERLIGHTPLAT_SRCS-$(CONFIG_ARCH_X86_64) += $(LIBHYPERLIGHTPLAT_BASE)/x86/cpu_vectors_x86_64.S
+LIBHYPERLIGHTPLAT_SRCS-$(CONFIG_ARCH_X86_64) += $(LIBHYPERLIGHTPLAT_BASE)/x86/setup.c
+LIBHYPERLIGHTPLAT_SRCS-$(CONFIG_ARCH_X86_64) += $(LIBHYPERLIGHTPLAT_BASE)/x86/lcpu_start.S
+LIBHYPERLIGHTPLAT_SRCS-$(CONFIG_ARCH_X86_64) += $(LIBHYPERLIGHTPLAT_BASE)/x86/time.c
+
+## Common sources
+LIBHYPERLIGHTPLAT_SRCS-y                          += $(LIBHYPERLIGHTPLAT_BASE)/shutdown.c
+LIBHYPERLIGHTPLAT_SRCS-y                          += $(LIBHYPERLIGHTPLAT_BASE)/memory.c
+# io.c removed: ukplat_virt_to_phys replaced by uk_paging_virt_to_phys in lib/ukpaging
+LIBHYPERLIGHTPLAT_SRCS-y                          += $(LIBHYPERLIGHTPLAT_BASE)/console.c
+LIBHYPERLIGHTPLAT_SRCS-y                          += $(LIBHYPERLIGHTPLAT_BASE)/dispatch.c
+LIBHYPERLIGHTPLAT_SRCS-y                          += $(UK_PLAT_COMMON_BASE)/memory.c|common
+LIBHYPERLIGHTPLAT_SRCS-y                          += $(UK_PLAT_HYPERLIGHT_DEF_LDS)
+
+LIBHYPERLIGHTPLAT_SRCS-y		 += $(UK_PLAT_COMMON_BASE)/bootinfo.c|common
+LIBHYPERLIGHTPLAT_SRCS-y		 += $(UK_PLAT_COMMON_BASE)/bootinfo.lds.S|common
+
+## Host function call device (/dev/hcall)
+LIBHYPERLIGHTPLAT_SRCS-$(CONFIG_HYPERLIGHT_HCALL) += $(LIBHYPERLIGHTPLAT_BASE)/hcall.c
