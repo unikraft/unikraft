@@ -30,4 +30,11 @@ struct hyperlight_peb *hyperlight_get_peb(void);
  */
 const struct hyperlight_entry_args *hyperlight_get_entry_args(void);
 
+/**
+ * Get the hostfs mount path advertised by the Hyperlight host via the
+ * HLHSMNT TLV in init_data, or NULL when the host didn't specify one
+ * (in which case callers should fall back to their kconfig default).
+ */
+const char *hyperlight_hostfs_mountpoint_from_host(void);
+
 #endif /* __HYPERLIGHT_X86_SETUP_H__ */

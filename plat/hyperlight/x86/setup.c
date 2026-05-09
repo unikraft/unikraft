@@ -63,8 +63,15 @@ static inline void _check_ospke(void)
 #define HYPERLIGHT_CMDLINE_MAGIC "HLCMDLN\0"
 #define HYPERLIGHT_CMDLINE_MAGIC_LEN 8
 
+/* Magic for the optional hostfs-mount TLV that follows the cmdline. */
+#define HYPERLIGHT_MOUNT_MAGIC "HLHSMNT\0"
+#define HYPERLIGHT_MOUNT_MAGIC_LEN 8
+
 /* Maximum combined cmdline length */
 #define HYPERLIGHT_MAX_CMDLINE 1024
+
+/* Maximum hostfs mount path advertised by the host. */
+#define HYPERLIGHT_MAX_MOUNT_PATH 256
 
 /* Forward declaration for console init */
 void _ukplat_init_console(void);
@@ -80,6 +87,20 @@ extern struct hyperlight_entry_args hyperlight_entry_args;
 
 /* Static buffer for combined cmdline */
 static char hyperlight_cmdline_buf[HYPERLIGHT_MAX_CMDLINE];
+
+/* Static buffer for an optional hostfs mount path advertised by the host
+ * via the HLHSMNT TLV. Empty string means "unset" (use kconfig default).
+ */
+static char hyperlight_hostfs_mountpoint[HYPERLIGHT_MAX_MOUNT_PATH];
+
+/**
+ * Return the runtime-configured hostfs mount path, or NULL if the host
+ * didn't advertise one. Callable from lib/hostfs at auto-mount time.
+ */
+const char *hyperlight_hostfs_mountpoint_from_host(void)
+{
+	return hyperlight_hostfs_mountpoint[0] ? hyperlight_hostfs_mountpoint : 0;
+}
 
 /* Base cmdline with random seed (kernel args) */
 static const char hyperlight_base_cmdline[] =
@@ -120,9 +141,35 @@ static const char *extract_cmdline_from_initrd(__u64 *init_ptr, __u64 *init_size
 	__u32 cmdline_len = len_ptr[0] | (len_ptr[1] << 8) |
 			    (len_ptr[2] << 16) | (len_ptr[3] << 24);
 
-	/* Calculate header size (aligned to UK_PAL_PAGE_SIZE) */
-	__u64 header_size = HYPERLIGHT_CMDLINE_MAGIC_LEN + 4 + cmdline_len + 1;
-	__u64 padded_header_size = (header_size + UK_PAL_PAGE_SIZE - 1) & ~(UK_PAL_PAGE_SIZE - 1);
+	/* Calculate total TLV size: cmdline + optional hostfs mount TLV. */
+	__u64 unpadded =
+		HYPERLIGHT_CMDLINE_MAGIC_LEN + 4 + cmdline_len + 1;
+
+	/* Optional HLHSMNT TLV immediately after the cmdline NUL. */
+	if (unpadded + HYPERLIGHT_MOUNT_MAGIC_LEN + 4 <= size
+	    && memcmp(data + unpadded, HYPERLIGHT_MOUNT_MAGIC,
+		      HYPERLIGHT_MOUNT_MAGIC_LEN) == 0) {
+		const unsigned char *ml_ptr = (const unsigned char *)
+			(data + unpadded + HYPERLIGHT_MOUNT_MAGIC_LEN);
+		__u32 mount_len = ml_ptr[0] | (ml_ptr[1] << 8) |
+				  (ml_ptr[2] << 16) | (ml_ptr[3] << 24);
+
+		if (mount_len < HYPERLIGHT_MAX_MOUNT_PATH &&
+		    unpadded + HYPERLIGHT_MOUNT_MAGIC_LEN + 4
+		    + mount_len + 1 <= size) {
+			const char *mount = data + unpadded
+				+ HYPERLIGHT_MOUNT_MAGIC_LEN + 4;
+			memcpy(hyperlight_hostfs_mountpoint, mount,
+			       mount_len);
+			hyperlight_hostfs_mountpoint[mount_len] = '\0';
+			unpadded += HYPERLIGHT_MOUNT_MAGIC_LEN + 4
+				+ mount_len + 1;
+		}
+	}
+
+	/* Pad whole TLV block to page boundary. */
+	__u64 padded_header_size = (unpadded + UK_PAL_PAGE_SIZE - 1)
+		& ~(UK_PAL_PAGE_SIZE - 1);
 
 	if (padded_header_size > size)
 		return NULL;

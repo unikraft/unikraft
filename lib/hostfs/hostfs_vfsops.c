@@ -19,6 +19,8 @@
 #include <vfscore/dentry.h>
 #include <vfscore/fs.h>
 
+#include <hyperlight-x86/setup.h>
+
 #include "hostfs.h"
 
 extern struct vnops hostfs_vnops;
@@ -74,10 +76,16 @@ hostfs_unmount(struct mount *mp, int flags __unused)
 #ifdef CONFIG_LIBHOSTFS_AUTOMOUNT
 static int hostfs_automount(struct uk_init_ctx *ictx __unused)
 {
-	const char *mountpoint = CONFIG_LIBHOSTFS_MOUNTPOINT;
+	/* Prefer the runtime mountpoint advertised by the Hyperlight host
+	 * via the HLHSMNT TLV (set by `hyperlight-unikraft --mount H:/G`).
+	 * If absent, fall back to the compile-time kconfig default.
+	 */
+	const char *runtime = hyperlight_hostfs_mountpoint_from_host();
+	const char *mountpoint = runtime ? runtime : CONFIG_LIBHOSTFS_MOUNTPOINT;
 	int ret;
 
-	uk_pr_info("Mount hostfs to %s...\n", mountpoint);
+	uk_pr_info("Mount hostfs to %s%s...\n", mountpoint,
+		   runtime ? " (from host --mount)" : "");
 
 	ret = mkdir(mountpoint, S_IRWXU);
 	if (ret != 0 && errno != EEXIST) {

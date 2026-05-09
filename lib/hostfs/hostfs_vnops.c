@@ -169,7 +169,6 @@ static int hostfs_lookup(struct vnode *dvp, const char *name,
 	char child[HOSTFS_MAX_PATH];
 	int rc;
 
-	uk_pr_info("hostfs_lookup: name=%s\n", name);
 	*vpp = NULL;
 	if (*name == '\0')
 		return ENOENT;
@@ -179,11 +178,9 @@ static int hostfs_lookup(struct vnode *dvp, const char *name,
 	rc = join_path(dnp->path, name, child, sizeof(child));
 	if (rc < 0)
 		return -rc;
-	uk_pr_info("hostfs_lookup: child=%s\n", child);
 
 	struct hostfs_stat st = {0};
 	rc = hostfs_rpc_stat(child, &st);
-	uk_pr_info("hostfs_lookup: stat rc=%d\n", rc);
 	if (rc < 0)
 		return -rc;
 
