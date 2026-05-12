@@ -184,19 +184,25 @@ void hyperlight_dispatch_push_void_result(void)
 /**
  * Prepare the CPU exception environment for dispatch after restore.
  *
- * After snapshot/restore, the kernel's IST stacks (in .bss) are CoW
- * (read-only).  Any CPU exception would try to push to a CoW IST
- * stack, triggering a #PF during delivery → double fault → triple
- * fault (silent VM reset).
+ * After snapshot/restore, all writable guest pages are CoW (read-only
+ * in guest PTEs with AVL_COW bit set).  The kernel has a C-level CoW
+ * handler (cow.c) registered on the page fault event that resolves
+ * heap CoW faults at runtime.  But the handler runs on IST2 (trap
+ * stack), and IST-related data structures (idt_ist_saved, cpu_idt,
+ * lcpu_except_stack) are in BSS — also CoW.  A CoW fault on a BSS
+ * page during exception delivery would nest before IST is disabled,
+ * corrupting the outer exception frame.
  *
  * Strategy:
  * 1. Save the kernel's IDTR
  * 2. Install a temporary IDT on the scratch stack with IST=0
  *    (exceptions push to current stack, which is scratch = writable)
  * 3. Restore MSRs (LSTAR, STAR, SFMASK, KERNEL_GS_BASE)
- * 4. Pre-fault the kernel's IST stacks by writing to them
- *    (CoW faults resolved by temp IDT handler on scratch stack)
- * 5. Reload the kernel's IDT (IST stacks now writable)
+ * 4. Pre-fault the entire kernel rw- section (.data + .bss) so the
+ *    exception infrastructure (IST stacks, IDT, cow_initialized, etc.)
+ *    is writable before the kernel IDT is restored
+ * 5. Reload the kernel's IDT — heap CoW faults are now handled by the
+ *    C-level cow_handle_fault() via the page fault event chain
  */
 static void hyperlight_dispatch_prepare(void)
 {
@@ -238,59 +244,21 @@ static void hyperlight_dispatch_prepare(void)
 	wrmsr(MSR_SFMASK, g_saved_sfmask);
 	wrmsr(MSR_KERNEL_GS_BASE, g_saved_kernel_gs_base);
 
-	/* 4. Pre-fault kernel IST stacks.
-	 * Read IST addresses from the TSS (found via GDT + TR).
-	 * Write to the top 2 pages of each to trigger CoW resolution.
+	/* 4. Pre-fault the entire kernel rw- section (.data + .bss).
+	 * This resolves CoW on all kernel-internal pages (IST stacks,
+	 * IDT entries, CoW handler state, scheduler data, etc.) so the
+	 * kernel exception handler can safely run after IDT restore.
 	 */
 	{
-		struct {
-			__u16 limit;
-			__u64 base;
-		} __attribute__((packed)) gdtr;
-		__asm__ volatile("sgdt %0" : "=m"(gdtr));
-
-		__u16 tr;
-		__asm__ volatile("str %0" : "=r"(tr));
-
-		__u8 *gdt = (__u8 *)gdtr.base;
-		__u8 *tss_desc = gdt + (tr & ~0x7);
-		__u64 tss_base =
-			((__u64)tss_desc[2]) |
-			((__u64)tss_desc[3] << 8) |
-			((__u64)tss_desc[4] << 16) |
-			((__u64)tss_desc[7] << 24) |
-			((__u64)*(__u32 *)(tss_desc + 8) << 32);
-
-		/* TSS layout: IST1 @ +36, IST2 @ +44, IST3 @ +52 */
-		__u64 ist1 = *(volatile __u64 *)(tss_base + 36);
-		__u64 ist2 = *(volatile __u64 *)(tss_base + 44);
-		__u64 ist3 = *(volatile __u64 *)(tss_base + 52);
-
-		/* Pre-fault top 2 pages of each IST stack */
-		if (ist1) {
-			*(volatile __u64 *)(ist1 - 8) = 0;
-			*(volatile __u64 *)(ist1 - 4096) = 0;
-		}
-		if (ist2) {
-			*(volatile __u64 *)(ist2 - 8) = 0;
-			*(volatile __u64 *)(ist2 - 4096) = 0;
-		}
-		if (ist3) {
-			*(volatile __u64 *)(ist3 - 8) = 0;
-			*(volatile __u64 *)(ist3 - 4096) = 0;
-		}
+		extern char _data[], _end[];
+		__u64 start = ((__u64)_data) & ~0xFFFULL;
+		__u64 end = ((__u64)_end + 0xFFF) & ~0xFFFULL;
+		for (__u64 p = start; p < end; p += 0x1000)
+			*(volatile __u8 *)p = *(volatile __u8 *)p;
 	}
 
-	/* 5. Reload the kernel's IDT (IST stacks now writable) */
+	/* 5. Reload the kernel's IDT */
 	__asm__ volatile("lidt %0" : : "m"(saved_idtr));
-
-	/* 6. Reset nested exception counter.
-	 * Must happen AFTER step 5: this writes to .bss which is CoW.
-	 * With the kernel's IDT restored (and IST stacks now writable),
-	 * any CoW fault from this write is handled correctly.
-	 */
-	
-	
 }
 
 /* Dispatch entry/exit */

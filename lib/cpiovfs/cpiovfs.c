@@ -1,10 +1,11 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /*
- * cpiovfs: Read-only CPIO archive filesystem for Unikraft
+ * cpiovfs: CPIO archive filesystem for Unikraft
  *
- * Mounts a CPIO archive (from initrd) as a read-only filesystem,
- * serving file data directly from archive memory without extraction.
- * This eliminates the CPIO extraction overhead during boot.
+ * Mounts a CPIO archive (from initrd) serving file data directly from
+ * archive memory without extraction. Supports ephemeral in-memory
+ * directories and files (for mount points, temp files, etc.) while
+ * archive-backed content remains zero-copy.
  *
  * Copyright (c) 2025, Microsoft Corporation. All rights reserved.
  */
@@ -47,6 +48,8 @@ struct cpiovfs_node {
 	size_t size;
 	struct cpiovfs_node *child; /* first child (directories) */
 	struct cpiovfs_node *next;  /* next sibling */
+	int ephemeral;     /* 1 = in-memory node (data is malloc'd) */
+	size_t alloc;      /* allocated capacity for ephemeral files */
 };
 
 #define CPIOVFS_NODE(vp) ((struct cpiovfs_node *)(vp)->v_data)
@@ -475,47 +478,187 @@ cpiovfs_inactive(struct vnode *vp __unused)
 	return 0;
 }
 
+/* ---- Ephemeral write operations (in-memory, not backed by CPIO) ---- */
+
+static int
+cpiovfs_mkdir_impl(struct vnode *dvp, const char *name, mode_t mode)
+{
+	struct cpiovfs_node *dnp = dvp->v_data;
+	struct cpiovfs_node *np;
+	size_t len = strlen(name);
+
+	if (len > 255)
+		return ENAMETOOLONG;
+	if (!S_ISDIR(mode))
+		return EINVAL;
+
+	np = cpiovfs_add_child(dnp, name, len, VDIR, mode);
+	if (!np)
+		return ENOMEM;
+	np->ephemeral = 1;
+	return 0;
+}
+
+static int
+cpiovfs_create_impl(struct vnode *dvp, const char *name, mode_t mode)
+{
+	struct cpiovfs_node *dnp = dvp->v_data;
+	struct cpiovfs_node *np;
+	size_t len = strlen(name);
+
+	if (len > 255)
+		return ENAMETOOLONG;
+
+	np = cpiovfs_add_child(dnp, name, len, VREG, mode);
+	if (!np)
+		return ENOMEM;
+	np->ephemeral = 1;
+	return 0;
+}
+
+static int
+cpiovfs_write_impl(struct vnode *vp, struct uio *uio, int ioflag __unused)
+{
+	struct cpiovfs_node *np = vp->v_data;
+	size_t off, end, need;
+	char *newbuf;
+
+	if (!np->ephemeral)
+		return EROFS;
+	if (vp->v_type != VREG)
+		return EINVAL;
+	if (uio->uio_offset < 0)
+		return EINVAL;
+
+	off = (size_t)uio->uio_offset;
+	end = off + uio->uio_resid;
+
+	if (end > np->alloc) {
+		need = end < 4096 ? 4096 : end * 2;
+		newbuf = realloc((void *)np->data, need);
+		if (!newbuf)
+			return ENOMEM;
+		memset(newbuf + np->size, 0, need - np->size);
+		np->data = newbuf;
+		np->alloc = need;
+	}
+
+	int rc = vfscore_uiomove((void *)(np->data + off), uio->uio_resid, uio);
+	if (rc)
+		return rc;
+
+	if (end > np->size) {
+		np->size = end;
+		vp->v_size = end;
+	}
+	return 0;
+}
+
+static int
+cpiovfs_truncate_impl(struct vnode *vp, off_t length)
+{
+	struct cpiovfs_node *np = vp->v_data;
+
+	if (!np->ephemeral)
+		return EROFS;
+	if (vp->v_type != VREG)
+		return EINVAL;
+
+	if ((size_t)length > np->alloc) {
+		size_t need = (size_t)length < 4096 ? 4096 : (size_t)length;
+		char *newbuf = realloc((void *)np->data, need);
+		if (!newbuf)
+			return ENOMEM;
+		memset(newbuf + np->size, 0, need - np->size);
+		np->data = newbuf;
+		np->alloc = need;
+	}
+	np->size = (size_t)length;
+	vp->v_size = (size_t)length;
+	return 0;
+}
+
+static int
+cpiovfs_symlink_impl(struct vnode *dvp, const char *name, const char *link)
+{
+	struct cpiovfs_node *dnp = dvp->v_data;
+	struct cpiovfs_node *np;
+	size_t nlen = strlen(name);
+	size_t llen = strlen(link);
+
+	if (nlen > 255)
+		return ENAMETOOLONG;
+
+	np = cpiovfs_add_child(dnp, name, nlen, VLNK, S_IFLNK | 0777);
+	if (!np)
+		return ENOMEM;
+	np->ephemeral = 1;
+	np->data = strndup(link, llen);
+	if (!np->data)
+		return ENOMEM;
+	np->size = llen;
+	return 0;
+}
+
+static int
+cpiovfs_remove_impl(struct vnode *dvp, struct vnode *vp,
+		    const char *name __unused)
+{
+	struct cpiovfs_node *np = vp->v_data;
+
+	if (!np->ephemeral)
+		return EROFS;
+
+	struct cpiovfs_node *dnp = dvp->v_data;
+	struct cpiovfs_node **pp;
+	for (pp = &dnp->child; *pp; pp = &(*pp)->next) {
+		if (*pp == np) {
+			*pp = np->next;
+			if (np->data && np->alloc)
+				free((void *)np->data);
+			free(np->name);
+			free(np);
+			return 0;
+		}
+	}
+	return ENOENT;
+}
+
 #define cpiovfs_open      ((vnop_open_t)vfscore_vop_nullop)
 #define cpiovfs_close     ((vnop_close_t)vfscore_vop_nullop)
 #define cpiovfs_seek      ((vnop_seek_t)vfscore_vop_nullop)
 #define cpiovfs_fsync     ((vnop_fsync_t)vfscore_vop_nullop)
-#define cpiovfs_write     ((vnop_write_t)vfscore_vop_erofs)
-#define cpiovfs_create    ((vnop_create_t)vfscore_vop_erofs)
-#define cpiovfs_remove    ((vnop_remove_t)vfscore_vop_erofs)
 #define cpiovfs_rename    ((vnop_rename_t)vfscore_vop_erofs)
-#define cpiovfs_mkdir     ((vnop_mkdir_t)vfscore_vop_erofs)
 #define cpiovfs_rmdir     ((vnop_rmdir_t)vfscore_vop_erofs)
 #define cpiovfs_setattr   ((vnop_setattr_t)vfscore_vop_nullop)
-#define cpiovfs_truncate  ((vnop_truncate_t)vfscore_vop_erofs)
 #define cpiovfs_link      ((vnop_link_t)vfscore_vop_erofs)
 #define cpiovfs_fallocate ((vnop_fallocate_t)vfscore_vop_einval)
-#define cpiovfs_symlink   ((vnop_symlink_t)vfscore_vop_erofs)
 #define cpiovfs_poll      ((vnop_poll_t)vfscore_vop_einval)
 
 struct vnops cpiovfs_vnops = {
 	cpiovfs_open,
 	cpiovfs_close,
 	cpiovfs_read,
-	cpiovfs_write,
+	cpiovfs_write_impl,
 	cpiovfs_seek,
 	cpiovfs_ioctl,
 	cpiovfs_fsync,
 	cpiovfs_readdir,
 	cpiovfs_lookup,
-	cpiovfs_create,
-	cpiovfs_remove,
+	cpiovfs_create_impl,
+	cpiovfs_remove_impl,
 	cpiovfs_rename,
-	cpiovfs_mkdir,
+	cpiovfs_mkdir_impl,
 	cpiovfs_rmdir,
 	cpiovfs_getattr,
 	cpiovfs_setattr,
 	cpiovfs_inactive,
-	cpiovfs_truncate,
+	cpiovfs_truncate_impl,
 	cpiovfs_link,
 	(vnop_cache_t) NULL,
 	cpiovfs_fallocate,
 	cpiovfs_readlink,
-	cpiovfs_symlink,
+	cpiovfs_symlink_impl,
 	cpiovfs_poll,
 };
 

@@ -273,6 +273,27 @@ void uk_plat_native_except_err_handler(int trapnr,
 	struct uk_plat_native_except_err_ctx ctx;
 	int rc;
 
+#if CONFIG_PLAT_HYPERLIGHT
+	extern __uptr hyperlight_kernel_fsbase;
+	__u64 saved_fsbase = 0;
+	if (hyperlight_kernel_fsbase) {
+		saved_fsbase = uk_arch_x86_64_rdmsrl(0xC0000100);
+		uk_arch_x86_64_wrmsrl(0xC0000100, hyperlight_kernel_fsbase);
+	}
+	/* Clear IST for page fault entry to prevent IST re-entry corruption.
+	 * Nested page faults (e.g. CoW resolution) will use the current stack
+	 * instead of reloading IST2 and overwriting the saved frame.
+	 */
+	__u8 saved_pf_ist = 0;
+	{
+		__u32 idx = 0; /* single CPU in Hyperlight */
+		struct uk_arch_x86_64_seg_gate_desc64 *pf_desc =
+			&cpu_idt[idx][UK_ARCH_X86_64_TRAPNUM_PAGE_FAULT];
+		saved_pf_ist = pf_desc->ist;
+		pf_desc->ist = 0;
+	}
+#endif
+
 	ctx = (struct uk_plat_native_except_err_ctx){
 		.regs = regs,
 		.trapnr = trapnr,
@@ -285,8 +306,18 @@ void uk_plat_native_except_err_handler(int trapnr,
 	rc = uk_raise_event_ptr(trap_event_table[trapnr], &ctx);
 	if (unlikely(rc < 0))
 		uk_pr_crit("event handler returned error: %d\n", rc);
-	else if (rc != UK_EVENT_NOT_HANDLED)
+	else if (rc != UK_EVENT_NOT_HANDLED) {
+#if CONFIG_PLAT_HYPERLIGHT
+		{
+			__u32 idx = 0;
+			cpu_idt[idx][UK_ARCH_X86_64_TRAPNUM_PAGE_FAULT].ist =
+				saved_pf_ist;
+		}
+		if (saved_fsbase)
+			uk_arch_x86_64_wrmsrl(0xC0000100, saved_fsbase);
+#endif
 		return;
+	}
 
 	if (trap_event_table[trapnr] ==
 		UK_EVENT_PTR(UK_PLAT_NATIVE_EXCEPT_EVENT_UNHANDLED))

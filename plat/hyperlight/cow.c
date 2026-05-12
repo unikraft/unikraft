@@ -541,7 +541,6 @@ static int hyperlight_cow_pf_handler(void *data)
 	__vaddr_t fault_addr;
 	int error_code;
 
-
 	if (!cow_initialized)
 		return UK_EVENT_NOT_HANDLED;
 
