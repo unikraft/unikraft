@@ -18,7 +18,6 @@
 
 #include <sys/socket.h>
 #include <netinet/in.h>
-#include <arpa/inet.h>
 
 #include <uk/alloc.h>
 #include <uk/assert.h>
@@ -126,6 +125,24 @@ static long b64_decode(const char *src, size_t n, void *dst_, size_t cap)
 	}
 	if (i != n) return -1;
 	return (long)o;
+}
+
+/* -------- IPv4 address helpers (no arpa/inet.h in nolibc) -------- */
+
+static void ipv4_ntop(const struct in_addr *src, char *dst, size_t sz)
+{
+	const unsigned char *b = (const unsigned char *)&src->s_addr;
+	snprintf(dst, sz, "%u.%u.%u.%u", b[0], b[1], b[2], b[3]);
+}
+
+static int ipv4_pton(const char *src, struct in_addr *dst)
+{
+	unsigned a, b, c, d;
+	if (sscanf(src, "%u.%u.%u.%u", &a, &b, &c, &d) != 4)
+		return 0;
+	unsigned char *p = (unsigned char *)&dst->s_addr;
+	p[0] = a; p[1] = b; p[2] = c; p[3] = d;
+	return 1;
 }
 
 /* -------- tiny JSON helpers (same pattern as hostfs) -------- */
@@ -249,17 +266,9 @@ static void sockaddr_to_json(const struct sockaddr *addr, socklen_t len,
 	if (addr->sa_family == AF_INET && len >= sizeof(struct sockaddr_in)) {
 		const struct sockaddr_in *in = (const struct sockaddr_in *)addr;
 		char ip[INET_ADDRSTRLEN];
-		inet_ntop(AF_INET, &in->sin_addr, ip, sizeof(ip));
+		ipv4_ntop(&in->sin_addr, ip, sizeof(ip));
 		snprintf(buf, cap, "\"addr\":\"%s\",\"port\":%u",
 			 ip, ntohs(in->sin_port));
-	} else if (addr->sa_family == AF_INET6 &&
-		   len >= sizeof(struct sockaddr_in6)) {
-		const struct sockaddr_in6 *in6 =
-			(const struct sockaddr_in6 *)addr;
-		char ip[INET6_ADDRSTRLEN];
-		inet_ntop(AF_INET6, &in6->sin6_addr, ip, sizeof(ip));
-		snprintf(buf, cap, "\"addr\":\"%s\",\"port\":%u",
-			 ip, ntohs(in6->sin6_port));
 	} else {
 		snprintf(buf, cap, "\"addr\":\"0.0.0.0\",\"port\":0");
 	}
@@ -278,7 +287,7 @@ static void json_to_sockaddr(const char *json, struct sockaddr *addr,
 	memset(in, 0, sizeof(*in));
 	in->sin_family = AF_INET;
 	in->sin_port = htons((uint16_t)port);
-	inet_pton(AF_INET, ip, &in->sin_addr);
+	ipv4_pton(ip, &in->sin_addr);
 	if (addr_len)
 		*addr_len = sizeof(struct sockaddr_in);
 }
