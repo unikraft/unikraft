@@ -653,6 +653,10 @@ static int hostsock_socketpair(struct posix_socket_driver *d __attribute__((unus
 	return -EOPNOTSUPP;
 }
 
+static void hostsock_poll_setup(posix_sock *sock __attribute__((unused)))
+{
+}
+
 static struct posix_socket_ops hostsock_ops = {
 	.create      = hostsock_create,
 	.accept4     = hostsock_accept4,
@@ -673,6 +677,7 @@ static struct posix_socket_ops hostsock_ops = {
 	.write       = hostsock_write,
 	.close       = hostsock_close,
 	.ioctl       = hostsock_ioctl,
+	.poll_setup  = hostsock_poll_setup,
 };
 
 POSIX_SOCKET_FAMILY_REGISTER(AF_INET, &hostsock_ops);
