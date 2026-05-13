@@ -16,8 +16,10 @@ listen
 recv
 recvfrom
 recvmsg
+recvmmsg
 send
 sendmsg
+sendmmsg
 sendto
 socketpair
 uk_socket_create

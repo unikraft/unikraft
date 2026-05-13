@@ -939,6 +939,53 @@ ssize_t send(int sock, const void *buf, size_t len, int flags)
 }
 #endif /* UK_LIBC_SYSCALLS */
 
+UK_SYSCALL_R_DEFINE(int, sendmmsg, int, sock, struct mmsghdr *, msgvec,
+		    unsigned int, vlen, unsigned int, flags)
+{
+	unsigned int i;
+	ssize_t ret;
+
+	if (unlikely(!msgvec))
+		return -EFAULT;
+
+	for (i = 0; i < vlen; i++) {
+		ret = uk_syscall_r_sendmsg(sock,
+					   (long)&msgvec[i].msg_hdr,
+					   (long)flags);
+		if (ret < 0) {
+			if (i > 0)
+				return (int)i;
+			return (int)ret;
+		}
+		msgvec[i].msg_len = (unsigned int)ret;
+	}
+	return (int)vlen;
+}
+
+UK_SYSCALL_R_DEFINE(int, recvmmsg, int, sock, struct mmsghdr *, msgvec,
+		    unsigned int, vlen, unsigned int, flags,
+		    struct timespec *, timeout)
+{
+	unsigned int i;
+	ssize_t ret;
+
+	if (unlikely(!msgvec))
+		return -EFAULT;
+
+	for (i = 0; i < vlen; i++) {
+		ret = uk_syscall_r_recvmsg(sock,
+					   (long)&msgvec[i].msg_hdr,
+					   (long)flags);
+		if (ret < 0) {
+			if (i > 0)
+				return (int)i;
+			return (int)ret;
+		}
+		msgvec[i].msg_len = (unsigned int)ret;
+	}
+	return (int)vlen;
+}
+
 #endif /* CONFIG_LIBPOSIX_FDTAB */
 
 
