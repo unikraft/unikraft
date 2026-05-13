@@ -684,3 +684,4 @@ static struct posix_socket_ops hostsock_ops = {
 };
 
 POSIX_SOCKET_FAMILY_REGISTER(AF_INET, &hostsock_ops);
+POSIX_SOCKET_FAMILY_REGISTER(AF_INET6, &hostsock_ops);
