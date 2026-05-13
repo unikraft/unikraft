@@ -261,6 +261,54 @@ static int build_req(const char *fmt, ...)
 
 /* -------- sockaddr helpers -------- */
 
+static void ipv6_ntop(const struct in6_addr *src, char *dst, size_t sz)
+{
+	const unsigned char *b = src->s6_addr;
+	/* Check for IPv4-mapped */
+	int v4mapped = 1;
+	for (int i = 0; i < 10; i++)
+		if (b[i]) { v4mapped = 0; break; }
+	if (v4mapped && b[10] == 0xff && b[11] == 0xff) {
+		snprintf(dst, sz, "::ffff:%u.%u.%u.%u",
+			 b[12], b[13], b[14], b[15]);
+		return;
+	}
+	/* General case: find longest run of zeros for :: */
+	unsigned short w[8];
+	for (int i = 0; i < 8; i++)
+		w[i] = (b[i*2] << 8) | b[i*2+1];
+	int best_start = -1, best_len = 0, cur_start = -1, cur_len = 0;
+	for (int i = 0; i < 8; i++) {
+		if (w[i] == 0) {
+			if (cur_start < 0) cur_start = i;
+			cur_len++;
+		} else {
+			if (cur_len > best_len) {
+				best_start = cur_start;
+				best_len = cur_len;
+			}
+			cur_start = -1;
+			cur_len = 0;
+		}
+	}
+	if (cur_len > best_len) {
+		best_start = cur_start;
+		best_len = cur_len;
+	}
+	char *p = dst;
+	char *end = dst + sz;
+	for (int i = 0; i < 8; i++) {
+		if (best_len >= 2 && i == best_start) {
+			p += snprintf(p, end - p, "::");
+			i += best_len - 1;
+			continue;
+		}
+		if (i > 0 && !(best_len >= 2 && i == best_start + best_len))
+			p += snprintf(p, end - p, ":");
+		p += snprintf(p, end - p, "%x", w[i]);
+	}
+}
+
 static void sockaddr_to_json(const struct sockaddr *addr, socklen_t len,
 			     char *buf, size_t cap)
 {
@@ -268,11 +316,85 @@ static void sockaddr_to_json(const struct sockaddr *addr, socklen_t len,
 		const struct sockaddr_in *in = (const struct sockaddr_in *)addr;
 		char ip[INET_ADDRSTRLEN];
 		ipv4_ntop(&in->sin_addr, ip, sizeof(ip));
-		snprintf(buf, cap, "\"addr\":\"%s\",\"port\":%u",
+		snprintf(buf, cap,
+			 "\"family\":2,\"addr\":\"%s\",\"port\":%u",
 			 ip, ntohs(in->sin_port));
+	} else if (addr->sa_family == AF_INET6 &&
+		   len >= sizeof(struct sockaddr_in6)) {
+		const struct sockaddr_in6 *in6 =
+			(const struct sockaddr_in6 *)addr;
+		char ip[64];
+		ipv6_ntop(&in6->sin6_addr, ip, sizeof(ip));
+		snprintf(buf, cap,
+			 "\"family\":10,\"addr\":\"%s\",\"port\":%u",
+			 ip, ntohs(in6->sin6_port));
 	} else {
-		snprintf(buf, cap, "\"addr\":\"0.0.0.0\",\"port\":0");
+		snprintf(buf, cap,
+			 "\"family\":2,\"addr\":\"0.0.0.0\",\"port\":0");
 	}
+}
+
+static int ipv6_pton(const char *src, struct in6_addr *dst)
+{
+	memset(dst, 0, sizeof(*dst));
+	/* Handle IPv4-mapped ::ffff:a.b.c.d */
+	if (strncmp(src, "::ffff:", 7) == 0) {
+		dst->s6_addr[10] = 0xff;
+		dst->s6_addr[11] = 0xff;
+		unsigned a, b, c, d;
+		if (sscanf(src + 7, "%u.%u.%u.%u", &a, &b, &c, &d) != 4)
+			return 0;
+		dst->s6_addr[12] = a;
+		dst->s6_addr[13] = b;
+		dst->s6_addr[14] = c;
+		dst->s6_addr[15] = d;
+		return 1;
+	}
+	/* Handle ::1 (loopback) */
+	if (strcmp(src, "::1") == 0) {
+		dst->s6_addr[15] = 1;
+		return 1;
+	}
+	/* Handle :: (unspecified) */
+	if (strcmp(src, "::") == 0)
+		return 1;
+	/* General IPv6 parsing: simplified two-part with :: */
+	unsigned short words[8];
+	int nwords = 0, gap = -1;
+	const char *p = src;
+	while (*p && nwords < 8) {
+		if (p[0] == ':' && p[1] == ':') {
+			gap = nwords;
+			p += 2;
+			continue;
+		}
+		if (*p == ':')
+			p++;
+		unsigned val = 0;
+		int digits = 0;
+		while (*p && *p != ':' && digits < 4) {
+			unsigned c = *p++;
+			if (c >= '0' && c <= '9') val = val * 16 + c - '0';
+			else if (c >= 'a' && c <= 'f') val = val * 16 + c - 'a' + 10;
+			else if (c >= 'A' && c <= 'F') val = val * 16 + c - 'A' + 10;
+			else return 0;
+			digits++;
+		}
+		words[nwords++] = (unsigned short)val;
+	}
+	if (gap >= 0) {
+		int shift = 8 - nwords;
+		int i;
+		for (i = nwords - 1; i >= gap; i--)
+			words[i + shift] = words[i];
+		for (i = gap; i < gap + shift; i++)
+			words[i] = 0;
+	}
+	for (int i = 0; i < 8; i++) {
+		dst->s6_addr[i * 2] = words[i] >> 8;
+		dst->s6_addr[i * 2 + 1] = words[i] & 0xff;
+	}
+	return 1;
 }
 
 static void json_to_sockaddr(const char *json, struct sockaddr *addr,
@@ -280,17 +402,29 @@ static void json_to_sockaddr(const char *json, struct sockaddr *addr,
 {
 	char ip[64];
 	long long port = 0;
+	long long family = AF_INET;
 	if (json_get_string(json, "addr", ip, sizeof(ip)) < 0)
 		return;
 	json_get_int(json, "port", &port);
+	json_get_int(json, "family", &family);
 
-	struct sockaddr_in *in = (struct sockaddr_in *)addr;
-	memset(in, 0, sizeof(*in));
-	in->sin_family = AF_INET;
-	in->sin_port = htons((uint16_t)port);
-	ipv4_pton(ip, &in->sin_addr);
-	if (addr_len)
-		*addr_len = sizeof(struct sockaddr_in);
+	if (family == AF_INET6) {
+		struct sockaddr_in6 *in6 = (struct sockaddr_in6 *)addr;
+		memset(in6, 0, sizeof(*in6));
+		in6->sin6_family = AF_INET6;
+		in6->sin6_port = htons((uint16_t)port);
+		ipv6_pton(ip, &in6->sin6_addr);
+		if (addr_len)
+			*addr_len = sizeof(struct sockaddr_in6);
+	} else {
+		struct sockaddr_in *in = (struct sockaddr_in *)addr;
+		memset(in, 0, sizeof(*in));
+		in->sin_family = AF_INET;
+		in->sin_port = htons((uint16_t)port);
+		ipv4_pton(ip, &in->sin_addr);
+		if (addr_len)
+			*addr_len = sizeof(struct sockaddr_in);
+	}
 }
 
 /* -------- socket operations -------- */
