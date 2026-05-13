@@ -24,6 +24,7 @@
 #include <uk/errptr.h>
 #include <uk/print.h>
 #include <uk/socket_driver.h>
+#include <uk/posix-fd.h>
 
 #include <hyperlight-x86/hcall.h>
 
@@ -653,8 +654,10 @@ static int hostsock_socketpair(struct posix_socket_driver *d __attribute__((unus
 	return -EOPNOTSUPP;
 }
 
-static void hostsock_poll_setup(posix_sock *sock __attribute__((unused)))
+static void hostsock_poll_setup(posix_sock *sock)
 {
+	/* All I/O is synchronously blocked on the host, so always report ready. */
+	posix_sock_event_set(sock, UKFD_POLLIN | UKFD_POLLOUT);
 }
 
 static struct posix_socket_ops hostsock_ops = {
