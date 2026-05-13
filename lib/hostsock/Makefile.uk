@@ -1,0 +1,6 @@
+$(eval $(call addlib_s,libhostsock,$(CONFIG_LIBHOSTSOCK)))
+
+LIBHOSTSOCK_CINCLUDES-y += -I$(CONFIG_UK_BASE)/plat/hyperlight/include
+LIBHOSTSOCK_CINCLUDES-y += -I$(CONFIG_UK_BASE)/lib/posix-socket/include
+
+LIBHOSTSOCK_SRCS-y += $(LIBHOSTSOCK_BASE)/hostsock.c

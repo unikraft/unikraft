@@ -1,0 +1,11 @@
+config LIBHOSTSOCK
+	bool "hostsock: host-proxied socket driver for Hyperlight guests"
+	default n
+	depends on LIBPOSIX_SOCKET
+	depends on PLAT_HYPERLIGHT
+	select HYPERLIGHT_HCALL
+	help
+	  Registers an AF_INET socket driver that proxies every POSIX
+	  socket operation (connect, send, recv, bind, listen, accept, …)
+	  to the Hyperlight host via the __dispatch RPC interface. The
+	  host performs real networking on behalf of the guest.
