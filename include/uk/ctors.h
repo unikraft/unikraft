@@ -42,7 +42,10 @@
 extern "C" {
 #endif
 
-typedef void (*uk_ctor_func_t)();
+typedef void (*uk_ctor_func_t)(void);
+
+/* ELF .init_array constructors (argc, argv), see lib/ukboot/boot.c */
+typedef void (*uk_init_ctor_func_t)(int, char *[]);
 
 /*
  * Function pointer arrays of constructors; provided by
@@ -50,8 +53,8 @@ typedef void (*uk_ctor_func_t)();
  */
 extern const uk_ctor_func_t __preinit_array_start[];
 extern const uk_ctor_func_t __preinit_array_end;
-extern const uk_ctor_func_t __init_array_start[];
-extern const uk_ctor_func_t __init_array_end;
+extern const uk_init_ctor_func_t __init_array_start[];
+extern const uk_init_ctor_func_t __init_array_end;
 extern const uk_ctor_func_t uk_ctortab_start[];
 extern const uk_ctor_func_t uk_ctortab_end;
 
@@ -101,6 +104,11 @@ extern const uk_ctor_func_t uk_ctortab_end;
 #define uk_ctortab_foreach(itr, ctortab_start, ctortab_end)	\
 	for ((itr) = DECONST(uk_ctor_func_t*, ctortab_start);	\
 	     (itr) < &(ctortab_end);				\
+	     (itr)++)
+
+#define uk_init_ctortab_foreach(itr, ctortab_start, ctortab_end)	\
+	for ((itr) = DECONST(uk_init_ctor_func_t*, ctortab_start);	\
+	     (itr) < &(ctortab_end);					\
 	     (itr)++)
 
 #ifdef __cplusplus

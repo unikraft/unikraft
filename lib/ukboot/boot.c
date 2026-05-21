@@ -479,6 +479,7 @@ int do_main(int argc, char *argv[])
 {
 	char **envp __maybe_unused;
 	uk_ctor_func_t *ctorfn;
+	uk_init_ctor_func_t *init_ctorfn;
 	int ret;
 
 	/*
@@ -503,13 +504,14 @@ int do_main(int argc, char *argv[])
 
 	uk_pr_info("Constructor table at %p - %p\n",
 		   &__init_array_start[0], &__init_array_end);
-	uk_ctortab_foreach(ctorfn, __init_array_start, __init_array_end) {
-		if (!*ctorfn)
+	uk_init_ctortab_foreach(init_ctorfn, __init_array_start,
+				__init_array_end) {
+		if (!*init_ctorfn)
 			continue;
 
-		uk_pr_debug("Call constructor: %p(%d, %p)...\n", *ctorfn,
+		uk_pr_debug("Call constructor: %p(%d, %p)...\n", *init_ctorfn,
 			    argc, argv);
-		(*ctorfn)(argc, argv);
+		(*init_ctorfn)(argc, argv);
 	}
 
 #if CONFIG_LIBUKDEBUG_PRINTK_INFO
