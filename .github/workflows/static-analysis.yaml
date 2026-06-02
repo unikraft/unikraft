@@ -189,7 +189,7 @@ jobs:
         uses: whisperity/codechecker-analysis-action@v1
         id: codechecker
         with:
-          version: 'master'
+          version: '6.27.3'
           llvm-version: 'ignore' # already installed
           ignore-analyze-crashes: false
           config: "${{ github.workspace }}/.codechecker.json"
