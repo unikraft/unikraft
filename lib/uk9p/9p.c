@@ -39,6 +39,20 @@
 #include <uk/9pfid.h>
 #include <uk/trace.h>
 
+/*
+ * Protocol overhead for Rread:
+ *
+ *  size[4] + type[1] + tag[2] + count[4] = 11.
+ */
+#define UK_9P_RREAD_OVERHEAD	11
+
+/*
+ * Protocol overhead for Twrite:
+ *
+ *  size[4] + type[1] + tag[2] + fid[4] + offset[8] + count[4] = 23
+ */
+#define UK_9P_TWRITE_OVERHEAD	23
+
 UK_TRACEPOINT(uk_9p_trace_request_create, "");
 UK_TRACEPOINT(uk_9p_trace_request_allocated, "");
 UK_TRACEPOINT(uk_9p_trace_ready, "tag %u", uint16_t);
@@ -441,9 +455,11 @@ int64_t uk_9p_read(struct uk_9pdev *dev, struct uk_9pfid *fid,
 	struct uk_9preq *req;
 	int64_t rc;
 
+	if (dev->msize <= UK_9P_RREAD_OVERHEAD)
+		return -EINVAL;
 	if (fid->iounit != 0)
 		count = MIN(count, fid->iounit);
-	count = MIN(count, dev->msize - 11);
+	count = MIN(count, dev->msize - UK_9P_RREAD_OVERHEAD);
 
 	uk_pr_debug("TREAD fid %u offset %lu count %u\n", fid->fid,
 			offset, count);
@@ -456,7 +472,7 @@ int64_t uk_9p_read(struct uk_9pdev *dev, struct uk_9pfid *fid,
 		(rc = uk_9preq_write64(req, offset)) ||
 		(rc = uk_9preq_write32(req, count)) ||
 		(rc = send_and_wait_zc(dev, req, UK_9PREQ_ZCDIR_READ, buf,
-				       count, 11)) ||
+				       count, UK_9P_RREAD_OVERHEAD)) ||
 		(rc = uk_9preq_read32(req, &count)))
 		goto out;
 
@@ -475,9 +491,11 @@ int64_t uk_9p_write(struct uk_9pdev *dev, struct uk_9pfid *fid,
 	struct uk_9preq *req;
 	int64_t rc;
 
+	if (dev->msize <= UK_9P_TWRITE_OVERHEAD)
+		return -EINVAL;
 	if (fid->iounit != 0)
 		count = MIN(count, fid->iounit);
-	count = MIN(count, dev->msize - 23);
+	count = MIN(count, dev->msize - UK_9P_TWRITE_OVERHEAD);
 
 	uk_pr_debug("TWRITE fid %u offset %lu count %u\n", fid->fid,
 			offset, count);
@@ -489,7 +507,7 @@ int64_t uk_9p_write(struct uk_9pdev *dev, struct uk_9pfid *fid,
 		(rc = uk_9preq_write64(req, offset)) ||
 		(rc = uk_9preq_write32(req, count)) ||
 		(rc = send_and_wait_zc(dev, req, UK_9PREQ_ZCDIR_WRITE,
-				(void *)buf, count, 23)) ||
+				(void *)buf, count, UK_9P_TWRITE_OVERHEAD)) ||
 		(rc = uk_9preq_read32(req, &count)))
 		goto out;
 
@@ -590,9 +608,11 @@ int64_t uk_9p_readdir(struct uk_9pdev *dev, struct uk_9pfid *fid,
 	struct uk_9preq *req;
 	int64_t rc;
 
+	if (dev->msize <= UK_9P_RREAD_OVERHEAD)
+		return -EINVAL;
 	if (fid->iounit != 0)
 		count = MIN(count, fid->iounit);
-	count = MIN(count, dev->msize - 11);
+	count = MIN(count, dev->msize - UK_9P_RREAD_OVERHEAD);
 
 	uk_pr_debug("TREADDIR fid %u offset %lu count %u\n", fid->fid,
 			offset, count);
@@ -605,7 +625,7 @@ int64_t uk_9p_readdir(struct uk_9pdev *dev, struct uk_9pfid *fid,
 		(rc = uk_9preq_write64(req, offset)) ||
 		(rc = uk_9preq_write32(req, count)) ||
 		(rc = send_and_wait_zc(dev, req, UK_9PREQ_ZCDIR_READ, buf,
-				       count, 11)) ||
+				       count, UK_9P_RREAD_OVERHEAD)) ||
 		(rc = uk_9preq_read32(req, &count)))
 		goto out;
 
