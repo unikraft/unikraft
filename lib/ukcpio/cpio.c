@@ -140,7 +140,7 @@ try_rm_nonempty_dir(const char *path)
 	char newpath[PATH_MAX];
 	char *newend = newpath + strlcpy(newpath, path, PATH_MAX);
 
-	if (unlikely(newend - newpath + 2 > PATH_MAX)) {
+	if (unlikely(newend - newpath + 2 >= PATH_MAX)) {
 		uk_pr_err("Cannot rename %s, path too long\n", path);
 		return -ENAMETOOLONG;
 	}
