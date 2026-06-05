@@ -59,8 +59,11 @@
 #include <uk/assert.h>
 #include <uk/print.h>
 #include <uk/spinlock.h>
+#include <uk/bitops.h>
+#include <uk/bitops/bitmap.h>
 #include <uk/lcpu.h>
 #include <uk/plat/time.h>
+#include <uk/posix-futex-discipline.h>
 
 /** @struct uk_futex
  *  @brief Futex structure.
@@ -75,6 +78,100 @@ struct uk_futex {
 
 static UK_LIST_HEAD(futex_list);
 static uk_spinlock futex_list_lock = UK_SPINLOCK_INITIALIZER();
+
+/* Queuing discipline for futex wait lists */
+#define UK_FUTEX_MAX_ENTRIES  CONFIG_LIBPOSIX_FUTEX_MAX_ENTRIES
+
+struct futex_discipline_entry {
+	void *addr;
+	int discipline;
+};
+
+static struct futex_discipline_entry futex_disc_table[UK_FUTEX_MAX_ENTRIES];
+static unsigned long futex_disc_bitmap[UK_BITS_TO_LONGS(UK_FUTEX_MAX_ENTRIES)];
+
+/**
+ * Register or update the queuing discipline for a futex address.
+ * FUTEX_DISCIPLINE_FIFO: waiters are queued in FIFO order (default).
+ * FUTEX_DISCIPLINE_PRIO: waiters are queued by thread priority (higher first).
+ */
+int uk_futex_set_discipline(void *addr, int discipline)
+{
+	unsigned long bit;
+	unsigned long irqf;
+
+	if (discipline != FUTEX_DISCIPLINE_FIFO &&
+	    discipline != FUTEX_DISCIPLINE_PRIO)
+		return -EINVAL;
+
+	uk_spin_lock_irqsave(&futex_list_lock, irqf);
+
+	/* Update if already registered */
+	uk_for_each_set_bit(bit, futex_disc_bitmap,
+			    UK_FUTEX_MAX_ENTRIES) {
+		if (futex_disc_table[bit].addr == addr) {
+			futex_disc_table[bit].discipline = discipline;
+			uk_spin_unlock_irqrestore(&futex_list_lock, irqf);
+			return 0;
+		}
+	}
+
+	/* Find free slot */
+	bit = uk_find_first_zero_bit(futex_disc_bitmap,
+				     UK_FUTEX_MAX_ENTRIES);
+	if (bit >= UK_FUTEX_MAX_ENTRIES) {
+		uk_spin_unlock_irqrestore(&futex_list_lock, irqf);
+		return -ENOMEM;
+	}
+
+	futex_disc_table[bit].addr = addr;
+	futex_disc_table[bit].discipline = discipline;
+	uk_set_bit(bit, futex_disc_bitmap);
+
+	uk_spin_unlock_irqrestore(&futex_list_lock, irqf);
+	return 0;
+}
+
+/**
+ * Remove a registered discipline entry for a futex address.
+ */
+int uk_futex_del_discipline(void *addr)
+{
+	unsigned long bit;
+	unsigned long irqf;
+
+	uk_spin_lock_irqsave(&futex_list_lock, irqf);
+
+	uk_for_each_set_bit(bit, futex_disc_bitmap,
+			    UK_FUTEX_MAX_ENTRIES) {
+		if (futex_disc_table[bit].addr == addr) {
+			futex_disc_table[bit].addr = NULL;
+			futex_disc_table[bit].discipline = 0;
+			uk_clear_bit(bit, futex_disc_bitmap);
+			uk_spin_unlock_irqrestore(&futex_list_lock, irqf);
+			return 0;
+		}
+	}
+
+	uk_spin_unlock_irqrestore(&futex_list_lock, irqf);
+	return -ENOENT;
+}
+
+/**
+ * Find the queuing discipline for a futex address.
+ * Must be called with futex_list_lock held.
+ */
+static int futex_find_discipline(void *addr)
+{
+	unsigned long bit;
+
+	uk_for_each_set_bit(bit, futex_disc_bitmap,
+			    UK_FUTEX_MAX_ENTRIES) {
+		if (futex_disc_table[bit].addr == addr)
+			return futex_disc_table[bit].discipline;
+	}
+	return FUTEX_DISCIPLINE_FIFO;
+}
 
 /**
  * Prepare to wait on a futex.
@@ -112,12 +209,25 @@ static int futex_wait(uint32_t *uaddr, uint32_t val, const __nsec *timeout)
 	uk_pr_debug("FUTEX_WAIT: Condition met (*uaddr == %"PRIu32", uaddr: %p)\n",
 			val, uaddr);
 
-	/* Enqueue thread to wait list */
-	irqf = uk_lcpu_save_irqf();
-	uk_spin_lock(&futex_list_lock);
+	/* Enqueue thread to wait list based on discipline */
+	uk_spin_lock_irqsave(&futex_list_lock, irqf);
+	if (futex_find_discipline((void *)uaddr) == FUTEX_DISCIPLINE_PRIO) {
+		struct uk_list_head *pos;
+		struct uk_futex *walk;
+
+		uk_list_for_each(pos, &futex_list) {
+			walk = uk_list_entry(pos, struct uk_futex, list_node);
+			if (walk->uaddr != uaddr)
+				continue;
+			if (current->prio > walk->thread->prio) {
+				uk_list_add_tail(&f.list_node, pos);
+				goto enqueued;
+			}
+		}
+	}
 	uk_list_add_tail(&f.list_node, &futex_list);
-	uk_spin_unlock(&futex_list_lock);
-	uk_lcpu_restore_irqf(irqf);
+enqueued:
+	uk_spin_unlock_irqrestore(&futex_list_lock, irqf);
 
 	if (timeout) {
 		/* Block at most until `timeout` nanosecs */
@@ -132,8 +242,7 @@ static int futex_wait(uint32_t *uaddr, uint32_t val, const __nsec *timeout)
 	uk_sched_yield();
 
 	uk_pr_debug("FUTEX_WAIT: Woke up (uaddr: %p)\n", uaddr);
-	irqf = uk_lcpu_save_irqf();
-	uk_spin_lock(&futex_list_lock);
+	uk_spin_lock_irqsave(&futex_list_lock, irqf);
 
 	/* If the futex is still in the wait list, then it timed out */
 	uk_list_for_each_safe(itr, tmp, &futex_list) {
@@ -142,15 +251,13 @@ static int futex_wait(uint32_t *uaddr, uint32_t val, const __nsec *timeout)
 		if (f_tmp->uaddr == uaddr && f_tmp->thread == current) {
 			/* Remove the thread from the futex list */
 			uk_list_del(&f_tmp->list_node);
-			uk_spin_unlock(&futex_list_lock);
-			uk_lcpu_restore_irqf(irqf);
+			uk_spin_unlock_irqrestore(&futex_list_lock, irqf);
 
 			uk_pr_debug("FUTEX_WAIT: Woke up because of timeout\n");
 			return -ETIMEDOUT;
 		}
 	}
-	uk_spin_unlock(&futex_list_lock);
-	uk_lcpu_restore_irqf(irqf);
+	uk_spin_unlock_irqrestore(&futex_list_lock, irqf);
 
 	return 0;
 }
