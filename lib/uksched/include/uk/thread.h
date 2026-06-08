@@ -39,6 +39,9 @@
 #include <uk/prio.h>
 #include <uk/essentials.h>
 
+#define UK_THREAD_PRIO_MIN  1
+#define UK_THREAD_PRIO_MAX  CONFIG_LIBUKSCHED_MAX_PRIO
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -62,6 +65,7 @@ struct uk_thread {
 
 	UK_TAILQ_ENTRY(struct uk_thread) queue;
 	uint32_t flags;
+	int prio;			/**< Thread priority (higher = more important) */
 	__snsec wakeup_time;
 	struct uk_sched *sched;
 	struct uk_waitq_ticket wait_ticket;
