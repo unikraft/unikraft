@@ -16,6 +16,8 @@ LIBKVMPLAT_ASINCLUDES-y        += -I$(UK_PLAT_COMMON_BASE)/include
 LIBKVMPLAT_CINCLUDES-y         += -I$(LIBKVMPLAT_BASE)/include
 LIBKVMPLAT_CINCLUDES-y         += -I$(UK_PLAT_COMMON_BASE)/include
 LIBKVMPLAT_CINCLUDES-y         += -I$(UK_PLAT_DRIVERS_BASE)/include
+LIBKVMPLAT_CINCLUDES-y         += -I$(LIBUKRTC_GOLDFISH_BASE)/include
+
 
 LIBKVMPLAT_ASFLAGS             += -DKVMPLAT -DUK_USE_SECTION_SEGMENTS
 LIBKVMPLAT_CFLAGS              += -DKVMPLAT -DUK_USE_SECTION_SEGMENTS
@@ -28,6 +30,10 @@ UK_PLAT_KVM_DEF_LDS            := $(CONFIG_UK_BASE)/plat/kvm/x86/link64.lds.S
 else
 ifeq ($(CONFIG_ARCH_ARM_64),y)
 UK_PLAT_KVM_DEF_LDS            := $(CONFIG_UK_BASE)/plat/kvm/arm/link64.lds.S
+else
+ifeq ($(CONFIG_ARCH_RISCV_64),y)
+UK_PLAT_KVM_DEF_LDS            := $(CONFIG_UK_BASE)/plat/kvm/riscv/link64.lds.S
+endif
 endif
 endif
 
@@ -96,6 +102,13 @@ LIBKVMPLAT_SRCS-y                          += $(UK_PLAT_KVM_DEF_LDS)
 ifeq ($(CONFIG_KVM_BOOT_PROTO_EFI_STUB),y)
 LIBKVMPLAT_SRCS-y                          += $(LIBKVMPLAT_BASE)/efi.c|isr
 endif
+##
+## Architecture library definitions for riscv64
+##
+LIBKVMPLAT_SRCS-$(CONFIG_ARCH_RISCV_64) += $(LIBKVMPLAT_BASE)/riscv/entry64.S
+LIBKVMPLAT_SRCS-$(CONFIG_ARCH_RISCV_64) += $(LIBKVMPLAT_BASE)/riscv/setup.c
+LIBKVMPLAT_SRCS-$(CONFIG_ARCH_RISCV_64) += $(LIBKVMPLAT_BASE)/riscv/time.c
+LIBKVMPLAT_SRCS-$(CONFIG_ARCH_RISCV_64) += $(UK_PLAT_COMMON_BASE)/riscv/timer.c|common
 
 LIBKVMPLAT_SRCS-y		 += $(UK_PLAT_COMMON_BASE)/bootinfo.c|common
 LIBKVMPLAT_SRCS-$(CONFIG_LIBFDT) += $(UK_PLAT_COMMON_BASE)/bootinfo_fdt.c|common

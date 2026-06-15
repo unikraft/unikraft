@@ -1,7 +1,7 @@
 menuconfig PLAT_KVM
 	bool "KVM guest"
 	default n
-	depends on (ARCH_X86_64 || ARCH_ARM_64)
+	depends on (ARCH_X86_64 || ARCH_ARM_64 || ARCH_RISCV_64)
 	imply LIBUKPM
 	imply LIBUKPSCI if ARCH_ARM_64
 	select LIBUKDEBUG
@@ -11,9 +11,10 @@ menuconfig PLAT_KVM
 	select LIBUKTIMECONV
 	select LIBNOLIBC if !HAVE_LIBC
 	select LIBUKATOMIC if ARCH_X86_64
-	select HAVE_FDT if ARCH_ARM_64
-	imply LIBFDT if ARCH_ARM_64
-	imply LIBUKOFW if ARCH_ARM_64
+	select HAVE_FDT if (ARCH_ARM_64 || ARCH_RISCV_64)
+	select LIBFDT if (ARCH_ARM_64 || ARCH_RISCV_64)
+	select LIBUKOFW if (ARCH_ARM_64 || ARCH_RISCV_64)
+	select LIBUKRTC_GOLDFISH if ARCH_RISCV_64
 	select ELF64_TO_32 if ARCH_X86_64
 	select LIBUKRELOC if OPTIMIZE_PIE
 	select HAVE_PAGING
