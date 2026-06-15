@@ -55,6 +55,10 @@
 #include <uk/plat/memory.h>
 #include <uk/print.h>
 #include <uk/assert.h>
+#include <libfdt.h>
+#include <riscv/sbi.h>
+#include <uk/plat/time.h>
+#include <uk/intctlr.h>
 #include <uk/lcpu.h>
 
 void _ukplat_entry(void)
@@ -84,6 +88,10 @@ void _ukplat_entry(void)
 	bstack = (void *)((__uptr)bstack + __STACK_SIZE);
 
 	uk_pr_info("Entering from KVM (riscv64)...\n");
+
+	rc = uk_intctlr_probe();
+	if (unlikely(rc))
+		UK_CRASH("Interrupt controller init failed: %d\n", rc);
 
 	rc = uk_lcpu_init(uk_lcpu_get_bsp());
 	if (unlikely(rc))
