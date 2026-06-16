@@ -305,7 +305,7 @@ static void hyperlight_init_mem(struct ukplat_bootinfo *bi,
 	 * After cmdline extraction, init_data.size == 0 but the original
 	 * init_data had the size at (ptr + original_size - 8).
 	 */
-#define INITRD_MAP_BASE 0xC0000000ULL  /* Must match host INITRD_MAP_BASE */
+#define INITRD_MAP_BASE 0xFEF00000ULL  /* Must match host INITRD_MAP_BASE */
 	if (peb->init_data.size == 0 && g_peb->init_data.size >= 8) {
 		__u64 mapped_size = *(__u64 *)(
 			(__u8 *)g_peb->init_data.ptr + g_peb->init_data.size - 8
