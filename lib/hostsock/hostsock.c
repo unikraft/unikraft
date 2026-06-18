@@ -34,6 +34,7 @@
 /* Per-socket driver data. */
 struct hostsock_data {
 	uint32_t host_fd;
+	int nonblock;
 };
 
 /* Static per-call buffers. Not thread-safe; callers serialise via
@@ -427,6 +428,30 @@ static void json_to_sockaddr(const char *json, struct sockaddr *addr,
 	}
 }
 
+/* -------- tracked sockets for event rescan -------- */
+
+#define HOSTSOCK_MAX_TRACKED 64
+static posix_sock *tracked_socks[HOSTSOCK_MAX_TRACKED];
+static int tracked_count;
+
+static void hostsock_track(posix_sock *sock)
+{
+	if (tracked_count < HOSTSOCK_MAX_TRACKED)
+		tracked_socks[tracked_count++] = sock;
+}
+
+static void hostsock_untrack(posix_sock *sock)
+{
+	for (int i = 0; i < tracked_count; i++) {
+		if (tracked_socks[i] == sock) {
+			tracked_socks[i] = tracked_socks[--tracked_count];
+			return;
+		}
+	}
+}
+
+void hostsock_rescan_events(void);
+
 /* -------- socket operations -------- */
 
 static uint32_t get_host_fd(posix_sock *sock)
@@ -438,6 +463,7 @@ static uint32_t get_host_fd(posix_sock *sock)
 static void *hostsock_create(struct posix_socket_driver *d,
 			     int family, int type, int protocol)
 {
+	int nonblock = (type & SOCK_NONBLOCK) ? 1 : 0;
 	int sock_type = type & ~SOCK_FLAGS;
 	int n = build_req(
 		"{\"name\":\"net_socket\",\"args\":"
@@ -458,9 +484,10 @@ static void *hostsock_create(struct posix_socket_driver *d,
 	if (!sd)
 		return ERR2PTR(-ENOMEM);
 	sd->host_fd = (uint32_t)fd;
+	sd->nonblock = nonblock;
 
-	uk_pr_debug("hostsock: create fd=%u (family=%d type=%d)\n",
-		    sd->host_fd, family, sock_type);
+	uk_pr_debug("hostsock: create fd=%u (family=%d type=%d nb=%d)\n",
+		    sd->host_fd, family, sock_type, nonblock);
 	return sd;
 }
 
@@ -485,11 +512,46 @@ static int hostsock_listen(posix_sock *sock, int backlog)
 	return rpc_exchange(n, NULL);
 }
 
+/* Check if a host socket has a pending event using net_poll(timeout=0). */
+static int hostsock_check_ready(uint32_t host_fd, int events)
+{
+	int n = build_req(
+		"{\"name\":\"net_poll\",\"args\":"
+		"{\"fds\":[{\"fd\":%u,\"events\":%d}],\"timeout_ms\":0}}",
+		host_fd, events);
+	if (n < 0)
+		return 0;
+	size_t resp_len;
+	if (rpc_exchange(n, &resp_len) < 0)
+		return 0;
+	long long revents = 0;
+	json_get_int(rpc_resp, "revents", &revents);
+	return (int)revents;
+}
+
 static void *hostsock_accept4(posix_sock *sock,
 			      struct sockaddr *restrict addr,
 			      socklen_t *restrict addr_len,
-			      int flags __attribute__((unused)))
+			      int flags)
 {
+	struct hostsock_data *listen_data = posix_sock_get_data(sock);
+
+	/*
+	 * Always check readiness before calling the host's blocking accept.
+	 * A blocking hcall freezes the entire VM (single vCPU), so we must
+	 * never let accept block on the host side.  Return EAGAIN and let
+	 * the Unikraft poll/epoll layer handle the wait.
+	 *
+	 * This also covers runtimes that set non-blocking mode via
+	 * fcntl(F_SETFL, O_NONBLOCK) rather than ioctl(FIONBIO) — fcntl
+	 * updates the uk_file flags but not our sd->nonblock field.
+	 */
+	{
+		int ready = hostsock_check_ready(listen_data->host_fd, 1);
+		if (!(ready & 1)) /* POLLIN */
+			return ERR2PTR(-EAGAIN);
+	}
+
 	int n = build_req(
 		"{\"name\":\"net_accept\",\"args\":{\"fd\":%u}}",
 		get_host_fd(sock));
@@ -507,11 +569,13 @@ static void *hostsock_accept4(posix_sock *sock,
 	if (!sd)
 		return ERR2PTR(-ENOMEM);
 	sd->host_fd = (uint32_t)new_fd;
+	sd->nonblock = (flags & SOCK_NONBLOCK) ? 1 : 0;
 
 	if (addr && addr_len)
 		json_to_sockaddr(rpc_resp, addr, addr_len);
 
-	uk_pr_debug("hostsock: accept -> fd=%u\n", sd->host_fd);
+	uk_pr_debug("hostsock: accept -> fd=%u (nb=%d)\n",
+		    sd->host_fd, sd->nonblock);
 	return sd;
 }
 
@@ -572,6 +636,17 @@ static ssize_t hostsock_recvfrom(posix_sock *sock,
 				 struct sockaddr *from,
 				 socklen_t *restrict fromlen)
 {
+	/*
+	 * Always check readiness — a blocking recv hcall would freeze the
+	 * entire VM.  See the comment in hostsock_accept4.
+	 */
+	{
+		struct hostsock_data *sd = posix_sock_get_data(sock);
+		int ready = hostsock_check_ready(sd->host_fd, 1);
+		if (!(ready & 1))
+			return -EAGAIN;
+	}
+
 	int n = build_req(
 		"{\"name\":\"net_recvfrom\",\"args\":"
 		"{\"fd\":%u,\"len\":%zu,\"flags\":%d}}",
@@ -767,15 +842,20 @@ static int hostsock_close(posix_sock *sock)
 	if (n >= 0)
 		rpc_exchange(n, NULL);
 
+	hostsock_untrack(sock);
 	struct posix_socket_driver *drv = posix_sock_get_driver(sock);
 	uk_free(drv->allocator, sd);
 	return 0;
 }
 
-static int hostsock_ioctl(posix_sock *sock __attribute__((unused)),
-			  int request __attribute__((unused)),
-			  void *argp __attribute__((unused)))
+static int hostsock_ioctl(posix_sock *sock, int request, void *argp)
 {
+	/* FIONBIO = 0x5421 on Linux */
+	if (request == 0x5421 && argp) {
+		struct hostsock_data *sd = posix_sock_get_data(sock);
+		sd->nonblock = (*(int *)argp) ? 1 : 0;
+		return 0;
+	}
 	return -ENOSYS;
 }
 
@@ -790,8 +870,32 @@ static int hostsock_socketpair(struct posix_socket_driver *d __attribute__((unus
 
 static void hostsock_poll_setup(posix_sock *sock)
 {
-	/* All I/O is synchronously blocked on the host, so always report ready. */
-	posix_sock_event_set(sock, UKFD_POLLIN | UKFD_POLLOUT);
+	uint32_t fd = get_host_fd(sock);
+	/* POLLIN=1, POLLOUT=4 — check real readiness via host poll(). */
+	int revents = hostsock_check_ready(fd, 1 | 4);
+	unsigned events = 0;
+	if (revents & 1)
+		events |= UKFD_POLLIN;
+	if (revents & 4)
+		events |= UKFD_POLLOUT;
+	posix_sock_event_set(sock, events);
+	hostsock_track(sock);
+}
+
+void hostsock_rescan_events(void)
+{
+	for (int i = 0; i < tracked_count; i++) {
+		posix_sock *sock = tracked_socks[i];
+		uint32_t fd = get_host_fd(sock);
+		int revents = hostsock_check_ready(fd, 1 | 4);
+		unsigned events = 0;
+		if (revents & 1)
+			events |= UKFD_POLLIN;
+		if (revents & 4)
+			events |= UKFD_POLLOUT;
+		if (events)
+			posix_sock_event_set(sock, events);
+	}
 }
 
 static struct posix_socket_ops hostsock_ops = {

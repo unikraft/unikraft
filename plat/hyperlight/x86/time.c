@@ -5,6 +5,7 @@
  */
 
 #include <stdlib.h>
+#include <string.h>
 #include <uk/plat/time.h>
 #include <uk/lcpu.h>
 #include <uk/intctlr.h>
@@ -12,6 +13,7 @@
 #include <uk/atomic.h>
 #include <uk/arch/x86_64.h>
 #include <hyperlight-x86/setup.h>
+#include <hyperlight-x86/hcall.h>
 
 /* TSC frequency in Hz - will be calibrated at init */
 static __u64 tsc_freq;
@@ -88,14 +90,68 @@ __u32 ukplat_time_get_irq(void)
 	return 0;
 }
 
+#ifdef CONFIG_HYPERLIGHT_HCALL
+/*
+ * Call __hl_sleep via hcall. On the host this now also polls all sockets
+ * in the socket table, returning early with "socket_ready":true when a
+ * socket event occurs.  Returns 1 if sockets became ready, 0 otherwise.
+ */
+static int hyperlight_sleep_ns(__u64 ns)
+{
+	static char _req[128];
+	static char _resp[256];
+	__sz resp_len = 0;
+	int n = snprintf(_req, sizeof(_req),
+			 "{\"name\":\"__hl_sleep\",\"args\":{\"ns\":%llu}}",
+			 (unsigned long long)ns);
+	if (n < 0 || (__sz)n >= sizeof(_req))
+		return 0;
+	if (hyperlight_hcall((const __u8 *)_req, (__sz)n,
+			     (__u8 *)_resp, sizeof(_resp) - 1,
+			     &resp_len) < 0)
+		return 0;
+	_resp[resp_len] = '\0';
+	return strstr(_resp, "\"socket_ready\":true") != NULL;
+}
+
+#ifdef CONFIG_LIBHOSTSOCK
+extern void hostsock_rescan_events(void);
+#endif
+
+/* Block CPU until the specified time or pending events.
+ *
+ * Uses __hl_sleep instead of bare HLT so the host can simultaneously
+ * poll sockets and wake us early when network I/O is ready.
+ */
+void time_block_until(__snsec until)
+{
+	while ((__snsec) ukplat_monotonic_clock() < until) {
+		__snsec remaining = until - (__snsec)ukplat_monotonic_clock();
+		if (remaining <= 0)
+			break;
+
+		/* Cap each sleep at 100 ms to keep poll latency bounded. */
+		__u64 sleep_ns = (__u64)remaining;
+		if (sleep_ns > 100000000ULL)
+			sleep_ns = 100000000ULL;
+
+		if (hyperlight_sleep_ns(sleep_ns)) {
+#ifdef CONFIG_LIBHOSTSOCK
+			hostsock_rescan_events();
+#endif
+			break;
+		}
+	}
+}
+#else
 /* Block CPU until the specified time or pending events */
 void time_block_until(__snsec until)
 {
 	while ((__snsec) ukplat_monotonic_clock() < until) {
-		/* In Hyperlight, we just halt and wait for interrupt */
 		uk_lcpu_halt_irq();
 
 		if (uk_and_relax(&sched_have_pending_events, 0))
 			break;
 	}
 }
+#endif
