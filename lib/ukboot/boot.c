@@ -186,6 +186,17 @@ static struct uk_alloc *heap_init()
 	if (unlikely(rc))
 		return NULL;
 
+#ifdef CONFIG_PLAT_HYPERLIGHT
+	/* Hyperlight identity-maps the entire heap in the boot page tables
+	 * before the guest starts.  Tear down those PTEs so that the VMA's
+	 * demand-paging handler re-maps pages on first access — only
+	 * touched pages then carry PTEs, which keeps snapshots small.
+	 */
+	uk_paging_page_unmap(pt,
+			     heap_base + HEAP_INITIAL_LEN,
+			     alloc_pages - HEAP_INITIAL_PAGES, 0);
+#endif
+
 	rc = uk_alloc_addmem(a, (void *)(heap_base + HEAP_INITIAL_LEN),
 			     (alloc_pages - HEAP_INITIAL_PAGES) << UK_PAGING_PAGE_SHIFT);
 	if (unlikely(rc))
