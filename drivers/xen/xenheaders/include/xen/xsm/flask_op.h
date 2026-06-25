@@ -1,25 +1,8 @@
+/* SPDX-License-Identifier: MIT */
 /*
  *  This file contains the flask_op hypercall commands and definitions.
  *
  *  Author:  George Coker, <gscoker@alpha.ncsc.mil>
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to
- * deal in the Software without restriction, including without limitation the
- * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
- * sell copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
- * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
- * DEALINGS IN THE SOFTWARE.
  */
 
 #ifndef __FLASK_OP_H__
@@ -33,10 +16,12 @@ struct xen_flask_load {
     XEN_GUEST_HANDLE(char) buffer;
     uint32_t size;
 };
+typedef struct xen_flask_load xen_flask_load_t;
 
 struct xen_flask_setenforce {
     uint32_t enforcing;
 };
+typedef struct xen_flask_setenforce xen_flask_setenforce_t;
 
 struct xen_flask_sid_context {
     /* IN/OUT: sid to convert to/from string */
@@ -47,6 +32,7 @@ struct xen_flask_sid_context {
     uint32_t size;
     XEN_GUEST_HANDLE(char) context;
 };
+typedef struct xen_flask_sid_context xen_flask_sid_context_t;
 
 struct xen_flask_access {
     /* IN: access request */
@@ -60,6 +46,7 @@ struct xen_flask_access {
     uint32_t audit_deny;
     uint32_t seqno;
 };
+typedef struct xen_flask_access xen_flask_access_t;
 
 struct xen_flask_transition {
     /* IN: transition SIDs and class */
@@ -69,6 +56,7 @@ struct xen_flask_transition {
     /* OUT: new SID */
     uint32_t newsid;
 };
+typedef struct xen_flask_transition xen_flask_transition_t;
 
 #if __XEN_INTERFACE_VERSION__ < 0x00040800
 struct xen_flask_userlist {
@@ -106,11 +94,13 @@ struct xen_flask_boolean {
      */
     XEN_GUEST_HANDLE(char) name;
 };
+typedef struct xen_flask_boolean xen_flask_boolean_t;
 
 struct xen_flask_setavc_threshold {
     /* IN */
     uint32_t threshold;
 };
+typedef struct xen_flask_setavc_threshold xen_flask_setavc_threshold_t;
 
 struct xen_flask_hash_stats {
     /* OUT */
@@ -119,6 +109,7 @@ struct xen_flask_hash_stats {
     uint32_t buckets_total;
     uint32_t max_chain_len;
 };
+typedef struct xen_flask_hash_stats xen_flask_hash_stats_t;
 
 struct xen_flask_cache_stats {
     /* IN */
@@ -131,6 +122,7 @@ struct xen_flask_cache_stats {
     uint32_t reclaims;
     uint32_t frees;
 };
+typedef struct xen_flask_cache_stats xen_flask_cache_stats_t;
 
 struct xen_flask_ocontext {
     /* IN */
@@ -138,6 +130,7 @@ struct xen_flask_ocontext {
     uint32_t sid;
     uint64_t low, high;
 };
+typedef struct xen_flask_ocontext xen_flask_ocontext_t;
 
 struct xen_flask_peersid {
     /* IN */
@@ -145,12 +138,14 @@ struct xen_flask_peersid {
     /* OUT */
     uint32_t sid;
 };
+typedef struct xen_flask_peersid xen_flask_peersid_t;
 
 struct xen_flask_relabel {
     /* IN */
     uint32_t domid;
     uint32_t sid;
 };
+typedef struct xen_flask_relabel xen_flask_relabel_t;
 
 struct xen_flask_devicetree_label {
     /* IN */
@@ -158,6 +153,7 @@ struct xen_flask_devicetree_label {
     uint32_t length;
     XEN_GUEST_HANDLE(char) path;
 };
+typedef struct xen_flask_devicetree_label xen_flask_devicetree_label_t;
 
 struct xen_flask_op {
     uint32_t cmd;
@@ -175,7 +171,7 @@ struct xen_flask_op {
 #define FLASK_SETBOOL           12
 #define FLASK_COMMITBOOLS       13
 #define FLASK_MLS               14
-#define FLASK_DISABLE           15
+#define FLASK_DISABLE           15 /* No longer implemented */
 #define FLASK_GETAVC_THRESHOLD  16
 #define FLASK_SETAVC_THRESHOLD  17
 #define FLASK_AVC_HASHSTATS     18
@@ -188,26 +184,26 @@ struct xen_flask_op {
 #define FLASK_DEVICETREE_LABEL  25
     uint32_t interface_version; /* XEN_FLASK_INTERFACE_VERSION */
     union {
-        struct xen_flask_load load;
-        struct xen_flask_setenforce enforce;
+        xen_flask_load_t load;
+        xen_flask_setenforce_t enforce;
         /* FLASK_CONTEXT_TO_SID and FLASK_SID_TO_CONTEXT */
-        struct xen_flask_sid_context sid_context;
-        struct xen_flask_access access;
+        xen_flask_sid_context_t sid_context;
+        xen_flask_access_t access;
         /* FLASK_CREATE, FLASK_RELABEL, FLASK_MEMBER */
-        struct xen_flask_transition transition;
+        xen_flask_transition_t transition;
 #if __XEN_INTERFACE_VERSION__ < 0x00040800
         struct xen_flask_userlist userlist;
 #endif
         /* FLASK_GETBOOL, FLASK_SETBOOL */
-        struct xen_flask_boolean boolean;
-        struct xen_flask_setavc_threshold setavc_threshold;
-        struct xen_flask_hash_stats hash_stats;
-        struct xen_flask_cache_stats cache_stats;
+        xen_flask_boolean_t boolean;
+        xen_flask_setavc_threshold_t setavc_threshold;
+        xen_flask_hash_stats_t hash_stats;
+        xen_flask_cache_stats_t cache_stats;
         /* FLASK_ADD_OCONTEXT, FLASK_DEL_OCONTEXT */
-        struct xen_flask_ocontext ocontext;
-        struct xen_flask_peersid peersid;
-        struct xen_flask_relabel relabel;
-        struct xen_flask_devicetree_label devicetree_label;
+        xen_flask_ocontext_t ocontext;
+        xen_flask_peersid_t peersid;
+        xen_flask_relabel_t relabel;
+        xen_flask_devicetree_label_t devicetree_label;
     } u;
 };
 typedef struct xen_flask_op xen_flask_op_t;

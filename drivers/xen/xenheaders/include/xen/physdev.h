@@ -1,22 +1,5 @@
+/* SPDX-License-Identifier: MIT */
 /*
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to
- * deal in the Software without restriction, including without limitation the
- * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
- * sell copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
- * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
- * DEALINGS IN THE SOFTWARE.
- *
  * Copyright (c) 2006, Keir Fraser
  */
 
@@ -104,6 +87,9 @@ DEFINE_XEN_GUEST_HANDLE(physdev_set_iopl_t);
 /*
  * Set the current VCPU's I/O-port permissions bitmap.
  * @arg == pointer to physdev_set_iobitmap structure.
+ *
+ * When @nr_ports is non-zero, Xen, like real CPUs and the TSS IOPB, always
+ * reads 2 bytes from @bitmap, which might be one byte beyond @nr_ports.
  */
 #define PHYSDEVOP_set_iobitmap           7
 struct physdev_set_iobitmap {
@@ -148,7 +134,7 @@ struct physdev_irq {
 };
 typedef struct physdev_irq physdev_irq_t;
 DEFINE_XEN_GUEST_HANDLE(physdev_irq_t);
- 
+
 #define MAP_PIRQ_TYPE_MSI               0x0
 #define MAP_PIRQ_TYPE_GSI               0x1
 #define MAP_PIRQ_TYPE_UNKNOWN           0x2
@@ -192,7 +178,7 @@ struct physdev_manage_pci {
     /* IN */
     uint8_t bus;
     uint8_t devfn;
-}; 
+};
 
 typedef struct physdev_manage_pci physdev_manage_pci_t;
 DEFINE_XEN_GUEST_HANDLE(physdev_manage_pci_t);
@@ -211,8 +197,8 @@ struct physdev_manage_pci_ext {
     /* IN */
     uint8_t bus;
     uint8_t devfn;
-    unsigned is_extfn;
-    unsigned is_virtfn;
+    uint32_t is_extfn;
+    uint32_t is_virtfn;
     struct {
         uint8_t bus;
         uint8_t devfn;
@@ -229,11 +215,11 @@ DEFINE_XEN_GUEST_HANDLE(physdev_manage_pci_ext_t);
 struct physdev_op {
     uint32_t cmd;
     union {
-        struct physdev_irq_status_query      irq_status_query;
-        struct physdev_set_iopl              set_iopl;
-        struct physdev_set_iobitmap          set_iobitmap;
-        struct physdev_apic                  apic_op;
-        struct physdev_irq                   irq_op;
+        physdev_irq_status_query_t irq_status_query;
+        physdev_set_iopl_t         set_iopl;
+        physdev_set_iobitmap_t     set_iobitmap;
+        physdev_apic_t             apic_op;
+        physdev_irq_t              irq_op;
     } u;
 };
 typedef struct physdev_op physdev_op_t;
@@ -258,7 +244,7 @@ DEFINE_XEN_GUEST_HANDLE(physdev_setup_gsi_t);
  * the hypercall returns a free pirq */
 #define PHYSDEVOP_get_free_pirq    23
 struct physdev_get_free_pirq {
-    /* IN */ 
+    /* IN */
     int type;
     /* OUT */
     uint32_t pirq;
@@ -300,11 +286,7 @@ struct physdev_pci_device_add {
      * First element ([0]) is PXM domain associated with the device (if
      * XEN_PCI_DEV_PXM is set)
      */
-#if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 199901L
-    uint32_t optarr[];
-#elif defined(__GNUC__)
-    uint32_t optarr[0];
-#endif
+    uint32_t optarr[XEN_FLEX_ARRAY_DIM];
 };
 typedef struct physdev_pci_device_add physdev_pci_device_add_t;
 DEFINE_XEN_GUEST_HANDLE(physdev_pci_device_add_t);
@@ -317,6 +299,13 @@ DEFINE_XEN_GUEST_HANDLE(physdev_pci_device_add_t);
  */
 #define PHYSDEVOP_prepare_msix          30
 #define PHYSDEVOP_release_msix          31
+/*
+ * Notify the hypervisor that a PCI device has been reset, so that any
+ * internally cached state is regenerated.  Should be called after any
+ * device reset performed by the hardware domain.
+ */
+#define PHYSDEVOP_pci_device_reset      32
+
 struct physdev_pci_device {
     /* IN */
     uint16_t seg;
@@ -325,6 +314,16 @@ struct physdev_pci_device {
 };
 typedef struct physdev_pci_device physdev_pci_device_t;
 DEFINE_XEN_GUEST_HANDLE(physdev_pci_device_t);
+
+struct pci_device_reset {
+    physdev_pci_device_t dev;
+#define PCI_DEVICE_RESET_COLD 0x0
+#define PCI_DEVICE_RESET_WARM 0x1
+#define PCI_DEVICE_RESET_HOT  0x2
+#define PCI_DEVICE_RESET_FLR  0x3
+#define PCI_DEVICE_RESET_MASK 0x3
+    uint32_t flags;
+};
 
 #define PHYSDEVOP_DBGP_RESET_PREPARE    1
 #define PHYSDEVOP_DBGP_RESET_DONE       2
@@ -338,7 +337,7 @@ struct physdev_dbgp_op {
     uint8_t op;
     uint8_t bus;
     union {
-        struct physdev_pci_device pci;
+        physdev_pci_device_t pci;
     } u;
 };
 typedef struct physdev_dbgp_op physdev_dbgp_op_t;

@@ -1,25 +1,8 @@
+/* SPDX-License-Identifier: MIT */
 /******************************************************************************
  * xen.h
- * 
+ *
  * Guest OS interface to Xen.
- * 
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to
- * deal in the Software without restriction, including without limitation the
- * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
- * sell copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
- * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
- * DEALINGS IN THE SOFTWARE.
  *
  * Copyright (c) 2004, K A Fraser
  */
@@ -33,6 +16,10 @@
 #include "arch-x86/xen.h"
 #elif defined(__arm__) || defined (__aarch64__)
 #include "arch-arm.h"
+#elif defined(__powerpc64__)
+#include "arch-ppc.h"
+#elif defined(__riscv)
+#include "arch-riscv.h"
 #else
 #error "Unsupported architecture"
 #endif
@@ -52,6 +39,15 @@ DEFINE_XEN_GUEST_HANDLE(void);
 DEFINE_XEN_GUEST_HANDLE(uint64_t);
 DEFINE_XEN_GUEST_HANDLE(xen_pfn_t);
 DEFINE_XEN_GUEST_HANDLE(xen_ulong_t);
+
+/* Define a variable length array (depends on compiler). */
+#if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 199901L
+#define XEN_FLEX_ARRAY_DIM
+#elif defined(__GNUC__)
+#define XEN_FLEX_ARRAY_DIM  0
+#else
+#define XEN_FLEX_ARRAY_DIM  1 /* variable size */
+#endif
 
 /* Turn a plain number into a C unsigned (long (long)) constant. */
 #define __xen_mk_uint(x)  x ## U
@@ -118,9 +114,10 @@ DEFINE_XEN_GUEST_HANDLE(xen_ulong_t);
 #define __HYPERVISOR_domctl               36
 #define __HYPERVISOR_kexec_op             37
 #define __HYPERVISOR_tmem_op              38
-#define __HYPERVISOR_xc_reserved_op       39 /* reserved for XenClient */
+#define __HYPERVISOR_argo_op              39
 #define __HYPERVISOR_xenpmu_op            40
 #define __HYPERVISOR_dm_op                41
+#define __HYPERVISOR_hypfs_op             42
 
 /* Architecture-specific hypercall definitions. */
 #define __HYPERVISOR_arch_0               48
@@ -157,11 +154,11 @@ DEFINE_XEN_GUEST_HANDLE(xen_ulong_t);
 #define __HYPERVISOR_dom0_op __HYPERVISOR_platform_op
 #endif
 
-/* 
+/*
  * VIRTUAL INTERRUPTS
- * 
+ *
  * Virtual interrupts that a guest OS may receive from Xen.
- * 
+ *
  * In the side comments, 'V.' denotes a per-VCPU VIRQ while 'G.' denotes a
  * global VIRQ. The former can be bound once per VCPU and cannot be re-bound.
  * The latter can be allocated only once per guest: they must initially be
@@ -177,8 +174,8 @@ DEFINE_XEN_GUEST_HANDLE(xen_ulong_t);
 #define VIRQ_XENOPROF   7  /* V. XenOprofile interrupt: new sample available */
 #define VIRQ_CON_RING   8  /* G. (DOM0) Bytes received on console            */
 #define VIRQ_PCPU_STATE 9  /* G. (DOM0) PCPU state changed                   */
-#define VIRQ_MEM_EVENT  10 /* G. (DOM0) A memory event has occured           */
-#define VIRQ_XC_RESERVED 11 /* G. Reserved for XenClient                     */
+#define VIRQ_MEM_EVENT  10 /* G. (DOM0) A memory event has occurred          */
+#define VIRQ_ARGO       11 /* G. Argo interdomain message notification       */
 #define VIRQ_ENOMEM     12 /* G. (DOM0) Low on heap memory       */
 #define VIRQ_XENPMU     13 /* V.  PMC interrupt                              */
 
@@ -211,7 +208,7 @@ DEFINE_XEN_GUEST_HANDLE(xen_ulong_t);
  *                     (x) encodes the PFD as follows:
  *                     x == 0 => PFD == DOMID_SELF
  *                     x != 0 => PFD == x - 1
- * 
+ *
  * Sub-commands: ptr[1:0] specifies the appropriate MMU_* command.
  * -------------
  * ptr[1:0] == MMU_NORMAL_PT_UPDATE:
@@ -257,16 +254,20 @@ DEFINE_XEN_GUEST_HANDLE(xen_ulong_t);
  * To deallocate the pages, the operations are the reverse of the steps
  * mentioned above. The argument is MMUEXT_UNPIN_TABLE for all levels and the
  * pagetable MUST not be in use (meaning that the cr3 is not set to it).
- * 
+ *
  * ptr[1:0] == MMU_MACHPHYS_UPDATE:
  * Updates an entry in the machine->pseudo-physical mapping table.
  * ptr[:2]  -- Machine address within the frame whose mapping to modify.
  *             The frame must belong to the FD, if one is specified.
  * val      -- Value to write into the mapping entry.
- * 
+ *
  * ptr[1:0] == MMU_PT_UPDATE_PRESERVE_AD:
  * As MMU_NORMAL_PT_UPDATE above, but A/D bits currently in the PTE are ORed
  * with those in @val.
+ *
+ * ptr[1:0] == MMU_PT_UPDATE_NO_TRANSLATE:
+ * As MMU_NORMAL_PT_UPDATE above, but @val is not translated though FD
+ * page tables.
  *
  * @val is usually the machine frame number along with some attributes.
  * The attributes by default follow the architecture defined bits. Meaning that
@@ -334,9 +335,11 @@ DEFINE_XEN_GUEST_HANDLE(xen_ulong_t);
  *
  * PAT (bit 7 on) --> PWT (bit 3 on) and clear bit 7.
  */
-#define MMU_NORMAL_PT_UPDATE      0 /* checked '*ptr = val'. ptr is MA.      */
-#define MMU_MACHPHYS_UPDATE       1 /* ptr = MA of frame to modify entry for */
-#define MMU_PT_UPDATE_PRESERVE_AD 2 /* atomically: *ptr = val | (*ptr&(A|D)) */
+#define MMU_NORMAL_PT_UPDATE       0 /* checked '*ptr = val'. ptr is MA.      */
+#define MMU_MACHPHYS_UPDATE        1 /* ptr = MA of frame to modify entry for */
+#define MMU_PT_UPDATE_PRESERVE_AD  2 /* atomically: *ptr = val | (*ptr&(A|D)) */
+#define MMU_PT_UPDATE_NO_TRANSLATE 3 /* checked '*ptr = val'. ptr is MA.      */
+                                     /* val never translated.                 */
 
 /*
  * MMU EXTENDED OPERATIONS
@@ -480,7 +483,28 @@ DEFINE_XEN_GUEST_HANDLE(mmuext_op_t);
 /* ` } */
 
 /*
- * Commands to HYPERVISOR_console_io().
+ * ` int
+ * ` HYPERVISOR_console_io(unsigned int cmd,
+ * `                       unsigned int count,
+ * `                       char buffer[]);
+ *
+ * @cmd: Command (see below)
+ * @count: Size of the buffer to read/write
+ * @buffer: Pointer in the guest memory
+ *
+ * List of commands:
+ *
+ *  * CONSOLEIO_write: Write the buffer to Xen console.
+ *      For the hardware domain, all the characters in the buffer will
+ *      be written. Characters will be printed directly to the console.
+ *      For all the other domains, only the printable characters will be
+ *      written. Characters may be buffered until a newline (i.e '\n') is
+ *      found.
+ *      @return 0 on success, otherwise return an error code.
+ *  * CONSOLEIO_read: Attempts to read up to @count characters from Xen
+ *      console. The maximum buffer size (i.e. @count) supported is 2GB.
+ *      @return the number of characters read on success, otherwise return
+ *      an error code.
  */
 #define CONSOLEIO_write         0
 #define CONSOLEIO_read          1
@@ -578,6 +602,9 @@ DEFINE_XEN_GUEST_HANDLE(mmuext_op_t);
 /* Idle domain. */
 #define DOMID_IDLE           xen_mk_uint(0x7FFF)
 
+/* Mask for valid domain id values */
+#define DOMID_MASK           xen_mk_uint(0x7FFF)
+
 #ifndef __ASSEMBLY__
 
 typedef uint16_t domid_t;
@@ -596,7 +623,7 @@ DEFINE_XEN_GUEST_HANDLE(mmu_update_t);
 /*
  * ` enum neg_errnoval
  * ` HYPERVISOR_multicall(multicall_entry_t call_list[],
- * `                      uint32_t nr_calls);
+ * `                      unsigned long nr_calls);
  *
  * NB. The fields are logically the natural register size for this
  * architecture. In cases where xen_ulong_t is larger than this then
@@ -655,7 +682,7 @@ typedef struct vcpu_time_info vcpu_time_info_t;
 struct vcpu_info {
     /*
      * 'evtchn_upcall_pending' is written non-zero by Xen to indicate
-     * a pending notification for a particular VCPU. It is then cleared 
+     * a pending notification for a particular VCPU. It is then cleared
      * by the guest OS /before/ checking for pending work, thus avoiding
      * a set-and-check race. Note that the mask is only accessed by Xen
      * on the CPU that is currently hosting the VCPU. This means that the
@@ -686,7 +713,7 @@ struct vcpu_info {
 #endif /* XEN_HAVE_PV_UPCALL_MASK */
     xen_ulong_t evtchn_pending_sel;
     struct arch_vcpu_info arch;
-    struct vcpu_time_info time;
+    vcpu_time_info_t time;
 }; /* 64 bytes (x86) */
 #ifndef __XEN__
 typedef struct vcpu_info vcpu_info_t;
@@ -718,7 +745,7 @@ struct shared_info {
      *  3. Virtual interrupts ('events'). A domain can bind an event-channel
      *     port to a virtual interrupt source, such as the virtual-timer
      *     device or the emergency console.
-     * 
+     *
      * Event channels are addressed by a "port index". Each channel is
      * associated with two bits of information:
      *  1. PENDING -- notifies the domain that there is a pending notification
@@ -729,7 +756,7 @@ struct shared_info {
      *     becomes pending while the channel is masked then the 'edge' is lost
      *     (i.e., when the channel is unmasked, the guest must manually handle
      *     pending notifications as no upcall will be scheduled by Xen).
-     * 
+     *
      * To expedite scanning of pending notifications, any 0->1 pending
      * transition on an unmasked channel causes a corresponding bit in a
      * per-vcpu selector word to be set. Each bit in the selector covers a
@@ -739,12 +766,17 @@ struct shared_info {
     xen_ulong_t evtchn_mask[sizeof(xen_ulong_t) * 8];
 
     /*
-     * Wallclock time: updated only by control software. Guests should base
-     * their gettimeofday() syscall on this wallclock-base value.
+     * Wallclock time: updated by control software or RTC emulation.
+     * Guests should base their gettimeofday() syscall on this
+     * wallclock-base value.
+     * The values of wc_sec and wc_nsec are offsets from the Unix epoch
+     * adjusted by the domain's 'time offset' (in seconds) as set either
+     * by XEN_DOMCTL_settimeoffset, or adjusted via a guest write to the
+     * emulated RTC.
      */
     uint32_t wc_version;      /* Version counter: see vcpu_time_info_t. */
-    uint32_t wc_sec;          /* Secs  00:00:00 UTC, Jan 1, 1970.  */
-    uint32_t wc_nsec;         /* Nsecs 00:00:00 UTC, Jan 1, 1970.  */
+    uint32_t wc_sec;
+    uint32_t wc_nsec;
 #if !defined(__i386__)
     uint32_t wc_sec_hi;
 # define xen_wc_sec_hi wc_sec_hi
@@ -916,6 +948,11 @@ typedef struct dom0_vga_console_info {
             uint32_t gbl_caps;
             /* Mode attributes (offset 0x0, VESA command 0x4f01). */
             uint16_t mode_attrs;
+            uint16_t pad;
+#endif
+#if __XEN_INTERFACE_VERSION__ >= 0x00040d00
+            /* high 32 bits of lfb_base */
+            uint32_t ext_lfb_base;
 #endif
         } vesa_lfb;
     } u;
@@ -981,6 +1018,7 @@ struct xenctl_bitmap {
     XEN_GUEST_HANDLE_64(uint8) bitmap;
     uint32_t nr_bits;
 };
+typedef struct xenctl_bitmap xenctl_bitmap_t;
 #endif
 
 #endif /* defined(__XEN__) || defined(__XEN_TOOLS__) */

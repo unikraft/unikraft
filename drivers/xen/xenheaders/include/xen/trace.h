@@ -1,23 +1,6 @@
+/* SPDX-License-Identifier: MIT */
 /******************************************************************************
  * include/public/trace.h
- * 
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to
- * deal in the Software without restriction, including without limitation the
- * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
- * sell copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
- * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
- * DEALINGS IN THE SOFTWARE.
  *
  * Mark Williamson, (C) 2004 Intel Research Cambridge
  * Copyright (C) 2005 Bin Ren
@@ -84,7 +67,7 @@
 #define TRC_SCHED_CLASS_EVT(_c, _e) \
   ( ( TRC_SCHED_CLASS | \
       ((TRC_SCHED_##_c << TRC_SCHED_ID_SHIFT) & TRC_SCHED_ID_MASK) ) + \
-    (_e & TRC_SCHED_EVT_MASK) )
+    ((_e) & TRC_SCHED_EVT_MASK) )
 
 /* Trace classes for DOM0 operations */
 #define TRC_DOM0_DOMOPS     0x00041000   /* Domains manipulations */
@@ -195,8 +178,10 @@
 /* trace events per subclass */
 #define TRC_HVM_NESTEDFLAG      (0x400)
 #define TRC_HVM_VMENTRY         (TRC_HVM_ENTRYEXIT + 0x01)
-#define TRC_HVM_VMEXIT          (TRC_HVM_ENTRYEXIT + 0x02)
-#define TRC_HVM_VMEXIT64        (TRC_HVM_ENTRYEXIT + TRC_64_FLAG + 0x02)
+#define TRC_HVM_VMX_EXIT        (TRC_HVM_ENTRYEXIT + 0x02)
+#define TRC_HVM_VMX_EXIT64      (TRC_HVM_ENTRYEXIT + TRC_64_FLAG + 0x02)
+#define TRC_HVM_SVM_EXIT        (TRC_HVM_ENTRYEXIT + 0x03)
+#define TRC_HVM_SVM_EXIT64      (TRC_HVM_ENTRYEXIT + TRC_64_FLAG + 0x03)
 #define TRC_HVM_PF_XEN          (TRC_HVM_HANDLER + 0x01)
 #define TRC_HVM_PF_XEN64        (TRC_HVM_HANDLER + TRC_64_FLAG + 0x01)
 #define TRC_HVM_PF_INJECT       (TRC_HVM_HANDLER + 0x02)
@@ -235,6 +220,8 @@
 #define TRC_HVM_TRAP             (TRC_HVM_HANDLER + 0x23)
 #define TRC_HVM_TRAP_DEBUG       (TRC_HVM_HANDLER + 0x24)
 #define TRC_HVM_VLAPIC           (TRC_HVM_HANDLER + 0x25)
+#define TRC_HVM_XCR_READ64      (TRC_HVM_HANDLER + TRC_64_FLAG + 0x26)
+#define TRC_HVM_XCR_WRITE64     (TRC_HVM_HANDLER + TRC_64_FLAG + 0x27)
 
 #define TRC_HVM_IOPORT_WRITE    (TRC_HVM_HANDLER + 0x216)
 #define TRC_HVM_IOMEM_WRITE     (TRC_HVM_HANDLER + 0x217)

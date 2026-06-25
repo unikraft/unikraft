@@ -1,25 +1,8 @@
+/* SPDX-License-Identifier: MIT */
 /******************************************************************************
  * hvm/hvm_xs_strings.h
  *
  * HVM xenstore strings used in HVMLOADER.
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to
- * deal in the Software without restriction, including without limitation the
- * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
- * sell copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
- * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
- * DEALINGS IN THE SOFTWARE.
  *
  * Copyright (c) 2013, Citrix Systems
  */
@@ -69,6 +52,12 @@
 #define HVM_XS_SYSTEM_PRODUCT_NAME     "bios-strings/system-product-name"
 #define HVM_XS_SYSTEM_VERSION          "bios-strings/system-version"
 #define HVM_XS_SYSTEM_SERIAL_NUMBER    "bios-strings/system-serial-number"
+#define HVM_XS_BASEBOARD_MANUFACTURER  "bios-strings/baseboard-manufacturer"
+#define HVM_XS_BASEBOARD_PRODUCT_NAME  "bios-strings/baseboard-product-name"
+#define HVM_XS_BASEBOARD_VERSION       "bios-strings/baseboard-version"
+#define HVM_XS_BASEBOARD_SERIAL_NUMBER "bios-strings/baseboard-serial-number"
+#define HVM_XS_BASEBOARD_ASSET_TAG     "bios-strings/baseboard-asset-tag"
+#define HVM_XS_BASEBOARD_LOCATION_IN_CHASSIS "bios-strings/baseboard-location-in-chassis"
 #define HVM_XS_ENCLOSURE_MANUFACTURER  "bios-strings/enclosure-manufacturer"
 #define HVM_XS_ENCLOSURE_SERIAL_NUMBER "bios-strings/enclosure-serial-number"
 #define HVM_XS_ENCLOSURE_ASSET_TAG     "bios-strings/enclosure-asset-tag"
