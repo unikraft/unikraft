@@ -168,5 +168,6 @@ setup_tty_globals:
 	return 0;
 }
 
-uk_rootfs_initcall_prio(init_tty_cons, 0x0, UK_FS_PRIO_FSAVAIL);
+uk_rootfs_initcall_prio(init_tty_cons, 0x0,
+			UK_PRIO_BEFORE(UK_PRIO_LATEST));
 #endif /* !CONFIG_LIBUKFS_DEVFS */
