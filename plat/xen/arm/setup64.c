@@ -245,7 +245,7 @@ static int _get_ramdisk(struct ukplat_bootinfo *bi, void *fdtp)
 
 	mrd.vbase = (__vaddr_t)to_virt(UK_PAGING_PAGE_ALIGN_DOWN(initrd_base));
 	mrd.pbase = (__paddr_t)mrd.vbase;
-	mrd.pg_off = initrd_base - mrd.pbase;
+	mrd.pg_off = initrd_base - UK_PAGING_PAGE_ALIGN_DOWN(initrd_base);
 	mrd.len = initrd_end - initrd_base;
 	mrd.pg_count = UK_PAGING_PAGE_COUNT(mrd.pg_off + mrd.len);
 	mrd.type = UKPLAT_MEMRT_INITRD;
