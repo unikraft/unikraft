@@ -60,7 +60,7 @@ def main():
         raise Exception("Unsupported architecture: {}".format(opt.arch))
 
     endianness = "big" if opt.big else "little"
-    mrd_size = 64 if opt.names else 32
+    mrd_size = 80 if opt.names else 48
 
     # Extract name of the unikernel binary for KERNEL segments
     if opt.names:
