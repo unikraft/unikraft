@@ -8,7 +8,6 @@
 #include "gdbsup.h"
 #include "../../gdbstub.h"
 
-#include <uk/arch/traps.h>
 #include <uk/essentials.h>
 #include <uk/nofault.h>
 #include <uk/isr/string.h>
@@ -18,28 +17,28 @@
 #define BRK_OPCODE_MASK		0xffe0001fUL
 #define BRK_OPCODE		0xd4200000UL
 
-static void gdb_arch_enable_single_step(struct __regs *regs)
+static void gdb_arch_enable_single_step(struct uk_lcpu_regs *regs)
 {
-	__sz mdscr = SYSREG_READ(mdscr_el1);
+	__sz mdscr = UK_ARCH_ARM64_SYSREG_READ(mdscr_el1);
 
-	mdscr |= MDSCR_EL1_SS;
-	mdscr |= MDSCR_EL1_KDE;
+	mdscr |= UK_ARCH_ARM64_MDSCR_EL1_SS;
+	mdscr |= UK_ARCH_ARM64_MDSCR_EL1_KDE;
 
-	SYSREG_WRITE(mdscr_el1, mdscr);
+	UK_ARCH_ARM64_SYSREG_WRITE(mdscr_el1, mdscr);
 
-	regs->spsr_el1 |= SPSR_EL1_SS;
+	regs->spsr_el1 |= UK_ARCH_ARM64_SPSR_EL1_SS;
 }
 
-static void gdb_arch_disable_single_step(struct __regs *regs)
+static void gdb_arch_disable_single_step(struct uk_lcpu_regs *regs)
 {
-	__sz mdscr = SYSREG_READ(mdscr_el1);
+	__sz mdscr = UK_ARCH_ARM64_SYSREG_READ(mdscr_el1);
 
-	mdscr &= ~MDSCR_EL1_SS;
-	mdscr &= ~MDSCR_EL1_KDE;
+	mdscr &= ~UK_ARCH_ARM64_MDSCR_EL1_SS;
+	mdscr &= ~UK_ARCH_ARM64_MDSCR_EL1_KDE;
 
-	SYSREG_WRITE(mdscr_el1, mdscr);
+	UK_ARCH_ARM64_SYSREG_WRITE(mdscr_el1, mdscr);
 
-	regs->spsr_el1 &= ~SPSR_EL1_SS;
+	regs->spsr_el1 &= ~UK_ARCH_ARM64_SPSR_EL1_SS;
 }
 
 /* We get here via traps raised by the platform
@@ -50,7 +49,7 @@ static void gdb_arch_disable_single_step(struct __regs *regs)
  * we only support software breakpoints so there is no need to configure
  * hardware breakpoints yet. See D2.7 and D2.8.4 of DDI0487K.
  */
-static int gdb_arch_dbg_trap(int errnr, struct __regs *regs)
+static int gdb_arch_dbg_trap(int errnr, struct uk_lcpu_regs *regs)
 {
 	int r;
 
@@ -62,7 +61,7 @@ static int gdb_arch_dbg_trap(int errnr, struct __regs *regs)
 	} else if (r == GDB_DBG_STEP) { /* Single step */
 		gdb_arch_enable_single_step(regs);
 
-		regs->spsr_el1 &= ~SPSR_EL1_D;
+		regs->spsr_el1 &= ~UK_ARCH_ARM64_SPSR_EL1_D;
 	}
 
 	return 0;
@@ -82,7 +81,7 @@ static int gdb_arch_check_brk(unsigned long pc)
 static int gdb_arch_debug_handler(void *data)
 {
 	int have_brk, r;
-	struct ukarch_trap_ctx *ctx = (struct ukarch_trap_ctx *)data;
+	struct uk_lcpu_except_err_ctx *ctx = data;
 
 	r = gdb_arch_dbg_trap(5 /* SIGTRAP */, ctx->regs);
 	if (unlikely(r < 0))
@@ -101,30 +100,31 @@ static int gdb_arch_debug_handler(void *data)
 	if (unlikely(have_brk < 0))
 		return have_brk;
 
-	if ((ESR_EC_FROM(ctx->esr) == ESR_EL1_EC_BRK64) && (have_brk == 0)) {
+	if (UK_ARCH_ARM64_ESR_EC_FROM(ctx->esr) ==
+	    UK_ARCH_ARM64_ESR_EL1_EC_BRK64 && have_brk == 0) {
 		ctx->regs->elr_el1 += 4; /* instructions are all 4 bytes wide */
-		ctx->regs->spsr_el1 &= ~SPSR_EL1_SS;
+		ctx->regs->spsr_el1 &= ~UK_ARCH_ARM64_SPSR_EL1_SS;
 	}
 
 	return UK_EVENT_HANDLED;
 }
 
-UK_EVENT_HANDLER(UKARCH_TRAP_DEBUG, gdb_arch_debug_handler);
+UK_EVENT_HANDLER(UK_LCPU_EXCEPT_EVENT_DEBUG, gdb_arch_debug_handler);
 
-/* This table maps struct __regs to the gdb register file */
+/* This table maps struct uk_lcpu_regs to the gdb register file */
 static struct {
 	unsigned int offset;
 	unsigned int length;
 } gdb_register_map[] = {
-	{__offsetof(struct __regs, lr), 8},
-	{__offsetof(struct __regs, sp), 8},
-	{__offsetof(struct __regs, elr_el1), 8},
-	{__offsetof(struct __regs, spsr_el1), 8}
+	{__offsetof(struct uk_lcpu_regs, lr), 8},
+	{__offsetof(struct uk_lcpu_regs, sp), 8},
+	{__offsetof(struct uk_lcpu_regs, elr_el1), 8},
+	{__offsetof(struct uk_lcpu_regs, spsr_el1), 8}
 };
 
 #define GDB_REGISTER_MAP_COUNT ARRAY_SIZE(gdb_register_map)
 
-__ssz gdb_arch_read_register(int regnr, struct __regs *regs,
+__ssz gdb_arch_read_register(int regnr, struct uk_lcpu_regs *regs,
 			     void *buf, __sz buf_len __maybe_unused)
 {
 	if (regnr < 30) { /* x0-x29 */
@@ -149,7 +149,7 @@ __ssz gdb_arch_read_register(int regnr, struct __regs *regs,
 	return -EINVAL;
 }
 
-__ssz gdb_arch_write_register(int regnr, struct __regs *regs,
+__ssz gdb_arch_write_register(int regnr, struct uk_lcpu_regs *regs,
 			      void *buf, __sz buf_len)
 {
 	if (regnr < 30) { /* x0-x29 */

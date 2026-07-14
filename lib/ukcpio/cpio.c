@@ -38,7 +38,7 @@
 #include <limits.h>
 #include <errno.h>
 
-#include <uk/arch/paging.h>
+#include <uk/paging.h>
 #include <uk/assert.h>
 #include <uk/compat_list.h>
 #include <uk/print.h>
@@ -140,7 +140,7 @@ try_rm_nonempty_dir(const char *path)
 	char newpath[PATH_MAX];
 	char *newend = newpath + strlcpy(newpath, path, PATH_MAX);
 
-	if (unlikely(newend - newpath + 2 > PATH_MAX)) {
+	if (unlikely(newend - newpath + 2 >= PATH_MAX)) {
 		uk_pr_err("Cannot rename %s, path too long\n", path);
 		return -ENAMETOOLONG;
 	}
@@ -487,15 +487,15 @@ ukcpio_extract(const char *dest, const void *buf, size_t buflen)
 	 * entries that could fit in the given buffer. In the case of the
 	 * latter, if the CPIO archive is very small, the division might
 	 * actually result in a number that is not even enough for the
-	 * allocator's metadata, so add PAGE_SIZE as a safety measure,
+	 * allocator's metadata, so add UK_PAGING_PAGE_SIZE as a safety measure,
 	 * just in case.
 	 *
-	 * TODO: Find a better estimate than PAGE_SIZE, possibly a way for
-	 * allocators to give information about minimum required usable
+	 * TODO: Find a better estimate than UK_PAGING_PAGE_SIZE, possibly a
+	 * way for allocators to give information about minimum required usable
 	 * memory for initialization.
 	 */
 	max_alloc = MIN((size_t)uk_alloc_maxalloc(a),
-			PAGE_SIZE +
+			UK_PAGING_PAGE_SIZE +
 			buflen / sizeof(struct uk_cpio_header) *
 			sizeof(struct cpio_ilist_elm));
 	region_base = uk_malloc(a, max_alloc);

@@ -63,6 +63,6 @@
 		}							\
 	} while (0)
 
-#define nf_regs_ip(regs) ((regs)->rip)
+#define nf_regs_ip(regs) (uk_lcpu_regs_get(regs, PC))
 
 #endif /* __UKNOFAULT_ARCH_MACCESS_H__ */

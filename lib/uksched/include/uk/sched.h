@@ -37,7 +37,6 @@
 #ifndef __UK_SCHED_H__
 #define __UK_SCHED_H__
 
-#include <uk/plat/tls.h>
 #include <uk/alloc.h>
 #include <uk/thread.h>
 #include <uk/assert.h>

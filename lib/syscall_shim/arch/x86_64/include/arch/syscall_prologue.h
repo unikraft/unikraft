@@ -8,20 +8,11 @@
 #error Do not include this header directly
 #endif
 
-/* NOTE:
- * syscall.h is going to be included by many C-source files that may not
- * include headers from uk/plat/common and this is going to result in
- * lots of build errors.
- * TODO: Plat re-architecting will help with this, but for now, simply
- * re-define this macro to not waste time on this trivial matter.
- */
-#ifndef LCPU_AUXSP_OFFSET
-#define LCPU_AUXSP_OFFSET		0x20
-#endif /* !LCPU_AUXSP_OFFSET */
-
 #if !__ASSEMBLY__
 
+#include <uk/arch/x86_64.h>
 #include <uk/essentials.h>
+#include <uk/lcpu/auxsp.h>
 
 #define UK_SYSCALL_EXECENV_PROLOGUE_DEFINE(pname, fname, x, ...)	\
 	long __used							\
@@ -39,16 +30,17 @@
 		" * we actually return execution\n\t"                   \
 		" */\n\t"                                               \
 		"movq   %rsp, %r11\n\t"					\
-		"movq	%gs:(" STRINGIFY(LCPU_AUXSP_OFFSET) "), %rsp\n\t"\
+		"movq	" UK_PCPUVAR_X86_64_GSREL_GLOBAL(UK_LCPU_AUXSP_SYM) \
+			", %rsp\n\t"					\
 		"subq	$(" STRINGIFY(UKARCH_AUXSPCB_SIZE) "), %rsp\n\t"\
 		"movq	" STRINGIFY(UKARCH_AUXSPCB_OFFSETOF_CURR_FP)	\
 						"(%rsp), %rsp\n\t"	\
 		"/* Auxiliary stack is already ECTX aligned */\n\t"	\
 		"/* Make room for `struct UKARCH_EXECENV` */\n\t"	\
 		"subq	$(" STRINGIFY(UKARCH_EXECENV_SIZE -		\
-				     __REGS_SIZEOF)" ), %rsp\n\t"	\
+				     UK_LCPU_REGS_SIZE)" ), %rsp\n\t"\
 		"/* Now build stack frame beginning with 5 pointers\n\t"\
-		" * in the classical iretq/`struct __regs` format\n\t"	\
+		" * in the classical iretq/`struct uk_lcpu_regs` format\n\t"\
 		" */\n\t"						\
 		"/* Push stack segment, GDT data segment selector:\n\t"	\
 		" * [15: 3]: Selector Index - second GDT entry\n\t"	\
@@ -66,7 +58,7 @@
 		" * the rsp we were given, plus 8.\n\t"			\
 		" */\n\t"						\
 		"addq   $8, (%rsp)\n\t"                                 \
-		"/* Push EFLAGS register. Additionally, since we\n\t"	\
+		"/* Push RFLAGS register. Additionally, since we\n\t"	\
 		" * pushed it with IRQs disabled, it won't have\n\t"	\
 		" * the corresponding bit flag set, making it look\n\t"	\
 		" * like the caller of the syscall had IRQs off,\n\t"	\
@@ -74,7 +66,7 @@
 		" * manually set the flag.\n\t"				\
 		" */\n\t"						\
 		"pushfq\n\t"						\
-		"orq	$(" STRINGIFY(X86_EFLAGS_IF) "), 0(%rsp)\n\t"	\
+		"orq	$(" STRINGIFY(UK_ARCH_X86_64_RFLAGS_IF) "), 0(%rsp)\n\t"\
 		"/* Push code segment, GDT code segment selector:\n\t"	\
 		" * [15: 3]: Selector Index - first GDT entry\n\t"	\
 		" * [ 2: 2]: Table Indicator - GDT, table 0\n\t"	\
@@ -87,7 +79,7 @@
 		" */\n\t"						\
 		"movq	(%r11), %r11\n\t"				\
 		"pushq	%r11\n\t"					\
-		"/* Now just push the rest of `struct __regs` */\n\t"	\
+		"/* Now just push the rest of `struct uk_lcpu_regs` */\n\t"\
 		"pushq	%rax\n\t"					\
 		"pushq	%rdi\n\t"					\
 		"pushq	%rsi\n\t"					\
@@ -104,20 +96,22 @@
 		"pushq	%r13\n\t"					\
 		"pushq	%r14\n\t"					\
 		"pushq	%r15\n\t"					\
-		"subq	$(" STRINGIFY(__REGS_PAD_SIZE) "), %rsp\n\t"	\
+		"subq	$(" STRINGIFY(UK_LCPU_X86_64_REGS_OFFSETOF_R15)	\
+			"), %rsp\n\t"					\
 		"/* ECTX at slot w.r.t. `struct UKARCH_EXECENV` */\n\t" \
 		"movq	%rsp, %rdi\n\t"					\
-		"addq	$(" STRINGIFY(__REGS_SIZEOF +			\
-				     UKARCH_SYSCTX_SIZE) "), %rdi\n\t"	\
-		"call	ukarch_ectx_store\n\t"				\
+		"addq	$(" STRINGIFY(UK_LCPU_REGS_SIZE +		\
+				     UK_LCPU_SYSCTX_SIZE) "), %rdi\n\t"\
+		"call	" STRINGIFY(UK_LCPU_ECTX_STORE_FNSYM) "\n\t"	\
 		"/* SYSCTX at slot w.r.t. `struct UKARCH_EXECENV` */\n\t"\
 		"movq	%rsp, %rdi\n\t"					\
-		"addq	$(" STRINGIFY(__REGS_SIZEOF) "), %rdi\n\t"	\
-		"call	ukarch_sysctx_store\n\t"			\
+		"addq	$(" STRINGIFY(UK_LCPU_REGS_SIZE) "), %rdi\n\t"	\
+		"call	" STRINGIFY(UK_LCPU_SYSCTX_STORE_FNSYM) "\n\t"	\
 		"movq	%rsp, %rdi\n\t"					\
 		"sti\n\t"						\
 		"call	" STRINGIFY(fname) "\n\t"			\
-		"addq	$(" STRINGIFY(__REGS_PAD_SIZE) "), %rsp\n\t"	\
+		"addq	$(" STRINGIFY(UK_LCPU_X86_64_REGS_OFFSETOF_R15)	\
+			"), %rsp\n\t"					\
 		"/* Only restore callee preserved regs (ABI) */\n\t"	\
 		"popq	%r15\n\t"					\
 		"popq	%r14\n\t"					\

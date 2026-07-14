@@ -2,3 +2,4 @@ config LIBPOSIX_TIME
        bool "posix-time: Time syscalls"
        default n
        select HAVE_TIME
+       select LIBUKLCPU

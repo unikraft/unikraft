@@ -1,5 +1,8 @@
 $(eval $(call addlib_s,libposix_tty,$(CONFIG_LIBPOSIX_TTY)))
 
+# Register to uklibparam, sets "posix_tty" as parameter prefix (posix_tty.*)
+$(eval $(call addlib_paramprefix,libposix_tty,posix_tty))
+
 CINCLUDES-$(CONFIG_LIBPOSIX_TTY) += -I$(LIBPOSIX_TTY_BASE)/include
 CXXINCLUDES-$(CONFIG_LIBPOSIX_TTY) += -I$(LIBPOSIX_TTY_BASE)/include
 

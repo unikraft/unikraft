@@ -6,8 +6,12 @@ menu "Interrupt controller"
 source "$(shell,$(UK_BASE)/support/build/config-submenu.sh -q -o '$(KCONFIG_DIR)/drivers-intctlr.uk' -r '$(KCONFIG_DRIV_BASE)/ukintctlr' -l '$(KCONFIG_DRIV_BASE)/ukintctlr' -e '$(KCONFIG_EXCLUDEDIRS)')"
 endmenu
 
-menu "PS/2 controller"
-source "$(shell,$(UK_BASE)/support/build/config-submenu.sh -q -o '$(KCONFIG_DIR)/drivers-ukps2.uk' -r '$(KCONFIG_DRIV_BASE)/ukps2' -l '$(KCONFIG_DRIV_BASE)/ukps2' -e '$(KCONFIG_EXCLUDEDIRS)')"
+menu "Platform"
+source "$(shell,$(UK_BASE)/support/build/config-submenu.sh -q -o '$(KCONFIG_DIR)/drivers-plat.uk' -r '$(KCONFIG_DRIV_BASE)/plat' -l '$(KCONFIG_DRIV_BASE)/plat' -e '$(KCONFIG_EXCLUDEDIRS)')"
+endmenu
+
+menu "Input devices"
+source "$(shell,$(UK_BASE)/support/build/config-submenu.sh -q -o '$(KCONFIG_DIR)/drivers-input.uk' -r '$(KCONFIG_DRIV_BASE)/input' -l '$(KCONFIG_DRIV_BASE)/input' -e '$(KCONFIG_EXCLUDEDIRS)')"
 endmenu
 
 menu "Random Number Generator"
@@ -24,6 +28,10 @@ endmenu
 
 menu "Xen"
 source "$(shell,$(UK_BASE)/support/build/config-submenu.sh -q -o '$(KCONFIG_DIR)/drivers-xen.uk' -r '$(KCONFIG_DRIV_BASE)/xen' -l '$(KCONFIG_DRIV_BASE)/xen' -e '$(KCONFIG_EXCLUDEDIRS)')"
+endmenu
+
+menu "Firmware"
+source "$(shell,$(UK_BASE)/support/build/config-submenu.sh -q -o '$(KCONFIG_DIR)/drivers-firmware.uk' -r '$(KCONFIG_DRIV_BASE)/firmware' -l '$(KCONFIG_DRIV_BASE)/firmware' -e '$(KCONFIG_EXCLUDEDIRS)')"
 endmenu
 
 # Invisible option for full IBM PC/AT compatible machines

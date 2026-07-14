@@ -32,20 +32,20 @@
  *
  */
 #include <string.h>
+#include <uk/arch/util.h>
 #include <uk/essentials.h>
 #include <libfdt.h>
 #include <uk/ofw/fdt.h>
 #include <uk/intctlr.h>
 #include <uk/print.h>
-#include <arm/cpu.h>
 #include <uk/rtc.h>
 #include <uk/pl031.h>
 #include <uk/bus/platform.h>
 #include <uk/plat/common/bootinfo.h>
 
-#if CONFIG_PAGING
+#if CONFIG_LIBUKPAGING
 #include <uk/errptr.h>
-#endif /* CONFIG_PAGING */
+#endif /* CONFIG_LIBUKPAGING */
 
 static __u64 pl031_base_addr;
 static int pl031_irq;
@@ -71,7 +71,7 @@ static struct uk_alloc *a;
 
 static __u32 pl031_read_raw(void)
 {
-	return ioreg_read32(PL031_REG(RTC_DR));
+	return uk_arch_arm64_ioreg_read32(PL031_REG(RTC_DR));
 }
 
 void pl031_read_time(struct rtc_time *rt)
@@ -84,7 +84,7 @@ void pl031_read_time(struct rtc_time *rt)
 
 static void pl031_write_raw(__u32 val)
 {
-	ioreg_write32(PL031_REG(RTC_LR), val);
+	uk_arch_arm64_ioreg_write32(PL031_REG(RTC_LR), val);
 }
 
 void pl031_write_time(struct rtc_time *rt)
@@ -97,7 +97,7 @@ void pl031_write_time(struct rtc_time *rt)
 
 static void pl031_write_alarm_raw(__u32 alarm)
 {
-	ioreg_write32(PL031_REG(RTC_MR), alarm);
+	uk_arch_arm64_ioreg_write32(PL031_REG(RTC_MR), alarm);
 }
 
 void pl031_write_alarm(struct rtc_time *rt)
@@ -110,7 +110,7 @@ void pl031_write_alarm(struct rtc_time *rt)
 
 static __u32 pl031_read_alarm_raw(void)
 {
-	return ioreg_read32(PL031_REG(RTC_MR));
+	return uk_arch_arm64_ioreg_read32(PL031_REG(RTC_MR));
 }
 
 void pl031_read_alarm(struct rtc_time *rt)
@@ -120,42 +120,42 @@ void pl031_read_alarm(struct rtc_time *rt)
 
 void pl031_enable(void)
 {
-	ioreg_write32(PL031_REG(RTC_CR), 1);
+	uk_arch_arm64_ioreg_write32(PL031_REG(RTC_CR), 1);
 }
 
 void pl031_disable(void)
 {
-	ioreg_write32(PL031_REG(RTC_CR), 0);
+	uk_arch_arm64_ioreg_write32(PL031_REG(RTC_CR), 0);
 }
 
 int pl031_get_status(void)
 {
 	int val;
 
-	val = ioreg_read32(PL031_REG(RTC_CR));
+	val = uk_arch_arm64_ioreg_read32(PL031_REG(RTC_CR));
 	val &= PL031_RTC_CR_STATUS_MASK;
 	return val;
 }
 
 void pl031_enable_intr(void)
 {
-	ioreg_write32(PL031_REG(RTC_IMSC), 1);
+	uk_arch_arm64_ioreg_write32(PL031_REG(RTC_IMSC), 1);
 }
 
 void pl031_disable_intr(void)
 {
-	ioreg_write32(PL031_REG(RTC_IMSC), 0);
+	uk_arch_arm64_ioreg_write32(PL031_REG(RTC_IMSC), 0);
 }
 
 static __u32 pl031_get_raw_intr_state(void)
 {
-	return ioreg_read32(PL031_REG(RTC_RIS));
+	return uk_arch_arm64_ioreg_read32(PL031_REG(RTC_RIS));
 }
 
 void pl031_clear_intr(void)
 {
 	while (pl031_get_raw_intr_state())
-		ioreg_write32(PL031_REG(RTC_ICR), 1);
+		uk_arch_arm64_ioreg_write32(PL031_REG(RTC_ICR), 1);
 }
 
 int pl031_register_alarm_handler(int (*handler)(void *))
@@ -184,11 +184,11 @@ int pl031_init_rtc(void *dtb)
 	}
 	uk_pr_info("Found RTC at: 0x%lx\n", pl031_base_addr);
 
-#if CONFIG_PAGING
+#if CONFIG_LIBUKPAGING
 	pl031_base_addr = uk_bus_pf_devmap(pl031_base_addr, size);
 	if (unlikely(PTRISERR(pl031_base_addr)))
 		return PTR2ERR(pl031_base_addr);
-#endif /* CONFIG_PAGING */
+#endif /* CONFIG_LIBUKPAGING */
 
 	rc = uk_intctlr_irq_fdt_xlat(dtb, offs, 0, &irq);
 	if (unlikely(rc))

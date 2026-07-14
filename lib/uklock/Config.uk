@@ -1,6 +1,7 @@
 menuconfig LIBUKLOCK
 	bool "uklock: Multi-task synchronization primitives"
 	select LIBUKDEBUG
+	select LIBUKLCPU
 	default n
 
 if LIBUKLOCK

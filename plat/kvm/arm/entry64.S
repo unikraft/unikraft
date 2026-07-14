@@ -29,7 +29,8 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-#include <uk/arch/lcpu.h>
+
+#include <uk/asm/lcpu.h>
 #include <uk/arch/limits.h>
 #include <uk/asm.h>
 #include <uk/plat/common/sections.h>
@@ -70,7 +71,7 @@ ENTRY(_libkvmplat_entry)
 	 *         can write anywhere we also invalidate the entire image.
 	 */
 	mrs	x19, sctlr_el1
-	and	x19, x19, #SCTLR_EL1_M_BIT
+	and	x19, x19, #UK_ARCH_ARM64_SCTLR_EL1_M_BIT
 #if CONFIG_LIBUKRELOC
 	/* If PIE is enabled and the MMU is disabled we proceed to
 	 * invalidate the entire image region anyway, as libukreloc
@@ -81,23 +82,23 @@ ENTRY(_libkvmplat_entry)
 	cbz	x19, 1f
 #endif /* !CONFIG_LIBUKRELOC */
 
-	ur_ldr	x0, _start_ram_addr
-	ur_ldr	x1, _end
+	ur_addr	x0, _start_ram_addr
+	ur_addr	x1, _end
 	sub	x1, x1, x0
 	bl	clean_and_invalidate_dcache_range
 
 	/* Disable the MMU and D-Cache. */
 	dsb	sy
 	mrs	x2, sctlr_el1
-	mov	x3, #SCTLR_EL1_M_BIT|SCTLR_EL1_C_BIT
+	mov	x3, #UK_ARCH_ARM64_SCTLR_EL1_M_BIT|UK_ARCH_ARM64_SCTLR_EL1_C_BIT
 	bic	x2, x2, x3
 	msr	sctlr_el1, x2
 	isb
 #if CONFIG_LIBUKRELOC
 	b	1f
 0:
-	ur_ldr	x0, _start_ram_addr
-	ur_ldr	x1, _end
+	ur_addr	x0, _start_ram_addr
+	ur_addr	x1, _end
 	sub	x1, x1, x0
 	bl	invalidate_dcache_range
 #endif /* CONFIG_LIBUKRELOC */
@@ -106,7 +107,7 @@ ENTRY(_libkvmplat_entry)
 	 * avoid stale cache contents shadowing our changes once the MMU
 	 * and D-cache are enabled.
 	 */
-	ur_ldr	x26, lcpu_bootstack
+	ur_addr	x26, lcpu_bootstack
 	and	x26, x26, ~(__STACK_ALIGN_SIZE - 1)
 	mov	sp, x26
 	mov	x0, x26
@@ -122,17 +123,21 @@ ENTRY(_libkvmplat_entry)
 	bl      do_uk_reloc
 
 	/* Setup exception vector table address before enable MMU */
-	ur_ldr  x29, vector_table
+	ur_addr  x29, vector_table
 	msr VBAR_EL1, x29
 
 	/* Enable the mmu */
 	bl start_mmu
 
+	/* Set TPIDR_EL1 for BSP (idx=0): base + 0 * size = base */
+	ur_addr	x1, _uk_pcpuvar_base
+	msr	tpidr_el1, x1
+
 	/* Jump to early init */
 #if defined(CONFIG_KVM_BOOT_PROTO_LXBOOT)
 	mov x0, x25      /* dtb in x0 */
 #elif defined(CONFIG_KVM_BOOT_PROTO_QEMU_VIRT)
-	ur_ldr  x0, _dtb /* dtb in x0 */
+	ur_addr  x0, _dtb /* dtb in x0 */
 #endif
 	bl	ukplat_bootinfo_fdt_setup
 	b	_ukplat_entry

@@ -1,59 +1,38 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
-/*
- * Authors: Wei Chen <Wei.Chen@arm.com>
- *          Jianyong Wu <Jianyong.Wu@arm.com>
- *
- * Copyright (c) 2018, Arm Ltd. All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- *
- * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- * 3. Neither the name of the copyright holder nor the names of its
- *    contributors may be used to endorse or promote products derived from
- *    this software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
- * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGE.
+/* Copyright (c) 2018, Arm Ltd. All rights reserved.
+ * Copyright (c) 2023, Unikraft GmbH and The Unikraft Authors.
+ * Licensed under the BSD-3-Clause License (the "License").
+ * You may not use this file except in compliance with the License.
  */
-#include <string.h>
+
 #include <libfdt.h>
-#include <uk/essentials.h>
-#include <uk/print.h>
+#include <string.h>
+
+#include <uk/arch/limits.h>
+#include <uk/arch/util.h>
+#include <uk/asm.h>
 #include <uk/assert.h>
 #include <uk/bitops.h>
-#include <uk/asm.h>
-#include <uk/arch/limits.h>
-#include <uk/plat/lcpu.h>
-#ifdef CONFIG_UKPLAT_ACPI
-#include <uk/plat/common/acpi.h>
-#endif /* CONFIG_UKPLAT_ACPI */
-#include <uk/plat/common/bootinfo.h>
-#include <uk/plat/spinlock.h>
-#include <arm/cpu.h>
+#include <uk/essentials.h>
+#include <uk/event.h>
 #include <uk/intctlr.h>
 #include <uk/intctlr/gic-v2.h>
 #include <uk/intctlr/limits.h>
+#include <uk/lcpu.h>
 #include <uk/ofw/fdt.h>
+#include <uk/pcpuvar.h>
+#include <uk/plat/common/bootinfo.h>
+#include <uk/plat/spinlock.h>
+#include <uk/print.h>
 
-#if CONFIG_PAGING
+#if CONFIG_LIBUKACPI
+#include <uk/acpi.h>
+#endif /* CONFIG_LIBUKACPI */
+
+#if CONFIG_LIBUKPAGING
 #include <uk/bus/platform.h>
 #include <uk/errptr.h>
-#endif /* CONFIG_PAGING */
+#endif /* CONFIG_LIBUKPAGING */
 
 /* Max CPU interface for GICv2 */
 #define GIC_MAX_CPUIF		8
@@ -90,27 +69,27 @@ static const char * const gic_device_list[] __maybe_unused = {
 /* Inline functions to access GICC & GICD registers */
 static inline void write_gicd8(__u64 offset, __u8 val)
 {
-	ioreg_write8(GIC_DIST_REG(gicv2_drv, offset), val);
+	uk_arch_arm64_ioreg_write8(GIC_DIST_REG(gicv2_drv, offset), val);
 }
 
 static inline void write_gicd32(__u64 offset, __u32 val)
 {
-	ioreg_write32(GIC_DIST_REG(gicv2_drv, offset), val);
+	uk_arch_arm64_ioreg_write32(GIC_DIST_REG(gicv2_drv, offset), val);
 }
 
 static inline __u32 read_gicd32(__u64 offset)
 {
-	return ioreg_read32(GIC_DIST_REG(gicv2_drv, offset));
+	return uk_arch_arm64_ioreg_read32(GIC_DIST_REG(gicv2_drv, offset));
 }
 
 static inline void write_gicc32(__u64 offset, __u32 val)
 {
-	ioreg_write32(GIC_CPU_REG(gicv2_drv, offset), val);
+	uk_arch_arm64_ioreg_write32(GIC_CPU_REG(gicv2_drv, offset), val);
 }
 
 static inline __u32 read_gicc32(__u64 offset)
 {
-	return ioreg_read32(GIC_CPU_REG(gicv2_drv, offset));
+	return uk_arch_arm64_ioreg_read32(GIC_CPU_REG(gicv2_drv, offset));
 }
 
 /* Functions of GIC CPU interface */
@@ -208,9 +187,9 @@ void gicv2_sgi_gen_to_list(__u32 sgintid, __u8 targetlist)
 {
 	unsigned long irqf;
 
-	irqf = ukplat_lcpu_save_irqf();
+	irqf = uk_lcpu_save_irqf();
 	gicv2_sgi_gen(sgintid, GICD_SGI_FILTER_TO_LIST, targetlist);
-	ukplat_lcpu_restore_irqf(irqf);
+	uk_lcpu_restore_irqf(irqf);
 }
 
 /**
@@ -229,9 +208,9 @@ void gicv2_sgi_gen_to_others(__u32 sgintid)
 {
 	unsigned long irqf;
 
-	irqf = ukplat_lcpu_save_irqf();
+	irqf = uk_lcpu_save_irqf();
 	gicv2_sgi_gen(sgintid, GICD_SGI_FILTER_TO_OTHERS, 0);
-	ukplat_lcpu_restore_irqf(irqf);
+	uk_lcpu_restore_irqf(irqf);
 }
 
 /**
@@ -367,9 +346,13 @@ EXIT_UNLOCK:
 	dist_unlock(gicv2_drv);
 }
 
-static void gicv2_handle_irq(struct __regs *regs)
+static int gicv2_handle_irq(void *data)
 {
+	struct uk_lcpu_except_irq_ctx *ctx;
 	__u32 stat, irq;
+
+	ctx = data;
+	UK_ASSERT(ctx);
 
 	do {
 		stat = gicv2_ack_irq();
@@ -379,14 +362,15 @@ static void gicv2_handle_irq(struct __regs *regs)
 		uk_pr_debug("EL1 IRQ#%"__PRIu32" caught\n", irq);
 #else /* !CONFIG_HAVE_SMP */
 		uk_pr_debug("Core %"__PRIu64": EL1 IRQ#%"__PRIu32" caught\n",
-			    ukplat_lcpu_id(), irq);
+			    uk_pcpuvar_current_get(uk_pcpuvar_cpu_id), irq);
 #endif /* CONFIG_HAVE_SMP */
 
 		/* Ensure interrupt processing starts only after ACK */
-		isb();
+		uk_arch_arm64_isb();
 
 		if (irq <= GIC_MAX_IRQ) {
-			uk_intctlr_irq_handle(regs, irq);
+			uk_lcpu_except_irq_ctx_set_irq(ctx, irq);
+			uk_intctlr_irq_handle(ctx);
 			gicv2_eoi_irq(stat);
 			continue;
 		}
@@ -397,7 +381,11 @@ static void gicv2_handle_irq(struct __regs *regs)
 
 		break;
 	} while (1);
+
+	return UK_EVENT_HANDLED;
 }
+
+UK_EVENT_HANDLER(UK_LCPU_EXCEPT_EVENT_IRQ, gicv2_handle_irq);
 
 static void gicv2_init_dist(void)
 {
@@ -468,7 +456,7 @@ static void gicv2_init_cpuif(void)
 	/* Enable CPU interface */
 	gicv2_enable_cpuif();
 
-	isb();
+	uk_arch_arm64_isb();
 
 	uk_pr_info("GICv2 CPU interface initialized.\n");
 }
@@ -514,7 +502,6 @@ static void gicv2_set_ops(void)
 		.set_irq_trigger   = gicv2_set_irq_trigger,
 		.set_irq_prio      = gicv2_set_irq_prio,
 		.set_irq_affinity  = gicv2_set_irq_target,
-		.handle_irq        = gicv2_handle_irq,
 		.gic_sgi_gen       = gicv2_sgi_gen_to_cpu,
 	};
 
@@ -522,25 +509,25 @@ static void gicv2_set_ops(void)
 	gicv2_drv.ops = drv_ops;
 }
 
-#if defined(CONFIG_UKPLAT_ACPI)
+#if CONFIG_LIBUKACPI
 static int acpi_get_gicc(struct _gic_dev *g)
 {
 	union {
-		struct acpi_madt_gicc *gicc;
-		struct acpi_subsdt_hdr *h;
+		struct uk_acpi_madt_gicc *gicc;
+		struct uk_acpi_subsdt_hdr *h;
 	} m;
-	struct acpi_madt *madt;
+	struct uk_acpi_madt *madt;
 	__sz off, len;
 
-	madt = acpi_get_madt();
+	madt = uk_acpi_get_madt();
 	UK_ASSERT(madt);
 
 	/* In ACPI all GICCs' base address must be the same */
 	len = madt->hdr.tab_len - sizeof(*madt);
 	for (off = 0; off < len; off += m.h->len) {
-		m.h = (struct acpi_subsdt_hdr *)(madt->entries + off);
+		m.h = (struct uk_acpi_subsdt_hdr *)(madt->entries + off);
 
-		if (m.h->type != ACPI_MADT_GICC)
+		if (m.h->type != UK_ACPI_MADT_GICC)
 			continue;
 
 		/* If GICv3/4 this field is 0 */
@@ -573,7 +560,7 @@ static int gicv2_do_probe(void)
 
 	return 0;
 }
-#else /* CONFIG_UKPLAT_ACPI */
+#else /* !CONFIG_LIBUKACPI */
 static int gicv2_do_probe(void)
 {
 	struct ukplat_bootinfo *bi = ukplat_bootinfo_get();
@@ -611,9 +598,9 @@ static int gicv2_do_probe(void)
 
 	return 0;
 }
-#endif /* !CONFIG_UKPLAT_ACPI */
+#endif /* !CONFIG_LIBUKACPI */
 
-#if CONFIG_PAGING
+#if CONFIG_LIBUKPAGING
 static int gicv2_map(void)
 {
 	__vaddr_t vbase;
@@ -638,7 +625,7 @@ static int gicv2_map(void)
 
 	return 0;
 }
-#endif /* CONFIG_PAGING */
+#endif /* CONFIG_LIBUKPAGING */
 
 /**
  * Probe device tree or ACPI for GICv2
@@ -673,13 +660,13 @@ int gicv2_probe(struct _gic_dev **dev)
 		return rc;
 	}
 
-#if CONFIG_PAGING
+#if CONFIG_LIBUKPAGING
 	rc = gicv2_map();
 	if (unlikely(rc)) {
 		uk_pr_err("Could not map device (%d)\n", rc);
 		return rc;
 	}
-#endif /* CONFIG_PAGING */
+#endif /* CONFIG_LIBUKPAGING */
 
 	uk_pr_info("Found GICv2 on:\n");
 	uk_pr_info("\tDistributor  : 0x%lx - 0x%lx\n",

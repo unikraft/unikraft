@@ -10,20 +10,41 @@
 
 #ifdef __ASSEMBLY__
 
-/*
- * Macro to replace the non-relocation-friendly `ldr` instruction. The usage
- * is the same.
+/**
+ * Load symbol's value into register
  *
- * @param req The register into which to load the value of the symbol
- * @param sym The symbol whose value to place into the register
+ * Notice: "symbol value" refers to the contents in the symbol table, i.e.
+ *         an address or a constant, depending on the symbol type. To obtain
+ *         the value at the symbol's address, use ur_ldr instead.
+ *
+ * If the symbol is an absolute symbol, the value is loaded directly.
+ * Otherwise:
+ * - If relocation is enabled, uses PC-relative addressing (±4GiB for 4KiB pages)
+ * - If relocation is disabled uses literal load (no range constraints).
+ *
+ * @param req Target register
+ * @param sym Symbol whose address to load
  */
-.macro	ur_ldr	reg:req, sym:req
+.macro	ur_addr	reg:req, sym:req
 #if CONFIG_LIBUKRELOC
 	adrp	\reg, \sym
 	add	\reg, \reg, :lo12:\sym
 #else /* CONFIG_LIBUKRELOC */
 	ldr	\reg, =\sym
 #endif /* !CONFIG_LIBUKRELOC */
+.endm
+
+/**
+ * Dereference a symbol and load the resulting value into register
+ *
+ * Uses PC-relative addressing (±4GiB for 4KiB pages).
+ *
+ * @param req Target register
+ * @param sym Symbol to dereference
+ */
+.macro ur_ldr reg:req, sym:req
+	adrp	\reg, \sym
+	ldr	\reg, [\reg, :lo12:\sym]
 .endm
 
 #endif /* __ASSEMBLY__ */

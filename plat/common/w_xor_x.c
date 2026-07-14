@@ -1,44 +1,19 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
-/*
- * Authors: Marc Rittinghaus <marc.rittinghaus@kit.edu>
- *          Michalis Pappas <michalis.pappas@opensynergy.com>
- *
- * Copyright (c) 2021, Karlsruhe Institute of Technology (KIT).
+/* Copyright (c) 2021, Karlsruhe Institute of Technology (KIT).
  *                     All rights reserved.
  * Copyright (c) 2022, OpenSynergy GmbH. All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- *
- * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- * 3. Neither the name of the copyright holder nor the names of its
- *    contributors may be used to endorse or promote products derived from
- *    this software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
- * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGE.
+ * Copyright (c) 2025, Unikraft GmbH and The Unikraft Authors.
+ * Licensed under the BSD-3-Clause License (the "License").
+ * You may not use this file except in compliance with the License.
  */
+
 #include <uk/config.h>
+#include <uk/paging.h>
 #include <uk/plat/memory.h>
-#include <uk/plat/paging.h>
 #include <uk/print.h>
 
 #ifdef CONFIG_ARCH_ARM_64
-#include <arm/arm64/cpu.h>
+#include <uk/arch/util.h>
 #endif /* CONFIG_ARCH_ARM_64 */
 
 #ifdef CONFIG_UKPLAT_MEMRNAME
@@ -48,12 +23,12 @@
 #endif /* CONFIG_UKPLAT_MEMRNAME */
 
 #ifdef CONFIG_ARCH_ARM_64
-#define enable_wxn() ({				\
-	__u64 reg;				\
-	reg = SYSREG_READ64(SCTLR_EL1);		\
-	reg |= SCTLR_EL1_WXN_BIT;		\
-	SYSREG_WRITE64(SCTLR_EL1, reg);		\
-	isb();					\
+#define enable_wxn() ({					\
+	__u64 reg;					\
+	reg = UK_ARCH_ARM64_SYSREG_READ64(SCTLR_EL1);	\
+	reg |= UK_ARCH_ARM64_SCTLR_EL1_WXN_BIT;		\
+	UK_ARCH_ARM64_SYSREG_WRITE64(SCTLR_EL1, reg);	\
+	uk_arch_arm64_isb();				\
 })
 #endif /* CONFIG_ARCH_ARM_64 */
 
@@ -81,33 +56,33 @@ void __weak enforce_w_xor_x(void)
 		 * that is, if multiple sections reside in the same
 		 * page, they should have consistent protections.
 		 */
-		base  = ALIGN_DOWN(d->vbase, PAGE_SIZE);
-		end   = ALIGN_UP(d->vbase + d->len, PAGE_SIZE);
-		pages = DIV_ROUND_UP(end - base, PAGE_SIZE);
-		prot  = PAGE_ATTR_PROT_READ;
+		base  = ALIGN_DOWN(d->vbase, UK_PAGING_PAGE_SIZE);
+		end   = ALIGN_UP(d->vbase + d->len, UK_PAGING_PAGE_SIZE);
+		pages = DIV_ROUND_UP(end - base, UK_PAGING_PAGE_SIZE);
+		prot  = UK_PAGING_PAGE_ATTR_PROT_READ;
 
 		if (d->flags & UKPLAT_MEMRF_EXECUTE)
-			prot |= PAGE_ATTR_PROT_EXEC;
+			prot |= UK_PAGING_PAGE_ATTR_PROT_EXEC;
 		else if (d->flags & UKPLAT_MEMRF_WRITE)
-			prot |= PAGE_ATTR_PROT_WRITE;
+			prot |= UK_PAGING_PAGE_ATTR_PROT_WRITE;
 
 		uk_pr_debug("Setting protections for %s: %"
 			    __PRIvaddr " - %" __PRIvaddr " [R%c%c]\n",
 			    WXORX_REGION_NAME,
-			    base, base + pages * PAGE_SIZE,
-			    (prot & PAGE_ATTR_PROT_WRITE) ? 'W' : '-',
-			    (prot & PAGE_ATTR_PROT_EXEC) ? 'X' : '-');
+			    base, base + pages * UK_PAGING_PAGE_SIZE,
+			    (prot & UK_PAGING_PAGE_ATTR_PROT_WRITE) ? 'W' : '-',
+			    (prot & UK_PAGING_PAGE_ATTR_PROT_EXEC) ? 'X' : '-');
 
-		rc = ukplat_page_set_attr(ukplat_pt_get_active(),
-					  base, pages, prot, 0);
+		rc = uk_paging_page_set_attr(uk_paging_pt_get_active(),
+					     base, pages, prot, 0);
 
 		if (unlikely(rc)) {
 			uk_pr_err("Failed to set protections for %s: %"
 				  __PRIvaddr " - %" __PRIvaddr " [R%c%c]: %d\n",
 				  WXORX_REGION_NAME,
-				  base, base + pages * PAGE_SIZE,
-				  (prot & PAGE_ATTR_PROT_WRITE) ? 'W' : '-',
-				  (prot & PAGE_ATTR_PROT_EXEC) ? 'X' : '-',
+				  base, base + pages * UK_PAGING_PAGE_SIZE,
+				  (prot & UK_PAGING_PAGE_ATTR_PROT_WRITE) ? 'W' : '-',
+				  (prot & UK_PAGING_PAGE_ATTR_PROT_EXEC) ? 'X' : '-',
 				  rc);
 		}
 	}
@@ -117,7 +92,7 @@ void __weak enforce_w_xor_x(void)
 	 */
 	uk_pr_debug("Enabling WXN\n");
 	enable_wxn();
-	ukarch_tlb_flush();
+	uk_paging_tlb_flush();
 #endif /* CONFIG_ARCH_ARM64 */
 }
 #undef WXORX_REGION_NAME

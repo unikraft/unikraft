@@ -47,7 +47,8 @@ UK_TESTCASE(uk_console_testsuite, uk_console_devices)
 {
 	char buf[UK_CONSOLE_TEST_BUF_SIZE];
 
-	uk_console_init(&uk_console_test_dev, "test", &uk_console_test_ops, 0);
+	uk_console_init(&uk_console_test_dev, "test", &uk_console_test_ops, 0,
+			UK_CONSOLE_CLASS_NONE);
 	uk_console_register(&uk_console_test_dev);
 
 	UK_TEST_EXPECT(uk_console_get(uk_console_test_dev.id)

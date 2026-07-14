@@ -39,12 +39,11 @@
 #include <uk/print.h>
 #include <uk/alloc.h>
 #include <uk/netdev_driver.h>
+#include <uk/plat/xen/except.h>
 #if defined(__i386__) || defined(__x86_64__)
 #include <xen-x86/mm.h>
-#include <xen-x86/irq.h>
 #elif defined(__aarch64__)
 #include <xen-arm/mm.h>
-#include <arm/irq.h>
 #else
 #error "Unsupported architecture"
 #endif
@@ -78,7 +77,8 @@ static inline void *page_alloc(struct uk_alloc *a, unsigned long num_pages)
 	if (a->palloc)
 		return uk_palloc(a, num_pages);
 	else
-		return uk_memalign(a, PAGE_SIZE, num_pages * PAGE_SIZE);
+		return uk_memalign(a, UK_PAGING_PAGE_SIZE,
+				   num_pages * UK_PAGING_PAGE_SIZE);
 }
 
 static inline void page_free(struct uk_alloc *a, void *ptr,
@@ -118,7 +118,7 @@ static int network_tx_buf_gc(struct uk_netdev_tx_queue *txq)
 	int count = 0;
 
 	prod = txq->ring.sring->rsp_prod;
-	rmb(); /* Ensure we see responses up to 'rp'. */
+	uk_arch_rmb(); /* Ensure we see responses up to 'rp'. */
 
 	for (cons = txq->ring.rsp_cons; cons != prod; cons++) {
 		tx_rsp = RING_GET_RESPONSE(&txq->ring, cons);
@@ -162,19 +162,19 @@ static int netfront_xmit(struct uk_netdev *n,
 	UK_ASSERT(n != NULL);
 	UK_ASSERT(txq != NULL);
 	UK_ASSERT(pkt != NULL);
-	UK_ASSERT(pkt->len < PAGE_SIZE);
+	UK_ASSERT(pkt->len < UK_PAGING_PAGE_SIZE);
 	UK_ASSERT(!pkt->next); /* TODO: Support for netbuf chains missing */
-	UK_ASSERT(((unsigned long) pkt->buf & ~PAGE_MASK) == 0);
+	UK_ASSERT(((unsigned long)pkt->buf & ~UK_PAGING_PAGE_MASK) == 0);
 
 	nfdev = to_netfront_dev(n);
 
-	local_irq_save(flags);
+	flags = uk_plat_xen_save_irqf();
 	if (unlikely(RING_FULL(&txq->ring))) {
 		/* try some cleanup */
 		network_tx_buf_gc(txq);
 		if (unlikely(RING_FULL(&txq->ring))) {
 			uk_pr_debug("tx queue is full\n");
-			local_irq_restore(flags);
+			uk_plat_xen_restore_irqf(flags);
 			return 0x0;
 		}
 	}
@@ -214,7 +214,7 @@ static int netfront_xmit(struct uk_netdev *n,
 	status = UK_NETDEV_STATUS_SUCCESS;
 
 	txq->ring.req_prod_pvt = req_prod + 1;
-	wmb(); /* Ensure backend sees requests */
+	uk_arch_wmb(); /* Ensure backend sees requests */
 
 	RING_PUSH_REQUESTS_AND_CHECK_NOTIFY(&txq->ring, notify);
 	if (notify)
@@ -228,7 +228,7 @@ static int netfront_xmit(struct uk_netdev *n,
 	} while (more_to_do);
 
 	status |= (RING_FULL(&txq->ring)) ? 0x0 : UK_NETDEV_STATUS_MORE;
-	local_irq_restore(flags);
+	uk_plat_xen_restore_irqf(flags);
 
 	return status;
 }
@@ -243,7 +243,7 @@ static int netfront_rxq_enqueue(struct uk_netdev_rx_queue *rxq,
 	int notify;
 
 	/* buffer must be page aligned */
-	UK_ASSERT(((unsigned long) netbuf->buf & ~PAGE_MASK) == 0);
+	UK_ASSERT(((unsigned long)netbuf->buf & ~UK_PAGING_PAGE_MASK) == 0);
 
 	if (RING_FULL(&rxq->ring)) {
 		uk_pr_debug("rx queue is full\n");
@@ -275,7 +275,7 @@ static int netfront_rxq_enqueue(struct uk_netdev_rx_queue *rxq,
 	UK_ASSERT(rxq->gref[id] != GRANT_INVALID_REF);
 
 	rx_req->gref = rxq->gref[id];
-	wmb(); /* Ensure backend sees requests */
+	uk_arch_wmb(); /* Ensure backend sees requests */
 	rxq->ring.req_prod_pvt = req_prod + 1;
 
 	RING_PUSH_REQUESTS_AND_CHECK_NOTIFY(&rxq->ring, notify);
@@ -298,7 +298,7 @@ static int netfront_rxq_dequeue(struct uk_netdev_rx_queue *rxq,
 	UK_ASSERT(netbuf != NULL);
 
 	prod = rxq->ring.sring->rsp_prod;
-	rmb(); /* Ensure we see queued responses up to 'rp'. */
+	uk_arch_rmb(); /* Ensure we see queued responses up to 'rp'. */
 	cons = rxq->ring.rsp_cons;
 	/* No new descriptor since last dequeue operation */
 	if (cons == prod) {
@@ -481,9 +481,9 @@ static struct uk_netdev_tx_queue *netfront_txq_setup(struct uk_netdev *n,
 	sring = page_alloc(conf->a, 1);
 	if (!sring)
 		return ERR2PTR(-ENOMEM);
-	memset(sring, 0, PAGE_SIZE);
+	memset(sring, 0, UK_PAGING_PAGE_SIZE);
 	SHARED_RING_INIT(sring);
-	FRONT_RING_INIT(&txq->ring, sring, PAGE_SIZE);
+	FRONT_RING_INIT(&txq->ring, sring, UK_PAGING_PAGE_SIZE);
 	txq->ring_size = NET_TX_RING_SIZE;
 	txq->ring_ref = gnttab_grant_access(nfdev->xendev->otherend_id,
 		virt_to_mfn(sring), 0);
@@ -520,7 +520,7 @@ static struct uk_netdev_tx_queue *netfront_txq_setup(struct uk_netdev *n,
 }
 
 static void netfront_rxq_handler(evtchn_port_t port __unused,
-		struct __regs *regs __unused, void *arg)
+		struct uk_lcpu_regs *regs __unused, void *arg)
 {
 	struct uk_netdev_rx_queue *rxq = arg;
 
@@ -560,9 +560,9 @@ static struct uk_netdev_rx_queue *netfront_rxq_setup(struct uk_netdev *n,
 	sring = page_alloc(conf->a, 1);
 	if (!sring)
 		return ERR2PTR(-ENOMEM);
-	memset(sring, 0, PAGE_SIZE);
+	memset(sring, 0, UK_PAGING_PAGE_SIZE);
 	SHARED_RING_INIT(sring);
-	FRONT_RING_INIT(&rxq->ring, sring, PAGE_SIZE);
+	FRONT_RING_INIT(&rxq->ring, sring, UK_PAGING_PAGE_SIZE);
 	rxq->ring_size = NET_RX_RING_SIZE;
 	rxq->ring_ref = gnttab_grant_access(nfdev->xendev->otherend_id,
 		virt_to_mfn(sring), 0);
@@ -796,7 +796,7 @@ static void netfront_info_get(struct uk_netdev *n,
 	dev_info->max_mtu = nfdev->mtu;
 	dev_info->nb_encap_tx = 0;
 	dev_info->nb_encap_rx = 0;
-	dev_info->ioalign = PAGE_SIZE;
+	dev_info->ioalign = UK_PAGING_PAGE_SIZE;
 	dev_info->features = UK_NETDEV_F_RXQ_INTR | UK_NETDEV_F_PARTIAL_CSUM;
 }
 

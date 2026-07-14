@@ -33,7 +33,6 @@
  */
 
 #include <uk/arch/ctx.h>
-#include <uk/arch/lcpu.h>
 
 /*
  * NOTE: If we use the SP for single registers, we need to decrease the
@@ -130,8 +129,10 @@ ENTRY(ukarch_ctx_switch)
 	 */
 	str x18, [sp, #-16]!
 
-	/* Save callee-saved registers to prevctx's stack */
-	sub sp, sp, #__CALLEE_SAVED_SIZE
+	/* Save callee-saved registers, FP,
+	 * and LR, to prev thread's stack.
+	 */
+	sub sp, sp, #96
 	stp x19, x20, [sp, #16 * 0]
 	stp x21, x22, [sp, #16 * 1]
 	stp x23, x24, [sp, #16 * 2]
@@ -165,7 +166,7 @@ restore_point:
 	ldp x27, x28, [sp, #16 * 4]
 	ldp x29, x30, [sp, #16 * 5]
 
-	add sp, sp, #__CALLEE_SAVED_SIZE
+	add sp, sp, #96
 
 	/* restore x18 */
 	ldr x18, [sp], #16

@@ -42,5 +42,6 @@ struct uk_logbuf {
 	     (lm) = ((lm) == (lm)->next) ? __NULL : (lm)->next)
 
 int uk_logbuf_write(struct uk_logbuf *lb, struct uk_print_msg *msg);
+__isr int uk_logbuf_write_isr(struct uk_logbuf *lb, struct uk_print_msg *msg);
 
 #endif /* __UK_LOGBUF_H__ */

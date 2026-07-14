@@ -35,36 +35,38 @@
 #include <uk/intctlr/gic.h>
 #include <uk/intctlr/gic-v2.h>
 #include <uk/intctlr/gic-v3.h>
-#include <uk/plat/common/acpi.h>
+#if CONFIG_LIBUKACPI
+#include <uk/acpi.h>
+#endif /* CONFIG_LIBUKACPI */
 
 /** Sanity check for GIC driver availability */
 #if !defined(CONFIG_LIBUKINTCTLR_GICV2) && !defined(CONFIG_LIBUKINTCTLR_GICV3)
 #error At least one GIC driver should be selected!
 #endif
 
-#if defined(CONFIG_UKPLAT_ACPI)
+#if CONFIG_LIBUKACPI
 int acpi_get_gicd(struct _gic_dev *g)
 {
 	union {
-		struct acpi_madt_gicd *gicd;
-		struct acpi_subsdt_hdr *h;
+		struct uk_acpi_madt_gicd *gicd;
+		struct uk_acpi_subsdt_hdr *h;
 	} m;
-	struct acpi_madt *madt;
+	struct uk_acpi_madt *madt;
 	__sz off, len;
 
-	madt = acpi_get_madt();
+	madt = uk_acpi_get_madt();
 	UK_ASSERT(madt);
 
 	len = madt->hdr.tab_len - sizeof(*madt);
 	for (off = 0; off < len; off += m.h->len) {
-		m.h = (struct acpi_subsdt_hdr *)(madt->entries + off);
+		m.h = (struct uk_acpi_subsdt_hdr *)(madt->entries + off);
 
-		if (m.h->type != ACPI_MADT_GICD)
+		if (m.h->type != UK_ACPI_MADT_GICD)
 			continue;
 
-		if (m.gicd->version == ACPI_MADT_GICD_VERSION_2)
+		if (m.gicd->version == UK_ACPI_MADT_GICD_VERSION_2)
 			g->dist_mem_size = GICD_V2_MEM_SZ;
-		else if (m.gicd->version == ACPI_MADT_GICD_VERSION_3)
+		else if (m.gicd->version == UK_ACPI_MADT_GICD_VERSION_3)
 			g->dist_mem_size = GICD_V3_MEM_SZ;
 		else
 			return -ENOTSUP;
@@ -77,4 +79,4 @@ int acpi_get_gicd(struct _gic_dev *g)
 
 	return -ENOENT;
 }
-#endif /* CONFIG_UKPLAT_ACPI */
+#endif /* CONFIG_LIBUKACPI */

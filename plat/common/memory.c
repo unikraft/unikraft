@@ -37,10 +37,7 @@
 #include <uk/plat/common/bootinfo.h>
 #include <uk/asm/limits.h>
 #include <uk/alloc.h>
-
-#if CONFIG_HAVE_PAGING
-#include <uk/plat/paging.h>
-#endif /* CONFIG_HAVE_PAGING */
+#include <uk/paging.h>
 
 extern struct ukplat_memregion_desc bpt_unmap_mrd;
 
@@ -101,7 +98,7 @@ void *ukplat_memregion_alloc(__sz size, int type, __u16 flags)
 			mrd->vbase = pstart;
 			mrd->pg_off = 0;
 			mrd->len = desired_sz;
-			mrd->pg_count = PAGE_COUNT(desired_sz);
+			mrd->pg_count = UK_PAGING_PAGE_COUNT(desired_sz);
 			mrd->type = type;
 			mrd->flags = flags;
 
@@ -110,7 +107,7 @@ void *ukplat_memregion_alloc(__sz size, int type, __u16 flags)
 
 		/* Adjust free region */
 		mrd->len -= pend - mrd->pbase;
-		mrd->pg_count = PAGE_COUNT(mrd->len);
+		mrd->pg_count = UK_PAGING_PAGE_COUNT(mrd->len);
 		mrd->pbase = pend;
 
 		mrd->vbase = (__vaddr_t)mrd->pbase;
@@ -120,7 +117,7 @@ void *ukplat_memregion_alloc(__sz size, int type, __u16 flags)
 		alloc_mrd.vbase = pstart;
 		alloc_mrd.pg_off = 0;
 		alloc_mrd.len = desired_sz;
-		alloc_mrd.pg_count = PAGE_COUNT(desired_sz);
+		alloc_mrd.pg_count = UK_PAGING_PAGE_COUNT(desired_sz);
 		alloc_mrd.type = type;
 		alloc_mrd.flags = flags;
 
@@ -196,8 +193,8 @@ static inline void overlapping_mrd_fixup(struct ukplat_memregion_list *list,
 		UK_ASSERT(mr->type == UKPLAT_MEMRT_FREE ||
 			  mr->type == ml->type);
 
-		if (RANGE_CONTAIN(ml->pbase, ml->pg_count * PAGE_SIZE,
-				  mr->pbase, mr->pg_count * PAGE_SIZE)) {
+		if (RANGE_CONTAIN(ml->pbase, ml->pg_count * UK_PAGING_PAGE_SIZE,
+				  mr->pbase, mr->pg_count * UK_PAGING_PAGE_SIZE)) {
 			mr->len = 0;
 			mr->pg_count = 0;
 
@@ -206,8 +203,8 @@ static inline void overlapping_mrd_fixup(struct ukplat_memregion_list *list,
 		 */
 		} else {
 			mr->len -= ml->pbase + ml->len - mr->pbase;
-			mr->pg_count = PAGE_COUNT(mr->len);
-			mr->pbase = ml->pbase + ml->pg_count * PAGE_SIZE;
+			mr->pg_count = UK_PAGING_PAGE_COUNT(mr->len);
+			mr->pbase = ml->pbase + ml->pg_count * UK_PAGING_PAGE_SIZE;
 			mr->vbase = mr->pbase;
 		}
 
@@ -222,8 +219,8 @@ static inline void overlapping_mrd_fixup(struct ukplat_memregion_list *list,
 		/* If the left memory region is contained within the right
 		 * region, drop it entirely
 		 */
-		if (RANGE_CONTAIN(mr->pbase, mr->pg_count * PAGE_SIZE,
-				  ml->pbase, ml->pg_count * PAGE_SIZE)) {
+		if (RANGE_CONTAIN(mr->pbase, mr->pg_count * UK_PAGING_PAGE_SIZE,
+				  ml->pbase, ml->pg_count * UK_PAGING_PAGE_SIZE)) {
 			ml->len = 0;
 			ml->pg_count = 0;
 
@@ -232,13 +229,14 @@ static inline void overlapping_mrd_fixup(struct ukplat_memregion_list *list,
 		 * a new one if the left region is larger than the right region.
 		 */
 		} else {
-			__ssz len = ml->pbase + ml->pg_count * PAGE_SIZE -
-				    mr->pbase - mr->pg_count * PAGE_SIZE;
-			__uptr base = PAGE_ALIGN_UP(mr->pbase + mr->len);
+			__ssz len = ml->pbase + ml->pg_count * UK_PAGING_PAGE_SIZE -
+				    mr->pbase - mr->pg_count * UK_PAGING_PAGE_SIZE;
+			__uptr base = UK_PAGING_PAGE_ALIGN_UP(mr->pbase + mr->len);
 
 			if (len > 0 &&
-			    RANGE_CONTAIN(ml->pbase, ml->pg_count * PAGE_SIZE,
-					  mr->pbase, mr->pg_count * PAGE_SIZE))
+			    RANGE_CONTAIN(ml->pbase,
+					  ml->pg_count * UK_PAGING_PAGE_SIZE,
+					  mr->pbase, mr->pg_count * UK_PAGING_PAGE_SIZE))
 				/* len here is basically ml_end - mr_end. Thus,
 				 * len == 0 can happen only if mr is at the end
 				 * of the ml and we therefore ignore the rest.
@@ -252,18 +250,19 @@ static inline void overlapping_mrd_fixup(struct ukplat_memregion_list *list,
 						.vbase = base,
 						.pg_off = 0,
 						.len = len,
-						.pg_count = PAGE_COUNT(len),
+						.pg_count = UK_PAGING_PAGE_COUNT(len),
 						.type = UKPLAT_MEMRT_FREE,
 						.flags = ml->flags
 					}, ridx + 1);
 
 			/* Drop the fraction of ml that overlaps with mr */
 			if (ml->type == UKPLAT_MEMRT_FREE) {
-				ml->len = PAGE_ALIGN_DOWN(mr->pbase -
+				ml->len = UK_PAGING_PAGE_ALIGN_DOWN(mr->pbase -
 							  ml->pbase);
-				ml->pg_count = PAGE_COUNT(ml->len);
+				ml->pg_count = UK_PAGING_PAGE_COUNT(ml->len);
 			} else {
-				ml->pg_count = PAGE_COUNT(ml->pg_off + ml->len);
+				ml->pg_count = UK_PAGING_PAGE_COUNT(ml->pg_off +
+								    ml->len);
 				ml->len = (mr->pbase + mr->pg_off) -
 					  (ml->pbase + ml->pg_off);
 			}
@@ -327,8 +326,8 @@ void ukplat_memregion_list_coalesce(struct ukplat_memregion_list *list)
 		uk_pr_debug("Priority of right memory region: %d\n", mr_prio);
 		UK_ASSERT(mr_prio >= 0);
 
-		if (RANGE_OVERLAP(ml->pbase, ml->pg_count * PAGE_SIZE,
-				  mr->pbase, mr->pg_count * PAGE_SIZE)) {
+		if (RANGE_OVERLAP(ml->pbase, ml->pg_count * UK_PAGING_PAGE_SIZE,
+				  mr->pbase, mr->pg_count * UK_PAGING_PAGE_SIZE)) {
 			/* If they are not of the same priority */
 			if (ml_prio != mr_prio) {
 				uk_pr_debug("mrd's of different priority "
@@ -372,16 +371,16 @@ void ukplat_memregion_list_coalesce(struct ukplat_memregion_list *list)
 				 * and of different flags.
 				 */
 				UK_ASSERT(ml->flags == mr->flags);
-				UK_ASSERT(PAGE_ALIGNED(ml->pbase));
-				UK_ASSERT(PAGE_ALIGNED(mr->pbase));
+				UK_ASSERT(UK_PAGING_PAGE_ALIGNED(ml->pbase));
+				UK_ASSERT(UK_PAGING_PAGE_ALIGNED(mr->pbase));
 
 				/* If the left region is contained within the
 				 * right region, drop it
 				 */
 				if (RANGE_CONTAIN(mr->pbase,
-						  mr->pg_count * PAGE_SIZE,
+						  mr->pg_count * UK_PAGING_PAGE_SIZE,
 						  ml->pbase,
-						  ml->pg_count * PAGE_SIZE)) {
+						  ml->pg_count * UK_PAGING_PAGE_SIZE)) {
 					uk_pr_debug("Deleting left mrd!\n");
 					ukplat_memregion_list_delete(list, i);
 					continue;
@@ -391,10 +390,10 @@ void ukplat_memregion_list_coalesce(struct ukplat_memregion_list *list)
 				 */
 				} else if (RANGE_CONTAIN(ml->pbase,
 							 ml->pg_count *
-							 PAGE_SIZE,
+							 UK_PAGING_PAGE_SIZE,
 							 mr->pbase,
 							 mr->pg_count *
-							 PAGE_SIZE)) {
+							 UK_PAGING_PAGE_SIZE)) {
 					uk_pr_debug("Deleting right mrd!\n");
 					ukplat_memregion_list_delete(list,
 								     i + 1);
@@ -412,7 +411,7 @@ void ukplat_memregion_list_coalesce(struct ukplat_memregion_list *list)
 				 * overlapping region
 				 */
 				ml->len -= ml->pbase + ml->len - mr->pbase;
-				ml->pg_count = PAGE_COUNT(ml->pg_off + ml->len);
+				ml->pg_count = UK_PAGING_PAGE_COUNT(ml->pg_off + ml->len);
 
 				/* Delete the memory region we just merged into
 				 * the previous region.
@@ -435,12 +434,12 @@ void ukplat_memregion_list_coalesce(struct ukplat_memregion_list *list)
 			 */
 			UK_ASSERT(!ml->pg_off);
 			UK_ASSERT(!mr->pg_off);
-			UK_ASSERT(PAGE_ALIGNED(ml->pbase));
-			UK_ASSERT(PAGE_ALIGNED(mr->pbase));
+			UK_ASSERT(UK_PAGING_PAGE_ALIGNED(ml->pbase));
+			UK_ASSERT(UK_PAGING_PAGE_ALIGNED(mr->pbase));
 
 			uk_pr_debug("Merging two contiguous mrd's.\n");
 			ml->len += mr->len;
-			ml->pg_count = PAGE_COUNT(ml->len);
+			ml->pg_count = UK_PAGING_PAGE_COUNT(ml->len);
 			ukplat_memregion_list_delete(list, i + 1);
 		} else {
 			uk_pr_debug("No adjustment for these mrd's.\n");
@@ -472,12 +471,12 @@ int ukplat_memregion_get(int i, struct ukplat_memregion_desc **mrd)
 	return 0;
 }
 
-#ifdef CONFIG_HAVE_PAGING
+#ifdef CONFIG_LIBUKPAGING
 int ukplat_mem_init(void)
 {
-	return ukplat_paging_init();
+	return uk_paging_init();
 }
-#else /* CONFIG_HAVE_PAGING */
+#else /* CONFIG_LIBUKPAGING */
 int ukplat_mem_init(void)
 {
 	struct ukplat_bootinfo *bi = ukplat_bootinfo_get();
@@ -504,12 +503,12 @@ int ukplat_mem_init(void)
 			/* Region overlaps with unmapped area */
 			uk_pr_info("Memory %012lx-%012lx outside mapped area\n",
 				   unmap_end,
-				   mrdp->vbase + mrdp->pg_count * PAGE_SIZE);
+				   mrdp->vbase + mrdp->pg_count * UK_PAGING_PAGE_SIZE);
 
 			if (mrdp->type == UKPLAT_MEMRT_FREE) {
 				mrdp->len -= (mrdp->vbase + mrdp->len) -
 					     unmap_end;
-				mrdp->pg_count = PAGE_COUNT(mrdp->len);
+				mrdp->pg_count = UK_PAGING_PAGE_COUNT(mrdp->len);
 			}
 
 			/* Since regions are non-overlapping and ordered, we
@@ -525,4 +524,4 @@ int ukplat_mem_init(void)
 
 	return 0;
 }
-#endif /* !CONFIG_HAVE_PAGING */
+#endif /* !CONFIG_LIBUKPAGING */

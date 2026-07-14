@@ -15,6 +15,7 @@ config LIBPOSIX_TTY_DEVFS
 config LIBPOSIX_TTY_SERIAL
 	bool "Provide file driver for the serial console"
 	select LIBUKCONSOLE
+	select LIBUKFILE_CONSOLE
 
 config LIBPOSIX_TTY_STDIO
 	bool "Open standard I/O files at boot (fd 0, 1, 2)"

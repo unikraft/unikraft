@@ -1,8 +1,11 @@
 _uk_vprintk
 _uk_printk
+_uk_vprintk_isr
+_uk_printk_isr
 uk_hexdumpsn
 uk_hexdumpf
 uk_hexdumpd
 _uk_hexdumpd
 _uk_hexdumpk
 uk_print_dmesg
+uk_print_dmesg_isr

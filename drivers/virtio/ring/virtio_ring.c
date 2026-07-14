@@ -33,22 +33,24 @@
  * Inspired from the FreeBSD.
  * Commit-id: a89e7a10d501
  */
-#include <uk/config.h>
+
 #include <string.h>
-#include <uk/print.h>
-#include <uk/errptr.h>
-#include <uk/plat/common/cpu.h>
-#include <uk/sglist.h>
+
+#include <uk/arch/util.h>
 #include <uk/atomic.h>
-#include <uk/plat/io.h>
+#include <uk/config.h>
+#include <uk/errptr.h>
+#include <uk/paging.h>
+#include <uk/print.h>
+#include <uk/sglist.h>
+
 #include <virtio/virtio_ring.h>
 #include <virtio/virtqueue.h>
 #include <virtio/virtio_bus.h>
+
 #ifdef CONFIG_LIBUKVMEM
-#include <uk/arch/paging.h>
-#include <uk/plat/paging.h>
-#include <uk/vmem.h>
 #include <uk/falloc.h>
+#include <uk/vmem.h>
 #endif /* CONFIG_LIBUKVMEM */
 
 #define VIRTQUEUE_MAX_SIZE  32768
@@ -147,7 +149,7 @@ int virtqueue_intr_enable(struct virtqueue *vq)
 		 * interrupt. This is inline with the requirement from
 		 * virtio specification section 3.2.2
 		 */
-		mb();
+		uk_arch_mb();
 		/* Check if there are further descriptors */
 		if (virtqueue_hasdata(vq)) {
 			virtqueue_intr_disable(vq);
@@ -175,7 +177,7 @@ static inline void virtqueue_ring_update_avail(struct virtqueue_vring *vrq,
 	 * Write barrier to make sure we push the descriptor on the available
 	 * descriptor and then increment available index.
 	 */
-	wmb();
+	uk_arch_wmb();
 	vrq->vring.avail->idx++;
 }
 
@@ -234,10 +236,10 @@ void virtqueue_host_notify(struct virtqueue *vq)
 	 * that the virtqueue index update operation happened. Note that this
 	 * function is declared as inline.
 	 */
-	mb();
+	uk_arch_mb();
 
 	if (vq->vq_notify_host && virtqueue_notify_enabled(vq)) {
-		uk_pr_debug("notify queue %d\n", vq->queue_id);
+		uk_pr_debug_isr("notify queue %d\n", vq->queue_id);
 		vrq->last_notified_idx = vrq->vring.avail->idx;
 		vq->vq_notify_host(vq->vdev, vq->queue_id);
 	}
@@ -316,7 +318,7 @@ __paddr_t virtqueue_physaddr(struct virtqueue *vq)
 	UK_ASSERT(vq);
 
 	vrq = to_virtqueue_vring(vq);
-	return ukplat_virt_to_phys(vrq->vring_mem);
+	return uk_paging_virt_to_phys((__vaddr_t)vrq->vring_mem);
 }
 
 __paddr_t virtqueue_get_avail_addr(struct virtqueue *vq)
@@ -370,7 +372,7 @@ int virtqueue_buffer_dequeue(struct virtqueue *vq, void **cookie, __u32 *len)
 	 * We are reading from the used descriptor information updated by the
 	 * host.
 	 */
-	rmb();
+	uk_arch_rmb();
 	head_idx = elem->id;
 	if (len)
 		*len = elem->len;
@@ -393,12 +395,12 @@ int virtqueue_buffer_enqueue(struct virtqueue *vq, void *cookie,
 	vrq = to_virtqueue_vring(vq);
 	total_desc = read_bufs + write_bufs;
 	if (unlikely(total_desc < 1 || total_desc > vrq->vring.num)) {
-		uk_pr_err("%"__PRIu32" invalid number of descriptor\n",
-			  total_desc);
+		uk_pr_err_isr("%"__PRIu32" invalid number of descriptor\n",
+			      total_desc);
 		return -EINVAL;
 	} else if (vrq->desc_avail < total_desc) {
-		uk_pr_debug("Available descriptor:%"__PRIu16", Requested descriptor:%"__PRIu32"\n",
-			  vrq->desc_avail, total_desc);
+		uk_pr_debug_isr("Available descriptor:%"__PRIu16", Requested descriptor:%"__PRIu32"\n",
+				vrq->desc_avail, total_desc);
 		return -ENOSPC;
 	}
 	/* Get the head of free descriptor */
@@ -417,8 +419,8 @@ int virtqueue_buffer_enqueue(struct virtqueue *vq, void *cookie,
 	vrq->head_free_desc = idx;
 	vrq->desc_avail -= total_desc;
 
-	uk_pr_debug("Old head:%d, new head:%d, total_desc:%d\n",
-		    head_idx, idx, total_desc);
+	uk_pr_debug_isr("Old head:%d, new head:%d, total_desc:%d\n",
+			head_idx, idx, total_desc);
 
 	virtqueue_ring_update_avail(vrq, head_idx);
 	return vrq->desc_avail;
@@ -458,7 +460,7 @@ struct virtqueue *virtqueue_create(__u16 queue_id, __u16 nr_descs, __u16 align,
 	vrq = uk_malloc(a, sizeof(*vrq) +
 			nr_descs * sizeof(struct virtqueue_desc_info));
 	if (!vrq) {
-		uk_pr_err("Allocation of virtqueue failed\n");
+		uk_pr_err_isr("Allocation of virtqueue failed\n");
 		rc = -ENOMEM;
 		goto err_exit;
 	}
@@ -470,25 +472,26 @@ struct virtqueue *virtqueue_create(__u16 queue_id, __u16 nr_descs, __u16 align,
 	vrq->vring_mem = NULL;
 
 	ring_size = vring_size(nr_descs, align);
-#ifdef CONFIG_LIBUKVMEM
-	struct uk_pagetable *pt = ukplat_pt_get_active();
-	__paddr_t paddr = __PADDR_ANY;
-	__vaddr_t vaddr = __VADDR_ANY;
+#if CONFIG_LIBUKVMEM
+	struct uk_pagetable *pt = uk_paging_pt_get_active();
+	__paddr_t paddr = UK_PAGING_PADDR_ANY;
+	__vaddr_t vaddr = UK_PAGING_VADDR_ANY;
 
-	ring_size = PAGE_ALIGN_UP(ring_size);
+	ring_size = UK_PAGING_PAGE_ALIGN_UP(ring_size);
 
-	rc = pt->fa->falloc(pt->fa, &paddr, ring_size >> PAGE_SHIFT, 0);
+	rc = pt->fa->falloc(pt->fa, &paddr,
+			    ring_size >> UK_PAGING_PAGE_SHIFT, 0);
 	if (unlikely(rc))
 		goto err_freevq;
 
 	rc = uk_vma_map_dma(uk_vas_get_active(), &vaddr, ring_size,
-			    PAGE_ATTR_PROT_RW, UK_VMA_MAP_POPULATE,
+			    UK_PAGING_PAGE_ATTR_PROT_RW, UK_VMA_MAP_POPULATE,
 			    "virtqueue", paddr);
 	if (unlikely(rc))
 		goto err_freevq;
 
 	vrq->vring_mem = (void *)vaddr;
-#else /* CONFIG_LIBUKVMEM */
+#else /* !CONFIG_LIBUKVMEM */
 	if (uk_posix_memalign(a, &vrq->vring_mem,
 			      __PAGE_SIZE, ring_size) != 0) {
 		rc = -ENOMEM;
@@ -510,22 +513,34 @@ struct virtqueue *virtqueue_create(__u16 queue_id, __u16 nr_descs, __u16 align,
 	return vq;
 
 err_freevq:
-	uk_pr_err("Allocation of vring failed\n");
+	uk_pr_err_isr("Allocation of vring failed\n");
 	uk_free(a, vrq);
 err_exit:
 	return ERR2PTR(rc);
 }
 
-void virtqueue_destroy(struct virtqueue *vq, struct uk_alloc *a)
+void virtqueue_destroy(__u16 align __maybe_unused,
+		       struct virtqueue *vq, struct uk_alloc *a)
 {
+	__sz ring_size __maybe_unused;
 	struct virtqueue_vring *vrq;
+	int rc __maybe_unused;
 
 	UK_ASSERT(vq);
 
 	vrq = to_virtqueue_vring(vq);
 
 	/* Free the ring */
+#if CONFIG_LIBUKVMEM
+	ring_size = UK_PAGING_PAGE_ALIGN_UP(vring_size(vrq->vring.num, align));
+	rc = uk_vma_unmap(uk_vas_get_active(), (__vaddr_t)vrq->vring_mem,
+			  ring_size, 0);
+	if (unlikely(rc < 0))
+		uk_pr_err("Failed to unmap virtio ring %p: %d\n",
+			  vrq->vring_mem, rc);
+#else /* !CONFIG_LIBUKVMEM */
 	uk_free(a, vrq->vring_mem);
+#endif /* !CONFIG_LIBUKVMEM */
 
 	/* Free the virtqueue metadata */
 	uk_free(a, vrq);

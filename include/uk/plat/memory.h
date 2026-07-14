@@ -37,12 +37,11 @@
 #include <uk/essentials.h>
 #include <uk/arch/types.h>
 #include <uk/alloc.h>
-#include <uk/arch/paging.h>
 #include <uk/arch/types.h>
 #include <uk/essentials.h>
 #include <uk/config.h>
 #include <uk/arch/ctx.h>
-#include <uk/arch/paging.h>
+#include <uk/paging.h>
 #if CONFIG_LIBUKVMEM
 #include <uk/vmem.h>
 #endif /* CONFIG_LIBUKVMEM */
@@ -158,7 +157,7 @@ struct ukplat_memregion_desc {
  * - must only have valid flags as per UK_ASSERT_VALID_MRD_FLAGS
  * - memory region is not empty or of length 0
  * - virtual/physical base addresses are page-aligned
- * - resource in-page offset must be in the range [0, PAGE_SIZE)
+ * - resource in-page offset must be in the range [0, UK_PAGING_PAGE_SIZE)
  *
  * @param mrd pointer to the free memory region descriptor to validate
  */
@@ -166,10 +165,10 @@ struct ukplat_memregion_desc {
 	do {								\
 		UK_ASSERT_VALID_MRD_TYPE((mrd));			\
 		UK_ASSERT_VALID_MRD_FLAGS((mrd));			\
-		UK_ASSERT(PAGE_ALIGNED((mrd)->vbase));			\
-		UK_ASSERT(PAGE_ALIGNED((mrd)->pbase));			\
+		UK_ASSERT(UK_PAGING_PAGE_ALIGNED((mrd)->vbase));	\
+		UK_ASSERT(UK_PAGING_PAGE_ALIGNED((mrd)->pbase));	\
 		UK_ASSERT((mrd)->pg_off >= 0 &&				\
-			  (mrd)->pg_off < (__off)PAGE_SIZE);		\
+			  (mrd)->pg_off < (__off)UK_PAGING_PAGE_SIZE);	\
 	} while (0)
 
 /** UK_ASSERT_VALID_FREE_MRD(mrd) macro
@@ -178,7 +177,7 @@ struct ukplat_memregion_desc {
  * - must meet the criteria of a general valid memory region descriptor
  * - virtual/physical base addresses are equal
  * - region is aligned end-to-end, therefore length is multiple of
- * PAGE_SIZE times region's page count and the resource's
+ * UK_PAGING_PAGE_SIZE times region's page count and the resource's
  * in-page offset must be 0
  *
  * @param mrd pointer to the free memory region descriptor to validate
@@ -188,7 +187,7 @@ struct ukplat_memregion_desc {
 		UK_ASSERT_VALID_MRD((mrd));				\
 		UK_ASSERT((mrd)->type == UKPLAT_MEMRT_FREE);		\
 		UK_ASSERT((mrd)->vbase == (mrd)->pbase);		\
-		UK_ASSERT((mrd)->pg_count * PAGE_SIZE == (mrd)->len);	\
+		UK_ASSERT((mrd)->pg_count * UK_PAGING_PAGE_SIZE == (mrd)->len);\
 		UK_ASSERT(!(mrd)->pg_off);				\
 	} while (0)
 
@@ -197,7 +196,7 @@ struct ukplat_memregion_desc {
  * Ensure kernel memory region descriptor particular correctness:
  * - must meet the criteria of a general valid memory region descriptor
  * - region is aligned end-to-end, therefore length is multiple of
- * PAGE_SIZE times region's page count and the resource's
+ * UK_PAGING_PAGE_SIZE times region's page count and the resource's
  * in-page offset must be 0
  *
  * @param mrd pointer to the kernel memory region descriptor to validate
@@ -206,7 +205,7 @@ struct ukplat_memregion_desc {
 	do {								\
 		UK_ASSERT_VALID_MRD((mrd));				\
 		UK_ASSERT((mrd)->type == UKPLAT_MEMRT_KERNEL);		\
-		UK_ASSERT((mrd)->pg_count * PAGE_SIZE == (mrd)->len);	\
+		UK_ASSERT((mrd)->pg_count * UK_PAGING_PAGE_SIZE == (mrd)->len);\
 		UK_ASSERT(!(mrd)->pg_off);				\
 	} while (0)
 

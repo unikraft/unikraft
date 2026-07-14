@@ -107,7 +107,7 @@ size_t ramfs_file_range_bufcount(struct ramfs_file_data *file_data,
 	UK_ASSERT(len);
 
 	r = uk_sparsebuf_lookup(UK_SPARSEBUF_EMBED_HEADP(fhead, file_data),
-				off / PAGE_SIZE, &cur);
+				off / UK_PAGING_PAGE_SIZE, &cur);
 	if (!r)
 		/* File empty, one sparse area */
 		return 1;
@@ -140,7 +140,7 @@ size_t ramfs_file_range_get(struct ramfs_file_data *file_data,
 	UK_ASSERT(len);
 
 	r = uk_sparsebuf_lookup(UK_SPARSEBUF_EMBED_HEADP(fhead, file_data),
-				off / PAGE_SIZE, &cur);
+				off / UK_PAGING_PAGE_SIZE, &cur);
 	if (!r) {
 		/* Return all sparse */
 		iov[0].iov_base = NULL;
@@ -167,8 +167,9 @@ static
 ssize_t ramfs_file_range_acquire(struct ramfs_file_data *file_data,
 				 size_t off, size_t len)
 {
-	const size_t pgoff = off / PAGE_SIZE;
-	const size_t pgend = ALIGN_UP(off + len, PAGE_SIZE) / PAGE_SIZE;
+	const size_t pgoff = off / UK_PAGING_PAGE_SIZE;
+	const size_t pgend = ALIGN_UP(off + len, UK_PAGING_PAGE_SIZE) /
+			     UK_PAGING_PAGE_SIZE;
 	const size_t npages = pgend - pgoff;
 	ssize_t r;
 	UK_SPARSEBUF_EMBED_HEAD(fhead, file_data);
@@ -179,7 +180,7 @@ ssize_t ramfs_file_range_acquire(struct ramfs_file_data *file_data,
 	if (unlikely(r < 0))
 		return r;
 	/* Return what we managed to acquire */
-	return (pgoff + r) * PAGE_SIZE - off;
+	return (pgoff + r) * UK_PAGING_PAGE_SIZE - off;
 }
 
 static
@@ -187,8 +188,8 @@ void ramfs_file_range_release(struct ramfs_file_data *file_data,
 			      size_t off, size_t len)
 {
 	int r;
-	const size_t pgoff = off / PAGE_SIZE;
-	const size_t pgend = ALIGN_UP(off + len, PAGE_SIZE) / PAGE_SIZE;
+	const size_t pgoff = off / UK_PAGING_PAGE_SIZE;
+	const size_t pgend = DIV_ROUND_UP(off + len, UK_PAGING_PAGE_SIZE);
 	const size_t npages = pgend - pgoff;
 	UK_SPARSEBUF_EMBED_HEAD(fhead, file_data);
 
@@ -209,7 +210,7 @@ int ramfs_file_range_gift(struct ramfs_file_data *file_data,
 	UK_SPARSEBUF_EMBED_HEAD(fhead, file_data);
 
 	for (size_t i = 0; i < iovcnt; i++) {
-		const size_t npages = iov[i].iov_len / PAGE_SIZE;
+		const size_t npages = iov[i].iov_len / UK_PAGING_PAGE_SIZE;
 
 		r = uk_sparsebuf_assign(
 			&ramfs_sb_ctx,
@@ -238,7 +239,7 @@ size_t ramfs_file_data_read(struct ramfs_file_data *file_data,
 	UK_SPARSEBUF_EMBED_HEAD(fhead, file_data);
 
 	r = uk_sparsebuf_lookup(UK_SPARSEBUF_EMBED_HEADP(fhead, file_data),
-				off / PAGE_SIZE, &cur);
+				off / UK_PAGING_PAGE_SIZE, &cur);
 	if (!r)
 		return uk_iov_zero(iov, iovcnt, rem, &i, &boff);
 
@@ -271,8 +272,8 @@ size_t ramfs_file_data_write(struct ramfs_file_data *file_data,
 			     const struct iovec *iov, size_t iovcnt,
 			     size_t off, size_t rem)
 {
-	const size_t pgoff = off / PAGE_SIZE;
-	const size_t pgend = DIV_ROUND_UP(off + rem, PAGE_SIZE);
+	const size_t pgoff = off / UK_PAGING_PAGE_SIZE;
+	const size_t pgend = DIV_ROUND_UP(off + rem, UK_PAGING_PAGE_SIZE);
 	const size_t npages = pgend - pgoff;
 	struct uk_sparsebuf_cur cur;
 	size_t i = 0;

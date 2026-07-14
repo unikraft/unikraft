@@ -29,7 +29,8 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-#include <uk/arch/lcpu.h>
+#include <uk/asm/lcpu.h>
+#include <uk/lcpu.h>
 #include <uk/asm.h>
 
 /*
@@ -58,9 +59,9 @@
  * thread exit handler.
  */
 ENTRY(asm_thread_starter)
-	mov x2, sp
-	ldp x0, x1, [x2]			/* x1 = func, x0 = args */
-	ur_ldr  x30, uk_sched_thread_exit	/* Set thread exit handler */
+	mov	x2, sp
+	ldp	x0, x1, [x2]			/* x1 = func, x0 = args */
+	ur_addr	x30, uk_sched_thread_exit	/* Set thread exit handler */
 	br  x1					/* Jump to thread main func */
 ENDPROC(asm_thread_starter)
 
@@ -82,8 +83,10 @@ ENDPROC(asm_ctx_start)
  * This function will switch to the next thread context
  */
 ENTRY(asm_ctx_switch)
-	/* Save callee-saved registers to prevctx's stack */
-	sub x2, sp, #__CALLEE_SAVED_SIZE
+	/* Save callee-saved registers, FP,
+	 * and LR, to prev thread's stack.
+	 */
+	sub x2, sp, #96
 	stp x19, x20, [x2, #16 * 0]
 	stp x21, x22, [x2, #16 * 1]
 	stp x23, x24, [x2, #16 * 2]
@@ -95,7 +98,7 @@ ENTRY(asm_ctx_switch)
 	 * Record the restore point for switch out thread to restore
 	 * its called-saved registers in next switch to time.
 	 */
-	ur_ldr  x30, restore_point
+	ur_addr  x30, restore_point
 
 	/* Save sp and restore point to previous context */
 	stp x2, x30, [x0]
@@ -115,6 +118,6 @@ restore_point:
 	ldp x27, x28, [x2, #16 * 4]
 	ldp x29, x30, [x2, #16 * 5]
 
-	add sp, x2, #__CALLEE_SAVED_SIZE
+	add sp, x2, #96
 	ret
 ENDPROC(asm_ctx_switch)

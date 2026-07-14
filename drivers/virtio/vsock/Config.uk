@@ -1,0 +1,9 @@
+config LIBVIRTIO_VSOCK
+	bool "Virtio vsock device"
+	depends on LIBUKVSOCKDEV
+	select LIBVIRTIO_BUS
+	select LIBUKSGLIST
+	help
+		Virtio vsock is an efficient communication channel between the
+		host and/or other virtual machines.
+

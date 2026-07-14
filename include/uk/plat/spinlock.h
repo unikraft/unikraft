@@ -30,30 +30,30 @@
 #define __UKPLAT_SPINLOCK_H__
 
 #include <uk/arch/spinlock.h>
-#include <uk/plat/lcpu.h>
+#include <uk/lcpu.h>
 
 #define ukplat_spin_lock_irq(lock) \
 	do { \
-		ukplat_lcpu_disable_irq(); \
+		uk_lcpu_disable_irq(); \
 		ukarch_spin_lock(lock); \
 	} while (0)
 
 #define ukplat_spin_unlock_irq(lock) \
 	do { \
 		ukarch_spin_unlock(lock); \
-		ukplat_lcpu_enable_irq(); \
+		uk_lcpu_enable_irq(); \
 	} while (0)
 
 #define ukplat_spin_lock_irqsave(lock, flags) \
 	do { \
-		flags = ukplat_lcpu_save_irqf(); \
+		flags = uk_lcpu_save_irqf(); \
 		ukarch_spin_lock(lock); \
 	} while (0)
 
 #define ukplat_spin_unlock_irqrestore(lock, flags) \
 	do { \
 		ukarch_spin_unlock(lock); \
-		ukplat_lcpu_restore_irqf(flags); \
+		uk_lcpu_restore_irqf(flags); \
 	} while (0)
 
 #endif /* __PLAT_SPINLOCK_H__ */

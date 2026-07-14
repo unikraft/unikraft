@@ -1,0 +1,4 @@
+uk_psci_init
+uk_psci_cpu_on
+uk_psci_reset
+uk_psci_system_off

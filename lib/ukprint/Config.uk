@@ -14,6 +14,14 @@ menuconfig LIBUKPRINT_PRINTK
 
 if LIBUKPRINT_PRINTK
 
+config LIBUKPRINT_NOCARRIAGERETURN
+	bool "Do not prefix newlines with carriage returns"
+	help
+		Some consoles expect newlines to be preceded by carriage
+		returns and some don't. Enable this if you know your outputs
+		do not depend on carriage returns to prefix newlines in order
+		for them to work properly.
+
 config LIBUKPRINT_PRINT_TIME
 	bool "Show timestamp in messages"
 	default y

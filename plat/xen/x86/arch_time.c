@@ -37,12 +37,12 @@
 #include <stdint.h>
 #include <time.h>
 #include <uk/plat/time.h>
-#include <x86/cpu.h>
 #include <uk/plat/common/_time.h>
 #include <common/hypervisor.h>
 #include <common/events.h>
-#include <xen-x86/irq.h>
+#include <uk/plat/xen/except.h>
 #include <uk/assert.h>
+#include <uk/arch/util.h>
 
 /************************************************************************
  * Time functions
@@ -118,7 +118,7 @@ static unsigned long get_nsec_offset(void)
 {
 	uint64_t now, delta;
 
-	now = rdtsc();
+	now = uk_arch_x86_64_rdtsc();
 	delta = now - shadow.tsc_timestamp;
 
 	return scale_delta(delta, shadow.tsc_to_nsec_mul, shadow.tsc_shift);
@@ -194,17 +194,17 @@ __nsec ukplat_wall_clock(void)
 
 void time_block_until(__snsec until)
 {
-	UK_ASSERT(irqs_disabled());
+	UK_ASSERT(uk_plat_xen_irqs_disabled());
 
 	if ((__snsec) ukplat_monotonic_clock() < until) {
 		HYPERVISOR_set_timer_op(until);
-		ukplat_lcpu_halt_irq();
+		uk_lcpu_halt_irq();
 		HYPERVISOR_set_timer_op(0);
 	}
 }
 
 static void timer_handler(evtchn_port_t ev __unused,
-		struct __regs *regs __unused, void *ign __unused)
+		struct uk_lcpu_regs *regs __unused, void *ign __unused)
 {
 	__nsec until = ukplat_monotonic_clock() + UKPLAT_TIME_TICK_NSEC;
 

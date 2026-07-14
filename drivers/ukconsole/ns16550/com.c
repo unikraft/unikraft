@@ -26,6 +26,7 @@
  */
 
 #include <uk/arch/types.h>
+#include <uk/arch/util.h>
 #include <uk/console/driver.h>
 #include <uk/plat/common/bootinfo.h>
 #include <uk/prio.h>
@@ -138,51 +139,40 @@ UK_LIBPARAM_PARAM_ALIAS(early_port, &early_dev.port, __u16,
 #endif /* CONFIG_LIBUKLIBPARAM */
 #endif /* CONFIG_LIBNS16550_EARLY_CONSOLE */
 
-static inline void outb(__u16 port, __u8 v)
-{
-	__asm__ __volatile__("outb %0,%1" : : "a"(v), "dN"(port));
-}
-
-static inline __u8 inb(__u16 port)
-{
-	__u8 v;
-
-	__asm__ __volatile__("inb %1,%0" : "=a"(v) : "dN"(port));
-	return v;
-}
-
 static inline void com_setup(int port_addr, __u8 bauddiv_lo, __u8 bauddiv_hi)
 {
 	/* Disable all interrupts */
-	outb(COM_INTR(port_addr), 0x00);
+	uk_arch_x86_64_outb(COM_INTR(port_addr), 0x00);
 	/* Enable DLAB (set baudrate divisor) */
-	outb(COM_CTRL(port_addr), DLAB);
+	uk_arch_x86_64_outb(COM_CTRL(port_addr), DLAB);
 	/* Div (lo byte) */
-	outb(COM_DIV_LO(port_addr), bauddiv_lo);
+	uk_arch_x86_64_outb(COM_DIV_LO(port_addr), bauddiv_lo);
 	/* Div (hi byte) */
-	outb(COM_DIV_HI(port_addr), bauddiv_hi);
+	uk_arch_x86_64_outb(COM_DIV_HI(port_addr), bauddiv_hi);
 	/* Set 8N1, clear DLAB */
-	outb(COM_CTRL(port_addr), PROT);
+	uk_arch_x86_64_outb(COM_CTRL(port_addr), PROT);
 }
 
-static inline int com_check_tx_empty(int port_addr)
+__isr static inline int com_check_tx_empty(int port_addr)
 {
-	return (int)inb(COM_STATUS(port_addr)) & COM_STATUS_TX_READY_BIT;
+	return (int)uk_arch_x86_64_inb(COM_STATUS(port_addr)) &
+		COM_STATUS_TX_READY_BIT;
 }
 
-static inline void com_write(int port_addr, char chr)
+__isr static inline void com_write(int port_addr, char chr)
 {
 	while (!com_check_tx_empty(port_addr))
 		;
-	outb(COM_DATA(port_addr), chr);
+	uk_arch_x86_64_outb(COM_DATA(port_addr), chr);
 }
 
 static inline int com_check_rx_ready(int port_addr)
 {
-	return (int)inb(COM_STATUS(port_addr)) & COM_STATUS_RX_READY_BIT;
+	return (int)uk_arch_x86_64_inb(COM_STATUS(port_addr)) &
+		COM_STATUS_RX_READY_BIT;
 }
 
-__ssz com_out(struct uk_console *dev, const char *buf, __sz len)
+__isr __ssz com_out(struct uk_console *dev, const char *buf, __sz len)
 {
 	struct com_device *com_dev;
 	__sz leftover = len;
@@ -211,15 +201,16 @@ __ssz com_in(struct uk_console *dev, char *buf, __sz len)
 	for (i = 0; i < len; i++) {
 		if (!com_check_rx_ready(com_dev->port))
 			return i;
-		buf[i] = inb(COM_DATA(com_dev->port));
+		buf[i] = uk_arch_x86_64_inb(COM_DATA(com_dev->port));
 	}
 
 	return len;
 }
 
-static struct uk_console_ops com_ops = {
+static const struct uk_console_ops com_ops = {
 	.out = com_out,
-	.in = com_in
+	.in = com_in,
+	.emerg_out = com_out,
 };
 
 #if CONFIG_LIBNS16550_EARLY_CONSOLE
@@ -231,7 +222,8 @@ int com_early_init(struct ukplat_bootinfo *bi __unused)
 	if (!early_dev.port)
 		early_dev.port = COM_EARLY_PORT;
 	uk_console_init(&early_dev.dev, COM_EARLY_NAME, &com_ops,
-			UK_CONSOLE_FLAG_STDOUT | UK_CONSOLE_FLAG_STDIN);
+			UK_CONSOLE_FLAG_STDOUT | UK_CONSOLE_FLAG_STDIN,
+			UK_CONSOLE_CLASS_UART);
 	com_setup(early_dev.port, COM_EARLY_BAUDDIV_LO, COM_BAUDDIV_HI);
 
 	uk_console_register(&early_dev.dev);
@@ -252,7 +244,8 @@ static int com_init_port(struct uk_alloc *a, const char *name, __u16 port,
 
 	com_setup(port, bauddiv_lo, bauddiv_hi);
 	com_dev->port = port;
-	uk_console_init(&com_dev->dev, name, &com_ops, 0);
+	uk_console_init(&com_dev->dev, name, &com_ops, 0,
+			UK_CONSOLE_CLASS_UART);
 
 	uk_console_register(&com_dev->dev);
 

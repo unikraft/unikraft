@@ -4,10 +4,10 @@
  * You may not use this file except in compliance with the License.
  */
 
-#include <arm/arm64/irq.h>
 #include <string.h>
 #include <uk/process.h>
 #include <uk/arch/ctx.h>
+#include <uk/lcpu.h>
 
 void clone_setup_child_ctx(struct ukarch_execenv *pexecenv,
 			   struct uk_thread *child, __uptr sp)
@@ -15,6 +15,7 @@ void clone_setup_child_ctx(struct ukarch_execenv *pexecenv,
 	struct ukarch_execenv *cexecenv;
 	struct ukarch_auxspcb *auxspcb;
 	__uptr auxsp_pos;
+	__u64 tlsp;
 
 	UK_ASSERT(pexecenv);
 	UK_ASSERT(child);
@@ -42,16 +43,18 @@ void clone_setup_child_ctx(struct ukarch_execenv *pexecenv,
 	/* Child must see x0 as 0, as this is the register holding the return
 	 * value of clone children.
 	 */
-	cexecenv->regs.x[0] = 0x0;
+	uk_lcpu_regs_set(cexecenv->regs, X0, 0x0);
 
 	/* Use new stack pointer */
-	cexecenv->regs.sp = sp;
+	uk_lcpu_regs_set(cexecenv->regs, SP, sp);
 
-	/* Use parent's user land TPIDR_EL0 if clone did not have SETTLS */
+	/* Use parent's userland TPIDR_EL0 if clone did not have SETTLS */
 	if (!child->tlsp)
-		cexecenv->sysctx.tpidr_el0 = pexecenv->sysctx.tpidr_el0;
+		tlsp = uk_lcpu_sysctx_get(pexecenv->sysctx, TLSP);
 	else
-		cexecenv->sysctx.tpidr_el0 = child->tlsp;
+		tlsp = child->tlsp;
+
+	uk_lcpu_sysctx_set(cexecenv->sysctx, TLSP, tlsp);
 
 	ukarch_ctx_init_entry1(&child->ctx,
 			       auxsp_pos,

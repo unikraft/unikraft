@@ -33,7 +33,7 @@
 
 #include <uk/config.h>
 #include <uk/arch/ctx.h>
-#include <uk/plat/lcpu.h>
+#include <uk/lcpu.h>
 #if CONFIG_LIBUKDEBUG
 #include <uk/assert.h>
 #include <uk/print.h>
@@ -201,7 +201,7 @@ static void ehtrampo_dispatcher(struct ukarch_execenv *ee,
 }
 
 void ukarch_ctx_init_ehtrampo(struct ukarch_ctx *ctx,
-			      struct __regs *r,
+			      struct uk_lcpu_regs *r,
 			      __uptr sp,
 			      ukarch_ehtrampo_entry entry, long arg)
 {
@@ -216,17 +216,12 @@ void ukarch_ctx_init_ehtrampo(struct ukarch_ctx *ctx,
 	sp -= ALIGN_UP(sizeof(*ee), UKARCH_EXECENV_END_ALIGN);
 	ee = (struct ukarch_execenv *)sp;
 
-	ukarch_ectx_sanitize((struct ukarch_ectx *)&ee->ectx);
-	ukarch_ectx_store((struct ukarch_ectx *)&ee->ectx);
+	uk_lcpu_ectx_sanitize((struct uk_lcpu_ectx *)ee->ectx);
+	uk_lcpu_ectx_store((struct uk_lcpu_ectx *)ee->ectx);
 
-	ukarch_sysctx_store(&ee->sysctx);
+	uk_lcpu_sysctx_store((struct uk_lcpu_sysctx *)ee->sysctx);
 
-	/*
-	 * NOTE: Order is important. We save the registers after ectx.
-	 * As the compiler could implement this using memcpy(), we run
-	 * the risk of corrupting the ectx before we had a chance to save it.
-	 */
-	ee->regs = *r;
+	memcpy_isr(ee->regs, r, UK_LCPU_REGS_SIZE);
 
 	sp  = ukarch_rstack_push(sp, (__u64)0x0); /* SystemV call convention */
 	sp = ukarch_rstack_push(sp, (long)ehtrampo_dispatcher);

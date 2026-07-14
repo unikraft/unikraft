@@ -1,5 +1,6 @@
 uk_sys_nanosleep
 uk_sys_time
+uk_sys_times
 uk_sys_gettimeofday
 uk_sys_settimeofday
 uk_sys_clock_getres

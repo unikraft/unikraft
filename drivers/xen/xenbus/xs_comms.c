@@ -286,7 +286,7 @@ static int xs_msg_write(struct xsd_sockmsg *xsd_req,
 		return -ENOSPC;
 
 	/* We must write requests after reading the consumer index. */
-	mb();
+	uk_arch_mb();
 
 	/*
 	 * We're now guaranteed to be able to send the message
@@ -331,7 +331,7 @@ static int xs_msg_write(struct xsd_sockmsg *xsd_req,
 	UK_ASSERT(prod <= xsh.buf->req_cons + XENSTORE_RING_SIZE);
 
 	/* Remote must see entire message before updating indexes */
-	wmb();
+	uk_arch_wmb();
 
 	xsh.buf->req_prod += req_size;
 
@@ -517,7 +517,7 @@ static void xs_msg_read(struct xsd_sockmsg *hdr)
 	payload[hdr->len] = '\0';
 
 	/* Remote must not see available space until we've copied the reply */
-	mb();
+	uk_arch_mb();
 	xsh.buf->rsp_cons += sizeof(*hdr) + hdr->len;
 
 	if (xsh.buf->rsp_prod - cons >= XENSTORE_RING_SIZE)
@@ -541,7 +541,7 @@ static void xs_recv(void)
 			break;
 
 		/* Make sure data is read after reading the indexes */
-		rmb();
+		uk_arch_rmb();
 
 		/* copy the message header */
 		memcpy_from_ring(
@@ -560,7 +560,7 @@ static void xs_recv(void)
 			break;
 
 		/* Make sure data is read after reading the indexes */
-		rmb();
+		uk_arch_rmb();
 
 		uk_pr_debug("Message is good.\n");
 		xs_msg_read(&msg);
@@ -581,7 +581,7 @@ static __noreturn void xs_thread_func(void *ign __unused)
 }
 
 static void xs_evtchn_handler(evtchn_port_t port,
-		struct __regs *regs __unused, void *ign __unused)
+		struct uk_lcpu_regs *regs __unused, void *ign __unused)
 {
 	UK_ASSERT(xsh.evtchn == port);
 	uk_waitq_wake_up(&xsh.waitq);

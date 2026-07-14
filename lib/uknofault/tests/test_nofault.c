@@ -5,13 +5,13 @@
  */
 
 #include <uk/nofault.h>
-#include <uk/plat/paging.h>
+#include <uk/paging.h>
 #include <uk/assert.h>
 #include <uk/test.h>
 #include <uk/essentials.h>
 
 #define TEST_MAP_BASE	0x20000000000 /* 2 TiB - must not be used otherwise */
-#define TEST_MAP_END	(TEST_MAP_BASE + PAGE_SIZE)
+#define TEST_MAP_END	(TEST_MAP_BASE + UK_PAGING_PAGE_SIZE)
 
 #define nf_bug_on(cond)							\
 	do {								\
@@ -27,7 +27,7 @@ UK_TESTCASE(uknofault, test_nofault_probe_noaccess)
 	len = uk_nofault_probe_r(TEST_MAP_BASE, 1, 0);
 	UK_TEST_EXPECT_SNUM_EQ(len, 0);
 
-	len = uk_nofault_probe_r(TEST_MAP_BASE, PAGE_SIZE, 0);
+	len = uk_nofault_probe_r(TEST_MAP_BASE, UK_PAGING_PAGE_SIZE, 0);
 	UK_TEST_EXPECT_SNUM_EQ(len, 0);
 }
 
@@ -36,19 +36,19 @@ UK_TESTCASE(uknofault, test_nofault_probe_noaccess)
  */
 UK_TESTCASE(uknofault, test_nofault_probe_r)
 {
-	struct uk_pagetable *pt = ukplat_pt_get_active();
+	struct uk_pagetable *pt = uk_paging_pt_get_active();
 	__sz len;
 	int rc;
 
-	rc = ukplat_page_map(pt, TEST_MAP_BASE, __PADDR_ANY, 1,
-			     PAGE_ATTR_PROT_READ, 0);
+	rc = uk_paging_page_map(pt, TEST_MAP_BASE, UK_PAGING_PADDR_ANY, 1,
+				UK_PAGING_PAGE_ATTR_PROT_READ, 0);
 	nf_bug_on(rc != 0);
 
 	len = uk_nofault_probe_r(TEST_MAP_BASE, 1, 0);
 	UK_TEST_EXPECT_SNUM_EQ(len, 1);
 
-	len = uk_nofault_probe_r(TEST_MAP_BASE, PAGE_SIZE, 0);
-	UK_TEST_EXPECT_SNUM_EQ(len, PAGE_SIZE);
+	len = uk_nofault_probe_r(TEST_MAP_BASE, UK_PAGING_PAGE_SIZE, 0);
+	UK_TEST_EXPECT_SNUM_EQ(len, UK_PAGING_PAGE_SIZE);
 
 	len = uk_nofault_probe_r(TEST_MAP_BASE - 1, 2, 0);
 	UK_TEST_EXPECT_SNUM_EQ(len, 0);
@@ -59,22 +59,23 @@ UK_TESTCASE(uknofault, test_nofault_probe_r)
 	len = uk_nofault_probe_r(TEST_MAP_END - 1, 8, 0);
 	UK_TEST_EXPECT_SNUM_EQ(len, 1);
 
-	len = uk_nofault_probe_r(TEST_MAP_END - 1244, PAGE_SIZE, 0);
+	len = uk_nofault_probe_r(TEST_MAP_END - 1244, UK_PAGING_PAGE_SIZE, 0);
 	UK_TEST_EXPECT_SNUM_EQ(len, 1244);
 
 	/* Map another page and leave a hole of one page to check if
 	 * continuation works
 	 */
-	rc = ukplat_page_map(pt, TEST_MAP_BASE + 2 * PAGE_SIZE, __PADDR_ANY, 1,
-			     PAGE_ATTR_PROT_READ, 0);
+	rc = uk_paging_page_map(pt, TEST_MAP_BASE + 2 * UK_PAGING_PAGE_SIZE,
+				UK_PAGING_PADDR_ANY, 1,
+				UK_PAGING_PAGE_ATTR_PROT_READ, 0);
 	nf_bug_on(rc != 0);
 
-	len = uk_nofault_probe_r(TEST_MAP_BASE, 3 * PAGE_SIZE,
+	len = uk_nofault_probe_r(TEST_MAP_BASE, 3 * UK_PAGING_PAGE_SIZE,
 				 UK_NOFAULTF_CONTINUE);
-	UK_TEST_EXPECT_SNUM_EQ(len, 2 * PAGE_SIZE);
+	UK_TEST_EXPECT_SNUM_EQ(len, 2 * UK_PAGING_PAGE_SIZE);
 
 	/* Clean up */
-	rc = ukplat_page_unmap(pt, TEST_MAP_BASE, 3, 0);
+	rc = uk_paging_page_unmap(pt, TEST_MAP_BASE, 3, 0);
 	nf_bug_on(rc != 0);
 }
 
@@ -85,12 +86,13 @@ UK_TESTCASE(uknofault, test_nofault_probe_r)
  */
 UK_TESTCASE(uknofault, test_nofault_probe_rw)
 {
-	struct uk_pagetable *pt = ukplat_pt_get_active();
+	struct uk_pagetable *pt = uk_paging_pt_get_active();
 	__sz len;
 	int rc;
 
-	rc = ukplat_page_map(pt, TEST_MAP_BASE, __PADDR_ANY, 1,
-			     PAGE_ATTR_PROT_READ, 0);
+	rc = uk_paging_page_map(pt, TEST_MAP_BASE,
+				UK_PAGING_PADDR_ANY, 1,
+				UK_PAGING_PAGE_ATTR_PROT_READ, 0);
 	nf_bug_on(rc != 0);
 
 	len = uk_nofault_probe_r(TEST_MAP_BASE, 1, 0);
@@ -102,8 +104,8 @@ UK_TESTCASE(uknofault, test_nofault_probe_rw)
 	/* Make the page writeable. Set a sanity value so we can verify that
 	 * the rw probe does not change memory contents
 	 */
-	rc = ukplat_page_set_attr(pt, TEST_MAP_BASE, 1,
-				  PAGE_ATTR_PROT_RW, 0);
+	rc = uk_paging_page_set_attr(pt, TEST_MAP_BASE, 1,
+				     UK_PAGING_PAGE_ATTR_PROT_RW, 0);
 	nf_bug_on(rc != 0);
 
 	*((unsigned long *)TEST_MAP_BASE) = 0xdeadb0b0;
@@ -111,25 +113,26 @@ UK_TESTCASE(uknofault, test_nofault_probe_rw)
 	len = uk_nofault_probe_rw(TEST_MAP_BASE, 1, 0);
 	UK_TEST_EXPECT_SNUM_EQ(len, 1);
 
-	len = uk_nofault_probe_rw(TEST_MAP_END - 1244, PAGE_SIZE, 0);
+	len = uk_nofault_probe_rw(TEST_MAP_END - 1244, UK_PAGING_PAGE_SIZE, 0);
 	UK_TEST_EXPECT_SNUM_EQ(len, 1244);
 
 	/* Map another page and leave a hole of one page to check if
 	 * continuation works
 	 */
-	rc = ukplat_page_map(pt, TEST_MAP_BASE + 2 * PAGE_SIZE, __PADDR_ANY, 1,
-			     PAGE_ATTR_PROT_RW, 0);
+	rc = uk_paging_page_map(pt, TEST_MAP_BASE + 2 * UK_PAGING_PAGE_SIZE,
+				UK_PAGING_PADDR_ANY, 1,
+				UK_PAGING_PAGE_ATTR_PROT_RW, 0);
 	nf_bug_on(rc != 0);
 
-	len = uk_nofault_probe_rw(TEST_MAP_BASE, 3 * PAGE_SIZE,
+	len = uk_nofault_probe_rw(TEST_MAP_BASE, 3 * UK_PAGING_PAGE_SIZE,
 				  UK_NOFAULTF_CONTINUE);
-	UK_TEST_EXPECT_SNUM_EQ(len, 2 * PAGE_SIZE);
+	UK_TEST_EXPECT_SNUM_EQ(len, 2 * UK_PAGING_PAGE_SIZE);
 
 	/* Check sanity value */
 	UK_TEST_EXPECT_SNUM_EQ(*((unsigned long *)TEST_MAP_BASE), 0xdeadb0b0);
 
 	/* Clean up */
-	rc = ukplat_page_unmap(pt, TEST_MAP_BASE, 3, 0);
+	rc = uk_paging_page_unmap(pt, TEST_MAP_BASE, 3, 0);
 	nf_bug_on(rc != 0);
 }
 
@@ -142,7 +145,7 @@ UK_TESTCASE(uknofault, test_nofault_try_read)
 	unsigned long v2;
 	int rc;
 
-	rc = uk_nofault_try_read(v2, __VADDR_INV);
+	rc = uk_nofault_try_read(v2, UK_PAGING_VADDR_INV);
 	UK_TEST_EXPECT_SNUM_EQ(rc, 0);
 
 	rc = uk_nofault_try_read(v2, &v);
@@ -159,7 +162,7 @@ UK_TESTCASE(uknofault, test_nofault_try_write)
 	unsigned long v2;
 	int rc;
 
-	rc = uk_nofault_try_write(v, __VADDR_INV);
+	rc = uk_nofault_try_write(v, UK_PAGING_VADDR_INV);
 	UK_TEST_EXPECT_SNUM_EQ(rc, 0);
 
 	rc = uk_nofault_try_write(v, &v2);

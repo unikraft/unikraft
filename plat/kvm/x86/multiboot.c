@@ -7,10 +7,9 @@
 #include <uk/essentials.h>
 #include <uk/arch/limits.h>
 #include <uk/arch/types.h>
-#include <uk/arch/paging.h>
-#include <uk/plat/bootstrap.h>
+#include <uk/paging.h>
+#include <uk/pm.h>
 #include <uk/plat/common/bootinfo.h>
-#include <uk/plat/common/lcpu.h>
 #include <uk/plat/common/memory.h>
 #include <uk/plat/common/sections.h>
 #include <uk/reloc.h>
@@ -19,9 +18,9 @@
 #include <errno.h>
 #include <string.h>
 
-#define multiboot_crash(msg, rc)	ukplat_crash()
+#define multiboot_crash(msg, rc)	uk_pm_syscrash()
 
-void _ukplat_entry(struct lcpu *lcpu, struct ukplat_bootinfo *bi);
+void _ukplat_entry(struct ukplat_bootinfo *bi);
 
 static inline void mrd_insert(struct ukplat_bootinfo *bi,
 			      const struct ukplat_memregion_desc *mrd)
@@ -41,7 +40,7 @@ static inline void mrd_insert(struct ukplat_bootinfo *bi,
  * 1:1 boot page table set. Physical and virtual addresses thus match for all
  * regions in the mapped range.
  */
-void multiboot_entry(struct lcpu *lcpu, struct multiboot_info *mi)
+void multiboot_entry(struct multiboot_info *mi)
 {
 	struct ukplat_bootinfo *bi;
 	struct ukplat_memregion_desc mrd = {0};
@@ -88,11 +87,11 @@ void multiboot_entry(struct lcpu *lcpu, struct multiboot_info *mi)
 	if (mi->flags & MULTIBOOT_INFO_MODS) {
 		mods = (multiboot_module_t *)(__uptr)mi->mods_addr;
 		for (i = 0; i < mi->mods_count; i++) {
-			mrd.pbase = PAGE_ALIGN_DOWN(mods[i].mod_start);
+			mrd.pbase = UK_PAGING_PAGE_ALIGN_DOWN(mods[i].mod_start);
 			mrd.vbase = mrd.pbase; /* 1:1 mapping */
 			mrd.pg_off = mods[i].mod_start - mrd.pbase;
 			mrd.len = mods[i].mod_end - mods[i].mod_start;
-			mrd.pg_count = PAGE_COUNT(mrd.pg_off + mrd.len);
+			mrd.pg_count = UK_PAGING_PAGE_COUNT(mrd.pg_off + mrd.len);
 			mrd.type  = UKPLAT_MEMRT_INITRD;
 			mrd.flags = UKPLAT_MEMRF_READ;
 
@@ -122,14 +121,15 @@ void multiboot_entry(struct lcpu *lcpu, struct multiboot_info *mi)
 
 			start = MAX(m->addr, __PAGE_SIZE);
 			end   = m->addr + m->len;
-			if (unlikely(end <= start || end - start < PAGE_SIZE))
+			if (unlikely(end <= start ||
+				     end - start < UK_PAGING_PAGE_SIZE))
 				continue;
 
-			mrd.pbase = PAGE_ALIGN_DOWN(start);
+			mrd.pbase = UK_PAGING_PAGE_ALIGN_DOWN(start);
 			mrd.vbase = mrd.pbase; /* 1:1 mapping */
 			mrd.pg_off = start - mrd.pbase;
 			mrd.len = end - start;
-			mrd.pg_count = PAGE_COUNT(mrd.pg_off + mrd.len);
+			mrd.pg_count = UK_PAGING_PAGE_COUNT(mrd.pg_off + mrd.len);
 
 			if (m->type == MULTIBOOT_MEMORY_AVAILABLE) {
 				mrd.type  = UKPLAT_MEMRT_FREE;
@@ -137,9 +137,9 @@ void multiboot_entry(struct lcpu *lcpu, struct multiboot_info *mi)
 					    UKPLAT_MEMRF_WRITE;
 
 				/* Free memory regions have
-				 * mrd.len == mrd.pg_count * PAGE_SIZE
+				 * mrd.len == mrd.pg_count * UK_PAGING_PAGE_SIZE
 				 */
-				mrd.len = PAGE_ALIGN_UP(mrd.len + mrd.pg_off);
+				mrd.len = UK_PAGING_PAGE_ALIGN_UP(mrd.len + mrd.pg_off);
 			} else {
 				mrd.type  = UKPLAT_MEMRT_RESERVED;
 				mrd.flags = UKPLAT_MEMRF_READ;
@@ -153,5 +153,5 @@ void multiboot_entry(struct lcpu *lcpu, struct multiboot_info *mi)
 		}
 	}
 
-	_ukplat_entry(lcpu, bi);
+	_ukplat_entry(bi);
 }

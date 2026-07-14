@@ -30,21 +30,18 @@
  */
 
 #include <uk/essentials.h>
+#include <uk/lcpu.h>
 
 #ifndef __UKARCH_CTX_H__
 #error Do not include this header directly
 #endif
 
-/* 32 * 128-bit NEON registers + 4 bytes (FPSR) + 4 bytes (FPCR) */
-#define UKARCH_ECTX_SIZE	520
-#define UKARCH_ECTX_ALIGN	16
-
 /* Stack needs to be aligned to 16 bytes */
 #define UKARCH_SP_ALIGN		16
 #define UKARCH_SP_ALIGN_MASK	(UKARCH_SP_ALIGN - 1)
 
-/* Auxiliary stack pointer needs to be aligned to UKARCH_ECTX_ALIGN */
-#define UKARCH_AUXSP_ALIGN	UKARCH_ECTX_ALIGN
+/* Auxiliary stack pointer needs to be aligned to UK_LCPU_ECTX_ALIGN */
+#define UKARCH_AUXSP_ALIGN	UK_LCPU_ECTX_ALIGN
 #define UKARCH_AUXSP_ALIGN_MASK	(UKARCH_AUXSP_ALIGN - 1)
 
 #if !__ASSEMBLY__

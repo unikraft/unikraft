@@ -3,11 +3,13 @@
  * Licensed under the BSD-3-Clause License (the "License").
  * You may not use this file except in compliance with the License.
  */
-#include <kvm/efi.h>
-#include <uk/arch/paging.h>
+
+#include <uk/arch/util.h>
+#include <uk/efi.h>
+#include <uk/paging.h>
 #include <uk/plat/common/bootinfo.h>
-#include <uk/plat/lcpu.h>
-#include <x86/cpu.h>
+#include <uk/lcpu.h>
+#include <uk/pm.h>
 
 /* Slave Controller Edge/Level Triggered Register */
 #define PIC2_ELCR2					0x4D1
@@ -28,25 +30,20 @@
 #define PIC2_DATA					0xA1
 #define PIC2_DATA_DEFAULT_MASK				0x8E
 
-void lcpu_start64(void *, void *) __noreturn;
-void _ukplat_entry(void *, void *);
+void lcpu_start64(void) __noreturn;
+void _ukplat_entry(struct ukplat_bootinfo *bi);
 
 extern void *x86_bpt_pml4;
 
-static __u8 __align(16) uk_efi_bootstack[__PAGE_SIZE];
-
-static struct {
-	void *entry_fn;
-	void *bootstack;
-} uk_efi_boot_startup_args;
+static __u8 __align(16) uk_efi_bootstack[UK_PAGING_PAGE_SIZE];
 
 /* Unless UEFI CSM (now dropped from the specification) is activated, our PIC's
  * are masked
  */
 static inline void unmask_8259_pic(void)
 {
-	outb(PIC1_DATA, PIC1_DATA_DEFAULT_MASK);
-	outb(PIC2_DATA, PIC2_DATA_DEFAULT_MASK);
+	uk_arch_x86_64_outb(PIC1_DATA, PIC1_DATA_DEFAULT_MASK);
+	uk_arch_x86_64_outb(PIC2_DATA, PIC2_DATA_DEFAULT_MASK);
 }
 
 /* UEFI enables the LAPIC Timer to run periodic routines, usually at 10KHz */
@@ -56,7 +53,7 @@ static inline void lapic_timer_disable(void)
 	__u32 eax, edx;
 
 	/* Check if APIC is active */
-	rdmsr(LAPIC_MSR_BASE, &eax, &edx);
+	uk_arch_x86_64_rdmsr(LAPIC_MSR_BASE, &eax, &edx);
 	if (unlikely(!(eax & LAPIC_BASE_EN)))
 		return;
 
@@ -72,7 +69,8 @@ static inline void lapic_timer_disable(void)
  */
 static inline void pic_8259_elcr2_level_irq10_11(void)
 {
-	outb(PIC2_ELCR2, PIC2_ELCR2_IRQ11_ECL | PIC2_ELCR2_IRQ10_ECL);
+	uk_arch_x86_64_outb(PIC2_ELCR2,
+			    PIC2_ELCR2_IRQ11_ECL | PIC2_ELCR2_IRQ10_ECL);
 }
 
 void __noreturn uk_efi_jmp_to_kern()
@@ -80,16 +78,18 @@ void __noreturn uk_efi_jmp_to_kern()
 	struct ukplat_bootinfo *bi = ukplat_bootinfo_get();
 
 	if (unlikely(!bi))
-		ukplat_crash();
+		uk_pm_syscrash();
 
-	uk_efi_boot_startup_args.entry_fn = &_ukplat_entry;
-	uk_efi_boot_startup_args.bootstack = uk_efi_bootstack + __PAGE_SIZE;
-
-	ukplat_lcpu_disable_irq();
-	ukarch_pt_write_base((__paddr_t)&x86_bpt_pml4);
+	uk_lcpu_disable_irq();
+	uk_paging_pt_write_base((__paddr_t)&x86_bpt_pml4);
 	unmask_8259_pic();
 	lapic_timer_disable();
 	pic_8259_elcr2_level_irq10_11();
 
-	lcpu_start64(&uk_efi_boot_startup_args, bi);
+	uk_pcpuvar_lval(0, UK_LCPU_SENTRY_SYM) = (__uptr)&_ukplat_entry;
+	uk_pcpuvar_lval(0, UK_LCPU_SSTACKP_SYM) = (__uptr)uk_efi_bootstack +
+						  __PAGE_SIZE;
+	uk_pcpuvar_lval(0, UK_LCPU_SARG_SYM) = (__uptr)bi;
+
+	lcpu_start64();
 }

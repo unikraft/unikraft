@@ -31,16 +31,17 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-#include <uk/arch/lcpu.h>
-#include <uk/arch/paging.h>
+#include <uk/arch/arm64.h>
+#include <uk/asm/lcpu.h>
 #include <uk/asm.h>
+#include <uk/paging.h>
 
-#define PTE_BLOCK_DEVICE_nGnRnE	(PTE_ATTR_DEVICE_nGnRnE + PTE_TYPE_BLOCK)
-#define PTE_BLOCK_DEVICE_nGnRE	(PTE_ATTR_DEVICE_nGnRE + PTE_TYPE_BLOCK)
-#define PTE_BLOCK_NORMAL_RW	(PTE_ATTR_NORMAL_RW + PTE_TYPE_BLOCK)
-#define PTE_BLOCK_NORMAL_RWX	(PTE_ATTR_NORMAL_RWX + PTE_TYPE_BLOCK)
-#define PTE_PAGE_NORMAL_RO	(PTE_ATTR_NORMAL_RO  + PTE_TYPE_PAGE)
-#define PTE_PAGE_NORMAL_RWX	(PTE_ATTR_NORMAL_RWX  + PTE_TYPE_PAGE)
+#define PTE_BLOCK_DEVICE_nGnRnE	(PTE_ATTR_DEVICE_nGnRnE + UK_ARCH_ARM64_PTE_TYPE_BLOCK)
+#define PTE_BLOCK_DEVICE_nGnRE	(PTE_ATTR_DEVICE_nGnRE + UK_ARCH_ARM64_PTE_TYPE_BLOCK)
+#define PTE_BLOCK_NORMAL_RW	(PTE_ATTR_NORMAL_RW + UK_ARCH_ARM64_PTE_TYPE_BLOCK)
+#define PTE_BLOCK_NORMAL_RWX	(PTE_ATTR_NORMAL_RWX + UK_ARCH_ARM64_PTE_TYPE_BLOCK)
+#define PTE_PAGE_NORMAL_RO	(PTE_ATTR_NORMAL_RO  + UK_ARCH_ARM64_PTE_TYPE_PAGE)
+#define PTE_PAGE_NORMAL_RWX	(PTE_ATTR_NORMAL_RWX  + UK_ARCH_ARM64_PTE_TYPE_PAGE)
 
 /**
  * Outputs a single table descriptor
@@ -48,7 +49,7 @@
  * @param paddr physical address of the linked PT
  */
 .macro pte_tbl_desc paddr
-	.quad \paddr + PTE_TYPE_TABLE
+	.quad \paddr + UK_ARCH_ARM64_PTE_TYPE_TABLE
 .endm
 
 /**
@@ -73,19 +74,19 @@
 .ifle \pages
 	.exitm
 .endif
-	pte_map_desc (\paddr + PAGE_Lx_SIZE(\lvl) * 0), \attr
+	pte_map_desc (\paddr + UK_PAGING_PAGE_Lx_SIZE(\lvl) * 0), \attr
 .ifgt (\pages - 8)
 	/* Have to do some unrolling to not exceed max nested macros */
-	pte_map_desc (\paddr + PAGE_Lx_SIZE(\lvl) * 1), \attr
-	pte_map_desc (\paddr + PAGE_Lx_SIZE(\lvl) * 2), \attr
-	pte_map_desc (\paddr + PAGE_Lx_SIZE(\lvl) * 3), \attr
-	pte_map_desc (\paddr + PAGE_Lx_SIZE(\lvl) * 4), \attr
-	pte_map_desc (\paddr + PAGE_Lx_SIZE(\lvl) * 5), \attr
-	pte_map_desc (\paddr + PAGE_Lx_SIZE(\lvl) * 6), \attr
-	pte_map_desc (\paddr + PAGE_Lx_SIZE(\lvl) * 7), \attr
-	pte_fill    (\paddr + PAGE_Lx_SIZE(\lvl) * 8), (\pages - 8), \lvl, \attr
+	pte_map_desc (\paddr + UK_PAGING_PAGE_Lx_SIZE(\lvl) * 1), \attr
+	pte_map_desc (\paddr + UK_PAGING_PAGE_Lx_SIZE(\lvl) * 2), \attr
+	pte_map_desc (\paddr + UK_PAGING_PAGE_Lx_SIZE(\lvl) * 3), \attr
+	pte_map_desc (\paddr + UK_PAGING_PAGE_Lx_SIZE(\lvl) * 4), \attr
+	pte_map_desc (\paddr + UK_PAGING_PAGE_Lx_SIZE(\lvl) * 5), \attr
+	pte_map_desc (\paddr + UK_PAGING_PAGE_Lx_SIZE(\lvl) * 6), \attr
+	pte_map_desc (\paddr + UK_PAGING_PAGE_Lx_SIZE(\lvl) * 7), \attr
+	pte_fill    (\paddr + UK_PAGING_PAGE_Lx_SIZE(\lvl) * 8), (\pages - 8), \lvl, \attr
 .else
-	pte_fill (\paddr + PAGE_Lx_SIZE(\lvl) * 1), (\pages - 1), \lvl, \attr
+	pte_fill (\paddr + UK_PAGING_PAGE_Lx_SIZE(\lvl) * 1), (\pages - 1), \lvl, \attr
 .endif
 .endm
 

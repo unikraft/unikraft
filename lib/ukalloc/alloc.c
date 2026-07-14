@@ -40,15 +40,15 @@
 #include <uk/essentials.h>
 #include <uk/assert.h>
 #include <uk/arch/limits.h>
-#include <uk/arch/lcpu.h>
-#include <uk/arch/paging.h>
+#include <uk/lcpu.h>
+#include <uk/paging.h>
 
 #if CONFIG_HAVE_MEMTAG
 #include <uk/arch/memtag.h>
 #endif
 
 #define size_to_num_pages(size) \
-	(PAGE_ALIGN_UP((unsigned long)(size)) / __PAGE_SIZE)
+	(UK_PAGING_PAGE_ALIGN_UP((unsigned long)(size)) / __PAGE_SIZE)
 #define page_off(x) ((unsigned long)(x) & (__PAGE_SIZE - 1))
 
 struct uk_alloc *_uk_alloc_head;
@@ -109,7 +109,7 @@ static struct metadata_ifpages *uk_get_metadata(const void *ptr)
 	UK_ASSERT((__uptr) ptr >= __PAGE_SIZE +
 		  METADATA_IFPAGES_SIZE_POW2);
 
-	metadata = PAGE_ALIGN_DOWN((__uptr)ptr);
+	metadata = UK_PAGING_PAGE_ALIGN_DOWN((__uptr)ptr);
 	if (metadata == (__uptr) ptr) {
 		/* special case: the memory was page-aligned.
 		 * In this case the metadata lies at the start of the
@@ -497,12 +497,20 @@ int uk_posix_memalign_ifmalloc(struct uk_alloc *a,
 
 void *uk_realloc_compat(struct uk_alloc *a, void *ptr, __sz size)
 {
+	__sz copy_size;
 	void *retptr;
 
 	UK_ASSERT(a);
+
+	/* If ptr is NULL, realloc() behaves like malloc().
+	 * Invalid size is handled by malloc().
+	 */
 	if (!ptr)
 		return uk_malloc(a, size);
 
+	/* If size is zero and ptr is not NULL, realloc()
+	 * is equivalent to free().
+	 */
 	if (!size) {
 		uk_free(a, ptr);
 		return __NULL;
@@ -512,9 +520,23 @@ void *uk_realloc_compat(struct uk_alloc *a, void *ptr, __sz size)
 	if (!retptr)
 		return __NULL;
 
-	memcpy(retptr, ptr, size);
+	/* FIXME As pointed out in other functions, this allocator
+	 * does not provide a way to check whether the pointer was
+	 * return by a previous allocation..
+	 */
+
+	/* Get previous allocation's size and copy data.
+	 * Preserve the contents up to the minimum of old
+	 * and new size. If new size is larger than old size,
+	 * the added memory will not be initialized.
+	 */
+	copy_size = MIN(uk_getmallocsize(ptr), size);
+
+	/* No support for in-place expansion, so we always need to copy */
+	memcpy(retptr, ptr, copy_size);
 
 	uk_free(a, ptr);
+
 	return retptr;
 }
 
@@ -523,11 +545,16 @@ void *uk_calloc_compat(struct uk_alloc *a, __sz nmemb, __sz size)
 	void *ptr;
 	__sz tlen = nmemb * size;
 
+	UK_ASSERT(a);
+
+	/* check either nmemb or size is zero */
+	if (!tlen)
+		return __NULL;
+
 	/* check for overflow */
 	if (nmemb > (~(__sz)0)/size)
 		return __NULL;
 
-	UK_ASSERT(a);
 	ptr = uk_malloc(a, tlen);
 	if (!ptr)
 		return __NULL;

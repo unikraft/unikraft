@@ -31,7 +31,7 @@
 #include <virtio/virtio_blk.h>
 #include <uk/sglist.h>
 #include <uk/blkdev_driver.h>
-#include <uk/plat/lcpu.h>
+#include <uk/lcpu.h>
 
 #define DRIVER_NAME		"virtio-blk"
 #define DEFAULT_SECTOR_SIZE	512
@@ -278,9 +278,9 @@ static void virtio_blkdev_queue_cleanup_requests(struct uk_blkdev_queue *queue)
 	/* Move all entries to local list, while ensuring no interrupt fiddles
 	 * with the list pointers.
 	 */
-	ukplat_lcpu_disable_irq();
+	uk_lcpu_disable_irq();
 	uk_list_splice_init(&queue->free_list, &list);
-	ukplat_lcpu_enable_irq();
+	uk_lcpu_enable_irq();
 
 	/* Free all old requests */
 	uk_list_for_each_entry_safe(request, request_tmp, &list,
@@ -524,7 +524,16 @@ static int virtio_blkdev_vqueue_setup(struct uk_blkdev_queue *queue,
 		return -ENOBUFS;
 	}
 
-	nr_desc = (nr_desc) ? nr_desc : max_desc;
+	/* Legacy virtio has queue_size register as RO, while modern has it RW.
+	 * This means the vring layout is immutable and setting up the queues
+	 * with anything less than the reported vq size will result in layout
+	 * mismatch between the host paravirtualized device and the
+	 * guest device driver.
+	 */
+	if (!nr_desc ||
+	    !VIRTIO_FEATURE_HAS(queue->vbd->vdev->features, VIRTIO_F_VERSION_1))
+		nr_desc = max_desc;
+
 	uk_pr_debug("Configuring the %d descriptors\n", nr_desc);
 
 	/* Check if the descriptor is a power of 2 */

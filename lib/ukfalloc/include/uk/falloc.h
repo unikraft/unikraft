@@ -34,10 +34,10 @@
 #ifndef __UK_FALLOC_H__
 #define __UK_FALLOC_H__
 
-#include <uk/arch/paging.h>
 #include <uk/arch/types.h>
-#include <uk/essentials.h>
 #include <uk/assert.h>
+#include <uk/essentials.h>
+#include <uk/paging.h>
 
 #ifdef CONFIG_LIBUKFALLOC_STATS
 #include <uk/atomic.h>
@@ -60,12 +60,13 @@ struct uk_falloc {
 	 * @param fa the instance of the frame allocator
 	 * @param [in,out] paddr the start address of the physical memory to
 	 *    allocate. The memory range has to be included in a prior call to
-	 *    `addmem`. Can be __PADDR_ANY to let the allocator choose an
-	 *    address. In this case, paddr receives the start address of the
-	 *    physical memory area on success, __PADDR_INV otherwise.
+	 *    `addmem`. Can be UK_PAGING_PADDR_ANY to let the allocator choose
+	 *    an address. In this case, paddr receives the start address of the
+	 *    physical memory area on success, UK_PAGING_PADDR_INV otherwise.
 	 *    FALLOC_FLAG_ALIGNED is ignored if a physical address is supplied
 	 * @param flags allocation flags (FALLOC_FLAG_*)
-	 * @param frames the number of frames to allocate (i.e., PAGE_SIZE)
+	 * @param frames the number of frames to allocate
+	 *		 (i.e., UK_PAGING_PAGE_SIZE)
 	 *
 	 * @return 0 on success, a non-zero error otherwise
 	 */
@@ -80,7 +81,8 @@ struct uk_falloc {
 	 * @param [out] paddr the start address of the allocated physical
 	 *    memory area. Not touched on error
 	 * @param flags allocation flags (FALLOC_FLAG_*)
-	 * @param frames the number of frames to allocate (i.e., PAGE_SIZE)
+	 * @param frames the number of frames to allocate
+	 *		 (i.e., UK_PAGING_PAGE_SIZE)
 	 * @param min the start of the permissable address range. Can be
 	 *    __PADDR_MIN to not restrict the permissable range at the low end
 	 * @param max the end of the permissable address range. Can be
@@ -123,7 +125,7 @@ struct uk_falloc {
 	 * @param frames the number of frames to add
 	 * @param dm_off the offset in the virtual address space where a
 	 *    direct mapping of the specified physical memory area can be found
-	 *    or __VADDR_INV if no such mapping exists
+	 *    or UK_PAGING_VADDR_INV if no such mapping exists
 	 *
 	 * @return 0 on success, a non-zero error otherwise
 	 */
@@ -180,11 +182,11 @@ static inline int _uk_falloc_init_stats(struct uk_falloc *fa __unused)
  * @param frames the number of frames to allocate
  *
  * @return the start address of the allocated physical memory area on success,
- *    __PADDR_INV otherwise
+ *    UK_PAGING_PADDR_INV otherwise
  */
 static inline __paddr_t uk_falloc(struct uk_falloc *fa, unsigned long frames)
 {
-	__paddr_t lpaddr = __PADDR_ANY;
+	__paddr_t lpaddr = UK_PAGING_PADDR_ANY;
 	int rc;
 
 	UK_ASSERT(fa);
@@ -192,7 +194,7 @@ static inline __paddr_t uk_falloc(struct uk_falloc *fa, unsigned long frames)
 
 	rc = fa->falloc(fa, &lpaddr, frames, 0);
 	if (unlikely(rc))
-		return __PADDR_INV;
+		return UK_PAGING_PADDR_INV;
 
 	return lpaddr;
 }

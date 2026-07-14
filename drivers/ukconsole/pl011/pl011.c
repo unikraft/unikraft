@@ -1,25 +1,13 @@
 /* SPDX-License-Identifier: ISC */
-/*
- * Authors: Wei Chen <Wei.Chen@arm.com>
- *
- * Copyright (c) 2018 Arm Ltd.
- *
- * Permission to use, copy, modify, and/or distribute this software
- * for any purpose with or without fee is hereby granted, provided
- * that the above copyright notice and this permission notice appear
- * in all copies.
- *
- * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL
- * WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED
- * WARRANTIES OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE
- * AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR
- * CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS
- * OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT,
- * NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN
- * CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+/* Copyright (c) 2018 Arm Ltd.
+ * Copyright (c) 2025, Unikraft GmbH and The Unikraft Authors.
+ * Licensed under the BSD-3-Clause License (the "License").
+ * You may not use this file except in compliance with the License.
  */
+
 #include <libfdt.h>
 #include <uk/assert.h>
+#include <uk/arch/util.h>
 #include <uk/bitops.h>
 #include <uk/init.h>
 #include <uk/libparam.h>
@@ -33,10 +21,10 @@
 #include <uk/alloc.h>
 #endif /* CONFIG_LIBUKALLOC */
 
-#if CONFIG_PAGING
+#if CONFIG_LIBUKPAGING
 #include <uk/bus/platform.h>
 #include <uk/errptr.h>
-#endif /* CONFIG_PAGING */
+#endif /* CONFIG_LIBUKPAGING */
 
 #if CONFIG_LIBPL011_EARLY_CONSOLE
 #include <uk/boot/earlytab.h>
@@ -98,10 +86,14 @@ UK_LIBPARAM_PARAM_ALIAS(base, &earlycon.base, __u64, "pl011 base");
 
 /* Macros to access PL011 Registers with base address */
 #define PL011_REG(base, r)		((__u16 *)((base) + (r)))
-#define PL011_REG_READ(base, r)		ioreg_read16(PL011_REG(base, r))
-#define PL011_REG_WRITE(base, r, v)	ioreg_write16(PL011_REG(base, r), v)
 
-static void pl011_putc(__u64 base, char a)
+#define PL011_REG_READ(base, r)		\
+	uk_arch_arm64_ioreg_read16(PL011_REG(base, r))
+
+#define PL011_REG_WRITE(base, r, v)	\
+	uk_arch_arm64_ioreg_write16(PL011_REG(base, r), v)
+
+__isr static void pl011_putc(__u64 base, char a)
 {
 	/* Wait until TX FIFO becomes empty */
 	while (PL011_REG_READ(base, REG_UARTFR_OFFSET) & FR_TXFF)
@@ -120,7 +112,7 @@ static int pl011_getc(__u64 base)
 	return (int)(PL011_REG_READ(base, REG_UARTDR_OFFSET) & 0xff);
 }
 
-static __ssz pl011_out(struct uk_console *dev, const char *buf, __sz len)
+__isr static __ssz pl011_out(struct uk_console *dev, const char *buf, __sz len)
 {
 	struct pl011_device *pl011_dev;
 	__sz l = len;
@@ -155,9 +147,10 @@ static __ssz pl011_in(struct uk_console *dev, char *buf, __sz len)
 	return len;
 }
 
-static struct uk_console_ops pl011_ops = {
+static const struct uk_console_ops pl011_ops = {
 	.out = pl011_out,
-	.in = pl011_in
+	.in = pl011_in,
+	.emerg_out = pl011_out,
 };
 
 static int pl011_setup(__u64 base)
@@ -242,7 +235,8 @@ static int early_init(struct ukplat_bootinfo *bi)
 		return rc;
 
 	uk_console_init(&earlycon.dev, "PL011",  &pl011_ops,
-			UK_CONSOLE_FLAG_STDOUT | UK_CONSOLE_FLAG_STDIN);
+			UK_CONSOLE_FLAG_STDOUT | UK_CONSOLE_FLAG_STDIN,
+			UK_CONSOLE_CLASS_UART);
 	uk_console_register(&earlycon.dev);
 
 	/* Add an mrd to keep the device mapped past init */
@@ -288,7 +282,8 @@ static int fdt_get_device(struct pl011_device *dev, const void *dtb,
 
 	uk_pr_debug("pl011 @ 0x%lx - 0x%lx\n", reg_base, reg_base + reg_size);
 
-	uk_console_init(&dev->dev, "PL011", &pl011_ops, 0);
+	uk_console_init(&dev->dev, "PL011", &pl011_ops, 0,
+			UK_CONSOLE_CLASS_UART);
 	dev->base = reg_base;
 	dev->size = reg_size;
 
@@ -351,14 +346,14 @@ static int init(struct uk_init_ctx *ictx __unused)
 			return rc;
 		}
 
-#if CONFIG_PAGING
+#if CONFIG_LIBUKPAGING
 		/* Map device region */
 		dev.base = uk_bus_pf_devmap(dev.base, dev.size);
 		if (unlikely(PTRISERR(dev.base))) {
 			uk_pr_err("Could not map pl011\n");
 			return PTR2ERR(dev.base);
 		}
-#endif /* !CONFIG_PAGING */
+#endif /* CONFIG_LIBUKPAGING */
 
 #if CONFIG_LIBPL011_EARLY_CONSOLE
 		/* `ukconsole` mandates that there is only a single

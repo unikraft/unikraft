@@ -2,6 +2,8 @@ menuconfig PLAT_KVM
 	bool "KVM guest"
 	default n
 	depends on (ARCH_X86_64 || ARCH_ARM_64)
+	imply LIBUKPM
+	imply LIBUKPSCI if ARCH_ARM_64
 	select LIBUKDEBUG
 	select LIBUKBOOT
 	select LIBUKBITOPS
@@ -14,6 +16,10 @@ menuconfig PLAT_KVM
 	imply LIBUKOFW if ARCH_ARM_64
 	select ELF64_TO_32 if ARCH_X86_64
 	select LIBUKRELOC if OPTIMIZE_PIE
+	select HAVE_PAGING
+	select LIBUKPLAT_NATIVE_PAL
+	select LIBUKPLAT_NATIVE_PAGING if LIBUKPAGING
+	select LIBUKPLAT_NATIVE_LCPU_PM if LIBUKLCPU
 	select HAVE_INTCTLR
 	select HAVE_APIC if ARCH_X86_64
 	select LIBUKINTCTLR_XPIC if ARCH_X86_64
@@ -53,8 +59,8 @@ config KVM_BOOT_PROTO_EFI_STUB
 	bool "EFI stub"
 	depends on KVM_VMM_QEMU && !KVM_VMM_FIRECRACKER
 	depends on OPTIMIZE_PIE
-	select UKPLAT_ACPI
-	select HAVE_REBOOT
+	select LIBUKACPI
+	select LIBUKEFI
 	help
 		Make Unikraft bootable by UEFI firmware
 
@@ -105,6 +111,7 @@ config KVM_VMM_QEMU
 	imply LIBUKINTCTLR_GICV2 if ARCH_ARM_64
 	imply LIBUKRTC_PL031
 	imply LIBVGACONS if ARCH_X86_64
+	imply KVM_VMM_QEMU_ISA_DEBUG_EXIT if ARCH_X86_64
 	select HAVE_IBMPC if ARCH_X86_64
 	select HAVE_PCI
 	select HAVE_MMIO
@@ -119,10 +126,18 @@ config KVM_VMM_FIRECRACKER
 	imply LIBNS16550 if LIBUKCONSOLE
 	imply LIBNS16550_EARLY_CONSOLE if LIBUKCONSOLE
 	imply LIBNS16550_COM1 if LIBUKCONSOLE && ARCH_X86_64
+	imply LIBUKPS2 if ARCH_X86_64
 	imply LIBUKPS2_KBD if ARCH_X86_64
+	imply LIBUKPS2_SYSRESET if ARCH_X86_64
 	imply LIBUKINTCTLR_GICV3 if ARCH_ARM_64
 	imply LIBUKRTC_PL031
 	depends on ARCH_X86_64 || ARCH_ARM_64
 
 endchoice
 endif
+
+config KVM_VMM_QEMU_ISA_DEBUG_EXIT
+	bool "Use QEMU isa-debug-exit device for shutdown"
+	depends on LIBUKPM
+	depends on KVM_VMM_QEMU
+	depends on ARCH_X86_64

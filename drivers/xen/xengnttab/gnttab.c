@@ -23,7 +23,7 @@
 #endif
 #include <uk/arch/limits.h>
 #include <uk/atomic.h>
-#include <uk/plat/lcpu.h>
+#include <uk/lcpu.h>
 #include <uk/semaphore.h>
 #include <uk/xen/gnttab.h>
 #if defined(__i386__) || defined(__x86_64__)
@@ -41,7 +41,7 @@
 /* NR_GRANT_FRAMES must be less than or equal to that configured in Xen */
 #define NR_GRANT_FRAMES         4
 #define NR_GRANT_ENTRIES \
-	(NR_GRANT_FRAMES * PAGE_SIZE / sizeof(grant_entry_v1_t))
+	(NR_GRANT_FRAMES * UK_PAGING_PAGE_SIZE / sizeof(grant_entry_v1_t))
 
 /*
  * Page allocations in this source file can benefit from a dedicated page alloc.
@@ -53,7 +53,8 @@ static inline void *page_alloc(struct uk_alloc *a, unsigned long num_pages)
 	if (a->palloc)
 		return uk_palloc(a, num_pages);
 	else
-		return uk_memalign(a, PAGE_SIZE, num_pages * PAGE_SIZE);
+		return uk_memalign(a, UK_PAGING_PAGE_SIZE,
+				   num_pages * UK_PAGING_PAGE_SIZE);
 }
 
 static struct gnttab {
@@ -74,7 +75,7 @@ static grant_ref_t get_free_entry(void)
 
 	uk_semaphore_down(&gnttab.sem);
 
-	flags = ukplat_lcpu_save_irqf();
+	flags = uk_lcpu_save_irqf();
 
 	gref = gnttab.gref_list[0];
 	UK_ASSERT(gref >= GNTTAB_NR_RESERVED_ENTRIES &&
@@ -85,7 +86,7 @@ static grant_ref_t get_free_entry(void)
 	gnttab.inuse[gref] = 1;
 #endif
 
-	ukplat_lcpu_restore_irqf(flags);
+	uk_lcpu_restore_irqf(flags);
 
 	return gref;
 }
@@ -94,7 +95,7 @@ static void put_free_entry(grant_ref_t gref)
 {
 	unsigned long flags;
 
-	flags = ukplat_lcpu_save_irqf();
+	flags = uk_lcpu_save_irqf();
 
 #ifdef DBGGNT
 	UK_ASSERT(gnttab.inuse[gref]);
@@ -103,7 +104,7 @@ static void put_free_entry(grant_ref_t gref)
 	gnttab.gref_list[gref] = gnttab.gref_list[0];
 	gnttab.gref_list[0] = gref;
 
-	ukplat_lcpu_restore_irqf(flags);
+	uk_lcpu_restore_irqf(flags);
 
 	uk_semaphore_up(&gnttab.sem);
 }
@@ -115,7 +116,7 @@ static void gnttab_grant_init(grant_ref_t gref, domid_t domid,
 	gnttab.table[gref].domid = domid;
 
 	/* Memory barrier */
-	wmb();
+	uk_arch_wmb();
 }
 
 static void gnttab_grant_permit_access(grant_ref_t gref, domid_t domid,
@@ -224,7 +225,7 @@ unsigned long gnttab_end_transfer(grant_ref_t gref)
 		flags = *pflags;
 
 	/* Read the frame number /after/ reading completion status. */
-	rmb();
+	uk_arch_rmb();
 	frame = gnttab.table[gref].frame;
 
 	put_free_entry(gref);

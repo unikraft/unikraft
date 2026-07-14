@@ -9,9 +9,9 @@
 #ifndef __UK_POD_TYPES_H__
 #define __UK_POD_TYPES_H__
 
-#include <uk/arch/paging.h>
 #include <uk/arch/types.h>
 #include <uk/essentials.h>
+#include <uk/paging.h>
 
 /**
  * Page in `npages` starting from addr, as part of an allocation registered with
@@ -20,7 +20,7 @@
  * May process fewer pages than requested, but must always make progress or
  * error out. It is undefined behavior to return 0.
  *
- * If `pa` is set (ukarch_paddr_isvalid) the buffer is guaranteed to be
+ * If `pa` is set (uk_paging_paddr_isvalid) the buffer is guaranteed to be
  * physically contiguous.
  * Specific backends may or may not provide `pa`.
  *

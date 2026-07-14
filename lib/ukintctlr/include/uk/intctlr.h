@@ -15,23 +15,7 @@ export "C" {
 
 #include <uk/alloc.h>
 #include <uk/essentials.h>
-#include <uk/plat/lcpu.h>
-
-/**
- * This event is raised before the platform code handles an IRQ. The normal
- * IRQ handling will continue or stop according to the returned `UK_EVENT_*`
- * value.
- * Note: this event is usually raised in an interrupt context.
- */
-#define UK_INTCTLR_EVENT_IRQ uk_intctlr_event_irq
-
-/** The event payload for the #UK_INTCTLR_EVENT_IRQ event */
-struct uk_intctlr_event_irq_data {
-	/** The registers of the interrupted code */
-	struct __regs *regs;
-	/** The platform specific interrupt vector number */
-	unsigned long irq;
-};
+#include <uk/lcpu.h>
 
 enum uk_intctlr_irq_trigger {
 	UK_INTCTLR_IRQ_TRIGGER_NONE, /* interpreted as "do not change" */
@@ -86,7 +70,7 @@ int uk_intctlr_probe(void);
  * @param irq  Interrupt to handle
  * @return zero on success or negative value on error
  */
-void uk_intctlr_irq_handle(struct __regs *regs, unsigned int irq);
+void uk_intctlr_irq_handle(struct uk_lcpu_except_irq_ctx *ctx);
 
 /**
  * Configure an interrupt

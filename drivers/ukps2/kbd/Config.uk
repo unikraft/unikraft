@@ -1,5 +1,0 @@
-config LIBUKPS2_KBD
-	bool "PS/2 Keyboard dumbed down driver"
-	depends on HAVE_IBMPC_PS2
-	select HAVE_SHUTDOWN_DISPATCHER
-	select LIBUKBITOPS

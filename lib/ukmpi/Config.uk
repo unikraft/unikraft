@@ -2,6 +2,7 @@ menuconfig LIBUKMPI
 	bool "ukmpi: Message Passing Interface"
 	select LIBNOLIBC if !HAVE_LIBC
 	select LIBUKDEBUG
+	select LIBUKLCPU
 	default n
 	help
 		Provide inter-thread communication primitives

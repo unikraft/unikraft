@@ -5,38 +5,58 @@
  */
 
 #include <uk/essentials.h>
+#include <uk/alloc.h>
 #include <uk/arch/types.h>
+#include <uk/bitops/bitmap.h>
 #include <uk/list.h>
 #include <uk/console.h>
 #include <uk/console/driver.h>
+#include <uk/spinlock.h>
 #include <errno.h>
 
 #if CONFIG_LIBUKDEBUG_PRINTK
 #include <uk/print.h>
 #endif /* CONFIG_LIBUKDEBUG_PRINTK */
 
+/* Maximum number of simultaneously registered console devices */
+#define UK_CONSOLE_MAX_DEVS  CONFIG_LIBUKCONSOLE_DEVICES_MAXCOUNT
+
 /* List of dynamically registered devices */
-static UK_LIST_HEAD(uk_console_device_list);
-static __u16 uk_console_device_count;
+static struct uk_spinlock cons_dev_list_lock = UK_SPINLOCK_INITIALIZER();
+static UK_LIST_HEAD(cons_dev_list);
+static __u16 cons_dev_count;
+/* Bit n set <=> device ID n is currently in use */
+static unsigned long cons_id_bitmap[UK_BITS_TO_LONGS(UK_CONSOLE_MAX_DEVS)];
 
 static __bool uk_console_set_stdout_once;
 static __bool uk_console_set_stdin_once;
+static __bool uk_console_set_emerg_stdout_once;
 
 struct uk_console *uk_console_get(__u16 id)
 {
 	struct uk_console *dev = __NULL;
 
-	uk_list_for_each_entry(dev, &uk_console_device_list, _list) {
-		if (dev->id == id)
+	uk_spin_lock(&cons_dev_list_lock);
+	uk_list_for_each_entry(dev, &cons_dev_list, _list) {
+		if (dev->id == id) {
+			uk_spin_unlock(&cons_dev_list_lock);
 			return dev;
+		}
 	}
+	uk_spin_unlock(&cons_dev_list_lock);
 
 	return __NULL;
 }
 
 __u16 uk_console_count(void)
 {
-	return uk_console_device_count;
+	__u16 count;
+
+	uk_spin_lock(&cons_dev_list_lock);
+	count = cons_dev_count;
+	uk_spin_unlock(&cons_dev_list_lock);
+
+	return count;
 }
 
 __ssz uk_console_out(const char *buf, __sz len)
@@ -50,10 +70,12 @@ __ssz uk_console_out(const char *buf, __sz len)
 		return -EINVAL;
 
 	/* Output to all STDOUT devices */
-	uk_list_for_each_entry(dev, &uk_console_device_list, _list) {
+	uk_spin_lock(&cons_dev_list_lock);
+	uk_list_for_each_entry(dev, &cons_dev_list, _list) {
 		if ((dev->flags & UK_CONSOLE_FLAG_STDOUT) && dev->ops->out)
 			uk_console_out_direct(dev, buf, len);
 	}
+	uk_spin_unlock(&cons_dev_list_lock);
 
 	return len;
 }
@@ -80,7 +102,8 @@ __ssz uk_console_in(char *buf, __sz len)
 	 *        We could solve this by remembering the iteration
 	 *        point between calls.
 	 */
-	uk_list_for_each_entry(dev, &uk_console_device_list, _list) {
+	uk_spin_lock(&cons_dev_list_lock);
+	uk_list_for_each_entry(dev, &cons_dev_list, _list) {
 		UK_ASSERT(dev->ops);
 		if ((dev->flags & UK_CONSOLE_FLAG_STDIN) && dev->ops->in) {
 			rc = uk_console_in_direct(dev, buf, leftover);
@@ -92,8 +115,31 @@ __ssz uk_console_in(char *buf, __sz len)
 				break;
 		}
 	}
+	uk_spin_unlock(&cons_dev_list_lock);
 
 	return len - leftover;
+}
+
+__isr __ssz uk_console_emerg_out(const char *buf, __sz len)
+{
+	struct uk_console *dev = __NULL;
+
+	if (unlikely(!len))
+		return 0;
+
+	if (unlikely(!buf))
+		return -EINVAL;
+
+	/* Output to all EMERG_STDOUT devices */
+	uk_spin_lock(&cons_dev_list_lock);
+	uk_list_for_each_entry(dev, &cons_dev_list, _list) {
+		if ((dev->flags & UK_CONSOLE_FLAG_EMERG_STDOUT) &&
+		    dev->ops->emerg_out)
+			uk_console_emerg_out_direct(dev, buf, len);
+	}
+	uk_spin_unlock(&cons_dev_list_lock);
+
+	return len;
 }
 
 __ssz uk_console_out_direct(struct uk_console *dev, const char *buf, __sz len)
@@ -128,16 +174,123 @@ __ssz uk_console_in_direct(struct uk_console *dev, char *buf, __sz len)
 	return dev->ops->in(dev, buf, len);
 }
 
+__isr __ssz uk_console_emerg_out_direct(struct uk_console *dev,
+					const char *buf, __sz len)
+{
+	UK_ASSERT(dev && dev->ops);
+
+	if (unlikely(!len))
+		return 0;
+
+	if (unlikely(!buf))
+		return -EINVAL;
+
+	if (unlikely(!dev->ops->emerg_out))
+		return -EIO;
+
+	return dev->ops->emerg_out(dev, buf, len);
+}
+
+int uk_console_out_direct_all(struct uk_console *dev,
+			      const char *buf, __sz len)
+{
+	__sz bytes_written = 0;
+	__ssz rc;
+
+	UK_ASSERT(dev && dev->ops);
+
+	if (unlikely(!len))
+		return 0;
+
+	if (unlikely(!buf))
+		return -EINVAL;
+
+	if (unlikely(!dev->ops->out))
+		return -EIO;
+
+	while (bytes_written < len) {
+		rc = dev->ops->out(dev, buf + bytes_written,
+				   len - bytes_written);
+		if (unlikely(rc < 0))
+			return (int)rc;
+
+		bytes_written += (__sz)rc;
+	}
+
+	return 0;
+}
+
+int uk_console_in_direct_all(struct uk_console *dev,
+			     char *buf, __sz len)
+{
+	__sz bytes_read = 0;
+	__ssz rc;
+
+	UK_ASSERT(dev && dev->ops);
+
+	if (unlikely(!len))
+		return 0;
+
+	if (unlikely(!buf))
+		return -EINVAL;
+
+	if (unlikely(!dev->ops->in))
+		return -EIO;
+
+	while (bytes_read < len) {
+		rc = dev->ops->in(dev, buf + bytes_read,
+				  len - bytes_read);
+		if (unlikely(rc < 0))
+			return (int)rc;
+
+		bytes_read += (__sz)rc;
+	}
+
+	return 0;
+}
+
+__isr int uk_console_emerg_out_direct_all(struct uk_console *dev,
+					  const char *buf, __sz len)
+{
+	__sz bytes_written = 0;
+	__ssz rc;
+
+	UK_ASSERT(dev && dev->ops);
+
+	if (unlikely(!len))
+		return 0;
+
+	if (unlikely(!buf))
+		return -EINVAL;
+
+	if (unlikely(!dev->ops->emerg_out))
+		return -EIO;
+
+	while (bytes_written < len) {
+		rc = dev->ops->emerg_out(dev, buf + bytes_written,
+					 len - bytes_written);
+		if (unlikely(rc < 0))
+			return (int)rc;
+
+		bytes_written += (__sz)rc;
+	}
+
+	return 0;
+}
+
 void uk_console_register(struct uk_console *dev)
 {
 	struct uk_console *known_dev __maybe_unused = __NULL;
+	unsigned long id;
 
 	UK_ASSERT(dev);
 	UK_ASSERT(dev->ops);
 
 #if CONFIG_LIBUKDEBUG_ENABLE_ASSERT
-	uk_list_for_each_entry(known_dev, &uk_console_device_list, _list)
+	uk_spin_lock(&cons_dev_list_lock);
+	uk_list_for_each_entry(known_dev, &cons_dev_list, _list)
 		UK_ASSERT(dev != known_dev);
+	uk_spin_unlock(&cons_dev_list_lock);
 #endif /* CONFIG_LIBUKDEBUG_ENABLE_ASSERT */
 
 	/* We want to make sure that one of the registered devices has the
@@ -150,6 +303,9 @@ void uk_console_register(struct uk_console *dev)
 
 	if (dev->flags & UK_CONSOLE_FLAG_STDIN)
 		uk_console_set_stdin_once = __true;
+
+	if (dev->flags & UK_CONSOLE_FLAG_EMERG_STDOUT)
+		uk_console_set_emerg_stdout_once = __true;
 
 	/* Otherwise, if the current device doesn't have any flags set and
 	 * there has not yet been another device with any flags set, we give
@@ -169,8 +325,30 @@ void uk_console_register(struct uk_console *dev)
 		dev->flags |= UK_CONSOLE_FLAG_STDIN;
 	}
 
-	uk_list_add_tail(&dev->_list, &uk_console_device_list);
-	dev->id = uk_console_device_count++;
+	if (!uk_console_set_emerg_stdout_once &&
+	    !(dev->flags & UK_CONSOLE_FLAG_EMERG_STDOUT) &&
+	    dev->ops->emerg_out) {
+		uk_console_set_emerg_stdout_once = __true;
+		dev->flags |= UK_CONSOLE_FLAG_EMERG_STDOUT;
+	}
+
+	uk_spin_lock(&cons_dev_list_lock);
+
+	uk_list_add_tail(&dev->_list, &cons_dev_list);
+
+	id = uk_find_next_zero_bit(cons_id_bitmap,
+				   UK_CONSOLE_MAX_DEVS, 0);
+	if (unlikely(id >= UK_CONSOLE_MAX_DEVS))
+		UK_CRASH("Cannot register more than %u console devices\n",
+			 UK_CONSOLE_MAX_DEVS);
+
+	uk_bitmap_set(cons_id_bitmap, (unsigned int)id, 1);
+	cons_dev_count++;
+
+	uk_spin_unlock(&cons_dev_list_lock);
+
+	UK_ASSERT(id < UK_CONSOLE_MAX_DEVS); /* out of console ID slots */
+	dev->id = (__u16)id;
 
 #if CONFIG_LIBUKDEBUG_PRINTK
 	uk_pr_info("Registered con%" __PRIu16 ": %s, flags: %c%c\n",
@@ -178,5 +356,173 @@ void uk_console_register(struct uk_console *dev)
 		   (dev->flags & UK_CONSOLE_FLAG_STDIN) ? 'I' : '-',
 		   (dev->flags & UK_CONSOLE_FLAG_STDOUT) ? 'O' : '-');
 #endif /* CONFIG_LIBUKDEBUG_PRINTK */
+}
 
+struct uk_console_async_callback {
+	void *cookie;
+	uk_console_async_handler_func handler;
+	__u32 evflags;
+	struct uk_list_head _list;
+};
+
+void console_async_release_cb(struct uk_console *dev)
+{
+	struct uk_console_async_callback *cb, *tmp;
+	struct uk_console_async *async_dev;
+
+	async_dev = __containerof(dev, struct uk_console_async, cons);
+
+	uk_spin_lock(&async_dev->_cb_list_lock);
+	uk_list_for_each_entry_safe(cb, tmp, &async_dev->_cb_list, _list) {
+		uk_list_del(&cb->_list);
+		uk_free(uk_alloc_get_default(), cb);
+	}
+	uk_spin_unlock(&async_dev->_cb_list_lock);
+}
+
+void uk_console_unregister(struct uk_console *dev)
+{
+	struct uk_console *cons;
+
+	UK_ASSERT(dev);
+	UK_ASSERT(dev->id < UK_CONSOLE_MAX_DEVS);
+
+	uk_spin_lock(&cons_dev_list_lock);
+
+	uk_list_del_init(&dev->_list);
+	uk_bitmap_clear(cons_id_bitmap, dev->id, 1);
+	cons_dev_count--;
+
+	dev->id = __U16_MAX;
+
+	if ((dev->flags & UK_CONSOLE_FLAG_ASYNC_RX) ||
+	    (dev->flags & UK_CONSOLE_FLAG_ASYNC_TX))
+		console_async_release_cb(dev);
+
+	/*
+	 * Re-evaluate the _once flags: if the removed device was the last
+	 * one carrying a given flag, future registrations must be able to
+	 * auto-assign that flag again.
+	 */
+	uk_console_set_stdout_once = __false;
+	uk_console_set_stdin_once = __false;
+	uk_console_set_emerg_stdout_once = __false;
+	uk_list_for_each_entry(cons, &cons_dev_list, _list) {
+		if (cons->flags & UK_CONSOLE_FLAG_STDOUT)
+			uk_console_set_stdout_once = __true;
+		if (cons->flags & UK_CONSOLE_FLAG_STDIN)
+			uk_console_set_stdin_once = __true;
+		if (cons->flags & UK_CONSOLE_FLAG_EMERG_STDOUT)
+			uk_console_set_emerg_stdout_once = __true;
+	}
+
+	uk_spin_unlock(&cons_dev_list_lock);
+}
+
+int uk_console_async_register_callback(struct uk_console *dev,
+				       uk_console_async_handler_func handler,
+				       void *cookie, __u32 event)
+{
+	struct uk_console_async_callback *cb;
+	struct uk_console_async *async_dev;
+
+	UK_ASSERT(dev);
+	UK_ASSERT(dev->ops);
+	UK_ASSERT(handler);
+
+	if (unlikely(!event ||
+		     (event & ~(UK_CONSOLE_ASYNC_EVENT_IN |
+				UK_CONSOLE_ASYNC_EVENT_OUT))))
+		return -EINVAL;
+
+	if (unlikely((event & UK_CONSOLE_ASYNC_EVENT_IN) &&
+		     !(dev->flags & UK_CONSOLE_FLAG_ASYNC_RX)))
+		return -ENOTSUP;
+
+	if (unlikely((event & UK_CONSOLE_ASYNC_EVENT_OUT) &&
+		     !(dev->flags & UK_CONSOLE_FLAG_ASYNC_TX)))
+		return -ENOTSUP;
+
+	cb = uk_malloc(uk_alloc_get_default(), sizeof(*cb));
+	if (unlikely(!cb)) {
+		uk_pr_err("Failed to allocate memory for the callback.\n");
+		return -ENOMEM;
+	}
+
+	cb->cookie = cookie;
+	cb->handler = handler;
+	cb->evflags = event;
+	UK_INIT_LIST_HEAD(&cb->_list);
+
+	async_dev = __containerof(dev, struct uk_console_async, cons);
+
+	uk_spin_lock(&async_dev->_cb_list_lock);
+	uk_list_add_tail(&cb->_list, &async_dev->_cb_list);
+	uk_spin_unlock(&async_dev->_cb_list_lock);
+
+	return 0;
+}
+
+int uk_console_async_unregister_callback(struct uk_console *dev,
+					 uk_console_async_handler_func handler,
+					 void *cookie, __u32 event)
+{
+	struct uk_console_async_callback *cb, *tmp;
+	struct uk_console_async *async_dev;
+
+	UK_ASSERT(dev);
+	UK_ASSERT(dev->ops);
+	UK_ASSERT(handler);
+
+	if (unlikely(!event ||
+		     (event & ~(UK_CONSOLE_ASYNC_EVENT_IN |
+				UK_CONSOLE_ASYNC_EVENT_OUT))))
+		return -EINVAL;
+
+	if (unlikely(!(dev->flags & (UK_CONSOLE_FLAG_ASYNC_RX |
+				     UK_CONSOLE_FLAG_ASYNC_TX))))
+		return -ENOTSUP;
+
+	async_dev = __containerof(dev, struct uk_console_async, cons);
+
+	uk_spin_lock(&async_dev->_cb_list_lock);
+	uk_list_for_each_entry_safe(cb, tmp, &async_dev->_cb_list, _list) {
+		if (cb->handler != handler ||
+		    cb->cookie != cookie  ||
+		    cb->evflags != event)
+			continue;
+
+		uk_list_del(&cb->_list);
+		uk_spin_unlock(&async_dev->_cb_list_lock);
+		uk_free(uk_alloc_get_default(), cb);
+		return 0;
+	}
+	uk_spin_unlock(&async_dev->_cb_list_lock);
+
+	return -ENOENT;
+}
+
+static inline void _uk_console_async_evhandle(struct uk_console_async *dev,
+					      __u32 event)
+{
+	struct uk_console_async_callback *cb;
+
+	uk_spin_lock(&dev->_cb_list_lock);
+	uk_list_for_each_entry(cb, &dev->_cb_list, _list) {
+		if (!(cb->evflags & event))
+			continue;
+
+		cb->handler(&dev->cons, cb->cookie);
+	}
+	uk_spin_unlock(&dev->_cb_list_lock);
+}
+
+void uk_console_async_in_handle(struct uk_console_async *dev)
+{
+	_uk_console_async_evhandle(dev, UK_CONSOLE_ASYNC_EVENT_IN);
+}
+
+void uk_console_async_out_handle(struct uk_console_async *dev)
+{
+	_uk_console_async_evhandle(dev, UK_CONSOLE_ASYNC_EVENT_OUT);
 }

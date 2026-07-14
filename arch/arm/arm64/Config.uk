@@ -168,7 +168,7 @@ menuconfig ARM64_FEAT_MTE
 	bool "Armv8.5 Memory Tagging Extensions"
 	select HAVE_MEMTAG
 	select LIBUKRANDOM
-	select PAGING
+	select LIBUKPAGING
 	help
 	  Protects against memory safety violations by restricting
 	  access to tagged memory regions.

@@ -1,0 +1,15 @@
+menuconfig LIBUKFILE_CONSOLE
+	bool "ukfile-console: Files backed by console devices"
+	select LIBUKFILE
+	select LIBUKCONSOLE
+	select LIBPOSIX_FD
+
+if LIBUKFILE_CONSOLE
+
+config LIBUKFILE_CONSOLE_OUT_NOCARRIAGERETURN
+	bool "Serial output: no carriage return"
+
+config LIBUKFILE_CONSOLE_IN_NOECHOBACK
+	bool "Serial input: no echo back"
+
+endif

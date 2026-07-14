@@ -7,7 +7,7 @@
 
 #include "gdbstub.h"
 #include <gdbsup.h>
-#include <uk/plat/lcpu.h>
+#include <uk/lcpu.h>
 
 #include <uk/assert.h>
 #include <uk/essentials.h>
@@ -20,17 +20,15 @@
 #include <uk/init.h>
 #include <uk/prio.h>
 
-#if CONFIG_HAVE_PAGING
-#include <uk/plat/paging.h>
-#include <uk/plat/io.h>
-#include <uk/page.h>
-#endif /* CONFIG_HAVE_PAGING */
+#if CONFIG_LIBUKPAGING
+#include <uk/paging.h>
+#endif /* CONFIG_LIBUKPAGING */
 
 #include <errno.h>
 #include <stddef.h>
 
 struct gdb_excpt_ctx {
-	struct __regs *regs;
+	struct uk_lcpu_regs *regs;
 	int errnr;
 };
 
@@ -318,16 +316,16 @@ static __ssz gdb_write_memory(unsigned long addr, __sz len,
 			      void *buf, __sz buf_len)
 {
 	__sz rc = 0;
-#if CONFIG_HAVE_PAGING
+#if CONFIG_LIBUKPAGING
 	__paddr_t paddr = 0;
 	__vaddr_t kmap_vaddr = 0;
 	struct uk_pagetable *pt = __NULL;
 	unsigned long n_pages = 0;
 
 	len = MIN(len, buf_len);
-	n_pages = round_pgup(len) / __PAGE_SIZE;
+	n_pages = UK_PAGING_PAGE_ALIGN_UP(len) / UK_PAGING_PAGE_SIZE;
 
-	pt = ukplat_pt_get_active();
+	pt = uk_paging_pt_get_active();
 	if (!pt) {
 		/* Paging isn't initialized. We don't need the kmap detour to
 		 * work around permissions.
@@ -338,12 +336,12 @@ static __ssz gdb_write_memory(unsigned long addr, __sz len,
 		return rc;
 	}
 
-	paddr = ukplat_virt_to_phys((void *)addr);
-	if (unlikely(paddr == __PADDR_INV))
+	paddr = uk_paging_virt_to_phys((__vaddr_t)addr);
+	if (unlikely(paddr == UK_PAGING_PADDR_INV))
 		return 0;
 
-	kmap_vaddr = ukplat_page_kmap(pt, paddr, n_pages, 0);
-	if (unlikely(kmap_vaddr == __VADDR_INV))
+	kmap_vaddr = uk_paging_page_kmap(pt, paddr, n_pages, 0);
+	if (unlikely(kmap_vaddr == UK_PAGING_VADDR_INV))
 		return 0;
 
 	/* We use the virtual address from kmap because it grants us write
@@ -354,15 +352,15 @@ static __ssz gdb_write_memory(unsigned long addr, __sz len,
 			       UK_NOFAULTF_NOPAGING);
 	gdb_arch_invalidate_cache(addr, len);
 
-	ukplat_page_kunmap(pt, kmap_vaddr, n_pages, 0);
+	uk_paging_page_kunmap(pt, kmap_vaddr, n_pages, 0);
 
 	return rc;
-#else /* !CONFIG_HAVE_PAGING */
+#else /* !CONFIG_LIBUKPAGING */
 	rc = uk_nofault_memcpy((void *)addr, buf, MIN(len, buf_len),
 			       UK_NOFAULTF_NOPAGING);
 	gdb_arch_invalidate_cache(addr, len);
 	return rc;
-#endif /* !CONFIG_HAVE_PAGING */
+#endif /* !CONFIG_LIBUKPAGING */
 }
 
 static __ssz gdb_send(const char *buf, __sz len)
@@ -718,7 +716,7 @@ static int gdb_handle_step_cont(char *buf, __sz buf_len,
 			return 0;
 		}
 
-		ukarch_regs_set_pc(addr, g->regs);
+		uk_lcpu_regs_set(g->regs, PC, addr);
 	}
 
 	return 1;
@@ -747,7 +745,7 @@ static int gdb_handle_step_cont_sig(char *buf, __sz buf_len,
 			return 0;
 		}
 
-		ukarch_regs_set_pc(addr, g->regs);
+		uk_lcpu_regs_set(g->regs, PC, addr);
 	}
 
 	return 1;
@@ -1123,9 +1121,9 @@ static __ssz gdb_virt_out(struct uk_console *dev __unused, const char *str,
 		 * This shouldn't happen, but it's better to be safe than
 		 * sorry on this.
 		 */
-		irqs = ukplat_lcpu_save_irqf();
+		irqs = uk_lcpu_save_irqf();
 		gdb_send_message_packet(str, len);
-		ukplat_lcpu_restore_irqf(irqs);
+		uk_lcpu_restore_irqf(irqs);
 	}
 
 	return len;
@@ -1135,7 +1133,7 @@ static struct uk_console_ops gdb_virt_ops = { .out = gdb_virt_out };
 
 static struct uk_console gdb_virt_console;
 
-int gdb_dbg_trap(int errnr, struct __regs *regs)
+int gdb_dbg_trap(int errnr, struct uk_lcpu_regs *regs)
 {
 	struct gdb_excpt_ctx g = {regs, errnr};
 	static int nest_cnt;
@@ -1157,18 +1155,18 @@ int gdb_dbg_trap(int errnr, struct __regs *regs)
 	 * in the debugger code itself or if we set a breakpoint in code
 	 * called by the debugger.
 	 */
-#ifdef UKPLAT_LCPU_MULTICORE
+#ifdef LIBUKLCPU_MULTICORE
 #warning The GDB stub does not support multicore systems
 #endif
 
-	irqs = ukplat_lcpu_save_irqf();
+	irqs = uk_lcpu_save_irqf();
 	if (nest_cnt > 0) {
-		ukplat_lcpu_restore_irqf(irqs);
+		uk_lcpu_restore_irqf(irqs);
 		return GDB_DBG_CONT;
 	}
 
 	if (!gdb_backing_console) {
-		ukplat_lcpu_restore_irqf(irqs);
+		uk_lcpu_restore_irqf(irqs);
 		return -ENODEV;
 	}
 
@@ -1176,7 +1174,7 @@ int gdb_dbg_trap(int errnr, struct __regs *regs)
 	r = gdb_main_loop(&g);
 	nest_cnt--;
 
-	ukplat_lcpu_restore_irqf(irqs);
+	uk_lcpu_restore_irqf(irqs);
 
 	return r;
 }
@@ -1196,7 +1194,8 @@ static int gdb_setup_backing_console(void)
 	UK_ASSERT(gdb_backing_console);
 
 	uk_console_init(&gdb_virt_console, "GDB virtual console",
-			&gdb_virt_ops, 0); /* Don't enable flags yet */
+			&gdb_virt_ops, 0, /* Don't enable flags yet */
+			UK_CONSOLE_CLASS_NONE);
 	if (gdb_mode_is_shared()) {
 		uk_console_register(&gdb_virt_console);
 	} else if (gdb_mode_is_auto()) {

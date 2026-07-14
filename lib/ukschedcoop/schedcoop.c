@@ -30,7 +30,7 @@
  * to Round Robin algorithm.
  */
 #include <uk/plat/config.h>
-#include <uk/plat/lcpu.h>
+#include <uk/lcpu.h>
 #include <uk/plat/memory.h>
 #include <uk/plat/time.h>
 #include <uk/sched_impl.h>
@@ -45,12 +45,12 @@ static void schedcoop_schedule(struct uk_sched *s)
 	__snsec now, min_wakeup_time;
 	unsigned long flags;
 
-	if (unlikely(ukplat_lcpu_irqs_disabled()))
+	if (unlikely(uk_lcpu_irqs_disabled()))
 		UK_CRASH("Must not call %s with IRQs disabled\n", __func__);
 
 	now = ukplat_monotonic_clock();
 	prev = uk_thread_current();
-	flags = ukplat_lcpu_save_irqf();
+	flags = uk_lcpu_save_irqf();
 
 #if 0 //TODO
 	if (in_callback)
@@ -120,7 +120,7 @@ static void schedcoop_schedule(struct uk_sched *s)
 
 	uk_sched_stats_sched_count_incr(s);
 
-	ukplat_lcpu_restore_irqf(flags);
+	uk_lcpu_restore_irqf(flags);
 
 	/* Interrupting the switch is equivalent to having the next thread
 	 * interrupted at the return instruction. And therefore at safe point.
@@ -166,7 +166,7 @@ static void schedcoop_thread_blocked(struct uk_sched *s, struct uk_thread *t)
 {
 	struct schedcoop *c = uksched2schedcoop(s);
 
-	UK_ASSERT(ukplat_lcpu_irqs_disabled());
+	UK_ASSERT(uk_lcpu_irqs_disabled());
 
 	if (t != uk_thread_current())
 		UK_TAILQ_REMOVE(&c->run_queue, t, queue);
@@ -183,7 +183,7 @@ static __noreturn void idle_thread_fn(void *argp)
 	UK_ASSERT(c);
 
 	for (;;) {
-		flags = ukplat_lcpu_save_irqf();
+		flags = uk_lcpu_save_irqf();
 
 		/*
 		 * FIXME: We assume that `uk_sched_thread_gc()` is non-blocking
@@ -202,7 +202,7 @@ static __noreturn void idle_thread_fn(void *argp)
 			 * a runnable thread in the queue.
 			 * Check if something else can be scheduled now.
 			 */
-			ukplat_lcpu_restore_irqf(flags);
+			uk_lcpu_restore_irqf(flags);
 
 			/* Use yield() here instead of schedule(), as the
 			 * latter would cause num_sched to exceed num_yield,
@@ -220,15 +220,15 @@ static __noreturn void idle_thread_fn(void *argp)
 
 		if (!wake_up_time || wake_up_time > now) {
 			if (wake_up_time)
-				ukplat_lcpu_halt_irq_until(wake_up_time);
+				uk_lcpu_halt_irq_until(wake_up_time);
 			else
-				ukplat_lcpu_halt_irq();
+				uk_lcpu_halt_irq();
 
 			/* handle pending events if any */
-			ukplat_lcpu_irqs_handle_pending();
+			uk_lcpu_irqs_handle_pending();
 		}
 
-		ukplat_lcpu_restore_irqf(flags);
+		uk_lcpu_restore_irqf(flags);
 
 		/* Try to schedule a thread that might now be available.
 		 * Use yield() here instead of schedule(), as the
@@ -261,7 +261,7 @@ static int schedcoop_start(struct uk_sched *s,
 	 *       a different thread is scheduled.
 	 */
 
-	ukplat_lcpu_enable_irq();
+	uk_lcpu_enable_irq();
 
 	return 0;
 }

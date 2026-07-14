@@ -1,0 +1,6 @@
+config LIBUKPSCI
+	bool "PSCI"
+	depends on ARCH_ARM_64
+	select LIBUKSMCCC
+	help
+		Arm Power State Coordination Interface

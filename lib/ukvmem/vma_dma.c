@@ -13,10 +13,9 @@
 #include <uk/alloc.h>
 #include <uk/vmem/vma_ops.h>
 #include <uk/arch/limits.h>
-#include <uk/arch/paging.h>
-#ifdef CONFIG_HAVE_PAGING
-#include <uk/plat/paging.h>
-#endif /* CONFIG_HAVE_PAGING */
+#ifdef CONFIG_LIBUKPAGING
+#include <uk/paging.h>
+#endif /* CONFIG_LIBUKPAGING */
 
 struct uk_vma_dma {
 	struct uk_vma base;
@@ -42,9 +41,9 @@ int vma_op_dma_new(struct uk_vas *vas, __vaddr_t vaddr __unused,
 	struct uk_vma_dma *vma_dma;
 
 	UK_ASSERT(data);
-	UK_ASSERT(PAGE_ALIGNED(args->paddr));
+	UK_ASSERT(UK_PAGING_PAGE_ALIGNED(args->paddr));
 	UK_ASSERT(args->paddr <= __PADDR_MAX - len);
-	UK_ASSERT(ukarch_paddr_range_isvalid(args->paddr, len));
+	UK_ASSERT(uk_paging_paddr_range_isvalid(args->paddr, len));
 
 	vma_dma = uk_malloc(vas->a, sizeof(struct uk_vma_dma));
 	if (unlikely(!vma_dma))
@@ -63,7 +62,7 @@ static int vma_op_dma_fault(struct uk_vma *vma, struct uk_vm_fault *fault)
 {
 	struct uk_vma_dma *vma_dma = (struct uk_vma_dma *)vma;
 
-	UK_ASSERT(PAGE_ALIGNED(fault->len));
+	UK_ASSERT(UK_PAGING_PAGE_ALIGNED(fault->len));
 	UK_ASSERT(fault->type & UK_VMA_FAULT_NONPRESENT);
 	UK_ASSERT(fault->vbase >= vma->start && fault->vbase < vma->end);
 
@@ -77,8 +76,9 @@ static int vma_op_dma_unmap(struct uk_vma *vma, __vaddr_t vaddr, __sz len)
 	UK_ASSERT(vaddr >= vma->start);
 	UK_ASSERT(vaddr + len <= vma->end);
 
-	return ukplat_page_unmap(vma->vas->pt, vaddr, len >> PAGE_SHIFT,
-				 PAGE_FLAG_KEEP_FRAMES);
+	return uk_paging_page_unmap(vma->vas->pt, vaddr,
+				    len >> UK_PAGING_PAGE_SHIFT,
+				    UK_PAGING_PAGE_FLAG_KEEP_FRAMES);
 }
 
 static int vma_op_dma_split(struct uk_vma *vma, __vaddr_t vaddr,

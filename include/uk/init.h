@@ -35,9 +35,11 @@
 #define _UK_INIT_H
 
 #include <uk/config.h>
-#include <uk/plat/bootstrap.h>
 #include <uk/essentials.h>
 #include <uk/prio.h>
+
+/* Has always available definitions with fallbacks */
+#include <uk/pm.h>
 
 #if CONFIG_LIBUKSCHED
 #include <uk/thread.h>
@@ -63,7 +65,9 @@ struct uk_init_ctx {
 };
 
 struct uk_term_ctx {
-	enum ukplat_gstate target;
+	/* Power management event that lead to teardown */
+	enum uk_pm_shutdown_op target;
+
 	/* Application exit code */
 	int exit_code;
 

@@ -11,11 +11,10 @@
 #include <uk/assert.h>
 #include <uk/vmem/vma_ops.h>
 #include <uk/arch/limits.h>
-#include <uk/arch/paging.h>
-#ifdef CONFIG_HAVE_PAGING
-#include <uk/plat/paging.h>
+#ifdef CONFIG_LIBUKPAGING
+#include <uk/paging.h>
 #include <uk/falloc.h>
-#endif /* CONFIG_HAVE_PAGING */
+#endif /* CONFIG_LIBUKPAGING */
 #include <uk/isr/string.h>
 
 #ifdef CONFIG_LIBUKVMEM_ANON_BASE
@@ -30,13 +29,13 @@ static __vaddr_t vma_op_anon_get_base(struct uk_vas *vas __unused,
 static int vma_op_anon_fault(struct uk_vma *vma, struct uk_vm_fault *fault)
 {
 	struct uk_pagetable * const pt = vma->vas->pt;
-	unsigned long pages = fault->len / PAGE_SIZE;
-	__paddr_t paddr = __PADDR_ANY;
+	unsigned long pages = fault->len / UK_PAGING_PAGE_SIZE;
+	__paddr_t paddr = UK_PAGING_PADDR_ANY;
 	__vaddr_t vaddr;
 	int rc;
 
-	UK_ASSERT(PAGE_ALIGNED(fault->len));
-	UK_ASSERT(fault->len == PAGE_Lx_SIZE(fault->level));
+	UK_ASSERT(UK_PAGING_PAGE_ALIGNED(fault->len));
+	UK_ASSERT(fault->len == UK_PAGING_PAGE_Lx_SIZE(fault->level));
 	UK_ASSERT(fault->type & UK_VMA_FAULT_NONPRESENT);
 
 	rc = pt->fa->falloc(pt->fa, &paddr, pages, FALLOC_FLAG_ALIGNED);
@@ -44,14 +43,14 @@ static int vma_op_anon_fault(struct uk_vma *vma, struct uk_vm_fault *fault)
 		return rc;
 
 	if (!(vma->flags & UK_VMA_FLAG_UNINITIALIZED)) {
-		vaddr = ukplat_page_kmap(pt, paddr, pages, 0);
-		if (unlikely(vaddr == __VADDR_INV)) {
+		vaddr = uk_paging_page_kmap(pt, paddr, pages, 0);
+		if (unlikely(vaddr == UK_PAGING_VADDR_INV)) {
 			pt->fa->ffree(pt->fa, paddr, pages);
 			return -ENOMEM;
 		}
 
 		memset_isr((void *)vaddr, 0, fault->len);
-		ukplat_page_kunmap(pt, vaddr, pages, 0);
+		uk_paging_page_kunmap(pt, vaddr, pages, 0);
 	}
 
 	fault->paddr = paddr;

@@ -25,7 +25,7 @@
 /* Ported from Mini-OS */
 
 #include <stdio.h>
-#include <arm/smccc.h>
+#include <uk/smccc.h>
 #include <xen-arm/os.h>
 #include <xen-arm/mm.h>
 #include <common/events.h>
@@ -38,7 +38,9 @@
 #include <xen/hvm/params.h>
 #include <libfdt.h>
 #include <xen-arm/setup.h>
-#include <uk/plat/common/lcpu.h>
+#include <uk/arch.h>
+#include <uk/lcpu.h>
+#include <uk/paging.h>
 #include <uk/plat/common/bootinfo.h>
 
 /*
@@ -65,7 +67,7 @@ void *HYPERVISOR_dtb;
  */
 paddr_t _libxenplat_paddr_offset;
 
-smccc_conduit_fn_t smccc_psci_call;
+uk_smccc_conduit_func smccc_psci_call;
 
 static int hvm_get_parameter(int idx, uint64_t *value)
 {
@@ -204,7 +206,7 @@ int uk_intctlr_plat_probe(void *arg)
 						L2_OFFSET));
 #endif
 	/* Setting memory barrier to get access to mapped pages */
-	wmb();
+	uk_arch_wmb();
 	return 0;
 }
 
@@ -241,11 +243,11 @@ static int _get_ramdisk(struct ukplat_bootinfo *bi, void *fdtp)
 	initrd_base = initrd_addr(fdt_initrd_start[0], start_len);
 	initrd_end = initrd_addr(fdt_initrd_end[0], end_len);
 
-	mrd.vbase = (__vaddr_t)to_virt(PAGE_ALIGN_DOWN(initrd_base));
+	mrd.vbase = (__vaddr_t)to_virt(UK_PAGING_PAGE_ALIGN_DOWN(initrd_base));
 	mrd.pbase = (__paddr_t)mrd.vbase;
 	mrd.pg_off = initrd_base - mrd.pbase;
 	mrd.len = initrd_end - initrd_base;
-	mrd.pg_count = PAGE_COUNT(mrd.pg_off + mrd.len);
+	mrd.pg_count = UK_PAGING_PAGE_COUNT(mrd.pg_off + mrd.len);
 	mrd.type = UKPLAT_MEMRT_INITRD;
 	mrd.flags = UKPLAT_MEMRF_READ;
 
@@ -275,15 +277,15 @@ static int _init_mem(struct ukplat_bootinfo *const bi, paddr_t physical_offset)
 	 * to the page allocator, so move it to the end and reserve that space.
 	 */
 	fdt_size = fdt_totalsize(HYPERVISOR_dtb);
-	new_dtb = to_virt(((max_pfn_p << __PAGE_SHIFT) - fdt_size)
-					  & __PAGE_MASK);
+	new_dtb = to_virt(((max_pfn_p << PAGE_SHIFT) - fdt_size)
+			  & PAGE_MASK);
 	if (new_dtb != HYPERVISOR_dtb)
 		memmove(new_dtb, HYPERVISOR_dtb, fdt_size);
 	HYPERVISOR_dtb = new_dtb;
 
 	bi->dtb = (__u64)HYPERVISOR_dtb;
 
-	max_pfn_p = to_phys(new_dtb) >> __PAGE_SHIFT;
+	max_pfn_p = to_phys(new_dtb) >> PAGE_SHIFT;
 
 	/*
 	 * Fill out mrd array
@@ -318,7 +320,7 @@ static int _init_mem(struct ukplat_bootinfo *const bi, paddr_t physical_offset)
 	    .pbase = (__paddr_t)HYPERVISOR_dtb,
 	    .len = fdt_size,
 	    .pg_off = 0,
-	    .pg_count = PAGE_COUNT(fdt_size),
+	    .pg_count = UK_PAGING_PAGE_COUNT(fdt_size),
 	    .type = UKPLAT_MEMRT_DEVICETREE,
 	    .flags = UKPLAT_MEMRF_READ,
 	};
@@ -391,7 +393,7 @@ void _libxenplat_armentry(void *dtb_pointer, paddr_t physical_offset)
 	init_events();
 
 	/* Initialize logical boot CPU */
-	r = lcpu_init(lcpu_get_bsp());
+	r = uk_lcpu_init(uk_lcpu_get_bsp());
 	if (unlikely(r))
 		UK_CRASH("Failed to initialize bootstrapping CPU: %d\n", r);
 

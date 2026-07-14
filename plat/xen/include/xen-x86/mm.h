@@ -47,6 +47,14 @@
 #include <xen-x86/mm_pv.h>
 #endif
 
+#include <uk/paging.h>
+
+#define PAGE_SIZE UK_PAGING_PAGE_SIZE
+#define PAGE_SHIFT UK_PAGING_PAGE_SHIFT
+#define PAGE_MASK UK_PAGING_PAGE_MASK
+#define PAGE_COUNT UK_PAGING_PAGE_COUNT
+#define PAGE_ALIGN_DOWN UK_PAGING_PAGE_ALIGN_DOWN
+
 /*
  * Physical address space usage:
  *

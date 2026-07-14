@@ -1,0 +1,6 @@
+config LIBUKPCPUVAR
+	bool "ukpcpuvar: Per-CPU variables"
+	help
+		Provides efficient per-CPU variable support with
+		architecture-optimized access primitives to eliminate locking
+		overhead for CPU-local data and avoid false sharing.

@@ -14,11 +14,10 @@
 #include <uk/assert.h>
 #include <uk/vmem/vma_ops.h>
 #include <uk/arch/limits.h>
-#include <uk/arch/paging.h>
-#ifdef CONFIG_HAVE_PAGING
-#include <uk/plat/paging.h>
+#ifdef CONFIG_LIBUKPAGING
 #include <uk/falloc.h>
-#endif /* CONFIG_HAVE_PAGING */
+#include <uk/paging.h>
+#endif /* CONFIG_LIBUKPAGING */
 #include <uk/isr/string.h>
 
 static bool in_top_guard_pages_range(struct uk_vma *vma, __vaddr_t vaddr)
@@ -56,12 +55,12 @@ static __vaddr_t vma_op_stack_get_base(struct uk_vas *vas __unused,
 static int vma_op_stack_fault(struct uk_vma *vma, struct uk_vm_fault *fault)
 {
 	struct uk_pagetable * const pt = vma->vas->pt;
-	__paddr_t paddr = __PADDR_ANY;
+	__paddr_t paddr = UK_PAGING_PADDR_ANY;
 	__vaddr_t vaddr;
 	int rc;
 
-	UK_ASSERT(PAGE_ALIGNED(fault->len));
-	UK_ASSERT(fault->len == PAGE_SIZE);
+	UK_ASSERT(UK_PAGING_PAGE_ALIGNED(fault->len));
+	UK_ASSERT(fault->len == UK_PAGING_PAGE_SIZE);
 	UK_ASSERT(fault->type & UK_VMA_FAULT_NONPRESENT);
 
 	/* Check if the access is in the guard page. For software-generated
@@ -70,7 +69,7 @@ static int vma_op_stack_fault(struct uk_vma *vma, struct uk_vm_fault *fault)
 	 */
 	if (in_guard_pages_range(vma, fault->vbase)) {
 		if (likely(fault->type & UK_VMA_FAULT_SOFT))
-			   return UKPLAT_PAGE_MAPX_ESKIP;
+			return UK_PAGING_PAGE_MAPX_ESKIP;
 
 		uk_pr_crit("Guard page 0x%lx of stack VMA 0x%lx - 0x%lx hit!\n",
 			   fault->vbase, vma->start, vma->end);
@@ -83,14 +82,14 @@ static int vma_op_stack_fault(struct uk_vma *vma, struct uk_vm_fault *fault)
 		return rc;
 
 	if (!(vma->flags & UK_VMA_FLAG_UNINITIALIZED)) {
-		vaddr = ukplat_page_kmap(pt, paddr, 1, 0);
-		if (unlikely(vaddr == __VADDR_INV)) {
+		vaddr = uk_paging_page_kmap(pt, paddr, 1, 0);
+		if (unlikely(vaddr == UK_PAGING_VADDR_INV)) {
 			pt->fa->ffree(pt->fa, paddr, 1);
 			return -ENOMEM;
 		}
 
-		memset_isr((void *)vaddr, 0, PAGE_SIZE);
-		ukplat_page_kunmap(pt, vaddr, 1, 0);
+		memset_isr((void *)vaddr, 0, UK_PAGING_PAGE_SIZE);
+		uk_paging_page_kunmap(pt, vaddr, 1, 0);
 	}
 
 	fault->paddr = paddr;

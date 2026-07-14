@@ -41,6 +41,7 @@
 #include <uk/alloc.h>
 #include <uk/plat/config.h>
 #include <common/hypervisor.h>
+#include <xen-x86/hypercall.h>
 #include <xen-x86/mm.h>
 #include <xen/memory.h>
 #include <uk/print.h>

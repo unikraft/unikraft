@@ -44,13 +44,14 @@ ssize_t virtiofs_pod_pgin(void *addr, size_t npages, __paddr_t pa __unused,
 	struct viofs_node *n = arg;
 	struct iovec iov = {
 		.iov_base = addr,
-		.iov_len = npages * PAGE_SIZE
+		.iov_len = npages * UK_PAGING_PAGE_SIZE
 	};
 	ssize_t r;
 
 	if (!npages)
 		return 0;
-	r = virtiofs_file_read(n, pgoff * PAGE_SIZE, npages * PAGE_SIZE,
+	r = virtiofs_file_read(n, pgoff * UK_PAGING_PAGE_SIZE,
+			       npages * UK_PAGING_PAGE_SIZE,
 			       &iov, 1, 0);
 	if (unlikely(r < 0))
 		return r;
@@ -58,10 +59,10 @@ ssize_t virtiofs_pod_pgin(void *addr, size_t npages, __paddr_t pa __unused,
 		/* Offset is past EOF; page in anon mem */
 		return uk_pod_anon_pagein(addr, npages, pa, arg, pgoff);
 
-	while (!IS_ALIGNED((size_t)r, PAGE_SIZE)) {
+	while (!IS_ALIGNED((size_t)r, UK_PAGING_PAGE_SIZE)) {
 		/* We've likely hit EOF; check & zero out rest */
-		const size_t end = pgoff * PAGE_SIZE + r;
-		const size_t rem = npages * PAGE_SIZE - r;
+		const size_t end = pgoff * UK_PAGING_PAGE_SIZE + r;
+		const size_t rem = npages * UK_PAGING_PAGE_SIZE - r;
 		void *const base = (char *)addr + end;
 
 		if (end != n->attr.size) {
@@ -73,7 +74,7 @@ ssize_t virtiofs_pod_pgin(void *addr, size_t npages, __paddr_t pa __unused,
 			err = virtiofs_file_read(n, end, rem, &iov, 1, 0);
 			if (unlikely(err < 0)) {
 				/* Return partial success if read min 1 page */
-				if ((size_t)r > PAGE_SIZE)
+				if ((size_t)r > UK_PAGING_PAGE_SIZE)
 					break;
 				return err;
 			}
@@ -86,7 +87,7 @@ ssize_t virtiofs_pod_pgin(void *addr, size_t npages, __paddr_t pa __unused,
 		memset(base, 0, rem);
 		r += rem;
 	}
-	return r / PAGE_SIZE;
+	return r / UK_PAGING_PAGE_SIZE;
 }
 
 static
@@ -94,8 +95,8 @@ ssize_t virtiofs_pod_pgwb(const void *addr, size_t npages,
 			  void *arg, size_t pgoff)
 {
 	struct viofs_node *n = arg;
-	size_t off = pgoff * PAGE_SIZE;
-	size_t rem = npages * PAGE_SIZE;
+	size_t off = pgoff * UK_PAGING_PAGE_SIZE;
+	size_t rem = npages * UK_PAGING_PAGE_SIZE;
 	size_t wbytes = 0;
 	size_t wpages;
 	ssize_t r;
@@ -117,10 +118,10 @@ ssize_t virtiofs_pod_pgwb(const void *addr, size_t npages,
 		wbytes += r;
 		off += r;
 		rem -= r;
-	} while (rem && !IS_ALIGNED(wbytes, PAGE_SIZE));
+	} while (rem && !IS_ALIGNED(wbytes, UK_PAGING_PAGE_SIZE));
 
 	/* If we managed to writeback at least 1 page, report success */
-	wpages = wbytes / PAGE_SIZE;
+	wpages = wbytes / UK_PAGING_PAGE_SIZE;
 	if (wpages)
 		return wpages;
 	/* We should only get here on error */
@@ -238,7 +239,7 @@ static
 void virtiofs_iodest_prep(struct virtiofs_iomem *iom, size_t off,
 			  struct virtiofs_iodest_ctx *c)
 {
-	const size_t pgoff = off / PAGE_SIZE;
+	const size_t pgoff = off / UK_PAGING_PAGE_SIZE;
 	int flags = 0;
 	UK_SPARSEBUF_EMBED_HEAD(iohead, &iom->io);
 
@@ -259,7 +260,7 @@ size_t virtiofs_iodest(struct virtiofs_iodest_ctx *c, size_t off, char **bufp)
 static
 int virtiofs_iomem_after(struct virtiofs_iomem *iom, size_t off)
 {
-	const size_t pgoff = off / PAGE_SIZE;
+	const size_t pgoff = off / UK_PAGING_PAGE_SIZE;
 	struct uk_sparsebuf_cur cur;
 	char *buf __maybe_unused;
 	UK_SPARSEBUF_EMBED_HEAD(iohead, &iom->io);

@@ -34,7 +34,7 @@
 #ifndef __UK_PREEMPT_H__
 #define __UK_PREEMPT_H__
 
-#define uk_preempt_disable()  barrier()
-#define uk_preempt_enable()   barrier()
+#define uk_preempt_disable()  __barrier()
+#define uk_preempt_enable()   __barrier()
 
 #endif /* __UK_PREEMPT_H__ */

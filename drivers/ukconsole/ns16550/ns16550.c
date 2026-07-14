@@ -27,8 +27,8 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-#include "uk/arch/lcpu.h"
 #include <libfdt.h>
+#include <uk/arch/util.h>
 #include <uk/assert.h>
 #include <uk/config.h>
 #include <uk/init.h>
@@ -43,10 +43,10 @@
 #include <uk/alloc.h>
 #endif /* CONFIG_LIBUKALLOC */
 
-#if CONFIG_PAGING
+#if CONFIG_LIBUKPAGING
 #include <uk/bus/platform.h>
 #include <uk/errptr.h>
-#endif /* CONFIG_PAGING */
+#endif /* CONFIG_LIBUKPAGING */
 
 #if CONFIG_LIBNS16550_EARLY_CONSOLE
 #include <uk/boot/earlytab.h>
@@ -105,19 +105,19 @@ static __u32 ns16550_reg_width = 1;
 /* Macros to access ns16550 registers with base address and reg shift */
 #define NS16550_REG(base, r) ((base) + ((r) << ns16550_reg_shift))
 
-static __u32 ns16550_reg_read(__u64 base, __u32 reg)
+__isr static __u32 ns16550_reg_read(__u64 base, __u32 reg)
 {
 	__u32 ret;
 
 	switch (ns16550_reg_width) {
 	case 1:
-		ret = ioreg_read8((__u8 *)NS16550_REG(base, reg)) & 0xff;
+		ret = uk_arch_arm64_ioreg_read8((__u8 *)NS16550_REG(base, reg)) & 0xff;
 		break;
 	case 2:
-		ret = ioreg_read16((__u16 *)NS16550_REG(base, reg)) & 0xffff;
+		ret = uk_arch_arm64_ioreg_read16((__u16 *)NS16550_REG(base, reg)) & 0xffff;
 		break;
 	case 4:
-		ret = ioreg_read32((__u32 *)NS16550_REG(base, reg));
+		ret = uk_arch_arm64_ioreg_read32((__u32 *)NS16550_REG(base, reg));
 		break;
 	default:
 		UK_CRASH("Invalid register width: %d\n", ns16550_reg_width);
@@ -125,26 +125,27 @@ static __u32 ns16550_reg_read(__u64 base, __u32 reg)
 	return ret;
 }
 
-static void ns16550_reg_write(__u64 base, __u32 reg, __u32 value)
+__isr static void ns16550_reg_write(__u64 base, __u32 reg, __u32 value)
 {
 	switch (ns16550_reg_width) {
 	case 1:
-		ioreg_write8((__u8 *)NS16550_REG(base, reg),
-			     (__u8)(value & 0xff));
+		uk_arch_arm64_ioreg_write8((__u8 *)NS16550_REG(base, reg),
+					   (__u8)(value & 0xff));
 		break;
 	case 2:
-		ioreg_write16((__u16 *)NS16550_REG(base, reg),
-			      (__u16)(value & 0xffff));
+		uk_arch_arm64_ioreg_write16((__u16 *)NS16550_REG(base, reg),
+					    (__u16)(value & 0xffff));
 		break;
 	case 4:
-		ioreg_write32((__u32 *)NS16550_REG(base, reg), value);
+		uk_arch_arm64_ioreg_write32((__u32 *)NS16550_REG(base, reg),
+					    value);
 		break;
 	default:
 		UK_CRASH("Invalid register width: %d\n", ns16550_reg_width);
 	}
 }
 
-static void ns16550_putc(__u64 base, char a)
+__isr static void ns16550_putc(__u64 base, char a)
 {
 	/* Wait until TX FIFO becomes empty */
 	while (!(ns16550_reg_read(base, NS16550_LSR_OFFSET) &
@@ -173,7 +174,8 @@ static int ns16550_getc(__u64 base)
 	return (int)(ns16550_reg_read(base, NS16550_RBR_OFFSET) & 0xff);
 }
 
-static __ssz ns16550_out(struct uk_console *dev, const char *buf, __sz len)
+__isr static __ssz ns16550_out(struct uk_console *dev,
+			       const char *buf, __sz len)
 {
 	struct ns16550_device *ns16550_dev;
 	__sz l = len;
@@ -208,9 +210,10 @@ static __ssz ns16550_in(struct uk_console *dev, char *buf, __sz len)
 	return len;
 }
 
-static struct uk_console_ops ns16550_ops = {
+static const struct uk_console_ops ns16550_ops = {
 	.out  = ns16550_out,
-	.in = ns16550_in
+	.in = ns16550_in,
+	.emerg_out = ns16550_out,
 };
 
 static int init_ns16550(__u64 base)
@@ -311,7 +314,8 @@ static int early_init(struct ukplat_bootinfo *bi)
 	}
 
 	uk_console_init(&earlycon.dev, "NS16550", &ns16550_ops,
-			UK_CONSOLE_FLAG_STDOUT | UK_CONSOLE_FLAG_STDIN);
+			UK_CONSOLE_FLAG_STDOUT | UK_CONSOLE_FLAG_STDIN,
+			UK_CONSOLE_CLASS_UART);
 	uk_console_register(&earlycon.dev);
 
 	mrd.pbase = earlycon.base;
@@ -356,7 +360,8 @@ static int fdt_get_device(struct ns16550_device *dev, const void *dtb,
 
 	uk_pr_debug("ns16550 @ 0x%lx - 0x%lx\n", reg_base, reg_base + reg_size);
 
-	uk_console_init(&dev->dev, "NS16550", &ns16550_ops, 0);
+	uk_console_init(&dev->dev, "NS16550", &ns16550_ops, 0,
+			UK_CONSOLE_CLASS_UART);
 	dev->base = reg_base;
 	dev->size = reg_size;
 
@@ -420,14 +425,14 @@ static int init(struct uk_init_ctx *ictx __unused)
 			return rc;
 		}
 
-#if CONFIG_PAGING
+#if CONFIG_LIBUKPAGING
 		/* Map device region */
 		dev.base = uk_bus_pf_devmap(dev.base, dev.size);
 		if (unlikely(PTRISERR(dev.base))) {
 			uk_pr_err("Could not map ns16550\n");
 			return PTR2ERR(dev.base);
 		}
-#endif /* !CONFIG_PAGING */
+#endif /* CONFIG_LIBUKPAGING */
 
 #if CONFIG_LIBNS16550_EARLY_CONSOLE
 		/* `ukconsole` mandates that there is only a single

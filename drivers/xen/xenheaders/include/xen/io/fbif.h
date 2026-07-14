@@ -142,9 +142,9 @@ struct xenfb_page
     /*
      * Framebuffer page directory
      *
-     * Each directory page holds PAGE_SIZE / sizeof(*pd)
-     * framebuffer pages, and can thus map up to PAGE_SIZE *
-     * PAGE_SIZE / sizeof(*pd) bytes.  With PAGE_SIZE == 4096 and
+     * Each directory page holds UK_PAGING_PAGE_SIZE / sizeof(*pd)
+     * framebuffer pages, and can thus map up to UK_PAGING_PAGE_SIZE *
+     * UK_PAGING_PAGE_SIZE / sizeof(*pd) bytes.  With UK_PAGING_PAGE_SIZE == 4096 and
      * sizeof(unsigned long) == 4/8, that's 4 Megs 32 bit and 2 Megs
      * 64 bit.  256 directories give enough room for a 512 Meg
      * framebuffer with a max resolution of 12,800x10,240.  Should

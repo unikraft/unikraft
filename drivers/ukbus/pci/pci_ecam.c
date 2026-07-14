@@ -34,9 +34,9 @@
 #include <uk/bus/platform.h>
 #include <uk/errptr.h>
 #include <uk/list.h>
+#include <uk/arch/util.h>
 #include <uk/alloc.h>
 #include <uk/print.h>
-#include <uk/plat/common/cpu.h>
 #include <uk/plat/common/bootinfo.h>
 #include <libfdt_env.h>
 #include <uk/ofw/fdt.h>
@@ -93,7 +93,7 @@ int pci_generic_config_read(__u8 bus, __u8 devfn,
 	void *addr;
 
 	/* add rmb before io read */
-	rmb();
+	uk_arch_rmb();
 	addr = pci_ecam_map_bus(bus, devfn, where);
 	if (!addr) {
 		*(int *)val = ~0;
@@ -101,11 +101,11 @@ int pci_generic_config_read(__u8 bus, __u8 devfn,
 	}
 
 	if (size == 1)
-		*(__u8 *)val = ioreg_read8(addr);
+		*(__u8 *)val = uk_arch_arm64_ioreg_read8(addr);
 	else if (size == 2)
-		*(__u16 *)val = ioreg_read16(addr);
+		*(__u16 *)val = uk_arch_arm64_ioreg_read16(addr);
 	else if (size == 4)
-		*(__u32 *)val = ioreg_read32(addr);
+		*(__u32 *)val = uk_arch_arm64_ioreg_read32(addr);
 	else
 		uk_pr_err("not support size pci config read\n");
 
@@ -122,16 +122,16 @@ int pci_generic_config_write(__u8 bus, __u8 devfn,
 		return -1;
 
 	if (size == 1)
-		ioreg_write8(addr, val);
+		uk_arch_arm64_ioreg_write8(addr, val);
 	else if (size == 2)
-		ioreg_write16(addr, val);
+		uk_arch_arm64_ioreg_write16(addr, val);
 	else if (size == 4)
-		ioreg_write32(addr, val);
+		uk_arch_arm64_ioreg_write32(addr, val);
 	else
 		uk_pr_err("not support size pci config write\n");
 
 	/* add wmb after io write */
-	wmb();
+	uk_arch_wmb();
 
 	return 0;
 }
@@ -434,7 +434,7 @@ static int gen_pci_probe(struct pf_device *pfdev __unused)
 		reg_size = reg_size << 32 | fdt32_to_cpu(prop[3]);
 	}
 
-#if CONFIG_PAGING
+#if CONFIG_LIBUKPAGING
 	vaddr = uk_bus_pf_devmap(reg_base, reg_size);
 	if (unlikely(PTRISERR(vaddr))) {
 		uk_pr_err("Could not map MMIO region at 0x%lx - 0x%lx (%d)\n",
@@ -442,9 +442,9 @@ static int gen_pci_probe(struct pf_device *pfdev __unused)
 		return PTR2ERR(vaddr);
 	}
 	pcw.config_base = vaddr;
-#else /* !CONFIG_PAGING */
+#else /* !CONFIG_LIBUKPAGING */
 	pcw.config_base = reg_base;
-#endif /* !CONFIG_PAGING */
+#endif /* !CONFIG_LIBUKPAGING */
 
 	pcw.config_space_size = reg_size;
 	uk_pr_info("generic pci config base(0x%lx), size(0x%lx)\n",

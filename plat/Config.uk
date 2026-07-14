@@ -15,85 +15,20 @@ config UKPLAT_MEMREGION_MAX_COUNT
 		the amount of statically allocated space in the image made available
 		for storing memory region descriptors' metadata.
 
-if ARCH_X86_64 || (KVM_BOOT_PROTO_EFI_STUB && ARCH_ARM_64)
-
-config UKPLAT_ACPI
-	bool "Enable parsing of ACPI structures"
-	default n
-
-if UKPLAT_ACPI
-
-config UKPLAT_ACPI_CHECKSUM
-	bool "Verify ACPI structures' checksum"
-	default n
-
-endif
-
-endif
-
-config UKPLAT_LCPU_MAXCOUNT
+config UKPLAT_CPU_MAXCOUNT
 	int "Maximum number of supported logical CPUs"
 	range 1 256
 	default 1
 
 config HAVE_SMP
 	bool
-	default y if UKPLAT_LCPU_MAXCOUNT > 1
-	select LIBUKINTCTLR_APIC if (ARCH_X86_64 && UKPLAT_LCPU_MAXCOUNT > 1)
-	select UKPLAT_ACPI if ARCH_X86_64
-
-menu "Multiprocessor Configuration"
-	depends on HAVE_SMP
-
-config UKPLAT_LCPU_RUN_IRQ
-	int "Remote Function IRQ#"
-	default 5 if ARCH_ARM_64
-	default 13 if ARCH_X86_64
-	depends on ((ARCH_ARM_64 || ARCH_X86_64) && PLAT_KVM)
-
-config UKPLAT_LCPU_WAKEUP_IRQ
-	int "Wakeup IRQ#"
-	default 6 if ARCH_ARM_64
-	default 14 if ARCH_X86_64
-	depends on ((ARCH_ARM_64 || ARCH_X86_64) && PLAT_KVM)
-
-endmenu
-
-menuconfig PAGING
-	bool "Virtual memory API"
-	default n
-	select LIBUKFALLOC
-	select LIBUKFALLOCBUDDY
-	help
-		Provide low-level functions for working with page tables,
-		(un)mapping of pages, and changing of mapping flags
-
-if PAGING
-
-config PAGING_5LEVEL
-	bool "Enable 5-level paging (experimental)"
-	default n
-	depends on ARCH_X86_64
-
-config PAGING_STATS
-	bool "Collect paging statistics"
-	default n
-
-endif
-
-config HAVE_PAGING
-	bool
-	default y if PAGING
-	default n
-
-config HAVE_PAGING_DIRECTMAP
-	bool
-	default y if PAGING && ARCH_X86_64
-	default n
+	default y if UKPLAT_CPU_MAXCOUNT > 1
+	select LIBUKINTCTLR_APIC if (ARCH_X86_64 && UKPLAT_CPU_MAXCOUNT > 1)
+	select LIBUKACPI if ARCH_X86_64
 
 config ENFORCE_W_XOR_X
 	bool "Enforce W^X"
-	depends on PAGING && ARCH_ARM_64
+	depends on LIBUKPAGING && ARCH_ARM_64
 	default y
 	help
 		During boot the protection settings of all memory
@@ -129,4 +64,13 @@ config HAVE_SHUTDOWN_DISPATCHER
 	bool
 
 config HAVE_REBOOT
+	bool
+
+config HAVE_PAGING
+	bool
+
+config HAVE_5LEVEL_PT
+	bool
+
+config HAVE_CPU_MULTI_PHASE_STARTUP
 	bool

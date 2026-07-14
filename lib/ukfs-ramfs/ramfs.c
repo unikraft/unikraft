@@ -14,7 +14,7 @@
 #include <sys/mount.h>
 #include <linux/falloc.h>
 
-#include <uk/arch/paging.h>
+#include <uk/paging.h>
 #include <uk/alloc.h>
 #include <uk/atomic.h>
 #include <uk/errptr.h>
@@ -638,15 +638,16 @@ ssize_t ramfs_live_mem(struct ramfs_node *n, enum uk_file_mem_op op,
 	case UKFILE_MEM_GIFT:
 		if (unlikely(ISROFS(mntflags)))
 			return -EROFS;
-		if (unlikely(!IS_ALIGNED(off, PAGE_SIZE) ||
-			     !IS_ALIGNED(len, PAGE_SIZE)))
+		if (unlikely(!IS_ALIGNED(off, UK_PAGING_PAGE_SIZE) ||
+			     !IS_ALIGNED(len, UK_PAGING_PAGE_SIZE)))
 			return -EINVAL;
 
 		total = 0;
 		for (size_t i = 0; i < iovcnt; i++) {
 			if (unlikely(!IS_ALIGNED((uintptr_t)iov[i].iov_base,
-						 PAGE_SIZE) ||
-				     !IS_ALIGNED(iov[i].iov_len, PAGE_SIZE)))
+						 UK_PAGING_PAGE_SIZE) ||
+				     !IS_ALIGNED(iov[i].iov_len,
+						 UK_PAGING_PAGE_SIZE)))
 				return -EINVAL;
 			total += iov[i].iov_len;
 		}
@@ -671,7 +672,8 @@ ssize_t ramfs_live_mem(struct ramfs_node *n, enum uk_file_mem_op op,
 		ramfs_file_range_release(&n->file_data, off, len);
 		return 0;
 	case UKFILE_MEM_GIFT:
-		r = ramfs_file_range_gift(&n->file_data, off / PAGE_SIZE,
+		r = ramfs_file_range_gift(&n->file_data,
+					  off / UK_PAGING_PAGE_SIZE,
 					  iov, iovcnt);
 		if (r > 0 && off + len > n->statx.stx_size)
 			n->statx.stx_size = off + len;
@@ -692,10 +694,10 @@ int ramfs_live_getstat(struct ramfs_node *n,
 			UK_STATX_UID | UK_STATX_GID | UK_STATX_ATIME |
 			UK_STATX_BTIME | UK_STATX_CTIME | UK_STATX_MTIME |
 			UK_STATX_INO | UK_STATX_SIZE | UK_STATX_DIOALIGN;
-	arg->stx_blksize = PAGE_SIZE;
+	arg->stx_blksize = UK_PAGING_PAGE_SIZE;
 	arg->stx_ino = (uintptr_t)n;
-	arg->stx_dio_mem_align = PAGE_SIZE;
-	arg->stx_dio_offset_align = PAGE_SIZE;
+	arg->stx_dio_mem_align = UK_PAGING_PAGE_SIZE;
+	arg->stx_dio_offset_align = UK_PAGING_PAGE_SIZE;
 	/* Readout values */
 	arg->stx_nlink = n->statx.stx_nlink;
 	arg->stx_uid = n->statx.stx_uid;
@@ -790,29 +792,31 @@ int ramfs_node_falloc(struct ramfs_node *n, int mode, off_t soff, off_t slen,
 		break;
 
 	case FALLOC_FL_COLLAPSE_RANGE:
-		if (unlikely(!IS_ALIGNED(off, PAGE_SIZE) ||
-			     !IS_ALIGNED(len, PAGE_SIZE)))
+		if (unlikely(!IS_ALIGNED(off, UK_PAGING_PAGE_SIZE) ||
+			     !IS_ALIGNED(len, UK_PAGING_PAGE_SIZE)))
 			return -EINVAL;
 		if (unlikely(off + len >= n->statx.stx_size))
 			return -EINVAL;
 		if (unlikely(!len))
 			return 0;
-		r = ramfs_file_data_collapse(&n->file_data, off / PAGE_SIZE,
-					     len / PAGE_SIZE);
+		r = ramfs_file_data_collapse(&n->file_data,
+					     off / UK_PAGING_PAGE_SIZE,
+					     len / UK_PAGING_PAGE_SIZE);
 		if (!r)
 			n->statx.stx_size -= len;
 		break;
 
 	case FALLOC_FL_INSERT_RANGE:
-		if (unlikely(!IS_ALIGNED(off, PAGE_SIZE) ||
-			     !IS_ALIGNED(len, PAGE_SIZE)))
+		if (unlikely(!IS_ALIGNED(off, UK_PAGING_PAGE_SIZE) ||
+			     !IS_ALIGNED(len, UK_PAGING_PAGE_SIZE)))
 			return -EINVAL;
 		if (unlikely(off >= n->statx.stx_size))
 			return -EINVAL;
 		if (unlikely(!len))
 			return 0;
-		r = ramfs_file_data_insert_hole(&n->file_data, off / PAGE_SIZE,
-						len / PAGE_SIZE);
+		r = ramfs_file_data_insert_hole(&n->file_data,
+						off / UK_PAGING_PAGE_SIZE,
+						len / UK_PAGING_PAGE_SIZE);
 		if (!r)
 			n->statx.stx_size += len;
 		break;
@@ -864,7 +868,7 @@ int ramfs_live_ctl(struct ramfs_node *n, int fam, int req,
 /* TODO: make dynamic if needed */
 static const struct statfs ramfs_fsstat = {
 	.f_type = RAMFS_MAGIC,
-	.f_bsize = PAGE_SIZE,
+	.f_bsize = UK_PAGING_PAGE_SIZE,
 	.f_blocks = 0,
 	.f_bfree = 0,
 	.f_bavail = 0,
@@ -872,7 +876,7 @@ static const struct statfs ramfs_fsstat = {
 	.f_ffree = 0,
 	.f_fsid = {{ 0, 0 }},
 	.f_namelen = USHRT_MAX - 1,
-	.f_frsize = PAGE_SIZE,
+	.f_frsize = UK_PAGING_PAGE_SIZE,
 	.f_flags = 0,
 };
 

@@ -9,9 +9,9 @@
 #include <uk/alloc.h>
 #include <uk/alloc_impl.h>
 #include <uk/arch/ctx.h>
-#include <uk/arch/paging.h>
 #include <uk/assert.h>
 #include <uk/essentials.h>
+#include <uk/paging.h>
 #if CONFIG_LIBUKVMEM
 #include <uk/vmem.h>
 #endif /* CONFIG_LIBUKVMEM */
@@ -48,8 +48,8 @@ static void *stack_malloc(struct uk_alloc *a, __sz size)
 	sa = to_allocstack(a);
 
 #if CONFIG_LIBUKALLOCSTACK_PAGE_GUARDS
-	alloc_size = PAGE_ALIGN_UP(size);
-	vaddr = __VADDR_ANY;
+	alloc_size = UK_PAGING_PAGE_ALIGN_UP(size);
+	vaddr = UK_PAGING_VADDR_ANY;
 	rc = uk_vma_map_stack(sa->vas,
 			      &vaddr,
 			      alloc_size,
@@ -76,8 +76,8 @@ static void *stack_malloc(struct uk_alloc *a, __sz size)
 						       sa->premapped_len;
 	sp = ukarch_gen_sp(vaddr, alloc_size);
 	rc = uk_vma_advise(sa->vas,
-			   PAGE_ALIGN_DOWN((__vaddr_t)
-					   (PAGE_ALIGN_UP(sp) - premapped_len)),
+			   UK_PAGING_PAGE_ALIGN_DOWN((__vaddr_t)
+					   (UK_PAGING_PAGE_ALIGN_UP(sp) - premapped_len)),
 			   premapped_len,
 			   UK_VMA_ADV_WILLNEED,
 			   UK_VMA_FLAG_UNINITIALIZED);
@@ -140,12 +140,13 @@ static void *stack_memalign(struct uk_alloc *a, __sz align, __sz size)
 #if CONFIG_LIBUKALLOCSTACK_PAGE_GUARDS
 	/* If using page guards then we allocate stack VMA's instead. So,
 	 * the return address will always be page-aligned and the maximum
-	 * allowed alignment is PAGE_SIZE because we cannot satisfy higher
-	 * alignments and smaller than PAGE_SIZE alignments must be a
-	 * divisor of PAGE_SIZE (memalign alignments are always powers of 2 and
-	 * all powers of 2 below PAGE_SIZE are divisors of PAGE_SIZE).
+	 * allowed alignment is UK_PAGING_PAGE_SIZE because we cannot satisfy
+	 * higher alignments and smaller than UK_PAGING_PAGE_SIZE alignments
+	 * must be a divisor of UK_PAGING_PAGE_SIZE (memalign alignments are
+	 * always powers of 2 and all powers of 2 below UK_PAGING_PAGE_SIZE
+	 * are divisors of UK_PAGING_PAGE_SIZE).
 	 * One could argue we could do the following:
-	 * alloc_size = PAGE_ALIGN_UP(size) + align
+	 * alloc_size = UK_PAGING_PAGE_ALIGN_UP(size) + align
 	 * ... uk_vma_map_stack ... // create the stack VMA of size alloc_size
 	 * vaddr = ALIGN_UP(vaddr, align)
 	 *
@@ -156,11 +157,11 @@ static void *stack_memalign(struct uk_alloc *a, __sz align, __sz size)
 	 * to be aware of. It is not worth sacrificing expectations in favor
 	 * of an exceptional case that may never happen: as of this moment of
 	 * writing, I cannot see any case where one would need stacks with
-	 * an alignment higher than PAGE_SIZE.
+	 * an alignment higher than UK_PAGING_PAGE_SIZE.
 	 * Therefore, make this constraint clear when using page guards
-	 * configuration: alignment must not be bigger than PAGE_SIZE.
+	 * configuration: alignment must not be bigger than UK_PAGING_PAGE_SIZE.
 	 */
-	if (unlikely(align > PAGE_SIZE))
+	if (unlikely(align > UK_PAGING_PAGE_SIZE))
 		return NULL;
 #endif /* CONFIG_LIBUKALLOCSTACK_PAGE_GUARDS */
 
@@ -170,8 +171,8 @@ static void *stack_memalign(struct uk_alloc *a, __sz align, __sz size)
 	sa = to_allocstack(a);
 
 #if CONFIG_LIBUKALLOCSTACK_PAGE_GUARDS
-	alloc_size = PAGE_ALIGN_UP(size);
-	vaddr = __VADDR_ANY;
+	alloc_size = UK_PAGING_PAGE_ALIGN_UP(size);
+	vaddr = UK_PAGING_VADDR_ANY;
 	rc = uk_vma_map_stack(sa->vas,
 			      &vaddr,
 			      alloc_size,
@@ -196,8 +197,8 @@ static void *stack_memalign(struct uk_alloc *a, __sz align, __sz size)
 						       sa->premapped_len;
 	sp = ukarch_gen_sp(vaddr, alloc_size);
 	rc = uk_vma_advise(sa->vas,
-			   PAGE_ALIGN_DOWN((__vaddr_t)
-					   (PAGE_ALIGN_UP(sp) - premapped_len)),
+			   UK_PAGING_PAGE_ALIGN_DOWN((__vaddr_t)
+					   (UK_PAGING_PAGE_ALIGN_UP(sp) - premapped_len)),
 			   premapped_len,
 			   UK_VMA_ADV_WILLNEED,
 			   UK_VMA_FLAG_UNINITIALIZED);
@@ -263,7 +264,7 @@ struct uk_alloc *uk_allocstack_init(struct uk_alloc *a
 	UK_ASSERT(a);
 #if CONFIG_LIBUKVMEM
 	UK_ASSERT(vas);
-	UK_ASSERT(PAGE_ALIGNED(premapped_len));
+	UK_ASSERT(UK_PAGING_PAGE_ALIGNED(premapped_len));
 #endif /* CONFIG_LIBUKVMEM */
 
 	sa = uk_malloc(a, sizeof(*sa));

@@ -12,10 +12,9 @@
 #include <uk/falloc.h>
 #include <uk/vmem/vma_ops.h>
 #include <uk/arch/limits.h>
-#include <uk/arch/paging.h>
-#ifdef CONFIG_HAVE_PAGING
-#include <uk/plat/paging.h>
-#endif /* CONFIG_HAVE_PAGING */
+#ifdef CONFIG_LIBUKPAGING
+#include <uk/paging.h>
+#endif /* CONFIG_LIBUKPAGING */
 #include <vfscore/file.h>
 #include <vfscore/vma.h>
 #include <vfscore/vnode.h>
@@ -51,7 +50,7 @@ int vma_op_file_new(struct uk_vas *vas, __vaddr_t vaddr __unused,
 	UK_ASSERT(data);
 	UK_ASSERT(args->fd >= 0);
 	UK_ASSERT(args->offset >= 0);
-	UK_ASSERT(PAGE_ALIGNED(args->offset));
+	UK_ASSERT(UK_PAGING_PAGE_ALIGNED(args->offset));
 
 	/* Writable shared mappings are not supported.
 	 * Read-only shared mappings are partially supported.
@@ -60,7 +59,8 @@ int vma_op_file_new(struct uk_vas *vas, __vaddr_t vaddr __unused,
 	 * to the underlying file while the mapping is established will not be
 	 * reflected in memory.
 	 */
-	if ((*flags & UK_VMA_FILE_SHARED) && (attr & PAGE_ATTR_PROT_WRITE))
+	if ((*flags & UK_VMA_FILE_SHARED) &&
+	    (attr & UK_PAGING_PAGE_ATTR_PROT_WRITE))
 		return -ENOTSUP;
 
 	/* Since we cannot do ISR-safe file accesses in the fault handler,
@@ -135,15 +135,15 @@ static int vma_op_file_fault(struct uk_vma *vma, struct uk_vm_fault *fault)
 {
 	struct uk_vma_file *vma_file = (struct uk_vma_file *)vma;
 	struct uk_pagetable * const pt = vma->vas->pt;
-	unsigned long pages = fault->len / PAGE_SIZE;
-	__paddr_t paddr = __PADDR_ANY;
+	unsigned long pages = fault->len / UK_PAGING_PAGE_SIZE;
+	__paddr_t paddr = UK_PAGING_PADDR_ANY;
 	__vaddr_t vaddr;
 	__sz bytes;
 	__off off;
 	int rc;
 
-	UK_ASSERT(PAGE_ALIGNED(fault->len));
-	UK_ASSERT(fault->len == PAGE_Lx_SIZE(fault->level));
+	UK_ASSERT(UK_PAGING_PAGE_ALIGNED(fault->len));
+	UK_ASSERT(fault->len == UK_PAGING_PAGE_Lx_SIZE(fault->level));
 	UK_ASSERT(fault->type & UK_VMA_FAULT_NONPRESENT);
 
 	rc = pt->fa->falloc(pt->fa, &paddr, pages, FALLOC_FLAG_ALIGNED);
@@ -151,8 +151,8 @@ static int vma_op_file_fault(struct uk_vma *vma, struct uk_vm_fault *fault)
 		return rc;
 
 	if (!(vma->flags & UK_VMA_FLAG_UNINITIALIZED)) {
-		vaddr = ukplat_page_kmap(pt, paddr, pages, 0);
-		if (unlikely(vaddr == __VADDR_INV)) {
+		vaddr = uk_paging_page_kmap(pt, paddr, pages, 0);
+		if (unlikely(vaddr == UK_PAGING_VADDR_INV)) {
 			pt->fa->ffree(pt->fa, paddr, pages);
 			return -ENOMEM;
 		}
@@ -161,7 +161,7 @@ static int vma_op_file_fault(struct uk_vma *vma, struct uk_vm_fault *fault)
 
 		rc = vma_file_read(vma_file->f, vaddr, fault->len, off, &bytes);
 		if (unlikely(rc)) {
-			ukplat_page_kunmap(pt, vaddr, pages, 0);
+			uk_paging_page_kunmap(pt, vaddr, pages, 0);
 			pt->fa->ffree(pt->fa, paddr, pages);
 
 			return rc;
@@ -171,7 +171,7 @@ static int vma_op_file_fault(struct uk_vma *vma, struct uk_vm_fault *fault)
 		UK_ASSERT(fault->len >= bytes);
 
 		memset_isr((void *)(vaddr + bytes), 0, fault->len - bytes);
-		ukplat_page_kunmap(pt, vaddr, pages, 0);
+		uk_paging_page_kunmap(pt, vaddr, pages, 0);
 	}
 
 	fault->paddr = paddr;
@@ -230,7 +230,8 @@ static int vma_op_file_merge(struct uk_vma *vma, struct uk_vma *next)
 static int vma_op_file_set_attr(struct uk_vma *vma, unsigned long attr)
 {
 	/* Writable shared mappings are not supported. */
-	if ((vma->flags & UK_VMA_FILE_SHARED) && (attr & PAGE_ATTR_PROT_WRITE))
+	if ((vma->flags & UK_VMA_FILE_SHARED) &&
+	    (attr & UK_PAGING_PAGE_ATTR_PROT_WRITE))
 		return -EPERM;
 
 	/* Default handler */

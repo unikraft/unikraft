@@ -74,7 +74,7 @@
 #include <inttypes.h>
 #include <string.h>
 #include <uk/plat/console.h>
-#include <uk/arch/lcpu.h>
+#include <uk/lcpu.h>
 #include <uk/assert.h>
 #include <uk/essentials.h>
 #include <uk/config.h>
@@ -90,14 +90,9 @@
 #if (defined __X86_32__) || (defined __X86_64__)
 #include <xen-x86/setup.h>
 #include <xen-x86/mm.h>
-#if defined __X86_32__
-#include <xen-x86/hypercall32.h>
-#elif defined __X86_64__
-#include <xen-x86/hypercall64.h>
-#endif
 #elif (defined __ARM_32__) || (defined __ARM_64__)
+#include <xen-arm/setup.h>
 #include <xen-arm/mm.h>
-#include <xen-arm/hypercall.h>
 #endif
 
 #if (defined __aarch64__)
@@ -139,7 +134,8 @@ retry:
 	cons = console_ring->out_cons;
 	prod = console_ring->out_prod;
 
-	mb(); /* make sure we have cons & prod before touching the ring */
+	/* make sure we have cons & prod before touching the ring */
+	uk_arch_mb();
 	UK_BUGON((prod - cons) > sizeof(console_ring->out));
 
 	while ((sent < len) && ((prod - cons) < sizeof(console_ring->out))) {
@@ -157,7 +153,8 @@ retry:
 			str[sent];
 		sent++;
 	}
-	wmb(); /* ensure characters are written before increasing out_prod */
+	/* ensure characters are written before increasing out_prod */
+	uk_arch_wmb();
 	console_ring->out_prod = prod;
 
 	/* Is the console fully initialized?
@@ -187,7 +184,7 @@ void xencons_flush(void)
 		return;
 
 	while (intf->out_cons < intf->out_prod)
-		barrier();
+		__barrier();
 }
 
 static int hv_console_input(char *str, unsigned int maxlen)
@@ -197,7 +194,8 @@ static int hv_console_input(char *str, unsigned int maxlen)
 
 	cons = console_ring->in_cons;
 	prod = console_ring->in_prod;
-	rmb(); /* make sure in_cons, in_prod are read before enqueuing */
+	/* make sure in_cons, in_prod are read before enqueuing */
+	uk_arch_rmb();
 	UK_BUGON((prod - cons) > sizeof(console_ring->in));
 
 	while (cons != prod && maxlen > 0) {
@@ -208,14 +206,14 @@ static int hv_console_input(char *str, unsigned int maxlen)
 		maxlen--;
 	}
 
-	wmb(); /* ensure finished operation before updating in_cons */
+	uk_arch_wmb(); /* ensure finished operation before updating in_cons */
 	console_ring->in_cons = cons;
 
 	return read;
 }
 
 static void hv_console_event(evtchn_port_t port __unused,
-			     struct __regs *regs __unused,
+			     struct uk_lcpu_regs *regs __unused,
 			     void *data __unused)
 {
 	/* NOT IMPLEMENTED YET */
@@ -273,7 +271,8 @@ static int hv_console_prepare(struct ukplat_bootinfo *bi __unused)
 	console_ring = mfn_to_virt(HYPERVISOR_start_info->console.domU.mfn);
 	console_evtchn = HYPERVISOR_start_info->console.domU.evtchn;
 	uk_console_init(&console_dev, "XenConsole", &console_ops,
-			UK_CONSOLE_FLAG_STDOUT | UK_CONSOLE_FLAG_STDIN);
+			UK_CONSOLE_FLAG_STDOUT | UK_CONSOLE_FLAG_STDIN,
+			UK_CONSOLE_CLASS_HVC);
 	uk_console_register(&console_dev);
 	return 0;
 }
@@ -286,7 +285,8 @@ static int hv_console_prepare(struct ukplat_bootinfo *bi __unused)
 	    (struct xencons_interface *)HYPERVISOR_start_info->console.domU.mfn;
 	console_evtchn = HYPERVISOR_start_info->console.domU.evtchn;
 	uk_console_init(&console_dev, "XenConsole", &console_ops,
-			UK_CONSOLE_FLAG_STDOUT | UK_CONSOLE_FLAG_STDIN);
+			UK_CONSOLE_FLAG_STDOUT | UK_CONSOLE_FLAG_STDIN,
+			UK_CONSOLE_CLASS_HVC);
 	uk_console_register(&console_dev);
 	return 0;
 }

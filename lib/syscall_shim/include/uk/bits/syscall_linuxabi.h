@@ -1,7 +1,7 @@
 #ifndef __LIBSYSCALL_SHIM_SYSCALL_LINUXABI_H__
 #define __LIBSYSCALL_SHIM_SYSCALL_LINUXABI_H__
 
-#include <uk/arch/lcpu.h>
+#include <uk/lcpu.h>
 
 /*
  * Mappings of `struct __reg` register fields
@@ -14,30 +14,30 @@
  */
 
 #if (defined __X86_64__)
-#define __syscall_rip		rcx
-#define __syscall_rsyscall	orig_rax
-#define __syscall_rarg0		rdi
-#define __syscall_rarg1		rsi
-#define __syscall_rarg2		rdx
-#define __syscall_rarg3		r10
-#define __syscall_rarg4		r8
-#define __syscall_rarg5		r9
+#define __syscall_rip		RCX
+#define __syscall_rsyscall	ORIG_RAX
+#define __syscall_rarg0		RDI
+#define __syscall_rarg1		RSI
+#define __syscall_rarg2		RDX
+#define __syscall_rarg3		R10
+#define __syscall_rarg4		R8
+#define __syscall_rarg5		R9
 
-#define __syscall_rret0		rax
-#define __syscall_rret1		rdx
+#define __syscall_rret0		RAX
+#define __syscall_rret1		RDX
 
 #elif (defined __ARM_64__)
-#define __syscall_rip		elr_el1
-#define __syscall_rsyscall	x[8]
-#define __syscall_rarg0		x[0]
-#define __syscall_rarg1		x[1]
-#define __syscall_rarg2		x[2]
-#define __syscall_rarg3		x[3]
-#define __syscall_rarg4		x[4]
-#define __syscall_rarg5		x[5]
+#define __syscall_rip		ELR_EL1
+#define __syscall_rsyscall	X8
+#define __syscall_rarg0		X0
+#define __syscall_rarg1		X1
+#define __syscall_rarg2		X2
+#define __syscall_rarg3		X3
+#define __syscall_rarg4		X4
+#define __syscall_rarg5		X5
 
-#define __syscall_rret0		x[0]
-#define __syscall_rret1		x[1]
+#define __syscall_rret0		X0
+#define __syscall_rret1		X1
 
 #else
 #error "Missing register mappings for selected target architecture"

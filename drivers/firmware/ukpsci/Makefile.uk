@@ -1,0 +1,10 @@
+$(eval $(call addlib_s,libukpsci,$(CONFIG_LIBUKPSCI)))
+
+ASINCLUDES-$(CONFIG_LIBUKPSCI)  += -I$(LIBUKPSCI_BASE)/include
+CINCLUDES-$(CONFIG_LIBUKPSCI)   += -I$(LIBUKPSCI_BASE)/include
+CXXINCLUDES-$(CONFIG_LIBUKPSCI) += -I$(LIBUKPSCI_BASE)/include
+
+# TODO Remove as soon as plat dependencies go away
+LIBUKPSCI_CINCLUDES-y += -I$(UK_PLAT_COMMON_BASE)/include
+
+LIBUKPSCI_SRCS-y += $(LIBUKPSCI_BASE)/psci.c

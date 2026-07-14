@@ -37,7 +37,7 @@
 #include <uk/arch/types.h>
 #include <uk/arch/limits.h>
 #include <uk/atomic.h>
-#include <uk/arch/lcpu.h>
+#include <uk/lcpu.h>
 #include <uk/config.h>
 
 #ifdef CONFIG_LIBUKDEBUG
@@ -106,7 +106,7 @@ static inline int uk_refcount_release(__atomic *ref)
 	__refcnt_assert(ref != __NULL);
 
 	/* Compiler Fence */
-	barrier();
+	__barrier();
 
 	old = uk_fetch_add(&ref->counter, -1);
 	__refcnt_assert(old > 0);
@@ -119,7 +119,7 @@ static inline int uk_refcount_release(__atomic *ref)
 	 * Ensure that the destructor sees all updates.  The fence_rel
 	 * at the start of the function synchronized with this fence.
 	 */
-	barrier();
+	__barrier();
 	return 1;
 }
 

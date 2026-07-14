@@ -82,10 +82,15 @@ define measure_loc =
 $(shell $(OBJDUMP) -dl "$(1)" | grep '^/' | grep -v '^/[/*]' | $(SED) -e 's/ [(]discriminator .*[)]//g' | sort -u | wc -l)
 endef
 
-# Generate <target>.ukcmpdb.json compile db file
-# gen_compile_db $1:target
+# Generate <target>.ukcmpdb.json compile db entry from <target>.cmd
+#
+# Notice: The directory, file, and output fields are assigned directly by
+# Make without JSON escaping. This assumes that source and build paths do
+# not contain backslash (\) or double-quote (") characters.
+#
+# gen_compile_db $1:source,$2:target
 define gen_compile_db =
-$(shell if [ $(call have_clang) = y ] ; then printf " -MJ $(addsuffix .ukcmpdb.json,$(1))" ; fi)
+	$Q sed 's/\\/\\\\/g; s/"/\\"/g; s|.*|{ "directory": "$(CURDIR)"$(comma) "file": "$(1)"$(comma) "output": "$(2)"$(comma) "command": "&" }$(comma)|; q' $(addsuffix .cmd,$(2)) > $(addsuffix .ukcmpdb.json,$(2))
 endef
 
 ################################################################################
@@ -664,12 +669,12 @@ $(4): $(2)
 		       $$(CFLAGS) $$(CFLAGS-y) $$(CFLAGS_EXTRA) \
 		       $$($(call vprefix_lib,$(1),CFLAGS)) $$($(call vprefix_lib,$(1),CFLAGS-y)) \
 		       $$($(call vprefix_src,$(1),$(2),$(3),FLAGS)) $$($(call vprefix_src,$(1),$(2),$(3),FLAGS-y)) \
-		       $(call gen_compile_db,$(4)) \
 		       $(5) \
 		       $$(DBGFLAGS) $$(DBGFLAGS-y) \
 		       -D__LIBNAME__=$(1) -D__BASENAME__=$(notdir $(2)) $(if $(3),-D__VARIANT__=$(3)) \
 		       -c $(2) -o $(4) $(call depflags,$(4))
 )
+$(call gen_compile_db,$(2),$(4))
 
 UK_SRCS-y += $(2)
 UK_DEPS-y += $(call out2dep,$(4))
@@ -695,6 +700,7 @@ $(4): $(2)
 		       -D__LIBNAME__=$(1) -D__BASENAME__=$(notdir $(2)) $(if $(3),-D__VARIANT__=$(3)) \
 		       -c $(2) -o $(4) $(call depflags,$(4))
 	)
+$(call gen_compile_db,$(2),$(4))
 
 UK_SRCS-y += $(2)
 UK_DEPS-y += $(call out2dep,$(4))

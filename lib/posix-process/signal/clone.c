@@ -10,7 +10,7 @@
 #include <string.h>
 
 #include <uk/config.h>
-#include <uk/arch/lcpu.h>
+#include <uk/lcpu.h>
 #include <uk/process.h>
 #include <uk/print.h>
 

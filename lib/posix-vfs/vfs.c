@@ -664,7 +664,13 @@ const struct uk_file *_vfs_lookupat(const struct uk_file *atroot,
 			uk_file_release(lout.aux);
 			if (unlikely(PTRISERR(ret)))
 				goto out;
+
+			/* If symlink target is non-FS leaf, return directly */
+			if (!uk_fs_isfs(ret) && pos == len)
+				goto out;
+
 			uk_file_release(d);
+
 			d = ret;
 			break;
 

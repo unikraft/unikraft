@@ -4,8 +4,10 @@ menuconfig LIBUKBOOT
 	select LIBUKDEBUG
 	select LIBUKARGPARSE
 	select HAVE_BOOTENTRY
+	imply LIBUKPM
 	imply LIBUKBOOT_MAINTHREAD if HAVE_SHUTDOWN_DISPATCHER
 	imply LIBUKBOOT_SHUTDOWNREQ_HANDLER if HAVE_SHUTDOWN_DISPATCHER
+	select LIBUKLCPU
 	default y
 
 	# FIXME: binary buddy allocator is hard-coded for now
@@ -139,7 +141,7 @@ endchoice
 config LIBUKBOOT_HEAP_BASE
 	hex "Heap base address"
 	default 0x400000000
-	depends on HAVE_PAGING
+	depends on LIBUKPAGING
 	depends on LIBUKBOOT_INITALLOC
 
 # Hidden configuration option that specifies that scheduling should be

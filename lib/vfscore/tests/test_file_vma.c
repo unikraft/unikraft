@@ -35,63 +35,71 @@ UK_TESTCASE(vfscore, test_vma_file)
 	fd = creat(VMEM_TEST_FILENAME, 0700);
 	uk_vmem_test_bug_on(fd < 0);
 
-	buf = malloc(PAGE_SIZE);
+	buf = malloc(UK_PAGING_PAGE_SIZE);
 	uk_vmem_test_bug_on(!buf);
 
-	memset(buf, 0xdd, PAGE_SIZE);
+	memset(buf, 0xdd, UK_PAGING_PAGE_SIZE);
 
 	for (i = 0; i < 3; i++) {
 		buf[0] = (char)i;
 
-		len = write(fd, buf, PAGE_SIZE);
-		uk_vmem_test_bug_on(len != PAGE_SIZE);
+		len = write(fd, buf, UK_PAGING_PAGE_SIZE);
+		uk_vmem_test_bug_on(len != UK_PAGING_PAGE_SIZE);
 	}
 
 	buf[0] = (char)i;
-	len = write(fd, buf, PAGE_SIZE / 2);
-	uk_vmem_test_bug_on(len != PAGE_SIZE / 2);
+	len = write(fd, buf, UK_PAGING_PAGE_SIZE / 2);
+	uk_vmem_test_bug_on(len != UK_PAGING_PAGE_SIZE / 2);
 
 	free(buf);
 
 	/* Create the mapping */
-	va1 = __VADDR_ANY;
+	va1 = UK_PAGING_VADDR_ANY;
 
-	rc = uk_vma_map_file(vas, &va1, 3 * PAGE_SIZE, PAGE_ATTR_PROT_READ,
-			     0, fd, 0);
+	rc = uk_vma_map_file(vas, &va1, 3 * UK_PAGING_PAGE_SIZE,
+			     UK_PAGING_PAGE_ATTR_PROT_READ, 0, fd, 0);
 	UK_TEST_EXPECT_ZERO(rc);
 
-	len = uk_vmem_test_probe_r(va1, 3 * PAGE_SIZE);
-	uk_vmem_test_bug_on(len != 3 * PAGE_SIZE);
+	len = uk_vmem_test_probe_r(va1, 3 * UK_PAGING_PAGE_SIZE);
+	uk_vmem_test_bug_on(len != 3 * UK_PAGING_PAGE_SIZE);
 
 	UK_TEST_EXPECT_SNUM_EQ(*((unsigned char *)(va1)), 0);
 	UK_TEST_EXPECT_SNUM_EQ(*((unsigned char *)(va1 + 1)), 0xdd);
-	UK_TEST_EXPECT_SNUM_EQ(*((unsigned char *)(va1 + PAGE_SIZE)), 1);
-	UK_TEST_EXPECT_SNUM_EQ(*((unsigned char *)(va1 + 2 * PAGE_SIZE)), 2);
+	UK_TEST_EXPECT_SNUM_EQ(*((unsigned char *)(va1 + UK_PAGING_PAGE_SIZE)), 1);
+	UK_TEST_EXPECT_SNUM_EQ(*((unsigned char *)(va1 + 2 * UK_PAGING_PAGE_SIZE)), 2);
 
-	rc = uk_vma_set_attr(vas, va1 + 2 * PAGE_SIZE, PAGE_SIZE,
-			     PAGE_ATTR_PROT_RW, 0);
+	rc = uk_vma_set_attr(vas, va1 + 2 * UK_PAGING_PAGE_SIZE,
+			     UK_PAGING_PAGE_SIZE,
+			     UK_PAGING_PAGE_ATTR_PROT_RW,
+			     0);
 	UK_TEST_EXPECT_ZERO(rc);
 
 	UK_TEST_EXPECT_ZERO(uk_vmem_test_check_vas(vas,
 		(struct uk_vmem_test_vma[]){
-			{va1, va1 + 2 * PAGE_SIZE, PAGE_ATTR_PROT_READ},
-			{va1 + 2 * PAGE_SIZE, va1 + 3 * PAGE_SIZE, PAGE_ATTR_PROT_RW},
+			{va1, va1 + 2 * UK_PAGING_PAGE_SIZE,
+			 UK_PAGING_PAGE_ATTR_PROT_READ},
+			{va1 + 2 * UK_PAGING_PAGE_SIZE,
+			 va1 + 3 * UK_PAGING_PAGE_SIZE,
+			 UK_PAGING_PAGE_ATTR_PROT_RW},
 		}, 2));
 
 	/* Unmap the first two pages of the file. Then map the last half page
 	 * of the file directly after the last VMA. They should merge.
 	 */
-	rc = uk_vma_unmap(vas, va1, 2 * PAGE_SIZE, 0);
+	rc = uk_vma_unmap(vas, va1, 2 * UK_PAGING_PAGE_SIZE, 0);
 	UK_TEST_EXPECT_ZERO(rc);
 
-	va2 = va1 + 3 * PAGE_SIZE;
-	rc = uk_vma_map_file(vas, &va2, PAGE_SIZE, PAGE_ATTR_PROT_RW, 0, fd,
-			     3 * PAGE_SIZE);
+	va2 = va1 + 3 * UK_PAGING_PAGE_SIZE;
+	rc = uk_vma_map_file(vas, &va2, UK_PAGING_PAGE_SIZE,
+			     UK_PAGING_PAGE_ATTR_PROT_RW,
+			     0, fd, 3 * UK_PAGING_PAGE_SIZE);
 	UK_TEST_EXPECT_ZERO(rc);
 
 	UK_TEST_EXPECT_ZERO(uk_vmem_test_check_vas(vas,
 		(struct uk_vmem_test_vma[]){
-			{va1 + 2 * PAGE_SIZE, va1 + 4 * PAGE_SIZE, PAGE_ATTR_PROT_RW},
+			{va1 + 2 * UK_PAGING_PAGE_SIZE,
+			 va1 + 4 * UK_PAGING_PAGE_SIZE,
+			 UK_PAGING_PAGE_ATTR_PROT_RW},
 		}, 1));
 
 	/* Check if we correctly read the last bits and if the remainder of the
@@ -99,7 +107,7 @@ UK_TESTCASE(vfscore, test_vma_file)
 	 */
 	UK_TEST_EXPECT_SNUM_EQ(*((unsigned char *)(va2)), 3);
 
-	va1 = va2 + PAGE_SIZE / 2 - 1;
+	va1 = va2 + UK_PAGING_PAGE_SIZE / 2 - 1;
 	UK_TEST_EXPECT_SNUM_EQ(*((unsigned char *)(va1)), 0xdd);
 	UK_TEST_EXPECT_SNUM_EQ(*((unsigned char *)(va1 + 1)), 0x00);
 

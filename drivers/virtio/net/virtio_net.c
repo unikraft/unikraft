@@ -822,7 +822,16 @@ static int virtio_netdev_vqueue_setup(struct virtio_net_device *vndev,
 		return -ENOBUFS;
 	}
 
-	nr_desc = (nr_desc != 0) ? nr_desc : max_desc;
+	/* Legacy virtio has queue_size register as RO, while modern has it RW.
+	 * This means the vring layout is immutable and setting up the queues
+	 * with anything less than the reported vq size will result in layout
+	 * mismatch between the host paravirtualized device and the
+	 * guest device driver.
+	 */
+	if (!nr_desc ||
+	    !VIRTIO_FEATURE_HAS(vndev->vdev->features, VIRTIO_F_VERSION_1))
+		nr_desc = max_desc;
+
 	uk_pr_debug("Configuring the %d descriptors\n", nr_desc);
 
 	/* Check if the descriptor is a power of 2 */

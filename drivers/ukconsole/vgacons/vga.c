@@ -29,8 +29,8 @@
 #include <sys/types.h>
 #include <stdint.h>
 #include <string.h>
-#include <x86/cpu.h>
-#include <x86/irq.h>
+#include <uk/arch/x86_64.h>
+#include <uk/arch/util.h>
 #include <uk/console/driver.h>
 #include <uk/prio.h>
 #include <uk/boot/earlytab.h>
@@ -118,14 +118,18 @@ static void vga_update_cursor(void)
 	unsigned long irq_flags;
 	uint8_t old;
 
-	local_irq_save(irq_flags);
-	old = inb(areg);
-	outb(areg, 0x0e); // Cursor Location High
-	outb(dreg, ((terminal_row * VGA_WIDTH) + terminal_column) >> 8);
-	outb(areg, 0x0f); // Cursor Location Low
-	outb(dreg, ((terminal_row * VGA_WIDTH) + terminal_column) & 0xff);
-	outb(areg, old);
-	local_irq_restore(irq_flags);
+	irq_flags = uk_lcpu_save_irqf();
+	old = uk_arch_x86_64_inb(areg);
+	/* Cursor Location High */
+	uk_arch_x86_64_outb(areg, 0x0e);
+	uk_arch_x86_64_outb(dreg, ((terminal_row * VGA_WIDTH) +
+			    terminal_column) >> 8);
+	/* Cursor Location Low */
+	uk_arch_x86_64_outb(areg, 0x0f);
+	uk_arch_x86_64_outb(dreg, ((terminal_row * VGA_WIDTH) +
+			    terminal_column) & 0xff);
+	uk_arch_x86_64_outb(areg, old);
+	uk_lcpu_restore_irqf(irq_flags);
 }
 
 static void vga_putc(char c)
@@ -150,10 +154,10 @@ static void vga_putc(char c)
 	 * code paths running through this function concurrently), but at
 	 * least we stay inside the video memory.
 	 */
-	local_irq_save(irq_flags);
+	irq_flags = uk_lcpu_save_irqf();
 	row = terminal_row;
 	column = terminal_column;
-	local_irq_restore(irq_flags);
+	uk_lcpu_restore_irqf(irq_flags);
 
 	switch (c) {
 	case '\a':
@@ -193,10 +197,10 @@ static void vga_putc(char c)
 		break;
 	}
 
-	local_irq_save(irq_flags);
+	irq_flags = uk_lcpu_save_irqf();
 	terminal_row = row;
 	terminal_column = column;
-	local_irq_restore(irq_flags);
+	uk_lcpu_restore_irqf(irq_flags);
 
 	vga_update_cursor();
 }
@@ -229,14 +233,14 @@ static int vga_check_settings(void)
 	 * It should be set, signifying that the VGA controller detects writes
 	 * to the VGA memory region.
 	 */
-	eram = inb(VGA_MISC_OUTPUT_REG) & VGA_ERAM_MASK;
+	eram = uk_arch_x86_64_inb(VGA_MISC_OUTPUT_REG) & VGA_ERAM_MASK;
 
 	/* Second, read 'Memory Map Select' filed in the 'Miscellaneous
 	 * Graphics Register'. It should be 0b11 in order to select the
 	 * 0xb8000-0xbffff address range.
 	 */
-	outb(VGA_GRAPHICS_ADDRESS_REG, VGA_MISC_GRAPHICS_REG);
-	memory_map_select = inb(VGA_GRAPHICS_DATA_REG)
+	uk_arch_x86_64_outb(VGA_GRAPHICS_ADDRESS_REG, VGA_MISC_GRAPHICS_REG);
+	memory_map_select = uk_arch_x86_64_inb(VGA_GRAPHICS_DATA_REG)
 			    & VGA_MEMORY_MAP_SELECT_MASK;
 
 	return eram && memory_map_select == VGA_MEMORY_MAP_SELECT_MASK;
@@ -252,18 +256,20 @@ static int vga_init(struct ukplat_bootinfo *bi)
 	terminal_column = 0;
 	terminal_color = vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
 
-	local_irq_save(irq_flags);
+	irq_flags = uk_lcpu_save_irqf();
 	if (!vga_check_settings()) {
 		__u8 val;
 
 		/* Set 'ERAM' in 'Miscellaneous Output Register'. */
-		val = inb(VGA_MISC_OUTPUT_REG);
-		outb(VGA_MISC_OUTPUT_REG, val | VGA_ERAM_MASK);
+		val = uk_arch_x86_64_inb(VGA_MISC_OUTPUT_REG);
+		uk_arch_x86_64_outb(VGA_MISC_OUTPUT_REG, val | VGA_ERAM_MASK);
 
 		/* Set 'Memory Map Select' in 'Miscellaneous Graphics Reg'. */
-		outb(VGA_GRAPHICS_ADDRESS_REG, VGA_MISC_GRAPHICS_REG);
-		val = inb(VGA_GRAPHICS_DATA_REG);
-		outb(VGA_GRAPHICS_DATA_REG, val | VGA_MEMORY_MAP_SELECT_MASK);
+		uk_arch_x86_64_outb(VGA_GRAPHICS_ADDRESS_REG,
+				    VGA_MISC_GRAPHICS_REG);
+		val = uk_arch_x86_64_inb(VGA_GRAPHICS_DATA_REG);
+		uk_arch_x86_64_outb(VGA_GRAPHICS_DATA_REG,
+				    val | VGA_MEMORY_MAP_SELECT_MASK);
 
 		/* When the settings are still not correct, we assume that there
 		 * is no VGA controller.
@@ -279,7 +285,7 @@ static int vga_init(struct ukplat_bootinfo *bi)
 	 * at 0x3cc. For our emulated color display, they should always be
 	 * 0x3d{4,5}, but better safe than sorry, so let's check at init time.
 	 */
-	if (inb(VGA_MISC_OUTPUT_REG) & VGA_IO_ADDRESS_SELECT_MASK) {
+	if (uk_arch_x86_64_inb(VGA_MISC_OUTPUT_REG) & VGA_IO_ADDRESS_SELECT_MASK) {
 		areg = 0x3d4;
 		dreg = 0x3d5;
 	} else {
@@ -291,22 +297,23 @@ static int vga_init(struct ukplat_bootinfo *bi)
 	 * and CURSOR_END (0x0b) to 0x0f enables the cursor and produces
 	 * a blinking underscore.
 	 */
-	outb(areg, 0x0a);
-	outb(dreg, 0x0e);
-	outb(areg, 0x0b);
-	outb(dreg, 0x0f);
-	local_irq_restore(irq_flags);
+	uk_arch_x86_64_outb(areg, 0x0a);
+	uk_arch_x86_64_outb(dreg, 0x0e);
+	uk_arch_x86_64_outb(areg, 0x0b);
+	uk_arch_x86_64_outb(dreg, 0x0f);
+	uk_lcpu_restore_irqf(irq_flags);
 
 	clear_terminal();
 
-	uk_console_init(&vga_dev, "vgacons", &vga_ops, UK_CONSOLE_FLAG_STDOUT);
+	uk_console_init(&vga_dev, "vgacons", &vga_ops, UK_CONSOLE_FLAG_STDOUT,
+			UK_CONSOLE_CLASS_FB);
 	uk_console_register(&vga_dev);
 
 	mrd.pbase = X86_VIDEO_MEM_START;
 	mrd.vbase = X86_VIDEO_MEM_START;
 	mrd.pg_off = 0;
 	mrd.len = X86_VIDEO_MEM_LEN;
-	mrd.pg_count = PAGE_COUNT(X86_VIDEO_MEM_LEN);
+	mrd.pg_count = UK_PAGING_PAGE_COUNT(X86_VIDEO_MEM_LEN);
 	mrd.type = UKPLAT_MEMRT_RESERVED;
 	mrd.flags = UKPLAT_MEMRF_READ | UKPLAT_MEMRF_WRITE;
 	rc = ukplat_memregion_list_insert(&bi->mrds, &mrd);

@@ -51,7 +51,6 @@
 #include <uk/init.h>
 #include <uk/list.h>
 #include <uk/ctors.h>
-#include <uk/page.h>
 
 #if CONFIG_LIBUKALLOC
 #include <uk/alloc.h>

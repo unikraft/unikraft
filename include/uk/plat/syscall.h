@@ -35,7 +35,7 @@
 #define __UKPLAT_SYSCALL__
 
 #include <uk/config.h>
-#include <uk/arch/lcpu.h>
+#include <uk/lcpu.h>
 
 #ifdef __cplusplus
 extern "C" {

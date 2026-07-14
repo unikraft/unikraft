@@ -74,19 +74,13 @@
 #include <uk/boot.h>
 #include <uk/plat/config.h>
 #include <uk/plat/console.h>
-#include <uk/plat/bootstrap.h>
+#include <uk/pm.h>
 #include <uk/plat/common/bootinfo.h>
-#include <x86/cpu.h>
 #include <x86/traps.h>
 
 #include <xen/xen.h>
 #include <common/events.h>
-#ifdef __X86_64__
-#include <xen-x86/hypercall64.h>
-#else
-#include <xen-x86/hypercall32.h>
-#endif
-#include <xen-x86/irq.h>
+#include <xen-x86/hypercall.h>
 #include <xen-x86/mm.h>
 #include <xen-x86/setup.h>
 #include <xen/arch-x86/cpuid.h>
@@ -100,11 +94,6 @@ shared_info_t *HYPERVISOR_shared_info;
  * in head.S.
  */
 char _libxenplat_bootstack[2*__STACK_SIZE];
-
-static inline void _init_traps(void)
-{
-	traps_lcpu_init(NULL);
-}
 
 static inline void _init_shared_info(void)
 {
@@ -183,6 +172,24 @@ static int _init_mem(struct ukplat_bootinfo *const bi)
 	return 0;
 }
 
+static void _init_segbase(void)
+{
+	int r;
+
+	r = HYPERVISOR_set_segment_base(SEGBASE_FS, 0);
+	if (unlikely(r))
+		goto err;
+	r = HYPERVISOR_set_segment_base(SEGBASE_GS_USER, 0);
+	if (unlikely(r))
+		goto err;
+	r = HYPERVISOR_set_segment_base(SEGBASE_GS_KERNEL, 0);
+	if (unlikely(r))
+		goto err;
+	return;
+err:
+	UK_CRASH("Error initializing segment registers: %d\n", r);
+}
+
 static void _libxenplat_x86bootinfo_setup(struct ukplat_bootinfo *bi)
 {
 	const char bl[] = "Xen";
@@ -205,11 +212,14 @@ void _libxenplat_x86entry(void *start_info)
 {
 	struct ukplat_bootinfo *bi;
 
+	_init_segbase();
+
 	bi = ukplat_bootinfo_get();
 	if (unlikely(!bi))
 		UK_CRASH("Failed to get bootinfo\n");
 
-	_init_traps();
+	xen_traps_init();
+
 	HYPERVISOR_start_info = (start_info_t *)start_info;
 
 	_init_shared_info(); /* remaps shared info */

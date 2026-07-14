@@ -39,16 +39,17 @@
 
 #include <xen/memory.h>
 #include <xen/hvm/hvm_op.h>
-#include <uk/arch/lcpu.h>
+#include <uk/arch.h>
+#include <uk/lcpu.h>
 #include <uk/atomic.h>
 #include <uk/bitops/bitscan.h>
 
 #define active_evtchns(sh, idx)				\
 	((sh)->evtchn_pending[idx] & ~(sh)->evtchn_mask[idx])
 
-int in_callback;
+static int in_callback;
 
-void do_hypervisor_callback(struct __regs *regs)
+void do_hypervisor_callback(struct uk_lcpu_regs *regs)
 {
 	unsigned long l1, l2, l1i, l2i;
 	unsigned int port;
@@ -62,7 +63,7 @@ void do_hypervisor_callback(struct __regs *regs)
 /* NB x86. No need for a barrier here -- XCHG is a barrier on x86. */
 #if !(defined __X86_32__ || defined __X86_64__)
 	/* Clear master flag /before/ clearing selector flag. */
-	wmb();
+	uk_arch_wmb();
 #endif
 	l1 = uk_exchange_n(&vcpu_info->evtchn_pending_sel, 0);
 	while (l1 != 0) {
@@ -81,7 +82,7 @@ void do_hypervisor_callback(struct __regs *regs)
 	in_callback = 0;
 }
 
-void ukplat_lcpu_irqs_handle_pending(void)
+void uk_plat_xen_irqs_handle_pending(void)
 {
 #ifdef XEN_HAVE_PV_UPCALL_MASK
 	int save;
@@ -97,12 +98,12 @@ void ukplat_lcpu_irqs_handle_pending(void)
 #ifdef XEN_HAVE_PV_UPCALL_MASK
 		vcpu->evtchn_upcall_mask = 1;
 #endif
-		barrier();
+		__barrier();
 		do_hypervisor_callback(NULL);
-		barrier();
+		__barrier();
 #ifdef XEN_HAVE_PV_UPCALL_MASK
 		vcpu->evtchn_upcall_mask = save;
-		barrier();
+		__barrier();
 #endif
 	};
 }

@@ -52,7 +52,7 @@ static inline int uk_vma_map_file(struct uk_vas *vas, __vaddr_t *vaddr,
 
 	UK_ASSERT(fd >= 0);
 	UK_ASSERT(offset >= 0);
-	UK_ASSERT(PAGE_ALIGNED(offset));
+	UK_ASSERT(UK_PAGING_PAGE_ALIGNED(offset));
 
 	return uk_vma_map(vas, vaddr, len, attr, flags, __NULL,
 			  &uk_vma_file_ops, &args);

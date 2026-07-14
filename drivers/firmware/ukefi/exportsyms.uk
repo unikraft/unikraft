@@ -1,0 +1,4 @@
+ uk_efi_rs_init
+ uk_efi_rs_syscrash
+ uk_efi_rs_syshalt
+ uk_efi_rs_sysrestart

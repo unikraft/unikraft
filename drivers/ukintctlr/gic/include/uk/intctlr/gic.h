@@ -84,8 +84,6 @@ struct _gic_operations {
 	void (*set_irq_prio)(__u32 irq, __u8 priority);
 	/** Set IRQ affinity (or "target" for GICv2) */
 	void (*set_irq_affinity)(__u32 irq, __u32 affinity);
-	/** Handle IRQ */
-	void (*handle_irq)(struct __regs *regs);
 	/** Send a SGI to the specifiec core */
 	void (*gic_sgi_gen)(__u8 sgintid, __u32 cpuid);
 };
@@ -140,8 +138,8 @@ struct _gic_dev {
  *
  * @return 0 on success, < 0 otherwise
  */
-#if defined(CONFIG_UKPLAT_ACPI)
+#if CONFIG_LIBUKACPI
 int acpi_get_gicd(struct _gic_dev *g);
-#endif /* CONFIG_UKPLAT_ACPI */
+#endif /* CONFIG_LIBUKACPI */
 
 #endif /* __UK_INTCTLR_GIC_H__ */

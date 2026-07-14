@@ -9,7 +9,7 @@ void schedcoop_thread_woken_isr(struct uk_sched *s, struct uk_thread *t)
 {
 	struct schedcoop *c = uksched2schedcoop(s);
 
-	UK_ASSERT(ukplat_lcpu_irqs_disabled());
+	UK_ASSERT(uk_lcpu_irqs_disabled());
 
 	if (t->wakeup_time > 0)
 		UK_TAILQ_REMOVE(&c->sleep_queue, t, queue);

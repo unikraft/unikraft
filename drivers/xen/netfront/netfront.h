@@ -45,8 +45,8 @@
 #endif
 
 
-#define NET_TX_RING_SIZE __CONST_RING_SIZE(netif_tx, PAGE_SIZE)
-#define NET_RX_RING_SIZE __CONST_RING_SIZE(netif_rx, PAGE_SIZE)
+#define NET_TX_RING_SIZE __CONST_RING_SIZE(netif_tx, UK_PAGING_PAGE_SIZE)
+#define NET_RX_RING_SIZE __CONST_RING_SIZE(netif_rx, UK_PAGING_PAGE_SIZE)
 
 /**
  * internal structure to represent the transmit queue.

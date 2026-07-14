@@ -37,7 +37,7 @@
 #include <errno.h>
 #include <uk/errptr.h>
 #include <uk/arch/types.h>
-#include <uk/arch/lcpu.h>
+#include <uk/lcpu.h>
 #include <uk/alloc.h>
 #include <uk/bus.h>
 #include <virtio/virtio_config.h>
@@ -276,6 +276,34 @@ static inline int virtio_config_get(struct virtio_dev *vdev, __u16 offset,
 
 	if (likely(vdev->cops->config_get))
 		rc = vdev->cops->config_get(vdev, offset, buf, len, type_len);
+
+	return rc;
+}
+
+/**
+ * Set the configuration information of the virtio device.
+ *
+ * @param vdev
+ *	Reference to the virtio device.
+ * @param offset
+ *	Offset into the virtio device configuration space.
+ * @param buf
+ *	A buffer to store the configuration information.
+ * @param len
+ *	The length of the buffer.
+ * @return int
+ *	>= 0, on successful writing the configuration space.
+ *	< 0, on error.
+ */
+static inline int virtio_config_set(struct virtio_dev *vdev, __u16 offset,
+				    void *buf, __u32 len)
+{
+	int rc = -ENOTSUP;
+
+	UK_ASSERT(vdev);
+
+	if (likely(vdev->cops->config_set))
+		rc = vdev->cops->config_set(vdev, offset, buf, len);
 
 	return rc;
 }

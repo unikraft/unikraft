@@ -29,7 +29,11 @@
 
 #include <uk/plat/common/sections.h>
 #include <uk/arch/limits.h>
-#include <uk/arch/paging.h>
+#include <uk/paging.h>
+
+#define PAGE_SIZE	UK_PAGING_PAGE_SIZE
+#define PAGE_MASK	UK_PAGING_PAGE_MASK
+#define PAGE_SHIFT	UK_PAGING_PAGE_SHIFT
 
 #ifndef __ASSEMBLY__
 typedef uint64_t paddr_t;

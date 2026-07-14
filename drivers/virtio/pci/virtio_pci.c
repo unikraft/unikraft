@@ -35,7 +35,7 @@
 #include <errno.h>
 #include <uk/alloc.h>
 #include <uk/print.h>
-#include <uk/plat/lcpu.h>
+#include <uk/lcpu.h>
 #include <uk/intctlr.h>
 #include <uk/bus/pci.h>
 #include <virtio/virtio_config.h>
@@ -138,7 +138,8 @@ static int virtio_pci_handle(void *arg)
 
 	if (isr_status & VIRTIO_PCI_ISR_CONFIG) {
 		/* We don't support configuration interrupt on the device */
-		uk_pr_warn("Unsupported config change interrupt received on virtio-pci device %p\n", d);
+		uk_pr_warn_isr("Unsupported config change interrupt received on virtio-pci device %p\n",
+			       d);
 	}
 
 	if (isr_status & VIRTIO_PCI_ISR_HAS_INTR)
@@ -179,9 +180,9 @@ static struct virtqueue *vpci_legacy_vq_setup(struct virtio_dev *vdev,
 			VIRTIO_PCI_QUEUE_PFN,
 			addr >> VIRTIO_PCI_QUEUE_ADDR_SHIFT);
 
-	flags = ukplat_lcpu_save_irqf();
+	flags = uk_lcpu_save_irqf();
 	UK_TAILQ_INSERT_TAIL(&vpdev->vdev.vqs, vq, next);
-	ukplat_lcpu_restore_irqf(flags);
+	uk_lcpu_restore_irqf(flags);
 
 err_exit:
 	return vq;
@@ -203,11 +204,11 @@ static void vpci_legacy_vq_release(struct virtio_dev *vdev,
 	virtio_cwrite32((void *)(unsigned long)vpdev->pci_base_addr,
 			VIRTIO_PCI_QUEUE_PFN, 0);
 
-	flags = ukplat_lcpu_save_irqf();
+	flags = uk_lcpu_save_irqf();
 	UK_TAILQ_REMOVE(&vpdev->vdev.vqs, vq, next);
-	ukplat_lcpu_restore_irqf(flags);
+	uk_lcpu_restore_irqf(flags);
 
-	virtqueue_destroy(vq, a);
+	virtqueue_destroy(VIRTIO_PCI_VRING_ALIGN, vq, a);
 }
 
 static int vpci_legacy_pci_vq_find(struct virtio_dev *vdev, __u16 num_vqs,

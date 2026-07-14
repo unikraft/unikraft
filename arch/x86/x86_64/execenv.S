@@ -5,7 +5,7 @@
  */
 
 #include <uk/arch/ctx.h>
-#include <uk/arch/lcpu.h>
+#include <uk/lcpu.h>
 #include <uk/asm.h>
 
 /**
@@ -37,11 +37,12 @@ ENTRY(ukarch_execenv_load)
 
 	/**
 	 * Load execenv's stored ECTX which resides at offset:
-	 * sizeof(struct __regs) + sizeof(struct ukarch_sysctx) from beginning
-	 * of execenv.
+	 * sizeof(struct uk_lcpu_regs) + sizeof(struct uk_lcpu_sysctx)
+	 * from beginning of execenv.
 	 */
-	addq	$(__REGS_SIZEOF + UKARCH_SYSCTX_SIZE), %rdi
-	call	ukarch_ectx_load
+	addq	$(UK_LCPU_REGS_SIZE + UK_LCPU_SYSCTX_SIZE), %rdi
+	call	UK_LCPU_ECTX_LOAD_FNSYM
+
 	/**
 	 * As stated previously, after function calls, %r12 preserved value of
 	 * execenv pointer so restore that into %rdi.
@@ -50,10 +51,10 @@ ENTRY(ukarch_execenv_load)
 
 	/**
 	 * Load execenv's stored system context which resides at offset:
-	 * sizeof(struct __regs) from beginning of execenv.
+	 * sizeof(struct uk_lcpu_regs) from beginning of execenv.
 	 */
-	addq	$(__REGS_SIZEOF), %rdi
-	call	ukarch_sysctx_load
+	addq	$(UK_LCPU_REGS_SIZE), %rdi
+	call	UK_LCPU_SYSCTX_LOAD_FNSYM
 
 	/**
 	 * Load execenv's stored general purpose registers which resides at
@@ -61,7 +62,7 @@ ENTRY(ukarch_execenv_load)
 	 */
 	movq	%r12, %rsp
 	.cfi_undefined rsp
-	addq	$(__REGS_PAD_SIZE), %rsp
+	addq	$(UK_LCPU_X86_64_REGS_OFFSETOF_R15), %rsp
 
 	popq	%r15
 	popq	%r14
@@ -79,7 +80,7 @@ ENTRY(ukarch_execenv_load)
 	popq	%rsi
 	popq	%rdi
 
-	addq	$(__REGS_PAD_SIZE), %rsp
+	addq	$(UK_LCPU_X86_64_REGS_OFFSETOF_R15), %rsp
 
 	iretq
 	.cfi_endproc

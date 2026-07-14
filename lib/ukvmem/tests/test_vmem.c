@@ -14,22 +14,21 @@
 #include <uk/print.h>
 #include <uk/alloc.h>
 #include <uk/falloc.h>
-#include <uk/arch/paging.h>
-#include <uk/plat/paging.h>
 #include <uk/nofault.h>
+#include <uk/paging.h>
 #include <uk/arch/limits.h>
 
 #define MAPPING_BASE CONFIG_LIBUKVMEM_DEFAULT_BASE
 
 /* Just define some shorter aliases */
 #undef PROT_R
-#define PROT_R PAGE_ATTR_PROT_READ
+#define PROT_R UK_PAGING_PAGE_ATTR_PROT_READ
 
 #undef PROT_RW
-#define PROT_RW PAGE_ATTR_PROT_RW
+#define PROT_RW UK_PAGING_PAGE_ATTR_PROT_RW
 
 #undef PROT_RWX
-#define PROT_RWX PAGE_ATTR_PROT_RWX
+#define PROT_RWX UK_PAGING_PAGE_ATTR_PROT_RWX
 
 static void vmem_print(struct uk_vas *vas)
 {
@@ -43,9 +42,9 @@ static void vmem_print(struct uk_vas *vas)
 
 		uk_pr_info("     [%zu] 0x%lx-0x%lx %c%c%c %s\n", i++,
 			   vma->start, vma->end,
-			   (vma->attr & PAGE_ATTR_PROT_READ) ? 'r' : '-',
-			   (vma->attr & PAGE_ATTR_PROT_WRITE) ? 'w' : '-',
-			   (vma->attr & PAGE_ATTR_PROT_EXEC) ? 'x' : '-',
+			   (vma->attr & UK_PAGING_PAGE_ATTR_PROT_READ) ? 'r' : '-',
+			   (vma->attr & UK_PAGING_PAGE_ATTR_PROT_WRITE) ? 'w' : '-',
+			   (vma->attr & UK_PAGING_PAGE_ATTR_PROT_EXEC) ? 'x' : '-',
 			   (vma->name) ? vma->name : "");
 	}
 }
@@ -120,7 +119,7 @@ UK_TESTCASE(ukvmem, test_basic_vas_layout)
 	int rc;
 
 	/* Create VMA at mapping base */
-	va = __VADDR_ANY;
+	va = UK_PAGING_VADDR_ANY;
 	rc = uk_vma_reserve(vas, &va, 0x10000);
 	UK_TEST_EXPECT_ZERO(rc);
 
@@ -136,7 +135,7 @@ UK_TESTCASE(ukvmem, test_basic_vas_layout)
 		}, 2));
 
 	/* Create VMA after first one, should merge */
-	va = __VADDR_ANY;
+	va = UK_PAGING_VADDR_ANY;
 	rc = uk_vma_reserve(vas, &va, 0x1000);
 	UK_TEST_EXPECT_ZERO(rc);
 
@@ -173,7 +172,7 @@ UK_TESTCASE(ukvmem, test_basic_vas_layout)
 		}, 2));
 
 	/* Create VMA that is too large for the hole, should merge with last */
-	va = __VADDR_ANY;
+	va = UK_PAGING_VADDR_ANY;
 	rc = uk_vma_reserve(vas, &va, 0x100000);
 	UK_TEST_EXPECT_ZERO(rc);
 
@@ -184,7 +183,7 @@ UK_TESTCASE(ukvmem, test_basic_vas_layout)
 		}, 2));
 
 	/* Create VMA that fits the hole, should merge everything */
-	va = __VADDR_ANY;
+	va = UK_PAGING_VADDR_ANY;
 	rc = uk_vma_reserve(vas, &va, 0xe000);
 	UK_TEST_EXPECT_ZERO(rc);
 
@@ -249,23 +248,23 @@ UK_TESTCASE(ukvmem, test_basic_vas_layout)
 	/* Create a couple of more complex VMAs, some of which should merge,
 	 * and some should not
 	 */
-	va = __VADDR_ANY;
+	va = UK_PAGING_VADDR_ANY;
 	rc = uk_vma_reserve_ex(vas, &va, 0x2000, PROT_RW, 0, NULL);
 	UK_TEST_EXPECT_ZERO(rc);
 
-	va = __VADDR_ANY;
+	va = UK_PAGING_VADDR_ANY;
 	rc = uk_vma_reserve_ex(vas, &va, 0x2000, PROT_RWX, 0, NULL);
 	UK_TEST_EXPECT_ZERO(rc);
 
-	va = __VADDR_ANY;
+	va = UK_PAGING_VADDR_ANY;
 	rc = uk_vma_reserve_ex(vas, &va, 0x2000, PROT_RWX, 0, "tst");
 	UK_TEST_EXPECT_ZERO(rc);
 
-	va = __VADDR_ANY;
+	va = UK_PAGING_VADDR_ANY;
 	rc = uk_vma_reserve_ex(vas, &va, 0x2000, PROT_RWX, 0, "tst");
 	UK_TEST_EXPECT_ZERO(rc);
 
-	va = __VADDR_ANY;
+	va = UK_PAGING_VADDR_ANY;
 	rc = uk_vma_reserve_ex(vas, &va, 0x2000, PROT_RW, 0, "tst");
 	UK_TEST_EXPECT_ZERO(rc);
 
@@ -279,7 +278,7 @@ UK_TESTCASE(ukvmem, test_basic_vas_layout)
 
 	/* Set attributes so that some areas are merged */
 	va = MAPPING_BASE + 0x1000;
-	rc = uk_vma_set_attr(vas, va, 0x7000, PAGE_ATTR_PROT_RW, 0);
+	rc = uk_vma_set_attr(vas, va, 0x7000, UK_PAGING_PAGE_ATTR_PROT_RW, 0);
 	UK_TEST_EXPECT_ZERO(rc);
 
 	UK_TEST_EXPECT_ZERO(uk_vmem_test_check_vas(vas,
@@ -320,11 +319,11 @@ UK_TESTCASE(ukvmem, test_vma_rsvd)
 	int rc;
 	__sz len;
 
-	vaddr = __VADDR_ANY;
-	rc = uk_vma_reserve(vas, &vaddr, PAGE_SIZE);
+	vaddr = UK_PAGING_VADDR_ANY;
+	rc = uk_vma_reserve(vas, &vaddr, UK_PAGING_PAGE_SIZE);
 	UK_TEST_EXPECT_ZERO(rc);
 
-	len = uk_vmem_test_probe_r(vaddr, PAGE_SIZE);
+	len = uk_vmem_test_probe_r(vaddr, UK_PAGING_PAGE_SIZE);
 	UK_TEST_EXPECT_SNUM_EQ(len, 0);
 
 	uk_vmem_test_vas_clean(vas);
@@ -346,7 +345,7 @@ UK_TESTCASE(ukvmem, test_vma_anon)
 	 * We disable demand-paging during the test access to make sure the
 	 * memory is actually pre-faulted.
 	 */
-	va1 = __VADDR_ANY;
+	va1 = UK_PAGING_VADDR_ANY;
 	rc = uk_vma_map_anon(vas, &va1, 0x10000, PROT_R,
 			     UK_VMA_MAP_POPULATE, NULL);
 	UK_TEST_EXPECT_ZERO(rc);
@@ -363,7 +362,7 @@ UK_TESTCASE(ukvmem, test_vma_anon)
 	 * access the memory with disabled/enabled paging. The VMA should merge
 	 * with the first one.
 	 */
-	va2 = __VADDR_ANY;
+	va2 = UK_PAGING_VADDR_ANY;
 	rc = uk_vma_map_anon(vas, &va2, 0x2000, PROT_R, 0, NULL);
 	UK_TEST_EXPECT_ZERO(rc);
 
@@ -420,7 +419,7 @@ UK_TESTCASE(ukvmem, test_vma_anon)
 	uk_vmem_test_vas_clean(vas);
 }
 
-#ifdef PAGE_LARGE_SHIFT
+#ifdef UK_PAGING_PAGE_LARGE_SHIFT
 /**
  * Tests if we can create anonymous mappings with large pages.
  */
@@ -433,53 +432,57 @@ UK_TESTCASE(ukvmem, test_vma_anon_large)
 	__sz len;
 
 	/* First try with an invalid length and address */
-	va = __VADDR_ANY;
-	rc = uk_vma_map_anon(vas, &va, PAGE_SIZE, PROT_RW,
-			     UK_VMA_MAP_SIZE(PAGE_LARGE_SHIFT), NULL);
+	va = UK_PAGING_VADDR_ANY;
+	rc = uk_vma_map_anon(vas, &va, UK_PAGING_PAGE_SIZE, PROT_RW,
+			     UK_VMA_MAP_SIZE(UK_PAGING_PAGE_LARGE_SHIFT), NULL);
 	UK_TEST_EXPECT_SNUM_EQ(rc, -EINVAL);
 
-	va = PAGE_LARGE_ALIGN_DOWN(MAPPING_BASE) - PAGE_SIZE;
-	rc = uk_vma_map_anon(vas, &va, PAGE_LARGE_SIZE * 2, PROT_RW,
-			     UK_VMA_MAP_SIZE(PAGE_LARGE_SHIFT), NULL);
+	va = UK_PAGING_PAGE_LARGE_ALIGN_DOWN(MAPPING_BASE) - UK_PAGING_PAGE_SIZE;
+	rc = uk_vma_map_anon(vas, &va, UK_PAGING_PAGE_LARGE_SIZE * 2, PROT_RW,
+			     UK_VMA_MAP_SIZE(UK_PAGING_PAGE_LARGE_SHIFT), NULL);
 	UK_TEST_EXPECT_SNUM_EQ(rc, -EINVAL);
 
-	va = __VADDR_ANY;
-	rc = uk_vma_map_anon(vas, &va, PAGE_LARGE_SIZE * 2, PROT_RW,
-			     UK_VMA_MAP_SIZE(PAGE_LARGE_SHIFT), NULL);
+	va = UK_PAGING_VADDR_ANY;
+	rc = uk_vma_map_anon(vas, &va, UK_PAGING_PAGE_LARGE_SIZE * 2, PROT_RW,
+			     UK_VMA_MAP_SIZE(UK_PAGING_PAGE_LARGE_SHIFT), NULL);
 	UK_TEST_EXPECT_ZERO(rc);
 
-	len = uk_vmem_test_probe_rw(va, PAGE_LARGE_SIZE * 2);
-	UK_TEST_EXPECT_SNUM_EQ(len, PAGE_LARGE_SIZE * 2);
+	len = uk_vmem_test_probe_rw(va, UK_PAGING_PAGE_LARGE_SIZE * 2);
+	UK_TEST_EXPECT_SNUM_EQ(len, UK_PAGING_PAGE_LARGE_SIZE * 2);
 
 	/* Check if this is really a large page */
-	lvl = PAGE_LEVEL;
-	rc = ukplat_pt_walk(vas->pt, va, &lvl, NULL, NULL);
+	lvl = UK_PAGING_PAGE_LEVEL;
+	rc = uk_paging_pt_walk(vas->pt, va, &lvl, NULL, NULL);
 	uk_vmem_test_bug_on(rc != 0);
 
-	UK_TEST_EXPECT_SNUM_EQ(lvl, PAGE_LARGE_LEVEL);
+	UK_TEST_EXPECT_SNUM_EQ(lvl, UK_PAGING_PAGE_LARGE_LEVEL);
 
 	/* Make sure that we cannot split the region with an invalid address
 	 * and length
 	 */
-	rc = uk_vma_set_attr(vas, va + PAGE_LARGE_SIZE, PAGE_SIZE, PROT_R, 0);
+	rc = uk_vma_set_attr(vas, va + UK_PAGING_PAGE_LARGE_SIZE,
+			     UK_PAGING_PAGE_SIZE, PROT_R, 0);
 	UK_TEST_EXPECT_SNUM_EQ(rc, -EINVAL);
 
-	rc = uk_vma_set_attr(vas, va + PAGE_SIZE, PAGE_LARGE_SIZE, PROT_R, 0);
+	rc = uk_vma_set_attr(vas, va + UK_PAGING_PAGE_SIZE,
+			     UK_PAGING_PAGE_LARGE_SIZE, PROT_R, 0);
 	UK_TEST_EXPECT_SNUM_EQ(rc, -EINVAL);
 
-	rc = uk_vma_set_attr(vas, va + PAGE_LARGE_SIZE, PAGE_LARGE_SIZE,
+	rc = uk_vma_set_attr(vas, va + UK_PAGING_PAGE_LARGE_SIZE,
+			     UK_PAGING_PAGE_LARGE_SIZE,
 			     PROT_R, 0);
 	UK_TEST_EXPECT_ZERO(0);
 
 	UK_TEST_EXPECT_ZERO(uk_vmem_test_check_vas(vas,
 		(struct uk_vmem_test_vma[]){
-			{va, va + PAGE_LARGE_SIZE, PROT_RW},
-			{va + PAGE_LARGE_SIZE, va + 2 * PAGE_LARGE_SIZE, PROT_R},
+			{va, va + UK_PAGING_PAGE_LARGE_SIZE, PROT_RW},
+			{va + UK_PAGING_PAGE_LARGE_SIZE,
+			 va + 2 * UK_PAGING_PAGE_LARGE_SIZE, PROT_R},
 		}, 2));
 
 	uk_vmem_test_vas_clean(vas);
 }
-#endif /* PAGE_LARGE_SHIFT */
+#endif /* UK_PAGING_PAGE_LARGE_SHIFT */
 
 /**
  * Tests direct physical memory mappings. We especially make sure that the
@@ -490,8 +493,8 @@ UK_TESTCASE(ukvmem, test_vma_dma)
 {
 	struct uk_vas *vas = uk_vmem_test_vas_init();
 	__vaddr_t kvaddr;
-	__vaddr_t vaddr = __VADDR_ANY;
-	__paddr_t paddr = __PADDR_ANY;
+	__vaddr_t vaddr = UK_PAGING_VADDR_ANY;
+	__paddr_t paddr = UK_PAGING_PADDR_ANY;
 	__vaddr_t va;
 	__sz len;
 	int rc, i;
@@ -503,42 +506,44 @@ UK_TESTCASE(ukvmem, test_vma_dma)
 	rc = vas->pt->fa->falloc(vas->pt->fa, &paddr, 4, 0);
 	uk_vmem_test_bug_on(rc != 0);
 
-	kvaddr = ukplat_page_kmap(vas->pt, paddr, 4, 0);
-	uk_vmem_test_bug_on(kvaddr == __VADDR_INV);
+	kvaddr = uk_paging_page_kmap(vas->pt, paddr, 4, 0);
+	uk_vmem_test_bug_on(kvaddr == UK_PAGING_VADDR_INV);
 
-	for (i = 0, va = kvaddr; i < 4; i++, va += PAGE_SIZE)
+	for (i = 0, va = kvaddr; i < 4; i++, va += UK_PAGING_PAGE_SIZE)
 		*((unsigned long *)va) = 0xDEADB0B0 + i;
 
-	rc = uk_vma_map_dma(vas, &vaddr, 4 * PAGE_SIZE, PROT_RW, 0,
+	rc = uk_vma_map_dma(vas, &vaddr, 4 * UK_PAGING_PAGE_SIZE, PROT_RW, 0,
 			    NULL, paddr);
 	UK_TEST_EXPECT_ZERO(rc);
 
 	/* Check if we can read the first 3 values back in */
-	for (i = 0, va = vaddr; i < 3; i++, va += PAGE_SIZE)
+	for (i = 0, va = vaddr; i < 3; i++, va += UK_PAGING_PAGE_SIZE)
 		if (*((unsigned long *)va) != 0xDEADB0B0 + i)
 			break;
 
 	UK_TEST_EXPECT_SNUM_EQ(i, 3);
 
 	/* Modify the values via the new mapping */
-	for (i = 0, va = vaddr; i < 3; i++, va += PAGE_SIZE)
+	for (i = 0, va = vaddr; i < 3; i++, va += UK_PAGING_PAGE_SIZE)
 		*((unsigned long *)va) = 0xB0B0CAFE + i;
 
 	/* Read the values back in via the kernel mapping */
-	for (i = 0, va = kvaddr; i < 3; i++, va += PAGE_SIZE)
+	for (i = 0, va = kvaddr; i < 3; i++, va += UK_PAGING_PAGE_SIZE)
 		if (*((unsigned long *)va) != 0xB0B0CAFE + i)
 			break;
 
 	UK_TEST_EXPECT_SNUM_EQ(i, 3);
 
 	/* Change protections of the first pair of pages */
-	rc = uk_vma_set_attr(vas, vaddr, 2 * PAGE_SIZE, PROT_R, 0);
+	rc = uk_vma_set_attr(vas, vaddr, 2 * UK_PAGING_PAGE_SIZE, PROT_R, 0);
 	UK_TEST_EXPECT_ZERO(rc);
 
 	UK_TEST_EXPECT_ZERO(uk_vmem_test_check_vas(vas,
 		(struct uk_vmem_test_vma[]){
-			{vaddr + 0 * PAGE_SIZE, vaddr + 2 * PAGE_SIZE, PROT_R},
-			{vaddr + 2 * PAGE_SIZE, vaddr + 4 * PAGE_SIZE, PROT_RW},
+			{vaddr + 0 * UK_PAGING_PAGE_SIZE,
+			 vaddr + 2 * UK_PAGING_PAGE_SIZE, PROT_R},
+			{vaddr + 2 * UK_PAGING_PAGE_SIZE,
+			 vaddr + 4 * UK_PAGING_PAGE_SIZE, PROT_RW},
 		}, 2));
 
 	/* Two pages should be read-only now and one of the rw-pages (the 4th)
@@ -548,30 +553,30 @@ UK_TESTCASE(ukvmem, test_vma_dma)
 	 * new physical base address computed during the split and used during
 	 * the fault is correct.
 	 */
-	len = uk_vmem_test_probe_r_nopage(vaddr, 4 * PAGE_SIZE);
-	UK_TEST_EXPECT_SNUM_EQ(len, 3 * PAGE_SIZE);
+	len = uk_vmem_test_probe_r_nopage(vaddr, 4 * UK_PAGING_PAGE_SIZE);
+	UK_TEST_EXPECT_SNUM_EQ(len, 3 * UK_PAGING_PAGE_SIZE);
 
-	len = uk_vmem_test_probe_rw_nopage(vaddr, 4 * PAGE_SIZE);
-	UK_TEST_EXPECT_SNUM_EQ(len, PAGE_SIZE);
+	len = uk_vmem_test_probe_rw_nopage(vaddr, 4 * UK_PAGING_PAGE_SIZE);
+	UK_TEST_EXPECT_SNUM_EQ(len, UK_PAGING_PAGE_SIZE);
 
-	*((unsigned long *)(vaddr + 3 * PAGE_SIZE)) = 0xB0B0CAFE + 3;
+	*((unsigned long *)(vaddr + 3 * UK_PAGING_PAGE_SIZE)) = 0xB0B0CAFE + 3;
 
-	UK_TEST_EXPECT_SNUM_EQ(*((unsigned long *)(kvaddr + 3 * PAGE_SIZE)),
+	UK_TEST_EXPECT_SNUM_EQ(*((unsigned long *)(kvaddr + 3 * UK_PAGING_PAGE_SIZE)),
 			       0xB0B0CAFE + 3);
 
 	/* We change the protections back to what they were and see if the
 	 * merge was successful.
 	 */
-	rc = uk_vma_set_attr(vas, vaddr, 2 * PAGE_SIZE, PROT_RW, 0);
+	rc = uk_vma_set_attr(vas, vaddr, 2 * UK_PAGING_PAGE_SIZE, PROT_RW, 0);
 	UK_TEST_EXPECT_ZERO(rc);
 
 	UK_TEST_EXPECT_ZERO(uk_vmem_test_check_vas(vas,
 		(struct uk_vmem_test_vma[]){
-			{vaddr, vaddr + 4 * PAGE_SIZE, PROT_RW},
+			{vaddr, vaddr + 4 * UK_PAGING_PAGE_SIZE, PROT_RW},
 		}, 1));
 
 	/* Clean up */
-	ukplat_page_kunmap(vas->pt, kvaddr, 4, 0);
+	uk_paging_page_kunmap(vas->pt, kvaddr, 4, 0);
 
 	rc = vas->pt->fa->ffree(vas->pt->fa, paddr, 4);
 	uk_vmem_test_bug_on(rc != 0);
@@ -584,27 +589,28 @@ UK_TESTCASE(ukvmem, test_vma_dma)
  * configuration option works, the guard page is present, and that stacks
  * are not merged or split.
  */
-#define VMEM_STACKSIZE (16 * PAGE_SIZE)
+#define VMEM_STACKSIZE (16 * UK_PAGING_PAGE_SIZE)
 UK_TESTCASE(ukvmem, test_vma_stack)
 {
 	struct uk_vas *vas = uk_vmem_test_vas_init();
-	__vaddr_t va1 = __VADDR_ANY;
-	__vaddr_t va2 = __VADDR_ANY;
+	__vaddr_t va1 = UK_PAGING_VADDR_ANY;
+	__vaddr_t va2 = UK_PAGING_VADDR_ANY;
 	__sz len;
 	int rc;
 
 	rc = uk_vma_map_stack(vas, &va1, VMEM_STACKSIZE, UK_VMA_STACK_GROWS_UP,
-			      NULL, 2 * PAGE_SIZE);
+			      NULL, 2 * UK_PAGING_PAGE_SIZE);
 	UK_TEST_EXPECT_ZERO(rc);
 
 	/* Verify that only the initial length has been allocated and the
 	 * memory is readable/writable
 	 */
 	len = uk_vmem_test_probe_rw_nopage(va1, VMEM_STACKSIZE);
-	UK_TEST_EXPECT_SNUM_EQ(len, 2 * PAGE_SIZE);
+	UK_TEST_EXPECT_SNUM_EQ(len, 2 * UK_PAGING_PAGE_SIZE);
 
 	/* Probe the top guard pages */
-	len = uk_vmem_test_probe_r(va1 + VMEM_STACKSIZE, UK_VMA_STACK_TOP_GUARD_SIZE);
+	len = uk_vmem_test_probe_r(va1 + VMEM_STACKSIZE,
+				   UK_VMA_STACK_TOP_GUARD_SIZE);
 	UK_TEST_EXPECT_ZERO(len);
 
 	/* Probe the bottom guard pages */
@@ -628,7 +634,8 @@ UK_TESTCASE(ukvmem, test_vma_stack)
 		}, 2));
 
 	/* Probe the top guard pages */
-	len = uk_vmem_test_probe_r(va2 + VMEM_STACKSIZE, UK_VMA_STACK_TOP_GUARD_SIZE);
+	len = uk_vmem_test_probe_r(va2 + VMEM_STACKSIZE,
+				   UK_VMA_STACK_TOP_GUARD_SIZE);
 	UK_TEST_EXPECT_ZERO(len);
 
 	/* Probe the bottom guard pages */
@@ -642,11 +649,11 @@ UK_TESTCASE(ukvmem, test_vma_stack)
 	UK_TEST_EXPECT_SNUM_EQ(len, VMEM_STACKSIZE);
 
 	/* Try to unmap only some part of the stack */
-	rc = uk_vma_unmap(vas, va2, PAGE_SIZE * 2, 0);
+	rc = uk_vma_unmap(vas, va2, UK_PAGING_PAGE_SIZE * 2, 0);
 	UK_TEST_EXPECT_SNUM_EQ(rc, -EPERM);
 
 	/* Try to set attr for a part of the stack */
-	rc = uk_vma_set_attr(vas, va2, PAGE_SIZE * 2, PROT_R, 0);
+	rc = uk_vma_set_attr(vas, va2, UK_PAGING_PAGE_SIZE * 2, PROT_R, 0);
 	UK_TEST_EXPECT_SNUM_EQ(rc, -EPERM);
 
 	/* But we should be able to change attributes for the whole VMA */
@@ -666,7 +673,7 @@ UK_TESTCASE(ukvmem, test_vma_stack)
 UK_TESTCASE(ukvmem, test_vma_replace)
 {
 	struct uk_vas *vas = uk_vmem_test_vas_init();
-	__vaddr_t va1 = __VADDR_ANY, va2;
+	__vaddr_t va1 = UK_PAGING_VADDR_ANY, va2;
 	__sz len;
 	int rc;
 

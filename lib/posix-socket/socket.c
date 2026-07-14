@@ -953,8 +953,8 @@ int uk_socketpair_create(int family, int type, int protocol,
 	if (unlikely(!d))
 		return -EAFNOSUPPORT;
 
-	al[0] = uk_malloc(d->allocator, sizeof(*al));
-	al[1] = uk_malloc(d->allocator, sizeof(*al));
+	al[0] = uk_malloc(d->allocator, sizeof(struct socket_alloc));
+	al[1] = uk_malloc(d->allocator, sizeof(struct socket_alloc));
 	if (unlikely(!al[0] || !al[1])) {
 		ret = -ENOMEM;
 		goto err_free;

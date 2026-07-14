@@ -1,5 +1,6 @@
 menuconfig LIBUKNOFAULT
 	bool "uknofault: Fault-safe memory access functions"
+	select LIBUKLCPU
 	default n
 	help
 		Provides functions for probing memory addresses and
@@ -21,6 +22,6 @@ config LIBUKNOFAULT_TEST
 	bool "Enable tests"
 	default n
 	select LIBUKTEST
-	depends on PAGING
+	depends on LIBUKPAGING
 
 endif

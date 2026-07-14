@@ -1,75 +1,51 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
-/*
+/* Copyright (c) 2018, Arm Ltd. All rights reserved.
  * Copyright (c) 2020, OpenSynergy GmbH. All rights reserved.
- *
- * ARM Generic Interrupt Controller support v3 version
- * based on plat/drivers/gic/gic-v2.c:
- *
- * Authors: Wei Chen <Wei.Chen@arm.com>
- *          Jianyong Wu <Jianyong.Wu@arm.com>
- *
- * Copyright (c) 2018, Arm Ltd. All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- *
- * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- * 3. Neither the name of the copyright holder nor the names of its
- *    contributors may be used to endorse or promote products derived from
- *    this software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
- * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGE.
+ * Copyright (c) 2025, Unikraft GmbH and The Unikraft Authors.
+ * Licensed under the BSD-3-Clause License (the "License").
+ * You may not use this file except in compliance with the License.
  */
+
 #include <string.h>
 #include <libfdt.h>
-#include <uk/config.h>
-#include <uk/essentials.h>
-#include <uk/print.h>
+
+#include <uk/arch/arm64.h>
+#include <uk/arch/util.h>
+#include <uk/asm.h>
 #include <uk/assert.h>
 #include <uk/bitops.h>
-#include <uk/asm.h>
-#include <uk/plat/lcpu.h>
-#ifdef CONFIG_UKPLAT_ACPI
-#include <uk/plat/common/acpi.h>
-#endif /* CONFIG_UKPLAT_ACPI */
-#include <uk/plat/common/bootinfo.h>
-#include <uk/plat/spinlock.h>
-#include <arm/cpu.h>
+#include <uk/config.h>
+#include <uk/essentials.h>
+#include <uk/event.h>
 #include <uk/intctlr.h>
 #include <uk/intctlr/gic.h>
 #include <uk/intctlr/gic-v3.h>
 #include <uk/intctlr/limits.h>
+#include <uk/lcpu.h>
 #include <uk/ofw/fdt.h>
+#include <uk/pcpuvar.h>
+#include <uk/plat/common/bootinfo.h>
+#include <uk/plat/spinlock.h>
+#include <uk/print.h>
 
-#if CONFIG_PAGING
+#if CONFIG_LIBUKACPI
+#include <uk/acpi.h>
+#endif /* CONFIG_LIBUKACPI */
+
+#if CONFIG_LIBUKPAGING
 #include <uk/bus/platform.h>
 #include <uk/errptr.h>
-#endif /* CONFIG_PAGING */
+#endif /* CONFIG_LIBUKPAGING */
 
 #define GIC_MAX_IRQ	UK_INTCTLR_MAX_IRQ
 
 #define GIC_RDIST_REG(gdev, r)					\
 	((void *)(gdev.rdist_mem_addr + (r) +			\
-	lcpu_get_current()->idx * GICR_STRIDE))
+	uk_pcpuvar_current_get(uk_pcpuvar_cpu_idx) * GICR_STRIDE))
 
-#define GIC_AFF_TO_ROUTER(aff, mode)				\
-	((((__u64)(aff) << 8) & MPIDR_AFF3_MASK) | ((aff) & 0xffffff) | \
-	 ((__u64)(mode) << 31))
+#define GIC_AFF_TO_ROUTER(aff, mode)					\
+	((((__u64)(aff) << 8) & UK_ARCH_ARM64_MPIDR_EL1_AFF3_MASK) |	\
+	 ((aff) & 0xffffff) | ((__u64)(mode) << 31))
 
 #ifdef CONFIG_HAVE_SMP
 __spinlock gicv3_dist_lock;
@@ -98,37 +74,37 @@ static const char * const gic_device_list[] __maybe_unused = {
 /* Inline functions to access GICD & GICR registers */
 static inline void write_gicd8(__u64 offset, __u8 val)
 {
-	ioreg_write8(GIC_DIST_REG(gicv3_drv, offset), val);
+	uk_arch_arm64_ioreg_write8(GIC_DIST_REG(gicv3_drv, offset), val);
 }
 
 static inline void write_gicrd8(__u64 offset, __u8 val)
 {
-	ioreg_write8(GIC_RDIST_REG(gicv3_drv, offset), val);
+	uk_arch_arm64_ioreg_write8(GIC_RDIST_REG(gicv3_drv, offset), val);
 }
 
 static inline void write_gicd32(__u64 offset, __u32 val)
 {
-	ioreg_write32(GIC_DIST_REG(gicv3_drv, offset), val);
+	uk_arch_arm64_ioreg_write32(GIC_DIST_REG(gicv3_drv, offset), val);
 }
 
 static inline void write_gicd64(__u64 offset, __u64 val)
 {
-	ioreg_write64(GIC_DIST_REG(gicv3_drv, offset), val);
+	uk_arch_arm64_ioreg_write64(GIC_DIST_REG(gicv3_drv, offset), val);
 }
 
 static inline __u32 read_gicd32(__u64 offset)
 {
-	return ioreg_read32(GIC_DIST_REG(gicv3_drv, offset));
+	return uk_arch_arm64_ioreg_read32(GIC_DIST_REG(gicv3_drv, offset));
 }
 
 static inline void write_gicrd32(__u64 offset, __u32 val)
 {
-	ioreg_write32(GIC_RDIST_REG(gicv3_drv, offset), val);
+	uk_arch_arm64_ioreg_write32(GIC_RDIST_REG(gicv3_drv, offset), val);
 }
 
 static inline __u32 read_gicrd32(__u64 offset)
 {
-	return ioreg_read32(GIC_RDIST_REG(gicv3_drv, offset));
+	return uk_arch_arm64_ioreg_read32(GIC_RDIST_REG(gicv3_drv, offset));
 }
 
 /**
@@ -141,7 +117,7 @@ static void wait_for_rwp(__u64 offset)
 	__u32 val;
 
 	do {
-		val = ioreg_read32((void *)(offset + GICD_CTLR));
+		val = uk_arch_arm64_ioreg_read32((void *)(offset + GICD_CTLR));
 	} while ((val & GICD_CTLR_RWP));
 }
 
@@ -154,12 +130,12 @@ static void wait_for_rwp(__u64 offset)
 static __u32 get_cpu_affinity(void)
 {
 	__u64 aff;
-	__u64 mpidr = SYSREG_READ64(MPIDR_EL1);
+	__u64 mpidr = UK_ARCH_ARM64_SYSREG_READ64(MPIDR_EL1);
 
-	aff = ((mpidr & MPIDR_AFF3_MASK) >> 8) |
-		(mpidr & MPIDR_AFF2_MASK) |
-		(mpidr & MPIDR_AFF1_MASK) |
-		(mpidr & MPIDR_AFF0_MASK);
+	aff = ((mpidr & UK_ARCH_ARM64_MPIDR_EL1_AFF3_MASK) >> 8) |
+		(mpidr & UK_ARCH_ARM64_MPIDR_EL1_AFF2_MASK) |
+		(mpidr & UK_ARCH_ARM64_MPIDR_EL1_AFF1_MASK) |
+		(mpidr & UK_ARCH_ARM64_MPIDR_EL1_AFF0_MASK);
 
 	return (__u32)aff;
 }
@@ -174,8 +150,8 @@ static __u32 gicv3_ack_irq(void)
 {
 	__u32 irq;
 
-	irq = SYSREG_READ32(ICC_IAR1_EL1);
-	dsb(sy);
+	irq = UK_ARCH_ARM64_SYSREG_READ32(ICC_IAR1_EL1);
+	uk_arch_arm64_dsb(sy);
 
 	return irq;
 }
@@ -189,12 +165,12 @@ static __u32 gicv3_ack_irq(void)
 static void gicv3_eoi_irq(__u32 irq)
 {
 	/* Lower the priority */
-	SYSREG_WRITE32(ICC_EOIR1_EL1, irq);
-	isb();
+	UK_ARCH_ARM64_SYSREG_WRITE32(ICC_EOIR1_EL1, irq);
+	uk_arch_arm64_isb();
 
 	/* Deactivate */
-	SYSREG_WRITE32(ICC_DIR_EL1, irq);
-	isb();
+	UK_ARCH_ARM64_SYSREG_WRITE32(ICC_DIR_EL1, irq);
+	uk_arch_arm64_isb();
 }
 
 /**
@@ -251,16 +227,16 @@ static void gicv3_sgi_gen(__u8 sgintid, __u32 cpuid)
 	sgi_register |= (sgintid << 24);
 
 	/* Set affinity fields and optional range selector */
-	sgi_register |= (extended_cpuid & MPIDR_AFF3_MASK) << 48;
-	sgi_register |= (extended_cpuid & MPIDR_AFF2_MASK) << 32;
-	sgi_register |= (extended_cpuid & MPIDR_AFF1_MASK) << 16;
+	sgi_register |= (extended_cpuid & UK_ARCH_ARM64_MPIDR_EL1_AFF3_MASK) << 48;
+	sgi_register |= (extended_cpuid & UK_ARCH_ARM64_MPIDR_EL1_AFF2_MASK) << 32;
+	sgi_register |= (extended_cpuid & UK_ARCH_ARM64_MPIDR_EL1_AFF1_MASK) << 16;
 	/**
 	 ** For affinity 0, we need to find which group of 16 values is
 	 ** represented by the TargetList field in ICC_SGI1R_EL1.
 	 **/
-	aff0 = extended_cpuid & MPIDR_AFF0_MASK;
+	aff0 = extended_cpuid & UK_ARCH_ARM64_MPIDR_EL1_AFF0_MASK;
 	if (aff0 >= 16) {
-		control_register_rss = SYSREG_READ64(ICC_CTLR_EL1) & (1 << 18);
+		control_register_rss = UK_ARCH_ARM64_SYSREG_READ64(ICC_CTLR_EL1) & (1 << 18);
 		type_register_rss =  read_gicd32(GICD_TYPER)  & (1 << 26);
 		if (control_register_rss == 1 && type_register_rss == 1) {
 			range_selector = aff0 / 16;
@@ -275,7 +251,7 @@ static void gicv3_sgi_gen(__u8 sgintid, __u32 cpuid)
 
 	/* Generate interrupt */
 	dist_lock(gicv3_drv);
-	SYSREG_WRITE64(ICC_SGI1R_EL1, sgi_register);
+	UK_ARCH_ARM64_SYSREG_WRITE64(ICC_SGI1R_EL1, sgi_register);
 	dist_unlock(gicv3_drv);
 }
 
@@ -434,24 +410,25 @@ static void gicv3_init_redist(void)
 	wait_for_rwp(gicv3_drv.rdist_mem_addr);
 
 	/* Enable system register access */
-	val  = SYSREG_READ32(ICC_SRE_EL1);
+	val  = UK_ARCH_ARM64_SYSREG_READ32(ICC_SRE_EL1);
 	val |= 0x7;
-	SYSREG_WRITE32(ICC_SRE_EL1, val);
-	isb();
+
+	UK_ARCH_ARM64_SYSREG_WRITE32(ICC_SRE_EL1, val);
+	uk_arch_arm64_isb();
 
 	/* No priority grouping */
-	SYSREG_WRITE32(ICC_BPR1_EL1, 0);
+	UK_ARCH_ARM64_SYSREG_WRITE32(ICC_BPR1_EL1, 0);
 
 	/* Set priority mask register */
-	SYSREG_WRITE32(ICC_PMR_EL1, 0xff);
+	UK_ARCH_ARM64_SYSREG_WRITE32(ICC_PMR_EL1, 0xff);
 
 	/* EOI drops priority, DIR deactivates the interrupt (mode 1) */
-	SYSREG_WRITE32(ICC_CTLR_EL1, GICC_CTLR_EL1_EOImode_drop);
+	UK_ARCH_ARM64_SYSREG_WRITE32(ICC_CTLR_EL1, GICC_CTLR_EL1_EOImode_drop);
 
 	/* Enable Group 1 interrupts */
-	SYSREG_WRITE32(ICC_IGRPEN1_EL1, 1);
+	UK_ARCH_ARM64_SYSREG_WRITE32(ICC_IGRPEN1_EL1, 1);
 
-	isb();
+	uk_arch_arm64_isb();
 
 	uk_pr_info("GICv3 redistributor initialized.\n");
 }
@@ -512,9 +489,13 @@ static void gicv3_init_dist(void)
 	uk_pr_info("GICv3 distributor initialized.\n");
 }
 
-static void gicv3_handle_irq(struct __regs *regs)
+static int gicv3_handle_irq(void *data)
 {
+	struct uk_lcpu_except_irq_ctx *ctx;
 	__u32 stat, irq;
+
+	ctx = data;
+	UK_ASSERT(ctx);
 
 	do {
 		stat = gicv3_ack_irq();
@@ -528,10 +509,11 @@ static void gicv3_handle_irq(struct __regs *regs)
 #endif /* CONFIG_HAVE_SMP */
 
 		/* Ensure interrupt processing starts only after ACK */
-		isb();
+		uk_arch_arm64_isb();
 
 		if (irq <= GIC_MAX_IRQ) {
-			uk_intctlr_irq_handle(regs, irq);
+			uk_lcpu_except_irq_ctx_set_irq(ctx, irq);
+			uk_intctlr_irq_handle(ctx);
 			gicv3_eoi_irq(stat);
 			continue;
 		}
@@ -542,7 +524,11 @@ static void gicv3_handle_irq(struct __regs *regs)
 
 		break;
 	} while (1);
+
+	return UK_EVENT_HANDLED;
 }
+
+UK_EVENT_HANDLER(UK_LCPU_EXCEPT_EVENT_IRQ, gicv3_handle_irq);
 
 /**
  * Initialize GICv3
@@ -584,7 +570,6 @@ static inline void gicv3_set_ops(void)
 		.set_irq_trigger   = gicv3_set_irq_trigger,
 		.set_irq_prio      = gicv3_set_irq_prio,
 		.set_irq_affinity  = gicv3_set_irq_affinity,
-		.handle_irq        = gicv3_handle_irq,
 		.gic_sgi_gen	   = gicv3_sgi_gen,
 	};
 
@@ -592,17 +577,17 @@ static inline void gicv3_set_ops(void)
 	gicv3_drv.ops = drv_ops;
 }
 
-#if defined(CONFIG_UKPLAT_ACPI)
+#if CONFIG_LIBUKACPI
 static int acpi_get_gicr(struct _gic_dev *g)
 {
 	union {
-		struct acpi_madt_gicr *gicr;
-		struct acpi_subsdt_hdr *h;
+		struct uk_acpi_madt_gicr *gicr;
+		struct uk_acpi_subsdt_hdr *h;
 	} m;
-	struct acpi_madt *madt;
+	struct uk_acpi_madt *madt;
 	__sz off, len;
 
-	madt = acpi_get_madt();
+	madt = uk_acpi_get_madt();
 	UK_ASSERT(madt);
 
 	/* We do not count the Redistributor regions, instead we rely on
@@ -612,9 +597,9 @@ static int acpi_get_gicr(struct _gic_dev *g)
 	 */
 	len = madt->hdr.tab_len - sizeof(*madt);
 	for (off = 0; off < len; off += m.h->len) {
-		m.h = (struct acpi_subsdt_hdr *)(madt->entries + off);
+		m.h = (struct uk_acpi_subsdt_hdr *)(madt->entries + off);
 
-		if (m.h->type != ACPI_MADT_GICR)
+		if (m.h->type != UK_ACPI_MADT_GICR)
 			continue;
 
 		g->rdist_mem_addr = m.gicr->paddr;
@@ -646,7 +631,7 @@ static int gicv3_do_probe(void)
 	 */
 	return acpi_get_gicr(&gicv3_drv);
 }
-#else /* CONFIG_UKPLAT_ACPI */
+#else /* !CONFIG_LIBUKACPI */
 static int gicv3_do_probe(void)
 {
 	struct ukplat_bootinfo *bi = ukplat_bootinfo_get();
@@ -695,9 +680,9 @@ static int gicv3_do_probe(void)
 
 	return 0;
 }
-#endif /* !CONFIG_UKPLAT_ACPI */
+#endif /* !CONFIG_LIBUKACPI */
 
-#if CONFIG_PAGING
+#if CONFIG_LIBUKPAGING
 static int gicv3_map(void)
 {
 	__vaddr_t vbase;
@@ -722,7 +707,7 @@ static int gicv3_map(void)
 
 	return 0;
 }
-#endif /* CONFIG_PAGING */
+#endif /* CONFIG_LIBUKPAGING */
 
 /**
  * Probe device tree for GICv3
@@ -757,13 +742,13 @@ int gicv3_probe(struct _gic_dev **dev)
 		return rc;
 	}
 
-#if CONFIG_PAGING
+#if CONFIG_LIBUKPAGING
 	rc = gicv3_map();
 	if (unlikely(rc)) {
 		uk_pr_err("Could not map device (%d)\n", rc);
 		return rc;
 	}
-#endif /* CONFIG_PAGING */
+#endif /* CONFIG_LIBUKPAGING */
 
 	uk_pr_info("Found GICv3 on:\n");
 	uk_pr_info("\tDistributor  : 0x%lx - 0x%lx\n",	gicv3_drv.dist_mem_addr,

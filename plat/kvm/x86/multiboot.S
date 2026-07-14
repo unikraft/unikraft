@@ -37,6 +37,7 @@
 #include <uk/config.h>
 #include <uk/asm.h>
 #include <uk/reloc.h>
+#include <uk/lcpu/start.h>
 
 #include <kvm-x86/multiboot.h>
 
@@ -45,12 +46,7 @@
  */
 .section .bss
 .space 4096
-lcpu_bootstack:
-
-.section .rodata
-lcpu_boot_startup_args:
-	ur_data	quad, multiboot_entry, 8
-	ur_data	quad, lcpu_bootstack, 8
+multiboot_bootstack:
 
 /**
  * 32-bit multiboot entry function
@@ -73,9 +69,16 @@ ENTRY(_multiboot_entry)
 	movl    $0x00100000, %edx
 	do_uk_reloc32   0
 
-	/* startup args for boot CPU */
-	ur_mov  lcpu_boot_startup_args, %edi, 4, _phys
-	movl	%ebx, %esi			/* multiboot info */
+	ur_mov	multiboot_bootstack, %edi, 4, _phys
+	ur_mov	uk_plat_native_sstackp, %esi, 4, _phys
+	movl	%edi, (%esi)
+
+	ur_mov	multiboot_entry, %edi, 4, _phys
+	ur_mov	uk_plat_native_sentry, %esi, 4, _phys
+	movl	%edi, (%esi)
+
+	ur_mov	uk_plat_native_sarg, %esi, 4, _phys
+	movl	%ebx, (%esi)
 
 	ur_mov	lcpu_start32, %ebx, 4, _phys
 	jmp     *%ebx

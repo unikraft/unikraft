@@ -8,7 +8,7 @@
 #ifndef __UKDEBUG_ARCH_GDBSUP_H__
 #define __UKDEBUG_ARCH_GDBSUP_H__
 
-#include <uk/arch/lcpu.h>
+#include <uk/lcpu.h>
 
 /* The following list must match the description in target.xml */
 enum gdb_arch_register_index {
@@ -53,9 +53,9 @@ enum gdb_arch_register_index {
 	GDB_REGS_NUM
 };
 
-__ssz gdb_arch_read_register(int regnr, struct __regs *regs,
+__ssz gdb_arch_read_register(int regnr, struct uk_lcpu_regs *regs,
 			     void *buf, __sz buf_len);
-__ssz gdb_arch_write_register(int regnr, struct __regs *regs,
+__ssz gdb_arch_write_register(int regnr, struct uk_lcpu_regs *regs,
 			      void *buf, __sz buf_len);
 void gdb_arch_invalidate_cache(__sz addr, __sz len);
 

@@ -56,7 +56,7 @@ void cdmp_gen_print_call_trace_entry(unsigned long addr)
 }
 #endif /* CONFIG_LIBUKDEBUG_CRASH_PRINT_CALL_TRACE && !__OMIT_FRAMEPOINTER__ */
 
-void crash_print_crashdump(struct __regs *regs)
+void crash_print_crashdump(struct uk_lcpu_regs *regs)
 {
 	cdmp_arch_print_registers(regs);
 

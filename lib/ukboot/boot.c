@@ -41,13 +41,13 @@
 #include <errno.h>
 
 #include <uk/boot.h>
-#ifdef CONFIG_HAVE_PAGING
-#include <uk/plat/paging.h>
+#ifdef CONFIG_LIBUKPAGING
 #include <uk/falloc.h>
+#include <uk/paging.h>
 #ifdef CONFIG_LIBUKVMEM
 #include <uk/vmem.h>
 #endif /* CONFIG_LIBUKVMEM */
-#endif /* CONFIG_HAVE_PAGING */
+#endif /* CONFIG_LIBUKPAGING */
 /* FIXME: allocators are hard-coded for now */
 #if CONFIG_LIBUKBOOT_INITBBUDDY
 #include <uk/allocbbuddy.h>
@@ -69,7 +69,7 @@
 #include <uk/allocstack.h>
 #if CONFIG_LIBUKBOOT_ALLOCSTACK_PREMAP_ORDER
 #define ALLOCSTACK_INITIAL_SIZE				\
-	(PAGE_SIZE * (1 << CONFIG_LIBUKBOOT_ALLOCSTACK_PREMAP_ORDER))
+	(UK_PAGING_PAGE_SIZE * (1 << CONFIG_LIBUKBOOT_ALLOCSTACK_PREMAP_ORDER))
 #endif /* CONFIG_LIBUKBOOT_ALLOCSTACK_PREMAP_ORDER */
 #endif /* CONFIG_LIBUKBOOT_ALLOCSTACK */
 #if CONFIG_LIBUKSCHED
@@ -78,11 +78,9 @@
 #if CONFIG_LIBUKBOOT_INITSCHEDCOOP
 #include <uk/schedcoop.h>
 #endif /* CONFIG_LIBUKBOOT_INITSCHEDCOOP */
-#include <uk/arch/lcpu.h>
-#include <uk/plat/bootstrap.h>
-#include <uk/plat/common/lcpu.h>
+#include <uk/lcpu.h>
+#include <uk/pm.h>
 #include <uk/plat/memory.h>
-#include <uk/plat/lcpu.h>
 #include <uk/plat/time.h>
 #include <uk/essentials.h>
 #include <uk/print.h>
@@ -92,16 +90,11 @@
 #include <uk/sp.h>
 #endif
 #include <uk/arch/tls.h>
-#include <uk/plat/tls.h>
 #if CONFIG_LIBUKBOOT_MAINTHREAD
 #include "shutdown_req.h"
 #endif /* CONFIG_LIBUKBOOT_MAINTHREAD */
 #include <uk/errptr.h>
 #include "banner.h"
-
-#if !CONFIG_LIBUKBOOT_INITSCHED
-#include <uk/plat/common/lcpu.h>
-#endif /* !CONFIG_LIBUKBOOT_INITSCHED */
 
 #if CONFIG_LIBUKINTCTLR
 #include <uk/intctlr.h>
@@ -128,7 +121,7 @@ static struct uk_alloc *heap_init()
 {
 	struct uk_alloc *a = NULL;
 #ifdef CONFIG_LIBUKBOOT_HEAP_BASE
-	struct uk_pagetable *pt = ukplat_pt_get_active();
+	struct uk_pagetable *pt = uk_paging_pt_get_active();
 	__sz free_pages, alloc_pages;
 	__vaddr_t heap_base;
 #ifdef CONFIG_LIBUKVMEM
@@ -149,8 +142,8 @@ static struct uk_alloc *heap_init()
 	heap_base = CONFIG_LIBUKBOOT_HEAP_BASE;
 
 #ifdef CONFIG_LIBUKVMEM
-#define HEAP_INITIAL_PAGES		16
-#define HEAP_INITIAL_LEN		(HEAP_INITIAL_PAGES << PAGE_SHIFT)
+#define HEAP_INITIAL_PAGES	16
+#define HEAP_INITIAL_LEN	(HEAP_INITIAL_PAGES << UK_PAGING_PAGE_SHIFT)
 	/* In addition to paging, we have virtual address space management. We
 	 * will thus also represent the heap as a dedicated VMA to enable
 	 * on-demand paging for the heap. However, we have a chicken-egg
@@ -162,12 +155,14 @@ static struct uk_alloc *heap_init()
 	 * mappings and then create the VMA on top. Afterwards, we add the
 	 * remainder of the VMA to the allocator.
 	 */
-	rc = ukplat_page_map(pt, heap_base, __PADDR_ANY,
-			     HEAP_INITIAL_PAGES, PAGE_ATTR_PROT_RW, 0);
+	rc = uk_paging_page_map(pt, heap_base, UK_PAGING_PADDR_ANY,
+				HEAP_INITIAL_PAGES, UK_PAGING_PAGE_ATTR_PROT_RW,
+				0);
 	if (unlikely(rc))
 		return NULL;
 
-	a = uk_alloc_init((void *)heap_base, HEAP_INITIAL_PAGES << PAGE_SHIFT);
+	a = uk_alloc_init((void *)heap_base,
+			  HEAP_INITIAL_PAGES << UK_PAGING_PAGE_SHIFT);
 	if (unlikely(!a))
 		return NULL;
 
@@ -179,31 +174,33 @@ static struct uk_alloc *heap_init()
 	if (unlikely(rc))
 		return NULL;
 
-	free_pages  = pt->fa->free_memory >> PAGE_SHIFT;
-	alloc_pages = free_pages - PT_PAGES(free_pages);
+	free_pages  = pt->fa->free_memory >> UK_PAGING_PAGE_SHIFT;
+	alloc_pages = free_pages - UK_PAGING_PT_PAGES(free_pages);
 
 	vaddr = heap_base;
 	rc = uk_vma_map_anon(&kernel_vas, &vaddr,
-			     (alloc_pages + HEAP_INITIAL_PAGES) << PAGE_SHIFT,
-			     PAGE_ATTR_PROT_RW, UK_VMA_MAP_UNINITIALIZED,
+			     (alloc_pages + HEAP_INITIAL_PAGES) << UK_PAGING_PAGE_SHIFT,
+			     UK_PAGING_PAGE_ATTR_PROT_RW,
+			     UK_VMA_MAP_UNINITIALIZED,
 			     "heap");
 	if (unlikely(rc))
 		return NULL;
 
 	rc = uk_alloc_addmem(a, (void *)(heap_base + HEAP_INITIAL_LEN),
-			     (alloc_pages - HEAP_INITIAL_PAGES) << PAGE_SHIFT);
+			     (alloc_pages - HEAP_INITIAL_PAGES) << UK_PAGING_PAGE_SHIFT);
 	if (unlikely(rc))
 		return NULL;
 #else /* CONFIG_LIBUKVMEM */
-	free_pages  = pt->fa->free_memory >> PAGE_SHIFT;
-	alloc_pages = free_pages - PT_PAGES(free_pages);
+	free_pages  = pt->fa->free_memory >> UK_PAGING_PAGE_SHIFT;
+	alloc_pages = free_pages - UK_PAGING_PT_PAGES(free_pages);
 
-	rc = ukplat_page_map(pt, heap_base, __PADDR_ANY,
-			     alloc_pages, PAGE_ATTR_PROT_RW, 0);
+	rc = uk_paging_page_map(pt, heap_base, UK_PAGING_PADDR_ANY,
+				alloc_pages, UK_PAGING_PAGE_ATTR_PROT_RW, 0);
 	if (unlikely(rc))
 		return NULL;
 
-	a = uk_alloc_init((void *)heap_base, alloc_pages << PAGE_SHIFT);
+	a = uk_alloc_init((void *)heap_base,
+			  alloc_pages << UK_PAGING_PAGE_SHIFT);
 #endif /* !CONFIG_LIBUKVMEM */
 #else /* CONFIG_LIBUKBOOT_HEAP_BASE */
 	/* Paging is disabled so we still have the static boot page table set
@@ -243,8 +240,10 @@ extern char **environ;
 void uk_boot_entry(void)
 {
 	struct uk_init_ctx ictx = { 0 };
-	/* NOTE: Default target is crash for failed initialization (inittab) */
-	struct uk_term_ctx tctx = { .target = UKPLAT_CRASH };
+	struct uk_term_ctx tctx = {
+		.exit_code = 0,
+		.target = UK_PM_SHUTDOWN_OP_SYSCRASH,
+	};
 	int rc = 0;
 #if CONFIG_LIBUKALLOC
 	struct uk_alloc *a = NULL, *sa = NULL, *auxsa = NULL;
@@ -327,7 +326,7 @@ void uk_boot_entry(void)
 	ukarch_tls_area_init(tls);
 	/* Activate TLS */
 	uktlsp = ukarch_tls_tlsp(tls);
-	ukplat_tlsp_set(uktlsp);
+	uk_lcpu_tlsp_set(uktlsp);
 
 	/* Allocate auxiliary stack for this execution context */
 	auxstack = uk_memalign(auxsa,
@@ -341,7 +340,7 @@ void uk_boot_entry(void)
 	auxspcb = ukarch_auxsp_get_cb(auxsp);
 	UK_ASSERT(auxspcb);
 	ukarch_auxspcb_set_uktlsp(auxspcb, uktlsp);
-	ukplat_lcpu_set_auxsp(auxsp);
+	uk_lcpu_set_auxsp(auxsp);
 #endif /* CONFIG_LIBUKBOOT_INITALLOC */
 
 #if CONFIG_LIBUKINTCTLR
@@ -384,7 +383,7 @@ void uk_boot_entry(void)
 #endif /* CONFIG_LIBUKBOOT_MAINTHREAD */
 
 	/* Enable interrupts before starting the application */
-	ukplat_lcpu_enable_irq();
+	uk_lcpu_enable_irq();
 
 	/**
 	 * Run init table
@@ -416,8 +415,7 @@ void uk_boot_entry(void)
 
 #if !CONFIG_LIBUKBOOT_MAINTHREAD
 	tctx.exit_code = do_main(ictx.cmdline.argc, ictx.cmdline.argv);
-	tctx.target = UKPLAT_HALT;
-
+	tctx.target = UK_PM_SHUTDOWN_OP_SYSHALT;
 #else /* CONFIG_LIBUKBOOT_MAINTHREAD */
 	/* Unblock main thread (will execute main()) */
 	uk_semaphore_up(&main_sema);
@@ -429,7 +427,7 @@ void uk_boot_entry(void)
 #endif /* CONFIG_LIBUKBOOT_MAINTHREAD */
 
 exit:
-	uk_pr_info("Halting system (%d)\n", tctx.target);
+	uk_pr_info("Shutting down system (%d)\n", tctx.target);
 
 	/**
 	 * Call termination functions from init table in reverse order
@@ -451,7 +449,7 @@ exit:
 
 	uk_pr_debug("Unikraft terminates with exit status %d (target: %d)\n",
 		    tctx.exit_code, tctx.target);
-	ukplat_terminate(tctx.target); /* does not return */
+	uk_pm_shutdown(tctx.target); /* does not return */
 }
 
 int do_main(int argc, char *argv[])
@@ -491,7 +489,7 @@ int do_main(int argc, char *argv[])
 		(*ctorfn)(argc, argv);
 	}
 
-#if CONFIG_LIBUKDEBUG_PRINTK_INFO
+#if CONFIG_LIBUKPRINT_KLVL_INFO
 #if CONFIG_LIBPOSIX_ENVIRON
 	envp = environ;
 	if (envp) {
@@ -510,7 +508,7 @@ int do_main(int argc, char *argv[])
 			uk_pr_info(", ");
 	}
 	uk_pr_info("])\n");
-#endif /* CONFIG_LIBUKDEBUG_PRINTK_INFO */
+#endif /* CONFIG_LIBUKPRINT_KLVL_INFO */
 
 	ret = main(argc, argv);
 	uk_pr_info("main returned %d\n", ret);
@@ -542,7 +540,7 @@ static __noreturn void main_thread(void *a0, void *a1)
 	 *       we already request a shutdown here in order to go down
 	 *       as earlier as possible.
 	 */
-	uk_boot_shutdown_req(UKPLAT_HALT);
+	uk_boot_shutdown_req(UK_PM_SHUTDOWN_OP_SYSHALT);
 #endif /* !LIBUKBOOT_MAINTHREAD_NOHALT */
 	/* Terminate "main" thread */
 	uk_thread_exit();
@@ -556,7 +554,7 @@ static void main_thread_dtor(struct uk_thread *m __unused)
 	 *       without returning to the caller of `main()` (for example
 	 *       via `uk_thread_exit()`).
 	 */
-	uk_boot_shutdown_req(UKPLAT_HALT);
+	uk_boot_shutdown_req(UK_PM_SHUTDOWN_OP_SYSHALT);
 #endif /* !LIBUKBOOT_MAINTHREAD_NOHALT */
 }
 #endif /* CONFIG_LIBUKBOOT_MAINTHREAD */

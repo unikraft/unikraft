@@ -37,10 +37,10 @@
  */
 
 #include <uk/config.h>
+#include <uk/arch/x86_64.h>
 #include <uk/asm.h>
-#include <uk/plat/common/lcpu.h>
 #include <uk/reloc.h>
-#include <kvm-x86/traps.h>
+#include <uk/lcpu.h>
 #include "lcpu_helpers.S"
 
 #define SEC_BEGIN(x)		.globl x86_##x##_begin; x86_##x##_begin = .;
@@ -49,9 +49,10 @@
 #define START16_PLACEHOLDER	0x1516	/* IS16 */
 #define START32_PLACEHOLDER	0x1532	/* IS32 */
 
+/* TODO: Move this to plat native driver */
 .section .data.boot.16
-.globl x86_start16_addr
-x86_start16_addr:
+.globl uk_plat_native_x86_64_start16_addr
+uk_plat_native_x86_64_start16_addr:
 	.quad	START16_PLACEHOLDER
 
 /* Implement dedicated start16 macro's whose only use-case is this file to cope
@@ -127,13 +128,13 @@ gdt32_ptr:
 	.word	(gdt32_end - gdt32 - 1)	/* size - 1	*/
 	data_start16	long, gdt32, 4	/* GDT address	*/
 gdt32_cs:
-	.quad	GDT_DESC_CODE32_VAL	/* 32-bit CS	*/
+	.quad	UK_ARCH_X86_64_GDT_DESC_CODE32_VAL	/* 32-bit CS	*/
 gdt32_ds:
-	.quad	GDT_DESC_DATA32_VAL	/* DS		*/
+	.quad	UK_ARCH_X86_64_GDT_DESC_DATA32_VAL	/* DS		*/
 gdt32_end:
 
 #define CR0_BOOT16_SETTINGS						\
-	  X86_CR0_PE	/* Protected mode */
+	  UK_ARCH_X86_64_CR0_PE	/* Protected mode */
 
 .code16
 ENTRY(lcpu_start16)
@@ -193,10 +194,6 @@ SEC_END(start16)
  * loaded with descriptors for 4GiB flat CS and DS segments. CS must have
  * execute/read permission and DS must have read/write permission. Interrupts
  * must be disabled. A20 gate must be enabled.
- *
- * NOTE: We assume a pointer to a struct lcpu_sargs in EDI and a pointer to
- * potential platform boot arguments in ESI (e.g., multiboot) if this is the
- * first boot.
  */
 
 .section .data.boot.32
@@ -205,24 +202,24 @@ gdt64:
 gdt64_null:
 	.quad	0x0000000000000000	/* null segment */
 gdt64_cs:
-	.quad	GDT_DESC_CODE64_VAL	/* 64-bit CS	*/
+	.quad	UK_ARCH_X86_64_GDT_DESC_CODE64_VAL	/* 64-bit CS	*/
 gdt64_ds:
-	.quad	GDT_DESC_DATA64_VAL	/* DS		*/
+	.quad	UK_ARCH_X86_64_GDT_DESC_DATA64_VAL	/* DS		*/
 gdt64_end:
 gdt64_ptr:
 	.word	gdt64_end - gdt64 - 1
 	ur_data	quad, gdt64, 8, _phys
 
 #define CR4_BOOT32_SETTINGS						\
-	  X86_CR4_PAE	/* Physical Address Extension */
+	  UK_ARCH_X86_64_CR4_PAE	/* Physical Address Extension */
 
 #define EFER_BOOT32_SETTINGS						\
-	  X86_EFER_LME	/* IA-32e Mode */
+	  UK_ARCH_X86_64_EFER_LME	/* IA-32e Mode */
 
 #define CR0_BOOT32_SETTINGS						\
-	  X86_CR0_PE	/* Protected mode */				\
-	| X86_CR0_WP	/* Write Protect */				\
-	| X86_CR0_PG	/* Paging */
+	  UK_ARCH_X86_64_CR0_PE	/* Protected mode */			\
+	| UK_ARCH_X86_64_CR0_WP	/* Write Protect */			\
+	| UK_ARCH_X86_64_CR0_PG	/* Paging */
 
 .code32
 .section .text.boot.32
@@ -234,7 +231,7 @@ ENTRY(lcpu_start32)
 	/* Switch to IA-32e mode (long mode) */
 	xorl	%edx, %edx
 	movl	$EFER_BOOT32_SETTINGS, %eax
-	movl	$X86_MSR_EFER, %ecx
+	movl	$UK_ARCH_X86_64_MSR_EFER, %ecx
 	wrmsr
 
 	/* Set boot page table and enable paging */
@@ -282,20 +279,12 @@ END(lcpu_start32)
  * read/write permission. ES and ES must be the same as DS. Interrupts must be
  * disabled.
  *
- * NOTE: We assume a pointer to a struct lcpu_sargs in RDI and a pointer to
- * potential platform boot arguments in RSI (e.g., multiboot) if this is the
- * first boot. In that case, we setup the CPU with the provided startup
- * arguments.
- *
  * NOTE: Code should be position-independent
  */
 
 .code64
 .section .text.boot.64
 ENTRY(lcpu_start64)
-	/* Save the startup args pointer */
-	movq	%rdi, %r8
-
 	/* Request basic CPU features and APIC ID
 	 * TODO: This APIC ID is limited to 256. Better get from leaf 0x1f
 	 */
@@ -303,21 +292,19 @@ ENTRY(lcpu_start64)
 	cpuid
 	shrl	$24, %ebx
 
-	/* Use APIC_ID * LCPU_SIZE for indexing the cpu structure */
-	movl	$LCPU_SIZE, %eax
-	imul	%ebx, %eax
+	/* Use APIC_ID for indexing the cpu var array */
+	uk_pcpuvar_x86_64_gsval	%rsp, %rbx
 
-	/* Compute pointer into CPU struct array and store it in RBP
+	/* Compute pointer into CPU variables array and store it in RBP
 	 * We do not use the frame pointer, yet
 	 * TODO: We are leaking implementation details. `lcpus` is defined
-	 * with `UKPLAT_PER_LCPU_DEFINE`. Find a way to properly access
-	 * this `lcpus` here.
+	 * with `__uk_pcpuvar`. Find a way to properly access this `lcpus` here.
 	 */
-	leaq	lcpus(%rip), %rbp
-	addq	%rax, %rbp
+	leaq	uk_lcpus(%rip), %rbp
+	addq	%rsp, %rbp
 
 	/* Put CPU into init state */
-	movl	$LCPU_STATE_INIT, LCPU_STATE_OFFSET(%rbp)
+	movl	$UK_LCPU_STATE_INIT, UK_LCPU_STATE_OFFSET(%rbp)
 
 	/* Enable FPU and SSE */
 	LCPU_ENABLE_FPU_SSE
@@ -346,9 +333,28 @@ no_avx:
 #if __FSGSBASE__
 	/* Enable FS and GS base */
 	LCPU_ENABLE_FSGSBASE fail
+	wrgsbase	%rsp
+	swapgs
+	wrgsbase	%rsp
+	swapgs
 #else /* !__FSGSBASE__ */
 	LCPU_ENABLE_FSGSBASE no_fsgsbase
+	wrgsbase	%rsp
+	swapgs
+	wrgsbase	%rsp
+	swapgs
+	jmp		0f
 no_fsgsbase:
+	movq     %rsp, %rax
+	movq     %rsp, %rdx
+	shrq     $32, %rdx
+
+	movl     $UK_ARCH_X86_64_MSR_GS_BASE, %ecx
+	wrmsr
+
+	movl     $UK_ARCH_X86_64_MSR_KERNEL_GS_BASE, %ecx
+	wrmsr
+0:
 #endif /* !__FSGSBASE__ */
 
 #if CONFIG_HAVE_X86PKU
@@ -357,22 +363,18 @@ no_fsgsbase:
 no_pku:
 #endif /* CONFIG_HAVE_X86PKU */
 
-	/* Check if we have startup arguments supplied */
-	test	%r8, %r8
-	jz	no_args
+#if __AVX512F__
+	/* Enable AVX512 */
+	LCPU_ENABLE_AVX512 fail
+#else /* !__AVX512F__ */
+	LCPU_ENABLE_AVX512 no_avx512
+no_avx512:
+#endif /* !__AVX512F__ */
 
-	/* Initialize the CPU configuration with the supplied startup args */
-	movq	LCPU_SARGS_ENTRY_OFFSET(%r8), %rax
-	movq	LCPU_SARGS_STACKP_OFFSET(%r8), %rsp
+	movq	UK_PCPUVAR_X86_64_GSREL(UK_LCPU_SARG_SYM), %rdi
+	movq	UK_PCPUVAR_X86_64_GSREL(UK_LCPU_SENTRY_SYM), %rax
+	movq	UK_PCPUVAR_X86_64_GSREL(UK_LCPU_SSTACKP_SYM), %rsp
 
-	jmp	jump_to_entry
-
-no_args:
-	/* Load the stack pointer and the entry address from the CPU struct */
-	movq	LCPU_ENTRY_OFFSET(%rbp), %rax
-	movq	LCPU_STACKP_OFFSET(%rbp), %rsp
-
-jump_to_entry:
 	/* According to System V AMD64 the stack pointer must be aligned to
 	 * 16-bytes. In other words, the value (RSP+8) must be a multiple of
 	 * 16 when control is transferred to the function entry point (i.e.,
@@ -382,7 +384,6 @@ jump_to_entry:
 	andq	$~0xf, %rsp
 	subq	$0x8, %rsp
 
-	movq	%rbp, %rdi
 #if !__OMIT_FRAMEPOINTER__
 	/* Reset frame pointer */
 	xorq	%rbp, %rbp
@@ -403,7 +404,7 @@ fail:
 	LCPU_EARLY_COM1_INIT
 	LCPU_EARLY_COM1_PRINT lcpu_start64_fail_msg
 
-	movl	$LCPU_STATE_HALTED, LCPU_STATE_OFFSET(%rbp)
+	movl	$UK_LCPU_STATE_HALTED, UK_LCPU_STATE_OFFSET(%rbp)
 
 fail_loop:
 	cli

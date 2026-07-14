@@ -37,10 +37,18 @@
 #include <common/hypervisor.h>
 #include <common/events.h>
 #include <xen/xen.h>
+#include <uk/plat/xen/except.h>
 #include <uk/print.h>
 #include <uk/event.h>
 #include <uk/assert.h>
 #include <uk/bitops/bitmap.h>
+#include <uk/arch/util.h>
+#include <uk/lcpu.h>
+#if (defined __X86_32__) || (defined __X86_64__)
+#include <xen-x86/smp.h>
+#elif (defined __ARM_32__) || (defined __ARM_64__)
+#include <xen-arm/smp.h>
+#endif
 
 #define NR_EVS 1024
 
@@ -54,12 +62,12 @@ typedef struct _ev_action_t {
 } ev_action_t;
 
 struct uk_event_irq_data {
-	struct __regs *regs;
-	unsigned long irq;
+	struct uk_lcpu_regs *regs;
+	__u32 irq;
 };
 
 static ev_action_t ev_actions[NR_EVS];
-static void default_handler(evtchn_port_t port, struct __regs *regs,
+static void default_handler(evtchn_port_t port, struct uk_lcpu_regs *regs,
 			    void *data);
 
 static unsigned long bound_ports[NR_EVS/(8*sizeof(unsigned long))];
@@ -90,7 +98,7 @@ void unbind_all_ports(void)
 /*
  * Demux events to different handlers.
  */
-int do_event(evtchn_port_t port, struct __regs *regs)
+int do_event(evtchn_port_t port, struct uk_lcpu_regs *regs)
 {
 	ev_action_t *action;
 	int rc;
@@ -129,7 +137,7 @@ evtchn_port_t bind_evtchn(evtchn_port_t port, evtchn_handler_t handler,
 			   port);
 
 	ev_actions[port].data = data;
-	wmb();
+	uk_arch_wmb();
 	ev_actions[port].handler = handler;
 	__uk_set_bit(port, bound_ports);
 
@@ -147,7 +155,7 @@ void unbind_evtchn(evtchn_port_t port)
 	clear_evtchn(port);
 
 	ev_actions[port].handler = default_handler;
-	wmb();
+	uk_arch_wmb();
 	ev_actions[port].data = NULL;
 	__uk_clear_bit(port, bound_ports);
 
@@ -228,7 +236,7 @@ void suspend_events(void)
 }
 #endif
 
-static void default_handler(evtchn_port_t port, struct __regs *regs __unused,
+static void default_handler(evtchn_port_t port, struct uk_lcpu_regs *regs __unused,
 			    void *ignore __unused)
 {
 	uk_pr_info("[Port %d] - event received\n", port);
@@ -336,7 +344,7 @@ inline void unmask_evtchn(evtchn_port_t port)
 #ifdef XEN_HAVE_PV_UPCALL_MASK
 		if (!vcpu_info->evtchn_upcall_mask)
 #endif
-			ukplat_lcpu_irqs_handle_pending();
+			uk_plat_xen_irqs_handle_pending();
 	}
 }
 
@@ -345,14 +353,4 @@ inline void clear_evtchn(evtchn_port_t port)
 	shared_info_t *s = HYPERVISOR_shared_info;
 
 	uk_clear_bit(port, &s->evtchn_pending[0]);
-}
-
-struct uk_alloc;
-
-int ukplat_irq_init(struct uk_alloc *a __unused)
-{
-	UK_ASSERT(ukplat_lcpu_irqs_disabled());
-
-	/* Nothing for now */
-	return 0;
 }

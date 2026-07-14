@@ -40,15 +40,6 @@
 
 #include <uk/intctlr/gic.h>
 
-/** Affinity AFF3 bit mask */
-#define MPIDR_AFF3_MASK			0xff00000000
-/** Affinity AFF2 bit mask */
-#define MPIDR_AFF2_MASK			0x0000ff0000
-/** Affinity AFF1 bit mask */
-#define MPIDR_AFF1_MASK			0x000000ff00
-/** Affinity AFF0 bit mask */
-#define MPIDR_AFF0_MASK			0x00000000ff
-
 /*
  * GIC System register assembly aliases
  */

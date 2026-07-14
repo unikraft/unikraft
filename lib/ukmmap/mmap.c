@@ -36,7 +36,6 @@
 #include <uk/alloc.h>
 #include <string.h>
 #include <uk/syscall.h>
-#include <uk/page.h>
 
 struct mmap_addr {
 	void *begin;

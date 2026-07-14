@@ -10,6 +10,10 @@
 
 #include <uk/config.h>
 
+#include <inttypes.h>
+#include <stdarg.h>
+#include <stddef.h>
+
 /*
  * Point uk_(v)snprintf to library-internal implementation as soon as
  * we do not use lib/nolibc as libc.
@@ -21,13 +25,15 @@
 #define uk_snprintf(...)  snprintf(__VA_ARGS__)
 
 #else /* !CONFIG_LIBNOLIBC */
-#include <stddef.h>
-#include <stdarg.h>
 #include <uk/essentials.h>
 
 int uk_vsnprintf(char *str, size_t size, const char *fmt, va_list ap);
 int uk_snprintf(char *str, size_t size, const char *fmt, ...) __printf(3, 4);
 
 #endif /* !CONFIG_LIBNOLIBC */
+
+__isr int uk_vsnprintf_isr(char *str, size_t size, const char *fmt, va_list ap);
+__isr int uk_snprintf_isr(char *str, size_t size, const char *fmt, ...)
+	__printf(3, 4);
 
 #endif /* __UK_PRINT_SNPRINTF_H__ */

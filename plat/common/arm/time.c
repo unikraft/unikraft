@@ -29,14 +29,17 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+
 #include <stdlib.h>
 #include <libfdt.h>
+
+#include <uk/arch/util.h>
 #include <uk/ofw/fdt.h>
 #include <uk/assert.h>
 #include <uk/plat/time.h>
-#include <uk/plat/lcpu.h>
+#include <uk/asm/lcpu.h>
+#include <uk/lcpu.h>
 #include <uk/atomic.h>
-#include <uk/plat/common/cpu.h>
 #include <uk/plat/common/sections.h>
 #include <uk/plat/common/bootinfo.h>
 #include <uk/intctlr.h>
@@ -56,7 +59,7 @@ void generic_timer_mask_irq(void)
 	set_el0(cntv_ctl, get_el0(cntv_ctl) | GT_TIMER_MASK_IRQ);
 
 	/* Ensure the write of sys register is visible */
-	isb();
+	uk_arch_arm64_isb();
 }
 
 void generic_timer_unmask_irq(void)
@@ -64,7 +67,7 @@ void generic_timer_unmask_irq(void)
 	set_el0(cntv_ctl, get_el0(cntv_ctl) & ~GT_TIMER_MASK_IRQ);
 
 	/* Ensure the write of sys register is visible */
-	isb();
+	uk_arch_arm64_isb();
 }
 
 uint32_t generic_timer_get_frequency(int fdt_timer)

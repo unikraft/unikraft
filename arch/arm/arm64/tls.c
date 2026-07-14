@@ -45,15 +45,10 @@
 
 #include <uk/arch/types.h>
 #include <uk/arch/tls.h>
+#include <uk/assert.h>
 #include <uk/essentials.h>
 #include <uk/print.h>
 #include <uk/print/hexdump.h>
-
-#if CONFIG_LIBUKDEBUG
-#include <uk/assert.h>
-#else /* !CONFIG_LIBUKDEBUG */
-#define UK_ASSERT(..) do {} while (0)
-#endif /* !CONFIG_LIBUKDEBUG */
 
 /*
  * Aarch64 ABI requires 16 bytes of space after the tlsp as part of the TCB.

@@ -37,7 +37,7 @@
 #include <uk/bitops/bitmap.h>
 #include <uk/assert.h>
 #include <vfscore/file.h>
-#include <uk/plat/lcpu.h>
+#include <uk/lcpu.h>
 #include <errno.h>
 #if CONFIG_LIBPOSIX_PROCESS_MULTITHREADING
 #include <uk/process.h>

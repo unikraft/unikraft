@@ -37,7 +37,6 @@
 
 #include <errno.h>
 #include <string.h>
-#include <uk/plat/io.h>
 #include <uk/arch/types.h>
 #include <uk/arch/limits.h>
 #include <uk/refcount.h>
@@ -45,9 +44,9 @@
 #ifdef CONFIG_LIBUKALLOC
 #include <uk/alloc.h>
 #endif /* CONFIG_LIBUKALLOC */
+#include <uk/paging.h>
 #include <uk/sglist.h>
 #ifdef CONFIG_LIBUKVMEM
-#include <uk/arch/paging.h>
 #include <uk/vmem.h>
 #endif /* CONFIG_LIBUKVMEM*/
 
@@ -109,15 +108,16 @@ static inline int _sglist_append_buf(struct uk_sglist *sg, void *buf,
 #ifdef CONFIG_LIBUKVMEM
 	/* Ensure the buffer is backed by physical memory */
 	error = uk_vma_advise(uk_vas_get_active(),
-			      PAGE_ALIGN_DOWN(vaddr),
-			      PAGE_ALIGN_UP(len + offset), UK_VMA_ADV_WILLNEED,
+			      UK_PAGING_PAGE_ALIGN_DOWN(vaddr),
+			      UK_PAGING_PAGE_ALIGN_UP(len + offset),
+			      UK_VMA_ADV_WILLNEED,
 			      UK_VMA_FLAG_UNINITIALIZED);
 	if (unlikely(error))
 		return error;
 #endif /* CONFIG_LIBUKVMEM */
 
 	/* Do the first page. It may have an offset. */
-	paddr = ukplat_virt_to_phys((void *)vaddr);
+	paddr = uk_paging_virt_to_phys(vaddr);
 	seglen = MIN(len, __PAGE_SIZE - offset);
 	if (sg->sg_nseg == 0) {
 		ss = sg->sg_segs;
@@ -137,7 +137,7 @@ static inline int _sglist_append_buf(struct uk_sglist *sg, void *buf,
 
 	while (len > 0) {
 		seglen = MIN(len, __PAGE_SIZE);
-		paddr = ukplat_virt_to_phys((void *)vaddr);
+		paddr = uk_paging_virt_to_phys(vaddr);
 		error = _sglist_append_range(sg, &ss, paddr, seglen);
 		if (error)
 			return error;
@@ -162,10 +162,10 @@ int uk_sglist_count(void *buf, size_t len)
 	vaddr = trunc_page((__vaddr_t)buf);
 	vendaddr = (__vaddr_t)buf + len;
 	nsegs = 1;
-	lastaddr = ukplat_virt_to_phys((void *)vaddr);
+	lastaddr = uk_paging_virt_to_phys(vaddr);
 	vaddr += __PAGE_SIZE;
 	while (vaddr < vendaddr) {
-		paddr = ukplat_virt_to_phys((void *)vaddr);
+		paddr = uk_paging_virt_to_phys(vaddr);
 		if (lastaddr + __PAGE_SIZE != paddr)
 			nsegs++;
 		lastaddr = paddr;

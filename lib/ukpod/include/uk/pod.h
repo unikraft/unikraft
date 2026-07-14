@@ -37,8 +37,8 @@
 
 /* PoD functions work with lengths and offsets in units of "pages".
  *
- * In the context of PoD a "page" is defined to be exactly PAGE_SIZE bytes,
- * regardless of the actual hardware page sizes in use (e.g., hugepages).
+ * In the context of PoD a "page" is defined to be exactly UK_PAGING_PAGE_SIZE
+ * bytes, regardless of the actual hardware page sizes in use (e.g., hugepages).
  */
 
 /* PoD functions all take as arguments `ops` -- page I/O operations -- as well

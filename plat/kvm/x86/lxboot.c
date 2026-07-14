@@ -7,17 +7,17 @@
 #include <uk/essentials.h>
 #include <uk/arch/limits.h>
 #include <uk/arch/types.h>
-#include <uk/arch/paging.h>
-#include <uk/plat/bootstrap.h>
+#include <uk/paging.h>
+#include <uk/pm.h>
 #include <uk/plat/common/bootinfo.h>
-#include <uk/plat/common/lcpu.h>
+#include <uk/lcpu.h>
 #include <uk/plat/common/memory.h>
 #include <uk/plat/common/sections.h>
 #include <kvm-x86/lxboot.h>
 
-#define lxboot_crash(rc, msg, ...) ukplat_crash()
+#define lxboot_crash(rc, msg, ...) uk_pm_syscrash()
 
-void _ukplat_entry(struct lcpu *lcpu, struct ukplat_bootinfo *bi);
+void _ukplat_entry(struct ukplat_bootinfo *bi);
 
 static void
 lxboot_init_cmdline(struct ukplat_bootinfo *bi, struct lxboot_params *bp)
@@ -60,12 +60,12 @@ lxboot_init_initrd(struct ukplat_bootinfo *bi, struct lxboot_params *bp)
 	if (initrd_addr == 0 || initrd_size == 0)
 		return;
 
-	mrd.pbase = PAGE_ALIGN_DOWN(initrd_addr);
+	mrd.pbase = UK_PAGING_PAGE_ALIGN_DOWN(initrd_addr);
 	mrd.vbase = mrd.pbase;
 	mrd.pg_off = initrd_addr - mrd.pbase;
 	mrd.len = initrd_size;
 	mrd.type = UKPLAT_MEMRT_INITRD;
-	mrd.pg_count = PAGE_COUNT(mrd.pg_off + initrd_size);
+	mrd.pg_count = UK_PAGING_PAGE_COUNT(mrd.pg_off + initrd_size);
 	mrd.flags = UKPLAT_MEMRF_READ;
 #ifdef CONFIG_UKPLAT_MEMRNAME
 	memcpy(mrd.name, "initrd", sizeof("initrd"));
@@ -91,26 +91,26 @@ lxboot_init_mem(struct ukplat_bootinfo *bi, struct lxboot_params *bp)
 		/* Kludge: Don't add zero-page, because the platform code does
 		 * not handle address zero well.
 		 */
-		start = MAX(entry->addr, PAGE_SIZE);
+		start = MAX(entry->addr, UK_PAGING_PAGE_SIZE);
 		end = entry->addr + entry->size;
 
 		if (end <= start)
 			continue;
 
-		mrd.pbase = PAGE_ALIGN_DOWN(start);
+		mrd.pbase = UK_PAGING_PAGE_ALIGN_DOWN(start);
 		mrd.vbase = mrd.pbase; /* 1:1 mapping */
 		mrd.pg_off = start - mrd.pbase;
 		mrd.len = end - start;
-		mrd.pg_count = PAGE_COUNT(mrd.pg_off + mrd.len);
+		mrd.pg_count = UK_PAGING_PAGE_COUNT(mrd.pg_off + mrd.len);
 
 		if (entry->type == LXBOOT_E820_TYPE_RAM) {
 			mrd.type = UKPLAT_MEMRT_FREE;
 			mrd.flags = UKPLAT_MEMRF_READ | UKPLAT_MEMRF_WRITE;
 
 			/* Free memory regions have
-			 * mrd.len == mrd.pg_count * PAGE_SIZE
+			 * mrd.len == mrd.pg_count * UK_PAGING_PAGE_SIZE
 			 */
-			mrd.len = PAGE_ALIGN_UP(mrd.len + mrd.pg_off);
+			mrd.len = UK_PAGING_PAGE_ALIGN_UP(mrd.len + mrd.pg_off);
 		} else {
 			mrd.type = UKPLAT_MEMRT_RESERVED;
 			mrd.flags = UKPLAT_MEMRF_READ;
@@ -132,7 +132,7 @@ lxboot_init_mem(struct ukplat_bootinfo *bi, struct lxboot_params *bp)
 			     "Failed to insert legacy high memory region\n");
 }
 
-void lxboot_entry(struct lcpu *lcpu, struct lxboot_params *bp)
+void lxboot_entry(struct lxboot_params *bp)
 {
 	struct ukplat_bootinfo *bi;
 
@@ -149,5 +149,5 @@ void lxboot_entry(struct lcpu *lcpu, struct lxboot_params *bp)
 
 	memcpy(bi->bootprotocol, "lxboot", sizeof("lxboot"));
 
-	_ukplat_entry(lcpu, bi);
+	_ukplat_entry(bi);
 }

@@ -32,7 +32,8 @@
  *
  * $FreeBSD$
  */
-#include <uk/arch/lcpu.h>
+
+#include <uk/asm/lcpu.h>
 #include <uk/arch/limits.h>
 #include <uk/asm.h>
 #include <uk/reloc.h>
@@ -45,7 +46,7 @@ ENTRY(start_mmu)
 	dsb sy
 
 	/* Load ttbr0, pagetable starts from _end */
-	ur_ldr  x27, arm64_bpt_l3_pt0
+	ur_addr  x27, arm64_bpt_l3_pt0
 	msr ttbr0_el1, x27
 	isb
 
@@ -59,16 +60,16 @@ ENTRY(start_mmu)
 	ldr x2, =MAIR_INIT_ATTR
 	msr mair_el1, x2
 
-#ifdef CONFIG_PAGING
+#if CONFIG_HAVE_PAGING
 	/* Set up TCR_EL1. The platform must provide a
 	 * configuration compatible with the paging API.
 	 */
 	ldr x2, =TCR_INIT_FLAGS
 	msr tcr_el1, x2
-#else /* CONFIG_PAGING */
+#else /* !CONFIG_HAVE_PAGING */
 	/* Get VIRT_BITS from id_aa64mmfr0_el1.PARange */
 	mrs x3, id_aa64mmfr0_el1
-	ur_ldr  x5, tcr_ips_bits
+	ur_addr  x5, tcr_ips_bits
 	ubfx x4, x3, #0, #4
 	ldrb w4, [x5, x4]
 	cmp x4, #52
@@ -84,13 +85,13 @@ setup_tcr_el1:
 	mov x5, #64
 	sub x5, x5, x4
 	mov x4, x5
-	lsl x5, x5, #TCR_EL1_T1SZ_SHIFT
+	lsl x5, x5, #UK_ARCH_ARM64_TCR_EL1_T1SZ_SHIFT
 	orr x5, x4, x5
 	ldr x2, =TCR_INIT_FLAGS
 	orr x2, x5, x2
 	bfi x2, x3, #32, #3
 	msr tcr_el1, x2
-#endif /* CONFIG_PAGING */
+#endif /* !CONFIG_HAVE_PAGING */
 
 	/* save lr */
 	mov x22, x30

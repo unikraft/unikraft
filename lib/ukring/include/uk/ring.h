@@ -33,11 +33,13 @@
 #define __UK_RING_H__
 
 #include <errno.h>
+#include <uk/arch.h>
+#include <uk/arch/util.h>
 #include <uk/mutex.h>
 #include <uk/print.h>
 #include <uk/config.h>
 #include <uk/assert.h>
-#include <uk/plat/lcpu.h>
+#include <uk/lcpu.h>
 #include <uk/atomic.h>
 #include <uk/essentials.h>
 #include <uk/preempt.h>
@@ -52,14 +54,14 @@ struct uk_ring {
 	int               br_prod_size;
 	int               br_prod_mask;
 	uint64_t          br_drops;
-	volatile uint32_t br_cons_head __align(CACHE_LINE_SIZE);
+	volatile uint32_t br_cons_head __align(UK_ARCH_CACHE_LINE_SIZE);
 	volatile uint32_t br_cons_tail;
 	int               br_cons_size;
 	int               br_cons_mask;
 #ifdef DEBUG_BUFRING
 	struct uk_mutex  *br_lock;
 #endif
-	void             *br_ring[0] __align(CACHE_LINE_SIZE);
+	void             *br_ring[0] __align(UK_ARCH_CACHE_LINE_SIZE);
 };
 
 /*
@@ -91,7 +93,7 @@ uk_ring_enqueue(struct uk_ring *br, void *buf)
 		cons_tail = br->br_cons_tail;
 
 		if (prod_next == cons_tail) {
-			rmb();
+			uk_arch_rmb();
 			if (prod_head == br->br_prod_head && cons_tail == br->br_cons_tail) {
 				br->br_drops++;
 				critical_exit();
@@ -111,17 +113,17 @@ uk_ring_enqueue(struct uk_ring *br, void *buf)
 	/*
 	 * If there are other enqueues in progress
 	 * that preceded us, we need to wait for them
-	 * to complete 
+	 * to complete
 	 */
 	while (br->br_prod_tail != prod_head)
-		ukarch_spinwait();
+		uk_arch_spinwait();
 	uk_store_n(&br->br_prod_tail, prod_next);
 	critical_exit();
 	return 0;
 }
 
 /*
- * multi-consumer safe dequeue 
+ * multi-consumer safe dequeue
  *
  */
 static __inline void *
@@ -152,7 +154,7 @@ uk_ring_dequeue_mc(struct uk_ring *br)
 	 * to complete
 	 */
 	while (br->br_cons_tail != cons_head)
-		ukarch_spinwait();
+		uk_arch_spinwait();
 
 	uk_store_n(&br->br_cons_tail, cons_next);
 	critical_exit();
@@ -161,7 +163,7 @@ uk_ring_dequeue_mc(struct uk_ring *br)
 }
 
 /*
- * single-consumer dequeue 
+ * single-consumer dequeue
  * use where dequeue is protected by a lock
  * e.g. a network driver's tx queue lock
  */
@@ -193,7 +195,7 @@ uk_ring_dequeue_sc(struct uk_ring *br)
 	 * br->br_ring[prod_head] = buf;
 	 * atomic_store_rel_32(&br->br_prod_tail, ...);
 	 *                                                                                prod_tail = br->br_prod_tail;
-	 *                                                                                if (cons_head == prod_tail) 
+	 *                                                                                if (cons_head == prod_tail)
 	 *                                                                                        return (NULL);
 	 *                                                                                <condition is false and code uses invalid(old) buf>`
 	 *
@@ -334,8 +336,8 @@ uk_ring_peek_clear_sc(struct uk_ring *br)
 	 */
 	#error "unsupported: atomic_thread_fence_acq()"
 	/* TODO atomic_thread_fence_acq(); */
-#elif defined(CONFIG_ARCH_ARM64)
-	dmb();
+#elif defined(CONFIG_ARCH_ARM_64)
+	uk_arch_arm64_dmb(ishld);
 #endif
 
 #ifdef DEBUG_BUFRING

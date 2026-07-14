@@ -36,6 +36,7 @@
 #define _GNU_SOURCE
 
 #include <uk/essentials.h>
+#include <uk/paging.h>
 #include <sys/stat.h>
 #include <dirent.h>
 #include <sys/param.h>
@@ -45,7 +46,6 @@
 #include <string.h>
 #include <stdlib.h>
 
-#include <uk/page.h>
 #include <vfscore/vnode.h>
 #include <vfscore/mount.h>
 #include <vfscore/uio.h>
@@ -377,7 +377,7 @@ ramfs_truncate(struct vnode *vp, off_t length)
 		}
 	} else if ((size_t) length > np->rn_bufsize) {
 		/* TODO: this could use a page level allocator */
-		new_size = round_pgup(length);
+		new_size = UK_PAGING_PAGE_ALIGN_UP(length);
 		new_buf = malloc(new_size);
 		if (!new_buf)
 			return EIO;
@@ -492,7 +492,7 @@ ramfs_write(struct vnode *vp, struct uio *uio, int ioflag)
 
 		if (end_pos > (off_t) np->rn_bufsize) {
 			// XXX: this could use a page level allocator
-			size_t new_size = round_pgup(end_pos);
+			size_t new_size = UK_PAGING_PAGE_ALIGN_UP(end_pos);
 			void *new_buf = calloc(1, new_size);
 
 			if (!new_buf)

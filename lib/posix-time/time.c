@@ -37,6 +37,7 @@
 #include <time.h>
 #include <unistd.h>
 #include <sys/time.h>
+#include <sys/times.h>
 #include <uk/plat/time.h>
 #include <uk/config.h>
 #include <uk/print.h>
@@ -45,7 +46,7 @@
 #if CONFIG_HAVE_SCHED
 #include <uk/sched.h>
 #else
-#include <uk/plat/lcpu.h>
+#include <uk/lcpu.h>
 #endif
 #include <uk/essentials.h>
 
@@ -58,10 +59,10 @@ static void __spin_wait(__nsec nsec)
 	__nsec until = ukplat_monotonic_clock() + nsec;
 	unsigned long flags;
 
-	flags = ukplat_lcpu_save_irqf();
+	flags = uk_lcpu_save_irqf();
 	while (until > ukplat_monotonic_clock())
-		ukplat_lcpu_halt_irq_until(until);
-	ukplat_lcpu_restore_irqf(flags);
+		uk_lcpu_halt_irq_until(until);
+	uk_lcpu_restore_irqf(flags);
 }
 #endif
 
@@ -178,10 +179,14 @@ int uk_sys_clock_getres(clockid_t clk_id, struct timespec *tp)
 
 	switch (clk_id) {
 	case CLOCK_MONOTONIC:
+	case CLOCK_MONOTONIC_RAW:
 	case CLOCK_MONOTONIC_COARSE:
 	case CLOCK_REALTIME:
 	case CLOCK_REALTIME_COARSE:
 	case CLOCK_BOOTTIME:
+#if CONFIG_HAVE_SCHED
+	case CLOCK_THREAD_CPUTIME_ID:
+#endif /* CONFIG_HAVE_SCHED */
 		if (tp) {
 			tp->tv_sec = 0;
 			tp->tv_nsec = UKPLAT_TIME_TICK_NSEC;
@@ -225,6 +230,12 @@ int uk_sys_clock_gettime(clockid_t clk_id, struct timespec *tp)
 	case CLOCK_REALTIME_COARSE:
 		now = ukplat_wall_clock();
 		break;
+#if CONFIG_HAVE_SCHED
+	case CLOCK_THREAD_CPUTIME_ID:
+		/* NOTE: exec_time does not account for current scheduled run */
+		now = uk_thread_current()->exec_time;
+		break;
+#endif /* CONFIG_HAVE_SCHED */
 	default:
 		error = EINVAL;
 		goto out_error;
@@ -273,9 +284,26 @@ UK_SYSCALL_R_DEFINE(int, clock_nanosleep, clockid_t, clockid, int, flags,
 	return uk_sys_clock_nanosleep(clockid, flags, request, remain);
 }
 
-UK_SYSCALL_R_DEFINE(int, times, struct tm *, buf)
+clock_t uk_sys_times(struct tms *buf)
 {
-	return -ENOTSUP;
+	/* NOTE: We assume all system time is used by the current process */
+	const clock_t utime = ukplat_monotonic_clock() /
+			      (UKARCH_NSEC_PER_SEC / CLOCKS_PER_SEC);
+
+	if (buf) {
+		/* We don't track time spent in the kernel */
+		buf->tms_stime = 0;
+		buf->tms_utime = utime;
+		/* We don't track time spent per-process; report zero */
+		buf->tms_cutime = 0;
+		buf->tms_cstime = 0;
+	}
+	return utime;
+}
+
+UK_SYSCALL_R_DEFINE(clock_t, times, struct tms *, buf)
+{
+	return uk_sys_times(buf);
 }
 
 UK_SYSCALL_R_DEFINE(int, setitimer, int, which,

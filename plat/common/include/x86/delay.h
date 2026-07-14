@@ -34,7 +34,6 @@
 #ifndef __PLAT_COMMON_X86_DELAY_H__
 #define __PLAT_COMMON_X86_DELAY_H__
 
-#include <x86/cpu.h>
 
 /*
  * Delay the execution for a given amount of microseconds/ milliseconds.
@@ -51,7 +50,7 @@ static inline void udelay(__u16 usec)
 		 * Writing to the 0x80 port has no effect, and takes
 		 * approximately 1us
 		 */
-		outb(DELAY_PORT, 1);
+		uk_arch_x86_64_outb(DELAY_PORT, 1);
 }
 
 static inline void mdelay(__u16 msec)

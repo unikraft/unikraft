@@ -30,7 +30,7 @@
 #ifndef __UK_ATOMIC_H__
 #define __UK_ATOMIC_H__
 
-#include <uk/arch/lcpu.h>
+#include <uk/lcpu.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -167,17 +167,17 @@ extern "C" {
 #define	UK_ACCESS_ONCE(x)			(*(volatile __typeof(x) *)&(x))
 
 #define	UK_WRITE_ONCE(x, v) do {	\
-	barrier();			\
+	__barrier();			\
 	UK_ACCESS_ONCE(x) = (v);	\
-	barrier();			\
+	__barrier();			\
 } while (0)
 
 #define	UK_READ_ONCE(x) ({		\
 	__typeof(x) __var = ({		\
-		barrier();		\
+		__barrier();		\
 		UK_ACCESS_ONCE(x);	\
 	});				\
-	barrier();			\
+	__barrier();			\
 	__var;				\
 })
 
