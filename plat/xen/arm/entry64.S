@@ -100,6 +100,10 @@ lr      .req    x30             // link register
 	.globl shared_info_page, IRQ_handler, stack
 	.globl boot_l1_pgtable, boot_l2_pgtable, fixmap_pgtable
 	.globl idmap_pgtable
+#ifdef CONFIG_XEN_STATIC_SHM
+	.globl shm_l2_pgtable
+	.globl shm_l3_pgtable
+#endif
 
 	.align 12 // 4KiB aligned
 boot_l1_pgtable:
@@ -110,6 +114,12 @@ fixmap_pgtable:
 	.space PAGE_SIZE
 idmap_pgtable:
 	.space PAGE_SIZE
+#ifdef CONFIG_XEN_STATIC_SHM
+shm_l2_pgtable:
+	.space PAGE_SIZE
+shm_l3_pgtable:
+	.space SHM_NR_L3_TABLES * PAGE_SIZE
+#endif
 
 
 shared_info_page:
