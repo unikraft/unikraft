@@ -82,6 +82,13 @@ define measure_loc =
 $(shell $(OBJDUMP) -dl "$(1)" | grep '^/' | grep -v '^/[/*]' | $(SED) -e 's/ [(]discriminator .*[)]//g' | sort -u | wc -l)
 endef
 
+#Use a build.log to measure source lines of code prior to binary output as a
+#tool useful for code tracking and certification
+define measure_sloc_stats =
+    BUILD_LOG=$(APP_DIR)/workdir/build/build.log  \
+	$(CONFIG_UK_BASE)/support/scripts/sloc-counter $(APP_DIR) $(if $(MODE),$(MODE),buildlog)
+endef
+
 # Generate <target>.ukcmpdb.json compile db entry from <target>.cmd
 #
 # Notice: The directory, file, and output fields are assigned directly by
