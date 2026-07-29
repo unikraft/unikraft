@@ -1,1 +1,3 @@
 uk_xc_do_sysctl
+uk_xc_sched_arinc653_schedule_set
+uk_xc_sched_arinc653_schedule_get

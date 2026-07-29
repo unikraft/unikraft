@@ -5,3 +5,15 @@ config UKXEN_CTRL
 	help
 		Provides a subset of Xen libxenctrl functionality for
 		unikernels.
+
+if UKXEN_CTRL
+
+config UKXEN_CTRL_ARINC653
+	bool "ARINC653 scheduler control"
+	default n
+	depends on UKXEN_CTRL
+	help
+		Provides xc_arinc653 hypercall interfaces for
+		get/set of ARINC653 scheduler schedules.
+
+endif
