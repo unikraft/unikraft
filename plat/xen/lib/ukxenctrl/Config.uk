@@ -1,0 +1,7 @@
+config UKXEN_CTRL
+	bool "ukxenctrl: Xen control interface (libxenctrl subset)"
+	default n
+	depends on PLAT_XEN
+	help
+		Provides a subset of Xen libxenctrl functionality for
+		unikernels.

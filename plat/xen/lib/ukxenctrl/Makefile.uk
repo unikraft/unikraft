@@ -1,0 +1,6 @@
+$(eval $(call addlib_s,libukxenctrl,$(CONFIG_UKXEN_CTRL)))
+
+CINCLUDES-$(CONFIG_UKXEN_CTRL)   += -I$(LIBUKXENCTRL_BASE)
+CINCLUDES-$(CONFIG_UKXEN_CTRL)   += -I$(CONFIG_UK_BASE)/plat/xen/include
+
+LIBUKXENCTRL_SRCS-$(CONFIG_UKXEN_CTRL) += $(LIBUKXENCTRL_BASE)/uk_xc_sysctl.c

@@ -33,6 +33,9 @@ menuconfig PLAT_XEN
 		Create a Unikraft image that runs as a Xen guest
 
 if (PLAT_XEN)
+
+source "$(UK_BASE)/plat/xen/lib/Config.uk"
+
 # Hidden options for pulling platform dependencies depending on arch
 config PLAT_XEN_X86_64
 	bool
