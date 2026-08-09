@@ -67,6 +67,7 @@
 #include <stddef.h>
 #include <uk/bus.h>
 #include <uk/alloc.h>
+#include <uk/arch/types.h>
 #include <uk/ctors.h>
 
 #ifdef __cplusplus
@@ -145,6 +146,24 @@ struct pci_driver {
 	pci_driver_add_func_t add_dev;
 };
 
+enum pci_bar_type {
+	PCI_BAR_NONE = 0,
+	PCI_BAR_IO,
+	PCI_BAR_MEM,
+};
+
+#define PCI_BAR_COUNT		6
+
+struct pci_bar {
+	enum pci_bar_type type;
+	__u8 index;
+	__u8 is_64;
+	__u64 pbase;
+	__u64 size;
+	__vaddr_t vbase;
+	__u32 flags;
+};
+
 enum pci_device_state {
 	PCI_DEVICE_STATE_RESET = 0,
 	PCI_DEVICE_STATE_RUNNING
@@ -159,6 +178,7 @@ struct pci_device {
 
 	unsigned long base;
 	unsigned long irq;
+	struct pci_bar bar[PCI_BAR_COUNT];
 };
 
 
@@ -257,6 +277,16 @@ static struct pci_bus_handler ph __unused;
 #define PCI_BASE_ADDRESS_4	0x20	/* 32 bits */
 #define PCI_BASE_ADDRESS_5	0x24	/* 32 bits */
 
+#define PCI_BASE_ADDRESS_SPACE		0x01
+#define PCI_BASE_ADDRESS_SPACE_IO	0x01
+#define PCI_BASE_ADDRESS_IO_MASK	(~0x03U)
+#define PCI_BASE_ADDRESS_MEM_MASK	(~0x0fU)
+#define PCI_BASE_ADDRESS_MEM_1M_MASK	0x000ffff0U
+#define PCI_BASE_ADDRESS_MEM_TYPE_MASK	0x06
+#define PCI_BASE_ADDRESS_MEM_TYPE_32	0x00
+#define PCI_BASE_ADDRESS_MEM_TYPE_1M	0x02
+#define PCI_BASE_ADDRESS_MEM_TYPE_64	0x04
+
 #define PCI_VENDOR_ID		0x0
 #define PCI_DEV_ID			0x02
 
@@ -267,6 +297,8 @@ static struct pci_bus_handler ph __unused;
 #define PCI_COMMAND_OFFSET   0x4
 #define PCI_BUS_MASTER_BIT   0x2
 #define PCI_STATUS_OFFSET    0x6
+#define PCI_STATUS		0x06
+#define  PCI_STATUS_CAP_LIST	0x10
 #define PCI_CLASS_REVISION   0x8
 #define PCI_CLASS_OFFSET     0xb
 #define PCI_SUBCLASS_OFFSET	 0xa
@@ -299,6 +331,19 @@ static struct pci_bus_handler ph __unused;
 #define PCI_MAX_LAT		0x3f	/* 8 bits */
 
 struct pci_driver *pci_find_driver(struct pci_device_id *id);
+
+__u8 pci_config_read8(struct pci_device *dev, int where);
+__u16 pci_config_read16(struct pci_device *dev, int where);
+__u32 pci_config_read32(struct pci_device *dev, int where);
+void pci_config_write8(struct pci_device *dev, int where, __u8 val);
+void pci_config_write16(struct pci_device *dev, int where, __u16 val);
+void pci_config_write32(struct pci_device *dev, int where, __u32 val);
+
+int pci_device_probe_bar(struct pci_device *dev, unsigned int bar);
+int pci_device_probe_bars(struct pci_device *dev);
+int pci_device_map_bar(struct pci_device *dev, unsigned int bar);
+int pci_device_enable(struct pci_device *dev);
+void pci_device_intx(struct pci_device *dev, int enable);
 
 #ifdef __cplusplus
 }

@@ -238,12 +238,13 @@ static void vm_set_status(struct virtio_dev *vdev, __u8 status)
 	virtio_mmio_cwrite32(vm_dev->base, VIRTIO_MMIO_STATUS, status);
 }
 
-static void vm_reset(struct virtio_dev *vdev)
+static int vm_reset(struct virtio_dev *vdev)
 {
 	struct virtio_mmio_device *vm_dev = to_virtio_mmio_device(vdev);
 
 	/* 0 status means a reset. */
 	virtio_mmio_cwrite32(vm_dev->base, VIRTIO_MMIO_STATUS, 0);
+	return 0;
 }
 
 /* Transport interface */
