@@ -16,6 +16,9 @@
 #include <uk/console/driver.h>
 #include <uk/compiler.h>
 #include <uk/errptr.h>
+#if CONFIG_PLAT_XEN
+#include <xen-arm/mm.h>
+#endif /* CONFIG_PLAT_XEN */
 
 #if CONFIG_LIBUKALLOC
 #include <uk/alloc.h>
@@ -284,7 +287,13 @@ static int fdt_get_device(struct pl011_device *dev, const void *dtb,
 
 	uk_console_init(&dev->dev, "PL011", &pl011_ops, 0,
 			UK_CONSOLE_CLASS_UART);
+#if CONFIG_PLAT_XEN
+	set_pgt_entry(&fixmap_pgtable[l2_pgt_idx(FIX_PL011_START)],
+		      ((reg_base & L2_MASK) | BLOCK_DEV_ATTR | L2_BLOCK));
+	dev->base = FIX_PL011_START + (reg_base & L2_OFFSET);
+#else
 	dev->base = reg_base;
+#endif /* CONFIG_PLAT_XEN */
 	dev->size = reg_size;
 
 	return 0;
