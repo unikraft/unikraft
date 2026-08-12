@@ -70,7 +70,7 @@
 #define REG_UARTICR_OFFSET	0x44
 
 static const char * const fdt_compatible[] = {
-	"arm,pl011", NULL
+	"arm,pl011", "arm,sbsa-uart", NULL
 };
 
 struct pl011_device {
