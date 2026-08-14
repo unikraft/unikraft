@@ -191,6 +191,109 @@ jobs:
           - platform: ${{ matrix.plat }}
             architecture: ${{ matrix.arch }}
 
+  static-analysis:
+    name: static-analysis
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+    - name: Load configuration
+      uses: ./.github/actions/ci-versions
+
+    - name: Build elfloader
+      id: build
+      uses: ./.github/actions/build-elfloader
+      with:
+        clang-version: ${{ env.CLANG_VERSION }}
+
+    - name: Run static analysis
+      uses: whisperity/codechecker-analysis-action@v1
+      id: codechecker
+      with:
+        version: ${{ env.CODECHECKER_VERSION }}
+        llvm-version: 'ignore' # already installed by the `build` step
+        ignore-analyze-crashes: false
+        config: "${{ github.workspace }}/.codechecker.json"
+        logfile: ${{ steps.build.outputs.logfile }}
+
+        # Store and diff require credentials, so both are
+        # performed by the `static-analysis` workflow.
+        store: false
+        diff: false
+
+    - name: Export report hashes
+      env:
+        ANALYZE_OUTPUT: ${{ steps.codechecker.outputs.analyze-output }}
+      run: |
+        set -eu
+        # `parse` exits with 2 when the analysers emitted at least one report,
+        # which is the normal case here and not an error.
+        CodeChecker parse "$ANALYZE_OUTPUT" \
+          --export baseline \
+          --output "${{ github.workspace }}/reports.baseline" \
+          || [ $? -eq 2 ]
+        # No findings at all means `parse` writes nothing.
+        touch "${{ github.workspace }}/reports.baseline"
+        echo "Exported $(grep -c '' reports.baseline) report hashes."
+
+    - name: Upload report hashes
+      uses: actions/upload-artifact@v4
+      with:
+        name: codechecker-baseline
+        path: reports.baseline
+        if-no-files-found: error
+        retention-days: 7
+
+    - name: Export report details
+      continue-on-error: true
+      env:
+        ANALYZE_OUTPUT: ${{ steps.codechecker.outputs.analyze-output }}
+      run: |
+        set -eu
+        # Annotate hashes above with file, line, checker and message,
+        # so that `static-analysis` can name new findings in summary
+        echo '{"version": 1, "reports": []}' > "${{ github.workspace }}/reports.json"
+        CodeChecker parse "$ANALYZE_OUTPUT" \
+          --export json \
+          --output "${{ github.workspace }}/reports.json" \
+          --trim-path-prefix /github/workspace "$GITHUB_WORKSPACE" \
+          || [ $? -eq 2 ]
+        # Pass on the rendered fields only, nothing else.
+        jq -c '[(.reports // [])[] | {
+                 hash: .report_hash,
+                 file: .file.path,
+                 line: .line,
+                 checker: .checker_name,
+                 severity: .severity,
+                 message: .message
+               }]' "${{ github.workspace }}/reports.json" \
+          > "${{ github.workspace }}/findings.json"
+        echo "Exported details for $(jq length findings.json) reports."
+
+    - name: Upload report details
+      continue-on-error: true
+      uses: actions/upload-artifact@v4
+      with:
+        name: codechecker-findings
+        path: findings.json
+        if-no-files-found: error
+        retention-days: 7
+
+    - name: Upload full report
+      if: ${{ always() && steps.codechecker.outputs.result-html-dir != '' }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: codechecker-report
+        path: |
+          ${{ steps.codechecker.outputs.result-html-dir }}
+          ${{ steps.codechecker.outputs.result-log }}
+        retention-days: 7
+
   catalog-tests:
     needs: [libc-test, self-test, helloworld]
     if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/staging' && github.repository_owner == 'unikraft' }}

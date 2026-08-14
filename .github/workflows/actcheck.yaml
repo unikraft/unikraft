@@ -6,6 +6,7 @@ on:
     branches: [staging]
     paths:
       - '.github/workflows/**'
+      - '.github/actions/**'
 
 jobs:
   action-lint:
