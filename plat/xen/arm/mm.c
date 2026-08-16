@@ -28,6 +28,8 @@
 #include <xen-arm/mm.h>
 #include <libfdt.h>
 #include <uk/arch/util.h>
+#include <uk/print.h>
+#include <uk/assert.h>
 
 #if defined(__aarch64__)
 extern char stack[];

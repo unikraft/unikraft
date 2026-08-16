@@ -6,6 +6,7 @@
 
 #include <errno.h>
 #include <signal.h>
+#include <uk/config.h>
 
 #if CONFIG_LIBPOSIX_PROCESS_SIGNAL
 #include "signal/signal.h"
