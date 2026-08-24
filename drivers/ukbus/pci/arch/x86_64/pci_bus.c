@@ -53,25 +53,124 @@
 
 #include <string.h>
 
+#include <uk/arch/spinlock.h>
 #include <uk/arch/util.h>
+#include <uk/lcpu.h>
 #include <uk/print.h>
 #include <uk/bus/pci.h>
+
+static __spinlock pci_config_lock = UKARCH_SPINLOCK_INITIALIZER();
+
+static __u32 pci_config_read_addr32(__u32 addr)
+{
+	unsigned long flags;
+	__u32 val;
+
+	flags = uk_lcpu_save_irqf();
+	ukarch_spin_lock(&pci_config_lock);
+	uk_arch_x86_64_outl(PCI_CONFIG_ADDR, addr);
+	val = uk_arch_x86_64_inl(PCI_CONFIG_DATA);
+	ukarch_spin_unlock(&pci_config_lock);
+	uk_lcpu_restore_irqf(flags);
+
+	return val;
+}
 
 #define PCI_CONF_READ(type, ret, a, s)					\
 	do {								\
 		__u32 _conf_data;					\
-		uk_arch_x86_64_outl(PCI_CONFIG_ADDR, (a) | PCI_CONF_##s);\
-		_conf_data = ((uk_arch_x86_64_inl(PCI_CONFIG_DATA) >>	\
+		_conf_data = ((pci_config_read_addr32((a) | PCI_CONF_##s) >>\
 			       PCI_CONF_##s##_SHFT) & PCI_CONF_##s##_MASK);\
 		*(ret) = (type) _conf_data;				\
 	} while (0)
+
+static inline __u32 pci_config_addr(struct pci_device *dev, int where)
+{
+	return PCI_ENABLE_BIT |
+		(dev->addr.bus << PCI_BUS_SHIFT) |
+		(dev->addr.devid << PCI_DEVICE_SHIFT) |
+		(dev->addr.function << PCI_FUNCTION_SHIFT) |
+		(where & ~0x3);
+}
+
+__u8 pci_config_read8(struct pci_device *dev, int where)
+{
+	unsigned long flags;
+	__u8 val;
+
+	flags = uk_lcpu_save_irqf();
+	ukarch_spin_lock(&pci_config_lock);
+	uk_arch_x86_64_outl(PCI_CONFIG_ADDR, pci_config_addr(dev, where));
+	val = uk_arch_x86_64_inb(PCI_CONFIG_DATA + (where & 0x3));
+	ukarch_spin_unlock(&pci_config_lock);
+	uk_lcpu_restore_irqf(flags);
+
+	return val;
+}
+
+__u16 pci_config_read16(struct pci_device *dev, int where)
+{
+	unsigned long flags;
+	__u16 val;
+
+	flags = uk_lcpu_save_irqf();
+	ukarch_spin_lock(&pci_config_lock);
+	uk_arch_x86_64_outl(PCI_CONFIG_ADDR, pci_config_addr(dev, where));
+	val = uk_arch_x86_64_inw(PCI_CONFIG_DATA + (where & 0x2));
+	ukarch_spin_unlock(&pci_config_lock);
+	uk_lcpu_restore_irqf(flags);
+
+	return val;
+}
+
+__u32 pci_config_read32(struct pci_device *dev, int where)
+{
+	return pci_config_read_addr32(pci_config_addr(dev, where));
+}
+
+void pci_config_write8(struct pci_device *dev, int where, __u8 val)
+{
+	unsigned long flags;
+
+	flags = uk_lcpu_save_irqf();
+	ukarch_spin_lock(&pci_config_lock);
+	uk_arch_x86_64_outl(PCI_CONFIG_ADDR, pci_config_addr(dev, where));
+	uk_arch_x86_64_outb(PCI_CONFIG_DATA + (where & 0x3), val);
+	ukarch_spin_unlock(&pci_config_lock);
+	uk_lcpu_restore_irqf(flags);
+}
+
+void pci_config_write16(struct pci_device *dev, int where, __u16 val)
+{
+	unsigned long flags;
+
+	flags = uk_lcpu_save_irqf();
+	ukarch_spin_lock(&pci_config_lock);
+	uk_arch_x86_64_outl(PCI_CONFIG_ADDR, pci_config_addr(dev, where));
+	uk_arch_x86_64_outw(PCI_CONFIG_DATA + (where & 0x2), val);
+	ukarch_spin_unlock(&pci_config_lock);
+	uk_lcpu_restore_irqf(flags);
+}
+
+void pci_config_write32(struct pci_device *dev, int where, __u32 val)
+{
+	unsigned long flags;
+
+	flags = uk_lcpu_save_irqf();
+	ukarch_spin_lock(&pci_config_lock);
+	uk_arch_x86_64_outl(PCI_CONFIG_ADDR, pci_config_addr(dev, where));
+	uk_arch_x86_64_outl(PCI_CONFIG_DATA, val);
+	ukarch_spin_unlock(&pci_config_lock);
+	uk_lcpu_restore_irqf(flags);
+}
 
 static inline int pci_driver_add_device(struct pci_driver *drv,
 					struct pci_address *addr,
 					struct pci_device_id *devid)
 {
 	struct pci_device *dev;
-	__u32 config_addr;
+	__u16 command;
+	int device_enabled = 0;
 	int ret;
 
 	UK_ASSERT(drv != NULL);
@@ -92,11 +191,30 @@ static inline int pci_driver_add_device(struct pci_driver *drv,
 	memcpy(&dev->addr, addr,  sizeof(dev->addr));
 	dev->drv = drv;
 
-	config_addr = (PCI_ENABLE_BIT)
-			| (addr->bus << PCI_BUS_SHIFT)
-			| (addr->devid << PCI_DEVICE_SHIFT);
-	PCI_CONF_READ(__u16, &dev->base, config_addr, IOBAR);
-	PCI_CONF_READ(__u8, &dev->irq, config_addr, IRQ);
+	ret = pci_device_probe_bars(dev);
+	if (unlikely(ret)) {
+		uk_pr_err("PCI %02x:%02x.%02x: Failed to probe BARs: %d\n",
+			  (int)addr->bus, (int)addr->devid,
+			  (int)addr->function, ret);
+		goto err_free_dev;
+	}
+
+	ret = pci_device_map_bar(dev, 0);
+	if (unlikely(ret && ret != -ENODEV)) {
+		uk_pr_err("PCI %02x:%02x.%02x: Failed to map BAR0: %d\n",
+			  (int)addr->bus, (int)addr->devid,
+			  (int)addr->function, ret);
+		goto err_free_dev;
+	}
+	if (dev->bar[0].type != PCI_BAR_NONE)
+		dev->base = dev->bar[0].vbase;
+	dev->irq = pci_config_read8(dev, PCI_INTERRUPT_LINE);
+
+	command = pci_config_read16(dev, PCI_COMMAND);
+	device_enabled = 1;
+	ret = pci_device_enable(dev);
+	if (unlikely(ret))
+		goto err_free_dev;
 
 	ret = drv->add_dev(dev);
 	if (ret < 0) {
@@ -104,9 +222,17 @@ static inline int pci_driver_add_device(struct pci_driver *drv,
 			  (int) addr->bus,
 			  (int) addr->devid,
 			  (int) addr->function);
-		uk_free(ph.a, dev);
+		goto err_free_dev;
 	}
-	return 0;
+	return ret;
+
+err_free_dev:
+	if (device_enabled)
+		pci_config_write16(dev, PCI_COMMAND,
+				   (command & ~PCI_COMMAND_MASTER) |
+				   PCI_COMMAND_INTX_DISABLE);
+	uk_free(ph.a, dev);
+	return ret;
 }
 
 static void probe_bus(__u32);
@@ -126,8 +252,7 @@ static int probe_function(__u32 bus, __u32 device, __u32 function)
 			| (device << PCI_DEVICE_SHIFT)
 			| (function << PCI_FUNCTION_SHIFT);
 
-	uk_arch_x86_64_outl(PCI_CONFIG_ADDR, config_addr);
-	config_data = uk_arch_x86_64_inl(PCI_CONFIG_DATA);
+	config_data = pci_config_read_addr32(config_addr);
 
 	devid.vendor_id = config_data & PCI_DEVICE_ID_MASK;
 	if (devid.vendor_id == PCI_INVALID_ID) {
@@ -187,13 +312,15 @@ static int probe_function(__u32 bus, __u32 device, __u32 function)
  */
 static void probe_bus(__u32 bus)
 {
-	__u32 config_addr, device, header_type, function = 0;
+	__u32 config_addr, device, header_type, function;
 
 	for (device = 0; device < PCI_MAX_DEVICES; ++device) {
-		if (!probe_function(bus, device, function))
+		if (probe_function(bus, device, 0))
 			continue;
 
-		config_addr = (PCI_ENABLE_BIT);
+		config_addr = PCI_ENABLE_BIT |
+			      (bus << PCI_BUS_SHIFT) |
+			      (device << PCI_DEVICE_SHIFT);
 		PCI_CONF_READ(__u32, &header_type,
 				config_addr, HEADER_TYPE);
 

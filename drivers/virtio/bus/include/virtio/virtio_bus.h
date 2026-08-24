@@ -91,7 +91,7 @@ struct virtio_dev_id {
  */
 struct virtio_config_ops {
 	/** Resetting the device */
-	void (*device_reset)(struct virtio_dev *vdev);
+	int (*device_reset)(struct virtio_dev *vdev);
 	/** Set configuration option */
 	int (*config_set)(struct virtio_dev *vdev, __u16 offset,
 			  const void *buf, __u32 len);
@@ -171,8 +171,7 @@ static inline int virtio_dev_reset(struct virtio_dev *vdev)
 	UK_ASSERT(vdev);
 
 	if (likely(vdev->cops->device_reset)) {
-		vdev->cops->device_reset(vdev);
-		rc = 0;
+		rc = vdev->cops->device_reset(vdev);
 	}
 
 	return rc;
@@ -205,6 +204,7 @@ static inline __u8 virtio_dev_status_get(struct virtio_dev *vdev)
  * @return
  *      0 on successful updating the status.
  *      -ENOTSUP, if the operation is not supported on the virtio device.
+ *      -EINVAL, if a modern device rejects negotiated features.
  */
 static inline int virtio_dev_status_update(struct virtio_dev *vdev, __u8 status)
 {
@@ -214,7 +214,13 @@ static inline int virtio_dev_status_update(struct virtio_dev *vdev, __u8 status)
 
 	if (likely(vdev->cops->status_set)) {
 		vdev->cops->status_set(vdev, status);
-		rc = 0;
+		if ((status & VIRTIO_CONFIG_STATUS_FEATURES_OK) &&
+		    VIRTIO_FEATURE_HAS(vdev->features, VIRTIO_F_VERSION_1) &&
+		    !(virtio_dev_status_get(vdev) &
+		      VIRTIO_CONFIG_STATUS_FEATURES_OK))
+			rc = -EINVAL;
+		else
+			rc = 0;
 	}
 	return rc;
 }

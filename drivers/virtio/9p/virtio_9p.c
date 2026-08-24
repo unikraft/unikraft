@@ -321,6 +321,7 @@ static int virtio_9p_vq_alloc(struct virtio_9p_device *d)
 		uk_pr_err(DRIVER_NAME": Failed to set up virtqueue %"PRIu16"\n",
 			  d->hwvq_id);
 		rc = PTR2ERR(d->vq);
+		goto exit;
 	}
 
 	d->vq->priv = d;
@@ -371,12 +372,27 @@ static int virtio_9p_feature_negotiate(struct virtio_9p_device *d)
 	d->tag[tag_len] = '\0';
 
 	d->vdev->features &= host_features;
+	if (VIRTIO_FEATURE_HAS(host_features, VIRTIO_F_VERSION_1))
+		VIRTIO_FEATURE_SET(d->vdev->features, VIRTIO_F_VERSION_1);
 	virtio_feature_set(d->vdev);
+	if (VIRTIO_FEATURE_HAS(d->vdev->features, VIRTIO_F_VERSION_1)) {
+		rc = virtio_dev_status_update(d->vdev,
+					      VIRTIO_CONFIG_STATUS_ACK |
+					      VIRTIO_CONFIG_STATUS_DRIVER |
+					      VIRTIO_CONFIG_STATUS_FEATURES_OK);
+		if (unlikely(rc ||
+			     !(virtio_dev_status_get(d->vdev) &
+			       VIRTIO_CONFIG_STATUS_FEATURES_OK))) {
+			rc = rc ? rc : -EINVAL;
+			goto free_mem;
+		}
+	}
 
 	return 0;
 
 free_mem:
 	uk_free(a, d->tag);
+	d->tag = NULL;
 out:
 	return rc;
 }
@@ -452,6 +468,7 @@ static int virtio_9p_add_dev(struct virtio_dev *vdev)
 out:
 	return rc;
 out_free:
+	uk_free(a, d->tag);
 	uk_free(a, d);
 	goto out;
 }

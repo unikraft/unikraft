@@ -6,6 +6,7 @@ config LIBUKBUS_PCI
 	depends on HAVE_PCI
 	depends on (ARCH_X86_64 || ARCH_ARM_64)
 	select LIBUKBUS
+	select LIBUKBUS_PLATFORM if LIBUKPAGING
 	help
 		PCI bus driver for probing and operating PCI devices
 
