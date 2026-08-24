@@ -10,6 +10,7 @@ $(eval $(call addplat_s,xen,$(CONFIG_PLAT_XEN)))
 ##
 $(eval $(call addplatlib,xen,libxenplat))
 $(eval $(call addplatlib_s,xen,libxenpvcalls,$(CONFIG_XEN_PVCALLS)))
+$(eval $(call import_lib,$(CONFIG_UK_BASE)/plat/xen/lib/ukxenctrl))
 
 ##
 ## Xen platform compilation settings

@@ -1,0 +1,5 @@
+menu "Xen Libraries"
+
+source "$(UK_BASE)/plat/xen/lib/ukxenctrl/Config.uk"
+
+endmenu
