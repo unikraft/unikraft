@@ -66,6 +66,7 @@ extern paddr_t _libxenplat_paddr_offset;
 
 #define SZ_2M           0x00200000
 
+#define FIXMAP_ENTRIES  (PAGE_SIZE / sizeof(lpae_t))
 #define PAGE_OFFSET     ((0xffffffffffffffff << (VA_BITS - 1))\
 						 & 0xffffffffffffffff)
 #define FIX_FDT_TOP     (PAGE_OFFSET)
@@ -78,6 +79,8 @@ extern paddr_t _libxenplat_paddr_offset;
 #define FIX_XS_START    (FIX_XS_TOP - SZ_2M)
 #define FIX_GNT_TOP     (FIX_XS_START)
 #define FIX_GNT_START   (FIX_GNT_TOP - SZ_2M)
+#define FIX_PL011_TOP   (FIX_GNT_START)
+#define FIX_PL011_START (FIX_PL011_TOP - SZ_2M)
 
 /*
  * Memory types available.
@@ -215,6 +218,7 @@ extern paddr_t _libxenplat_paddr_offset;
 #define map_frames(f, n) (NULL)
 
 #ifndef __ASSEMBLY__
+extern lpae_t fixmap_pgtable[FIXMAP_ENTRIES];
 void arch_mm_prepare(unsigned long *start_pfn_p, unsigned long *max_pfn_p);
 void set_pgt_entry(lpae_t *ptr, lpae_t val);
 #endif
