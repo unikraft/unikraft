@@ -1,0 +1,650 @@
+#!/bin/bash
+# SPDX-License-Identifier: BSD-3-Clause
+
+# print-sloc-stats - Count SLOC for any unikraft unikernel make project
+#
+# PROJ_DIR is the root of a unikraft make project (contains workdir/, .config, build.log)
+#
+# Append the following to Makefile all: to create build.log:
+#   V=1 2>&1 | tee $(UK_APP)/build.log
+
+
+
+set -e
+
+clean_up() {
+    rm -rf "$PREPROCESS_DIR" /tmp/dr_*.txt || true
+    rm -f "${csv_tmp:-}" "${tmp:-}" || true
+}
+trap clean_up EXIT
+
+#make sure cloc is installed
+if ! type -P cloc >/dev/null 2>&1; then
+
+    echo "ERROR: cloc not found. Install with: sudo apt-get install cloc" 1>&2
+    exit 1
+
+fi
+
+# Where this script lives (needed for recursive calls after cd into PROJ_DIR)
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+SCRIPT="$SCRIPT_DIR/$(basename "$0")"
+
+# ---------------------------------------------------------------
+# Usage
+# ---------------------------------------------------------------
+usage() {
+    echo "Usage: $0 <PROJ_DIR> [MODE] [MODE_ARGS...]"
+    echo ""
+    echo "  PROJ_DIR   Path to a unikraft make project (default base for all paths)"
+    echo ""
+    echo "Environment overrides:"
+    echo "  WORKDIR      Path to workdir/ (default: PROJ_DIR/workdir)"
+    echo "  BUILD_LOG    Path to build.log (default: PROJ_DIR/build.log)"
+    echo "  CONFIG_FILE  Path to .config (default: PROJ_DIR/.config)"
+    echo "  OUTPUT_DIR   Where to write reports (default: PROJ_DIR)"
+    echo ""
+    echo "Modes:"
+    echo "  buildlog          (default) Parse build.log for compiled sources"
+    echo "  dryrun            Use 'make -n' to resolve .config -> source list"
+    echo "  count FILE        Run cloc on an existing source file list"
+    echo "  preprocess FILE   gcc -E to strip #ifdef'd code, then count"
+    echo "  all               Run all modes and compare"
+    echo ""
+    echo "Examples:"
+    echo "  $0 c-hello buildlog"
+    echo "  WORKDIR=/opt/uk/workdir BUILD_LOG=/opt/uk/build.log $0 /opt/uk buildlog"
+    exit 1
+}
+
+# --- Parse arguments: PROJ_DIR is required, MODE is optional ---
+PROJ_DIR="${1:-}"
+if [[ -z $PROJ_DIR ]]; then
+    echo "ERROR: PROJ_DIR is required." 1>&2
+    echo ""
+    usage
+fi
+
+# Resolve to absolute path
+PROJ_DIR="$(cd "$PROJ_DIR" && pwd)" || { echo "ERROR: Cannot access $1" 1>&2; exit 1; }
+
+# Add unikraft project workdir to project path:
+WORKDIR="${WORKDIR:-$PROJ_DIR/workdir}"
+BUILD_LOG="${BUILD_LOG:-$PROJ_DIR/build.log}"
+CONFIG_FILE="${CONFIG_FILE:-$PROJ_DIR/.config}"
+OUTPUT_DIR="${OUTPUT_DIR:-$PROJ_DIR}"
+
+# Validate it looks like a unikraft project
+if [[ ! -d $WORKDIR ]]; then
+    echo "ERROR: $WORKDIR not found — not a unikraft make project?" 1>&2
+    exit 1
+fi
+
+MODE="${2:-buildlog}"
+
+# ---------------------------------------------------------------
+# Helper: extract code count from a file list via cloc
+# ---------------------------------------------------------------
+cloc_code_count() {
+    [[ -s "$1" ]] || { echo 0; return; }
+    cloc --list-file="$1" --csv --quiet 2>/dev/null \
+        | grep 'SUM' | awk -F',' '{print $NF}' | head -1 | sed 's/^$/0/'
+}
+
+# ---------------------------------------------------------------
+# Helper: detect platform from .config
+# ---------------------------------------------------------------
+detect_platform() {
+    local config="$CONFIG_FILE"
+    local plats=""
+    if [[ -f $config ]]; then
+        grep -q '^CONFIG_PLAT_KVM=y' "$config" && plats="${plats}kvm "
+        grep -q '^CONFIG_PLAT_XEN=y' "$config" && plats="${plats}xen "
+    fi
+    plats="${plats% }"
+    echo "${plats:-unknown}"
+}
+
+DETECTED_PLATFORM=$(detect_platform)
+
+# ---------------------------------------------------------------
+# Helper: split a source file list into mutually exclusive categories
+#   Usage: split_categories <input_file> <output_prefix>
+#   Creates: <prefix>_musl.txt, <prefix>_<platform>.txt,
+#            <prefix>_unikraft.txt, <prefix>_app.txt
+# ---------------------------------------------------------------
+split_categories() {
+    local input="$1"
+    local prefix="$2"
+
+    grep -iE "(musl)" "$input" \
+        > "${prefix}_musl.txt" 2>/dev/null || true
+
+    grep -E "(/unikraft/plat/|\+unikraft/plat/)" "$input" \
+        | grep -viE "(musl)" \
+        > "${prefix}_${DETECTED_PLATFORM}.txt" 2>/dev/null || true
+
+    grep -E "(/unikraft/|\+unikraft/|workdir/build/)" "$input" \
+    | grep -viE "(musl)" \
+    | grep -vE "(/unikraft/plat/|\+unikraft/plat/)" \
+    > "${prefix}_unikraft.txt" 2>/dev/null || true
+
+    comm -23 <(sort -u "$input") \
+        <(cat "${prefix}_musl.txt" "${prefix}_${DETECTED_PLATFORM}.txt" "${prefix}_unikraft.txt" 2>/dev/null | sort -u) \
+        > "${prefix}_app.txt" 2>/dev/null || true
+}
+
+
+# ---------------------------------------------------------------
+# Helper: one-line cloc summary for a category
+# ---------------------------------------------------------------
+generate_summary() {
+    local file_list="$1"
+    local label="$2"
+    local count
+    count=$(wc -l < "$file_list")
+
+    if [[ ! -s $file_list ]]; then
+        printf "  %-25s %6d files  %8d code  %8d comment  %8d blank  %8d total\n" \
+            "$label" "$count" 0 0 0 0
+        return
+    fi
+
+    local csv_tmp
+    csv_tmp=$(mktemp)
+    cloc --list-file="$file_list" --csv --quiet > "$csv_tmp" 2>/dev/null
+
+    local code blank comment
+    code=$(grep 'SUM' "$csv_tmp" | awk -F',' '{ print $NF }' | head -1)
+    comment=$(grep 'SUM' "$csv_tmp" | awk -F',' '{ print $(NF-1) }' | head -1)
+    blank=$(grep 'SUM' "$csv_tmp" | awk -F',' '{ print $(NF-2) }' | head -1)
+    : "${code:=0}" "${blank:=0}" "${comment:=0}"
+    local total=$((blank + comment + code))
+
+    printf "  %-25s %6d files  %8d code  %8d comment  %8d blank  %8d total\n" \
+        "$label" "$count" "$code" "$comment" "$blank" "$total"
+}
+
+# ---------------------------------------------------------------
+# all mode: run buildlog + dryrun + preprocess, compare results
+# ---------------------------------------------------------------
+if [[ $MODE = "all" ]]; then
+    REPORT_FILE="sloc_consistency_report.txt"
+
+    echo "========================================================================"
+    echo "  SLOC Consistency Report — Running all 3 modes"
+    echo "  $(date)"
+    echo "========================================================================"
+    echo ""
+
+    # --- Mode 1: buildlog ---
+    echo "[1/3] Running buildlog mode..."
+    if "$SCRIPT" "$PROJ_DIR" buildlog > /tmp/sloc_buildlog_out.txt 2>&1; then
+        BL_FILES=$(wc -l < $OUTPUT_DIR/build_sources.txt 2>/dev/null || echo 0)
+        BL_CODE=$(cloc_code_count $OUTPUT_DIR/build_sources.txt)
+        BL_APP_CODE=$(cloc_code_count $OUTPUT_DIR/build_sources_app.txt)
+        BL_PLAT_CODE=$(cloc_code_count $OUTPUT_DIR/build_sources_"$DETECTED_PLATFORM".txt)
+        BL_UK_CODE=$(cloc_code_count $OUTPUT_DIR/build_sources_unikraft.txt)
+        BL_MUSL_CODE=$(cloc_code_count $OUTPUT_DIR/build_sources_musl.txt)
+        echo "  buildlog: $BL_FILES files, $BL_CODE code lines"
+    else
+        echo "  buildlog: FAILED (no build.log found?)"
+        echo "  To create build.log,Append the following to Makefile all:"
+        echo "  V=1 2>&1 | tee \$(UK_APP)/build.log"
+        BL_FILES=0; BL_CODE=0; BL_APP_CODE=0; BL_PLAT_CODE=0; BL_UK_CODE=0; BL_MUSL_CODE=0
+    fi
+
+    # --- Mode 2: dryrun ---
+    echo "[2/3] Running dryrun mode..."
+    if "$SCRIPT" "$PROJ_DIR" dryrun > /tmp/sloc_dryrun_out.txt 2>&1; then
+        DR_FILES=$(wc -l < config_sources.txt 2>/dev/null || echo 0)
+        DR_CODE=$(cloc_code_count config_sources.txt)
+        split_categories config_sources.txt /tmp/dr
+        DR_APP_CODE=$(cloc_code_count /tmp/dr_app.txt)
+        DR_PLAT_CODE=$(cloc_code_count /tmp/dr_"$DETECTED_PLATFORM".txt)
+        DR_UK_CODE=$(cloc_code_count /tmp/dr_unikraft.txt)
+        DR_MUSL_CODE=$(cloc_code_count /tmp/dr_musl.txt)
+        echo "  dryrun:   $DR_FILES files, $DR_CODE code lines"
+    else
+        echo "  dryrun:   FAILED (missing .config or workdir?)"
+        DR_FILES=0; DR_CODE=0; DR_APP_CODE=0; DR_PLAT_CODE=0; DR_UK_CODE=0; DR_MUSL_CODE=0
+    fi
+
+    # --- Mode 3: preprocess ---
+    echo "[3/3] Running preprocess mode..."
+    # Use buildlog source list as input (most accurate for what was actually compiled)
+    PP_INPUT="build_sources.txt"
+    if [[ ! -s $PP_INPUT ]]; then
+        PP_INPUT="config_sources.txt"
+    fi
+    PP_CODE=0
+    PP_FILES=0
+    if [[ -s $PP_INPUT ]]; then
+        PP_FILES=$(wc -l < "$PP_INPUT")
+        # Run preprocess inline (don't exec, capture output)
+        if "$SCRIPT" "$PROJ_DIR" preprocess "$PP_INPUT" > /tmp/sloc_preprocess_out.txt 2>&1; then
+            PP_CODE=$(grep 'After preprocessing (code lines):' /tmp/sloc_preprocess_out.txt \
+                | awk '{ print $(NF) }' | head -1)
+            : "${PP_CODE:=0}"
+            echo "  preprocess: $PP_FILES files, $PP_CODE code lines (after #ifdef)"
+        else
+            echo "  preprocess: FAILED (missing cross-compiler?)"
+        fi
+    else
+        echo "  preprocess: SKIPPED (no source list available)"
+    fi
+
+    # --- Comparison report ---
+    echo ""
+    {
+        echo "========================================================================"
+        echo "  SLOC Consistency Report"
+        echo "  Generated: $(date)"
+        echo "  .config:   $CONFIG_FILE"
+        echo "========================================================================"
+        echo ""
+        echo "  Method              Files     Code   App Code  $DETECTED_PLATFORM Code  UK Code  Musl Code"
+        echo "  ------              -----     ----   --------  ---------  -------  ---------"
+        printf "  %-20s %5d  %7d    %7d    %7d  %7d    %7d\n" \
+            "buildlog" "$BL_FILES" "$BL_CODE" "$BL_APP_CODE" "$BL_PLAT_CODE" "$BL_UK_CODE" "$BL_MUSL_CODE"
+        printf "  %-20s %5d  %7d    %7d    %7d  %7d    %7d\n" \
+            "dryrun (make -n)" "$DR_FILES" "$DR_CODE" "$DR_APP_CODE" "$DR_PLAT_CODE" "$DR_UK_CODE" "$DR_MUSL_CODE"
+        printf "  %-20s %5d  %7d    %7s    %7s  %7s    %7s\n" \
+            "preprocess (gcc -E)" "$PP_FILES" "$PP_CODE" "-" "-" "-" "-"
+        echo ""
+        echo "  -------------------------------------------------------------------------"
+        echo ""
+
+        # File list comparison
+        if [[ -s build_sources.txt  &&  -s config_sources.txt ]]; then
+            ONLY_BUILDLOG=$(comm -23 build_sources.txt config_sources.txt | wc -l)
+            ONLY_DRYRUN=$(comm -13 build_sources.txt config_sources.txt | wc -l)
+            COMMON=$(comm -12 build_sources.txt config_sources.txt | wc -l)
+            echo "  File list comparison (buildlog vs dryrun):"
+            echo "    Common to both:     $COMMON files"
+            echo "    Only in buildlog:   $ONLY_BUILDLOG files"
+            echo "    Only in dryrun:     $ONLY_DRYRUN files"
+            echo ""
+            if [[ $ONLY_BUILDLOG -gt 0 ]]; then
+                echo "  Files only in buildlog (compiled but not in make -n):"
+                comm -23 build_sources.txt config_sources.txt | head -20 | sed 's/^/    /'
+                [ "$ONLY_BUILDLOG" -gt 20 ] && echo "    ... and $((ONLY_BUILDLOG - 20)) more"
+                echo ""
+            fi
+            if [[ $ONLY_DRYRUN -gt 0 ]]; then
+                echo "  Files only in dryrun (in make -n but not in build.log):"
+                comm -13 build_sources.txt config_sources.txt | head -20 | sed 's/^/    /'
+                [[ $ONLY_DRYRUN -gt 20 ]] && echo "    ... and $((ONLY_DRYRUN - 20)) more"
+                echo ""
+            fi
+        fi
+
+        # Code count comparison
+        echo "  Code count comparison:"
+        if [[ $BL_CODE -gt 0 &&  $DR_CODE -gt 0 ]]; then
+            DIFF=$((BL_CODE - DR_CODE))
+            if [[ $DIFF -eq 0 ]]; then
+                echo "    buildlog vs dryrun: MATCH ($BL_CODE lines)"
+            else
+                ABS_DIFF=${DIFF#-}
+                PCT=$(( (ABS_DIFF * 100) / BL_CODE ))
+                echo "    buildlog vs dryrun: DIFF $DIFF lines ($PCT% variance)"
+            fi
+        fi
+        if [[ $BL_CODE -gt 0 &&  $PP_CODE -gt 0 ]]; then
+            IFDEF_OUT=$((BL_CODE - PP_CODE))
+            PCT=$(( (IFDEF_OUT * 100) / BL_CODE ))
+            echo "    #ifdef'd out code:  $IFDEF_OUT lines ($PCT% of raw code)"
+            echo "    Effective compiled: $PP_CODE lines"
+        fi
+        echo ""
+        echo "========================================================================"
+    } | tee "$REPORT_FILE"
+
+    echo ""
+    echo "  Full report saved to: $PROJ_DIR/$REPORT_FILE"
+    echo "  Individual mode outputs in: $PROJ_DIR/sloc_*_out.txt"
+    exit 0
+fi
+
+# ---------------------------------------------------------------
+# count mode: ingest an existing source file list and run cloc
+# ---------------------------------------------------------------
+if [[ $MODE = "count" ]]; then
+    INPUT_FILE="${3:-}"
+    if [[ -z $INPUT_FILE ]] || [[ ! -f $INPUT_FILE ]]; then
+        echo "ERROR: count mode requires a source file list." 1>&2
+        echo "  Usage: $0 count <file_list.txt>"
+        exit 1
+    fi
+
+    TOTAL=$(wc -l < "$INPUT_FILE")
+    echo "=== SLOC count from: $INPUT_FILE ($TOTAL files) ==="
+    echo ""
+
+    split_categories "$INPUT_FILE" /tmp/sloc
+
+    echo "========================================================================"
+    echo "  SLOC Summary"
+    echo "========================================================================"
+    echo ""
+
+    generate_summary /tmp/sloc_app.txt "APP"
+    generate_summary /tmp/sloc_"$DETECTED_PLATFORM".txt "Platform ($DETECTED_PLATFORM)"
+    generate_summary /tmp/sloc_unikraft.txt "Unikraft core"
+    generate_summary /tmp/sloc_musl.txt "Musl libc"
+    echo "  -------------------------------------------------------------------------"
+    generate_summary "$INPUT_FILE" "TOTAL"
+
+    echo ""
+    echo "========================================================================"
+
+    exit 0
+fi
+
+# ---------------------------------------------------------------
+# dryrun mode: use make -n to resolve .config -> source list
+# ---------------------------------------------------------------
+if [[ $MODE = "dryrun" ]]; then
+    echo "=== Dry-run mode: resolving .config to source file list ==="
+
+    if [[ ! -f $CONFIG_FILE ]]; then
+        echo "ERROR: .config not found in $PROJ_DIR" 1>&2
+        exit 1
+    fi
+
+    if [[ ! -d $WORKDIR/unikraft ]]; then
+        echo "ERROR: workdir/unikraft not found. Run setup.sh first." 1>&2
+        exit 1
+    fi
+
+    CROSS_COMPILE="${CROSS_COMPILE:-aarch64-linux-gnu-}"
+
+    echo "  Using CROSS_COMPILE=$CROSS_COMPILE"
+
+    # make --trace -n prints the commands that would run; extract .c/.S/.s source files
+    make --trace -n CROSS_COMPILE="$CROSS_COMPILE" 2>&1 \
+        | grep -oE '[^ ]+\.(c|S|s)' \
+        | grep -v '\-o$' \
+        | sort -u \
+        > config_sources_raw.txt
+    # Filter to only files that exist
+    MISSING=0
+    > config_sources.txt
+    while IFS= read -r f; do
+        if [[ -f $f ]]; then
+            echo "$f" >> config_sources.txt
+        else
+            MISSING=$((MISSING + 1))
+        fi
+    done < config_sources_raw.txt
+
+    sort -u -o config_sources.txt config_sources.txt
+
+    TOTAL=$(wc -l < config_sources.txt)
+
+    echo ""
+    echo "  Source list: config_sources.txt"
+    echo "  Run: $0 count config_sources.txt"
+    echo ""
+
+    # Auto-run count on the result
+    exec "$SCRIPT" "$PROJ_DIR" count config_sources.txt
+fi
+
+# ---------------------------------------------------------------
+# preprocess mode: use gcc -E to strip #ifdef'd code before counting
+# ---------------------------------------------------------------
+if [[ $MODE = "preprocess" ]]; then
+    INPUT_FILE="${3:-}"
+    if [[ -z $INPUT_FILE ]] || [[ ! -f $INPUT_FILE ]]; then
+        echo "ERROR: preprocess mode requires a source file list." 1>&2
+        echo "  Usage: $0 preprocess <file_list.txt>"
+        exit 1
+    fi
+
+    echo "=== Preprocess mode: counting only code that survives #ifdef ==="
+
+    if [[ ! -f $CONFIG_FILE ]]; then
+        echo "ERROR: .config not found — needed to resolve #ifdef CONFIG_* guards" 1>&2
+        exit 1
+    fi
+
+    # Convert .config to -D flags: CONFIG_FOO=y -> -DCONFIG_FOO=1, CONFIG_FOO=val -> -DCONFIG_FOO=val
+    CONFIG_DEFINES=$(grep '^CONFIG_' "$CONFIG_FILE" \
+        | grep -v '^#' \
+        | sed 's/=y$/=1/' \
+        | sed 's/^/-D/' \
+        | tr '\n' ' ')
+    # Need the following unikraft specific arm 64 defines to resolve all headers for accurate preprocess sloc count
+    ARCH_DEFINES="-D__ARM_64__"
+    INC_PATHS=""
+    #Build full include paths so GCC -E can resolve the headers in the sources present in build log
+    if [[ -d $WORKDIR/unikraft ]]; then
+        # Find all include dirs in unikraft source tree
+        while IFS= read -r d; do
+            INC_PATHS="$INC_PATHS -I$d"
+        done < <(find -L "$WORKDIR/unikraft" -type d -name 'include' 2>/dev/null)
+    fi
+    # App includes
+    [[ -d $PROJ_DIR/include ]] && INC_PATHS="$INC_PATHS -I$PROJ_DIR/include"
+    # Build output includes (generated headers)
+    if [[ -d $WORKDIR/build ]]; then
+        while IFS= read -r d; do
+            INC_PATHS="$INC_PATHS -I$d"
+        done < <(find -L "$WORKDIR/build" -type d -name 'include' 2>/dev/null)
+    fi
+    # Musl includes
+    MUSL_ORIGIN="$WORKDIR/build/libmusl/origin/musl-1.2.3"
+    [[ -d $MUSL_ORIGIN/include ]] && INC_PATHS="$INC_PATHS -I$MUSL_ORIGIN/include"
+    #arch specific includes
+    MUSL_ARCH=$(grep '^CONFIG_UK_ARCH=' "$CONFIG_FILE" | sed 's/.*="//;s/"//' | sed 's/arm64/aarch64/')
+    [[ -d $MUSL_ORIGIN/arch/$MUSL_ARCH ]] && INC_PATHS="$INC_PATHS -I$MUSL_ORIGIN/arch/$MUSL_ARCH"
+    [[ -d $MUSL_ORIGIN/arch/generic ]] && INC_PATHS="$INC_PATHS -I$MUSL_ORIGIN/arch/generic"
+    [[ -d $MUSL_ORIGIN/src/internal ]] && INC_PATHS="$INC_PATHS -I$MUSL_ORIGIN/src/internal"
+    [[ -d $MUSL_ORIGIN/src/include ]] && INC_PATHS="$INC_PATHS -I$MUSL_ORIGIN/src/include"
+    # Libs/musl overlay
+    [[ -d $WORKDIR/libs/musl/include ]] && INC_PATHS="$INC_PATHS -I$WORKDIR/libs/musl/include"
+
+    CC="${CROSS_COMPILE:-aarch64-linux-gnu-}gcc"
+    GCC_INTERNAL=$($CC -print-file-name=include 2>/dev/null || echo "/usr/lib/gcc-cross/aarch64-linux-gnu/13/include")
+
+    PREPROCESS_DIR=$(mktemp -d)
+    PREPROCESSED_LIST="$PREPROCESS_DIR/preprocessed_files.txt"
+    > "$PREPROCESSED_LIST"
+
+    TOTAL=$(wc -l < "$INPUT_FILE")
+    PROCESSED=0
+    FAILED=0
+
+    echo "  Preprocessing $TOTAL files with $(echo $CONFIG_DEFINES | wc -w) CONFIG defines..."
+    echo ""
+
+    while IFS= read -r src; do
+        [[ -f $src ]] || continue
+        raw_out="$PREPROCESS_DIR/raw_$(basename "$src")"
+        out="$PREPROCESS_DIR/$(basename "$src")"
+
+        # gcc -E (without -P): preprocess with line markers so we can
+        # filter to only lines originating from the source file itself,
+        # excluding expanded #include contents.
+        if $CC -E \
+            -nostdinc \
+            -isystem "$GCC_INTERNAL" \
+            $INC_PATHS \
+            $CONFIG_DEFINES \
+            $ARCH_DEFINES \
+            -D__KERNEL__ \
+            "$src" > "$raw_out" 2>/dev/null; then
+            # Extract only lines belonging to the original source file.
+            # gcc -E emits markers like: # 42 "/path/to/file.c"
+            # We track the current file and only keep lines from $src.
+            awk -v srcfile="$src" '
+                /^# [0-9]+ "/ {
+                    gsub(/"/, "", $3)
+                    current = $3
+                    next
+                }
+                current == srcfile { print }
+            ' "$raw_out" > "$out"
+            rm -f "$raw_out"
+            echo "$out" >> "$PREPROCESSED_LIST"
+            PROCESSED=$((PROCESSED + 1))
+        else
+            FAILED=$((FAILED + 1))
+        fi
+    done < "$INPUT_FILE"
+
+    echo "  Preprocessed: $PROCESSED / $TOTAL ($FAILED failed)"
+    echo ""
+
+    if [[ $PROCESSED -eq 0 ]]; then
+        echo "ERROR: No files preprocessed successfully." 1>&2
+        exit 1
+    fi
+
+    # Preprocess output
+    RAW_CODE=$(cloc_code_count "$INPUT_FILE")
+    PP_CODE=$(cloc_code_count "$PREPROCESSED_LIST")
+
+    echo "  Raw source (code lines):              $RAW_CODE"
+    echo "  After preprocessing (code lines):     $PP_CODE"
+    if [[ $RAW_CODE -gt 0 ]]; then
+        IFDEF_REMOVED=$((RAW_CODE - PP_CODE))
+        PCT=$(( (IFDEF_REMOVED * 100) / RAW_CODE ))
+        echo "  #ifdef'd out:                         $IFDEF_REMOVED ($PCT%)"
+    fi
+    exit 0
+fi
+
+if [[ $MODE != "buildlog" ]]; then
+    usage
+fi
+
+if [[ ! -f $BUILD_LOG ]]; then
+    echo "ERROR: No build.log found." 1>&2
+    echo "To create build.log, apend the following to Makefile all:" 1>&2
+    echo "V=1 2>&1 | tee \$(UK_APP)/build.log" 1>&2
+    exit 1
+fi
+
+# Extract source file paths from "Installing rule:" lines
+grep -E "^Installing[^:]*:" "$BUILD_LOG" \
+    | sed 's/^Installing[^:]*: //; s/ -> .*//; s/[[:space:]]*$//' \
+    | grep -E '\.(c|S|s)$' \
+    | sort -u > "$OUTPUT_DIR/build_sources_raw.txt"
+
+# Combine missing-file check and filter in one pass
+MISSING=0
+tmp=$(mktemp)
+while IFS= read -r f; do
+    if [[ -f $f ]]; then echo "$f"; else MISSING=$((MISSING + 1)); fi
+done < "$OUTPUT_DIR/build_sources_raw.txt" > "$tmp"
+mv "$tmp" "$OUTPUT_DIR/build_sources.txt"
+[[ $MISSING -gt 0 ]] && echo "  WARNING: $MISSING files not found locally (generated build files)"
+
+sort -u -o "$OUTPUT_DIR/build_sources.txt" "$OUTPUT_DIR/build_sources.txt"
+
+TOTAL_FILES=$(wc -l < "$OUTPUT_DIR/build_sources.txt")
+
+split_categories "$OUTPUT_DIR/build_sources.txt" "$OUTPUT_DIR/build_sources"
+
+MUSL_COUNT=$(wc -l < "$OUTPUT_DIR/build_sources_musl.txt")
+PLAT_COUNT=$(wc -l < "$OUTPUT_DIR/build_sources_${DETECTED_PLATFORM}.txt")
+UK_COUNT=$(wc -l < "$OUTPUT_DIR/build_sources_unikraft.txt")
+APP_COUNT=$(wc -l < "$OUTPUT_DIR/build_sources_app.txt")
+CATEGORIZED=$((MUSL_COUNT + PLAT_COUNT + UK_COUNT + APP_COUNT))
+
+if [[ $CATEGORIZED -ne $TOTAL_FILES ]]; then
+    echo "  WARNING: $(( TOTAL_FILES - CATEGORIZED )) files uncategorized" >&2
+fi
+
+# ---------------------------------------------------------------
+# shorten_path: strip absolute prefix for readable output
+# ---------------------------------------------------------------
+shorten_path() {
+    echo "$1" | sed \
+        -e "s|${PROJ_DIR}/||" \
+        -e 's|.*/unikraft/plat/|plat/|' \
+        -e 's|.*/unikraft/|unikraft/|' \
+        -e 's|.*/musl-1\.2\.3/|musl/|' \
+        -e 's|.*/workdir/build/|build-gen/|'
+}
+
+# ---------------------------------------------------------------
+# generate_report: run cloc and format per-file output
+# ---------------------------------------------------------------
+generate_report() {
+    local file_list="$1" output="$2" label="$3"
+    [[ -s $file_list ]] || { echo "  No files for: $label"; return; }
+    local count=$(wc -l < "$file_list")
+    local csv_tmp=$(mktemp)
+    cloc --list-file="$file_list" --by-file --csv --quiet > "$csv_tmp"
+    {
+        echo "========================================================================"
+        echo "  ${label} (${count} files)"
+        echo "========================================================================"
+        echo ""
+        printf "%-70s %-12s %8s %8s %8s\n" "File" "Language" "Blank" "Comment" "Code"
+        printf "%-70s %-12s %8s %8s %8s\n" "----" "--------" "-----" "-------" "----"
+        tail -n +2 "$csv_tmp" | while IFS=',' read -r lang filename blank comment code rest; do
+            [ "$lang" = "SUM" ] || [ -z "$code" ] && continue
+            case "$blank" in *[!0-9-]*) continue ;; esac
+            printf "%-70s %-12s %8d %8d %8d\n" \
+                "$(shorten_path "$filename")" "$lang" "$blank" "$comment" "$code"
+        done
+        echo ""
+        tail -n +2 "$csv_tmp" | awk -F',' '$1=="SUM"{printf "%-70s %-12s %8d %8d %8d\n","TOTAL","",$3,$4,$5}'
+        echo ""
+    } > "$output"
+}
+
+# ---------------------------------------------------------------
+# Generate all reports
+# ---------------------------------------------------------------
+
+generate_report "$OUTPUT_DIR/build_sources.txt" "$OUTPUT_DIR/sloc_report_all.txt" "All Sources"
+for cat_file in app "$DETECTED_PLATFORM" unikraft musl; do
+    case "$cat_file" in
+        app)                label="Application Sources" ;;
+        "$DETECTED_PLATFORM") label="Platform Sources ($DETECTED_PLATFORM)" ;;
+        unikraft)           label="Unikraft Core Sources" ;;
+        musl)               label="Musl libc Sources" ;;
+    esac
+    generate_report "$OUTPUT_DIR/build_sources_${cat_file}.txt" "$OUTPUT_DIR/sloc_report_${cat_file}.txt" "$label"
+done
+
+# ---------------------------------------------------------------
+# Print summary table
+# ---------------------------------------------------------------
+
+{
+    echo ""
+    echo "========================================================================"
+    echo "  SLOC Summary — Unikernel Build (platform: $DETECTED_PLATFORM)"
+    echo "========================================================================"
+    echo ""
+
+    generate_summary "$OUTPUT_DIR/build_sources_app.txt" "App"
+    generate_summary "$OUTPUT_DIR/build_sources_${DETECTED_PLATFORM}.txt" "Platform ($DETECTED_PLATFORM)"
+    generate_summary "$OUTPUT_DIR/build_sources_unikraft.txt" "Unikraft core"
+    generate_summary "$OUTPUT_DIR/build_sources_musl.txt" "Musl libc"
+
+    echo "  -------------------------------------------------------------------------"
+    generate_summary "$OUTPUT_DIR/build_sources.txt" "TOTAL (all sources)"
+
+    echo ""
+    echo "========================================================================"
+} | tee "$OUTPUT_DIR/sloc_summary_report.txt"
+
+# Print the app detail report to stdout
+echo ""
+echo "=== Application Sources (detail) ==="
+cat "$OUTPUT_DIR/sloc_report_app.txt"
+
+echo ""
+echo "=== Done ==="
+echo "  Platform detected: $DETECTED_PLATFORM"
+echo "  Reports: sloc_report_{all,app,${DETECTED_PLATFORM},unikraft,musl}.txt"
+echo "  Cross-check: run '$0 $PROJ_DIR dryrun'"
+echo "  Full comparison: run '$0 $PROJ_DIR all'"
