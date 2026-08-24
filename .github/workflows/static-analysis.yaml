@@ -173,7 +173,7 @@ jobs:
           set -eu
           # Fetch hashes and annotate with details.
           sed -n 's/.*baseline report hashes: //p' diff.log \
-            | tr ', ' '\n\n' \
+            | tr ', ' '\n' \
             | grep -xE '[A-Za-z0-9._:-]{1,128}' \
             | sort -u > new-hashes.txt || :
 
