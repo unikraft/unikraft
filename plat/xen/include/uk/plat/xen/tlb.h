@@ -9,6 +9,7 @@
 
 /* Xen platform does not support paging; declare no-ops */
 #include <uk/arch/types.h>
+#include <uk/essentials.h>
 
 #ifdef __cplusplus
 extern "C" {

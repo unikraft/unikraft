@@ -1,22 +1,5 @@
+/* SPDX-License-Identifier: MIT */
 /*
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to
- * deal in the Software without restriction, including without limitation the
- * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
- * sell copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
- * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
- * DEALINGS IN THE SOFTWARE.
- *
  * Copyright (c) 2007, Keir Fraser
  */
 
@@ -24,6 +7,22 @@
 #define __XEN_PUBLIC_HVM_PARAMS_H__
 
 #include "hvm_op.h"
+
+/* These parameters are deprecated and their meaning is undefined. */
+#if defined(__XEN__) || defined(__XEN_TOOLS__)
+
+#define HVM_PARAM_PAE_ENABLED                4
+#define HVM_PARAM_DM_DOMAIN                 13
+#define HVM_PARAM_MEMORY_EVENT_CR0          20
+#define HVM_PARAM_MEMORY_EVENT_CR3          21
+#define HVM_PARAM_MEMORY_EVENT_CR4          22
+#define HVM_PARAM_MEMORY_EVENT_INT3         23
+#define HVM_PARAM_NESTEDHVM                 24
+#define HVM_PARAM_MEMORY_EVENT_SINGLE_STEP  25
+#define HVM_PARAM_BUFIOREQ_EVTCHN           26
+#define HVM_PARAM_MEMORY_EVENT_MSR          30
+
+#endif /* defined(__XEN__) || defined(__XEN_TOOLS__) */
 
 /*
  * Parameter space for HVMOP_{set,get}_param.
@@ -78,12 +77,9 @@
 #define HVM_PARAM_STORE_PFN    1
 #define HVM_PARAM_STORE_EVTCHN 2
 
-#define HVM_PARAM_PAE_ENABLED  4
-
 #define HVM_PARAM_IOREQ_PFN    5
 
 #define HVM_PARAM_BUFIOREQ_PFN 6
-#define HVM_PARAM_BUFIOREQ_EVTCHN 26
 
 #if defined(__i386__) || defined(__x86_64__)
 
@@ -139,6 +135,30 @@
 #define _HVMPV_crash_ctl 6
 #define HVMPV_crash_ctl (1 << _HVMPV_crash_ctl)
 
+/* Enable SYNIC MSRs */
+#define _HVMPV_synic 7
+#define HVMPV_synic (1 << _HVMPV_synic)
+
+/* Enable STIMER MSRs */
+#define _HVMPV_stimer 8
+#define HVMPV_stimer (1 << _HVMPV_stimer)
+
+/* Use Synthetic Cluster IPI Hypercall */
+#define _HVMPV_hcall_ipi 9
+#define HVMPV_hcall_ipi (1 << _HVMPV_hcall_ipi)
+
+/* Enable ExProcessorMasks */
+#define _HVMPV_ex_processor_masks 10
+#define HVMPV_ex_processor_masks (1 << _HVMPV_ex_processor_masks)
+
+/* Allow more than 64 VPs */
+#define _HVMPV_no_vp_limit 11
+#define HVMPV_no_vp_limit (1 << _HVMPV_no_vp_limit)
+
+/* Enable vCPU hotplug */
+#define _HVMPV_cpu_hotplug 12
+#define HVMPV_cpu_hotplug (1 << _HVMPV_cpu_hotplug)
+
 #define HVMPV_feature_mask \
         (HVMPV_base_freq | \
          HVMPV_no_freq | \
@@ -146,7 +166,13 @@
          HVMPV_reference_tsc | \
          HVMPV_hcall_remote_tlb_flush | \
          HVMPV_apic_assist | \
-         HVMPV_crash_ctl)
+         HVMPV_crash_ctl | \
+         HVMPV_synic | \
+         HVMPV_stimer | \
+         HVMPV_hcall_ipi | \
+         HVMPV_ex_processor_masks | \
+         HVMPV_no_vp_limit | \
+         HVMPV_cpu_hotplug)
 
 #endif
 
@@ -181,9 +207,6 @@
 /* Identity-map page directory used by Intel EPT when CR0.PG=0. */
 #define HVM_PARAM_IDENT_PT     12
 
-/* Device Model domain, defaults to 0. */
-#define HVM_PARAM_DM_DOMAIN    13
-
 /* ACPI S state: currently support S0 and S3 on x86. */
 #define HVM_PARAM_ACPI_S_STATE 14
 
@@ -208,17 +231,6 @@
  */
 #define HVM_PARAM_ACPI_IOPORTS_LOCATION 19
 
-/* Deprecated */
-#define HVM_PARAM_MEMORY_EVENT_CR0          20
-#define HVM_PARAM_MEMORY_EVENT_CR3          21
-#define HVM_PARAM_MEMORY_EVENT_CR4          22
-#define HVM_PARAM_MEMORY_EVENT_INT3         23
-#define HVM_PARAM_MEMORY_EVENT_SINGLE_STEP  25
-#define HVM_PARAM_MEMORY_EVENT_MSR          30
-
-/* Boolean: Enable nestedhvm (hvm only) */
-#define HVM_PARAM_NESTEDHVM    24
-
 /* Params for the mem event rings */
 #define HVM_PARAM_PAGING_RING_PFN   27
 #define HVM_PARAM_MONITOR_RING_PFN  28
@@ -234,8 +246,8 @@
 #define HVM_PARAM_VM_GENERATION_ID_ADDR 34
 
 /*
- * Set mode for altp2m:
- *  disabled: don't activate altp2m (default)
+ * Get mode for altp2m:
+ *  disabled: altp2m not active (default)
  *  mixed: allow access to all altp2m ops for both in-guest and external tools
  *  external: allow access to external privileged tools only
  *  limited: guest only has limited access (ie. control VMFUNC and #VE)

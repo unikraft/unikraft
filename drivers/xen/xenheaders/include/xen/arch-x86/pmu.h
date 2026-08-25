@@ -1,22 +1,5 @@
+/* SPDX-License-Identifier: MIT */
 /*
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to
- * deal in the Software without restriction, including without limitation the
- * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
- * sell copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
- * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
- * DEALINGS IN THE SOFTWARE.
- *
  * Copyright (c) 2015 Oracle and/or its affiliates. All rights reserved.
  */
 
@@ -35,11 +18,7 @@ struct xen_pmu_amd_ctxt {
     uint32_t ctrls;
 
     /* Counter MSRs */
-#if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 199901L
-    uint64_t regs[];
-#elif defined(__GNUC__)
-    uint64_t regs[0];
-#endif
+    uint64_t regs[XEN_FLEX_ARRAY_DIM];
 };
 typedef struct xen_pmu_amd_ctxt xen_pmu_amd_ctxt_t;
 DEFINE_XEN_GUEST_HANDLE(xen_pmu_amd_ctxt_t);
@@ -71,11 +50,7 @@ struct xen_pmu_intel_ctxt {
     uint64_t debugctl;
 
     /* Fixed and architectural counter MSRs */
-#if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 199901L
-    uint64_t regs[];
-#elif defined(__GNUC__)
-    uint64_t regs[0];
-#endif
+    uint64_t regs[XEN_FLEX_ARRAY_DIM];
 };
 typedef struct xen_pmu_intel_ctxt xen_pmu_intel_ctxt_t;
 DEFINE_XEN_GUEST_HANDLE(xen_pmu_intel_ctxt_t);
@@ -113,7 +88,7 @@ struct xen_pmu_arch {
          * Processor's registers at the time of interrupt.
          * WO for hypervisor, RO for guests.
          */
-        struct xen_pmu_regs regs;
+        xen_pmu_regs_t regs;
         /* Padding for adding new registers to xen_pmu_regs in the future */
 #define XENPMU_REGS_PAD_SZ  64
         uint8_t pad[XENPMU_REGS_PAD_SZ];
@@ -140,8 +115,8 @@ struct xen_pmu_arch {
      * hypervisor into hardware during XENPMU_flush
      */
     union {
-        struct xen_pmu_amd_ctxt amd;
-        struct xen_pmu_intel_ctxt intel;
+        xen_pmu_amd_ctxt_t amd;
+        xen_pmu_intel_ctxt_t intel;
 
         /*
          * Padding for contexts (fixed parts only, does not include MSR banks

@@ -1,25 +1,8 @@
+/* SPDX-License-Identifier: MIT */
 /******************************************************************************
  * platform.h
- * 
+ *
  * Hardware platform operations. Intended for use by domain-0 kernel.
- * 
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to
- * deal in the Software without restriction, including without limitation the
- * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
- * sell copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
- * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
- * DEALINGS IN THE SOFTWARE.
  *
  * Copyright (c) 2002-2006, K Fraser
  */
@@ -42,6 +25,7 @@ struct xenpf_settime32 {
     uint32_t nsecs;
     uint64_t system_time;
 };
+typedef struct xenpf_settime32 xenpf_settime32_t;
 #define XENPF_settime64           62
 struct xenpf_settime64 {
     /* IN variables. */
@@ -50,6 +34,7 @@ struct xenpf_settime64 {
     uint32_t mbz;
     uint64_t system_time;
 };
+typedef struct xenpf_settime64 xenpf_settime64_t;
 #if __XEN_INTERFACE_VERSION__ < 0x00040600
 #define XENPF_settime XENPF_settime32
 #define xenpf_settime xenpf_settime32
@@ -463,7 +448,11 @@ struct xen_processor_performance {
     uint32_t state_count;     /* total available performance states */
     XEN_GUEST_HANDLE(xen_processor_px_t) states;
     struct xen_psd_package domain_info;
-    uint32_t shared_type;     /* coordination type of this processor */
+    /* Coordination type of this processor */
+#define XEN_CPUPERF_SHARED_TYPE_HW   1 /* HW does needed coordination */
+#define XEN_CPUPERF_SHARED_TYPE_ALL  2 /* All dependent CPUs should set freq */
+#define XEN_CPUPERF_SHARED_TYPE_ANY  3 /* Freq can be set from any dependent CPU */
+    uint32_t shared_type;
 };
 typedef struct xen_processor_performance xen_processor_performance_t;
 DEFINE_XEN_GUEST_HANDLE(xen_processor_performance_t);
@@ -529,6 +518,7 @@ struct xenpf_cpu_hotadd
 	uint32_t acpi_id;
 	uint32_t pxm;
 };
+typedef struct xenpf_cpu_hotadd xenpf_cpu_hotadd_t;
 
 #define XENPF_mem_hotadd    59
 struct xenpf_mem_hotadd
@@ -538,6 +528,7 @@ struct xenpf_mem_hotadd
     uint32_t pxm;
     uint32_t flags;
 };
+typedef struct xenpf_mem_hotadd xenpf_mem_hotadd_t;
 
 #define XENPF_core_parking  60
 
@@ -615,6 +606,38 @@ typedef struct xenpf_symdata xenpf_symdata_t;
 DEFINE_XEN_GUEST_HANDLE(xenpf_symdata_t);
 
 /*
+ * Fetch the video console information and mode setup by Xen.  A non-
+ * negative return value indicates the size of the (part of the) structure
+ * which was filled.
+ */
+#define XENPF_get_dom0_console 64
+typedef struct dom0_vga_console_info xenpf_dom0_console_t;
+DEFINE_XEN_GUEST_HANDLE(xenpf_dom0_console_t);
+
+#define XENPF_get_ucode_revision 65
+struct xenpf_ucode_revision {
+    uint32_t cpu;             /* IN:  CPU number to get the revision from.  */
+    uint32_t signature;       /* OUT: CPU signature (CPUID.1.EAX).          */
+    uint32_t pf;              /* OUT: Platform Flags (Intel only)           */
+    uint32_t revision;        /* OUT: Microcode Revision.                   */
+};
+typedef struct xenpf_ucode_revision xenpf_ucode_revision_t;
+DEFINE_XEN_GUEST_HANDLE(xenpf_ucode_revision_t);
+
+/* Hypercall to microcode_update with flags */
+#define XENPF_microcode_update2    66
+struct xenpf_microcode_update2 {
+    /* IN variables. */
+    uint32_t flags;                   /* Flags to be passed with ucode. */
+/* Force to skip microcode version check */
+#define XENPF_UCODE_FORCE           1
+    uint32_t length;                  /* Length of microcode data. */
+    XEN_GUEST_HANDLE(const_void) data;/* Pointer to microcode data */
+};
+typedef struct xenpf_microcode_update2 xenpf_microcode_update2_t;
+DEFINE_XEN_GUEST_HANDLE(xenpf_microcode_update2_t);
+
+/*
  * ` enum neg_errnoval
  * ` HYPERVISOR_platform_op(const struct xen_platform_op*);
  */
@@ -622,29 +645,32 @@ struct xen_platform_op {
     uint32_t cmd;
     uint32_t interface_version; /* XENPF_INTERFACE_VERSION */
     union {
-        struct xenpf_settime           settime;
-        struct xenpf_settime32         settime32;
-        struct xenpf_settime64         settime64;
-        struct xenpf_add_memtype       add_memtype;
-        struct xenpf_del_memtype       del_memtype;
-        struct xenpf_read_memtype      read_memtype;
-        struct xenpf_microcode_update  microcode;
-        struct xenpf_platform_quirk    platform_quirk;
-        struct xenpf_efi_runtime_call  efi_runtime_call;
-        struct xenpf_firmware_info     firmware_info;
-        struct xenpf_enter_acpi_sleep  enter_acpi_sleep;
-        struct xenpf_change_freq       change_freq;
-        struct xenpf_getidletime       getidletime;
-        struct xenpf_set_processor_pminfo set_pminfo;
-        struct xenpf_pcpuinfo          pcpu_info;
-        struct xenpf_pcpu_version      pcpu_version;
-        struct xenpf_cpu_ol            cpu_ol;
-        struct xenpf_cpu_hotadd        cpu_add;
-        struct xenpf_mem_hotadd        mem_add;
-        struct xenpf_core_parking      core_parking;
-        struct xenpf_resource_op       resource_op;
-        struct xenpf_symdata           symdata;
-        uint8_t                        pad[128];
+        xenpf_settime_t               settime;
+        xenpf_settime32_t             settime32;
+        xenpf_settime64_t             settime64;
+        xenpf_add_memtype_t           add_memtype;
+        xenpf_del_memtype_t           del_memtype;
+        xenpf_read_memtype_t          read_memtype;
+        xenpf_microcode_update_t      microcode;
+        xenpf_platform_quirk_t        platform_quirk;
+        xenpf_efi_runtime_call_t      efi_runtime_call;
+        xenpf_firmware_info_t         firmware_info;
+        xenpf_enter_acpi_sleep_t      enter_acpi_sleep;
+        xenpf_change_freq_t           change_freq;
+        xenpf_getidletime_t           getidletime;
+        xenpf_set_processor_pminfo_t  set_pminfo;
+        xenpf_pcpuinfo_t              pcpu_info;
+        xenpf_pcpu_version_t          pcpu_version;
+        xenpf_cpu_ol_t                cpu_ol;
+        xenpf_cpu_hotadd_t            cpu_add;
+        xenpf_mem_hotadd_t            mem_add;
+        xenpf_core_parking_t          core_parking;
+        xenpf_resource_op_t           resource_op;
+        xenpf_symdata_t               symdata;
+        xenpf_dom0_console_t          dom0_console;
+        xenpf_ucode_revision_t        ucode_revision;
+        xenpf_microcode_update2_t     microcode2;
+        uint8_t                       pad[128];
     } u;
 };
 typedef struct xen_platform_op xen_platform_op_t;

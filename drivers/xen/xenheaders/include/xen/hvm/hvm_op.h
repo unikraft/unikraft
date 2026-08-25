@@ -1,22 +1,5 @@
+/* SPDX-License-Identifier: MIT */
 /*
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to
- * deal in the Software without restriction, including without limitation the
- * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
- * sell copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
- * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
- * DEALINGS IN THE SOFTWARE.
- *
  * Copyright (c) 2007, Keir Fraser
  */
 
@@ -32,11 +15,30 @@
 #define HVMOP_get_param           1
 struct xen_hvm_param {
     domid_t  domid;    /* IN */
+    uint16_t pad;
     uint32_t index;    /* IN */
     uint64_t value;    /* IN/OUT */
 };
 typedef struct xen_hvm_param xen_hvm_param_t;
 DEFINE_XEN_GUEST_HANDLE(xen_hvm_param_t);
+
+struct xen_hvm_altp2m_suppress_ve {
+    uint16_t view;
+    uint8_t suppress_ve; /* Boolean type. */
+    uint8_t pad1;
+    uint32_t pad2;
+    uint64_t gfn;
+};
+
+struct xen_hvm_altp2m_suppress_ve_multi {
+    uint16_t view;
+    uint8_t suppress_ve; /* Boolean type. */
+    uint8_t pad1;
+    int32_t first_error; /* Should be set to 0. */
+    uint64_t first_gfn; /* Value may be updated. */
+    uint64_t last_gfn;
+    uint64_t first_error_gfn; /* Gfn of the first error. */
+};
 
 #if __XEN_INTERFACE_VERSION__ < 0x00040900
 
@@ -83,6 +85,13 @@ DEFINE_XEN_GUEST_HANDLE(xen_hvm_set_pci_link_route_t);
 /* Flushes all VCPU TLBs: @arg must be NULL. */
 #define HVMOP_flush_tlbs          5
 
+/*
+ * hvmmem_type_t should not be defined when generating the corresponding
+ * compat header. This will ensure that the improperly named HVMMEM_(*)
+ * values are defined only once.
+ */
+#ifndef XEN_GENERATING_COMPAT_HEADERS
+
 typedef enum {
     HVMMEM_ram_rw,             /* Normal read/write guest RAM */
     HVMMEM_ram_ro,             /* Read-only; writes are discarded */
@@ -101,6 +110,8 @@ typedef enum {
                                   this type are only allowed to be changed back
                                   to HVMMEM_ram_rw. */
 } hvmmem_type_t;
+
+#endif /* XEN_GENERATING_COMPAT_HEADERS */
 
 /* Hint from PV drivers for pagetable destruction. */
 #define HVMOP_pagetable_dying        9
@@ -215,27 +226,62 @@ struct xen_hvm_altp2m_vcpu_enable_notify {
 typedef struct xen_hvm_altp2m_vcpu_enable_notify xen_hvm_altp2m_vcpu_enable_notify_t;
 DEFINE_XEN_GUEST_HANDLE(xen_hvm_altp2m_vcpu_enable_notify_t);
 
+struct xen_hvm_altp2m_vcpu_disable_notify {
+    uint32_t vcpu_id;
+};
+typedef struct xen_hvm_altp2m_vcpu_disable_notify xen_hvm_altp2m_vcpu_disable_notify_t;
+DEFINE_XEN_GUEST_HANDLE(xen_hvm_altp2m_vcpu_disable_notify_t);
+
 struct xen_hvm_altp2m_view {
     /* IN/OUT variable */
     uint16_t view;
-    /* Create view only: default access type
-     * NOTE: currently ignored */
     uint16_t hvmmem_default_access; /* xenmem_access_t */
 };
 typedef struct xen_hvm_altp2m_view xen_hvm_altp2m_view_t;
 DEFINE_XEN_GUEST_HANDLE(xen_hvm_altp2m_view_t);
 
+#if __XEN_INTERFACE_VERSION__ < 0x00040a00
 struct xen_hvm_altp2m_set_mem_access {
     /* view */
     uint16_t view;
     /* Memory type */
-    uint16_t hvmmem_access; /* xenmem_access_t */
+    uint16_t access; /* xenmem_access_t */
     uint32_t pad;
     /* gfn */
     uint64_t gfn;
 };
 typedef struct xen_hvm_altp2m_set_mem_access xen_hvm_altp2m_set_mem_access_t;
 DEFINE_XEN_GUEST_HANDLE(xen_hvm_altp2m_set_mem_access_t);
+#endif /* __XEN_INTERFACE_VERSION__ < 0x00040a00 */
+
+struct xen_hvm_altp2m_mem_access {
+    /* view */
+    uint16_t view;
+    /* Memory type */
+    uint16_t access; /* xenmem_access_t */
+    uint32_t pad;
+    /* gfn */
+    uint64_t gfn;
+};
+typedef struct xen_hvm_altp2m_mem_access xen_hvm_altp2m_mem_access_t;
+DEFINE_XEN_GUEST_HANDLE(xen_hvm_altp2m_mem_access_t);
+
+struct xen_hvm_altp2m_set_mem_access_multi {
+    /* view */
+    uint16_t view;
+    uint16_t pad;
+    /* Number of pages */
+    uint32_t nr;
+    /*
+     * Used for continuation purposes.
+     * Must be set to zero upon initial invocation.
+     */
+    uint64_t opaque;
+    /* List of pfns to set access for */
+    XEN_GUEST_HANDLE(const_uint64) pfn_list;
+    /* Corresponding list of access settings for pfn_list */
+    XEN_GUEST_HANDLE(const_uint8) access_list;
+};
 
 struct xen_hvm_altp2m_change_gfn {
     /* view */
@@ -250,13 +296,24 @@ struct xen_hvm_altp2m_change_gfn {
 typedef struct xen_hvm_altp2m_change_gfn xen_hvm_altp2m_change_gfn_t;
 DEFINE_XEN_GUEST_HANDLE(xen_hvm_altp2m_change_gfn_t);
 
+struct xen_hvm_altp2m_get_vcpu_p2m_idx {
+    uint32_t vcpu_id;
+    uint16_t altp2m_idx;
+};
+
+struct xen_hvm_altp2m_set_visibility {
+    uint16_t altp2m_idx;
+    uint8_t visible;
+    uint8_t pad;
+};
+
 struct xen_hvm_altp2m_op {
     uint32_t version;   /* HVMOP_ALTP2M_INTERFACE_VERSION */
     uint32_t cmd;
 /* Get/set the altp2m state for a domain */
 #define HVMOP_altp2m_get_domain_state     1
 #define HVMOP_altp2m_set_domain_state     2
-/* Set the current VCPU to receive altp2m event notifications */
+/* Set a given VCPU to receive altp2m event notifications */
 #define HVMOP_altp2m_vcpu_enable_notify   3
 /* Create a new view */
 #define HVMOP_altp2m_create_p2m           4
@@ -268,15 +325,40 @@ struct xen_hvm_altp2m_op {
 #define HVMOP_altp2m_set_mem_access       7
 /* Change a p2m entry to have a different gfn->mfn mapping */
 #define HVMOP_altp2m_change_gfn           8
+/* Set access for an array of pages */
+#define HVMOP_altp2m_set_mem_access_multi 9
+/* Set the "Suppress #VE" bit on a page */
+#define HVMOP_altp2m_set_suppress_ve      10
+/* Get the "Suppress #VE" bit of a page */
+#define HVMOP_altp2m_get_suppress_ve      11
+/* Get the access of a page of memory from a certain view */
+#define HVMOP_altp2m_get_mem_access       12
+/* Disable altp2m event notifications for a given VCPU */
+#define HVMOP_altp2m_vcpu_disable_notify  13
+/* Get the active vcpu p2m index */
+#define HVMOP_altp2m_get_p2m_idx          14
+/* Set the "Supress #VE" bit for a range of pages */
+#define HVMOP_altp2m_set_suppress_ve_multi 15
+/* Set visibility for a given altp2m view */
+#define HVMOP_altp2m_set_visibility       16
     domid_t domain;
     uint16_t pad1;
     uint32_t pad2;
     union {
-        struct xen_hvm_altp2m_domain_state       domain_state;
-        struct xen_hvm_altp2m_vcpu_enable_notify enable_notify;
-        struct xen_hvm_altp2m_view               view;
-        struct xen_hvm_altp2m_set_mem_access     set_mem_access;
-        struct xen_hvm_altp2m_change_gfn         change_gfn;
+        struct xen_hvm_altp2m_domain_state         domain_state;
+        struct xen_hvm_altp2m_vcpu_enable_notify   enable_notify;
+        struct xen_hvm_altp2m_view                 view;
+#if __XEN_INTERFACE_VERSION__ < 0x00040a00
+        struct xen_hvm_altp2m_set_mem_access       set_mem_access;
+#endif /* __XEN_INTERFACE_VERSION__ < 0x00040a00 */
+        struct xen_hvm_altp2m_mem_access           mem_access;
+        struct xen_hvm_altp2m_change_gfn           change_gfn;
+        struct xen_hvm_altp2m_set_mem_access_multi set_mem_access_multi;
+        struct xen_hvm_altp2m_suppress_ve          suppress_ve;
+        struct xen_hvm_altp2m_suppress_ve_multi    suppress_ve_multi;
+        struct xen_hvm_altp2m_vcpu_disable_notify  disable_notify;
+        struct xen_hvm_altp2m_get_vcpu_p2m_idx     get_vcpu_p2m_idx;
+        struct xen_hvm_altp2m_set_visibility       set_visibility;
         uint8_t pad[64];
     } u;
 };

@@ -1,25 +1,8 @@
+/* SPDX-License-Identifier: MIT */
 /******************************************************************************
  * vcpu.h
- * 
+ *
  * VCPU initialisation, query, and hotplug.
- * 
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to
- * deal in the Software without restriction, including without limitation the
- * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
- * sell copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
- * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
- * DEALINGS IN THE SOFTWARE.
  *
  * Copyright (c) 2005, Keir Fraser <keir@xensource.com>
  */
@@ -38,9 +21,9 @@
  */
 
 /*
- * Initialise a VCPU. Each VCPU can be initialised only once. A 
+ * Initialise a VCPU. Each VCPU can be initialised only once. A
  * newly-initialised VCPU will not run until it is brought up by VCPUOP_up.
- * 
+ *
  * @extra_arg == For PV or ARM guests this is a pointer to a vcpu_guest_context
  *               structure containing the initial state for the VCPU. For x86
  *               HVM based guests this is a pointer to a vcpu_hvm_context
@@ -127,6 +110,8 @@ DEFINE_XEN_GUEST_HANDLE(vcpu_runstate_info_t);
  *     runstate.state will always be RUNSTATE_running and
  *     runstate.state_entry_time will indicate the system time at which the
  *     VCPU was last scheduled to run.
+ *  3. New code wants to prefer VCPUOP_register_runstate_phys_area, and only
+ *     fall back to the operation here for backwards compatibility.
  * @extra_arg == pointer to vcpu_register_runstate_memory_area structure.
  */
 #define VCPUOP_register_runstate_memory_area 5
@@ -167,11 +152,14 @@ typedef struct vcpu_set_singleshot_timer vcpu_set_singleshot_timer_t;
 DEFINE_XEN_GUEST_HANDLE(vcpu_set_singleshot_timer_t);
 
 /* Flags to VCPUOP_set_singleshot_timer. */
- /* Require the timeout to be in the future (return -ETIME if it's passed). */
+ /*
+  * Request the timeout to be in the future (return -ETIME if it's passed)
+  * but can be ignored by the hypervisor.
+  */
 #define _VCPU_SSHOTTMR_future (0)
 #define VCPU_SSHOTTMR_future  (1U << _VCPU_SSHOTTMR_future)
 
-/* 
+/*
  * Register a memory location in the guest address space for the
  * vcpu_info structure.  This allows the guest to place the vcpu_info
  * structure in a convenient place, such as in a per-cpu data area.
@@ -192,7 +180,7 @@ DEFINE_XEN_GUEST_HANDLE(vcpu_register_vcpu_info_t);
 /* Send an NMI to the specified VCPU. @extra_arg == NULL. */
 #define VCPUOP_send_nmi             11
 
-/* 
+/*
  * Get the physical ID information for a pinned vcpu's underlying physical
  * processor.  The physical ID informmation is architecture-specific.
  * On x86: id[31:0]=apic_id, id[63:32]=acpi_id.
@@ -207,7 +195,7 @@ DEFINE_XEN_GUEST_HANDLE(vcpu_get_physid_t);
 #define xen_vcpu_physid_to_x86_apicid(physid) ((uint32_t)(physid))
 #define xen_vcpu_physid_to_x86_acpiid(physid) ((uint32_t)((physid) >> 32))
 
-/* 
+/*
  * Register a memory location to get a secondary copy of the vcpu time
  * parameters.  The master copy still exists as part of the vcpu shared
  * memory area, and this secondary copy is updated whenever the master copy
@@ -220,6 +208,9 @@ DEFINE_XEN_GUEST_HANDLE(vcpu_get_physid_t);
  * which allows it to get the current vcpu number (such as via a
  * segment limit).  It can then apply the normal algorithm to compute
  * system time from the tsc.
+ *
+ * New code wants to prefer VCPUOP_register_vcpu_time_phys_area, and only
+ * fall back to the operation here for backwards compatibility.
  *
  * @extra_arg == pointer to vcpu_register_time_info_memory_area structure.
  */
@@ -234,6 +225,23 @@ struct vcpu_register_time_memory_area {
 };
 typedef struct vcpu_register_time_memory_area vcpu_register_time_memory_area_t;
 DEFINE_XEN_GUEST_HANDLE(vcpu_register_time_memory_area_t);
+
+/*
+ * Like the respective VCPUOP_register_*_memory_area, just using the "addr.p"
+ * field of the supplied struct as a guest physical address (i.e. in GFN space).
+ * The respective area may not cross a page boundary.  Pass ~0 to unregister an
+ * area.  Note that as long as an area is registered by physical address, the
+ * linear address based area will not be serviced (updated) by the hypervisor.
+ *
+ * Note that the area registered via VCPUOP_register_runstate_memory_area will
+ * be updated in the same manner as the one registered via virtual address PLUS
+ * VMASST_TYPE_runstate_update_flag engaged by the domain.
+ *
+ * XENFEAT_{runstate,vcpu_time}_phys_area feature bits signal the availability
+ * of these ops.
+ */
+#define VCPUOP_register_runstate_phys_area      14
+#define VCPUOP_register_vcpu_time_phys_area     15
 
 #endif /* __XEN_PUBLIC_VCPU_H__ */
 

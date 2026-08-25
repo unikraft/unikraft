@@ -474,8 +474,23 @@ ENDPROC(_libxenplat_setup_idmap_pgtable)
 	ldr     \xreg, [sp], #8
 	.endm
 
+/*
+ * Exception trap frame layout (must match struct uk_plat_native_regs):
+ *
+ *   Offset   Content
+ *   0-232    x0-x29
+ *   240      x30 (lr)
+ *   248      elr_el1
+ *   256      spsr_el1
+ *   264      esr_el1
+ *   272      sp
+ *   280      pad
+ *
+ *   Total: 288 bytes
+ */
+
 	.macro trap_entry, el
-	sub     sp, sp, #32             // room for LR, SP, SPSR, ELR
+	sub     sp, sp, #48             // room for LR, ELR, SPSR, ESR, SP, pad
 	push    x29
 	push    x28
 	push    x27
@@ -506,22 +521,33 @@ ENDPROC(_libxenplat_setup_idmap_pgtable)
 	push    x2
 	push    x1
 	push    x0
+
+	/* Save LR and ELR_EL1 at offsets 240, 248 */
+	mrs     x21, elr_el1
+	stp     x30, x21, [sp, #240]
+
+	/* Save SPSR_EL1 and ESR_EL1 at offsets 256, 264 */
+	mrs     x22, spsr_el1
+	mrs     x23, esr_el1
+	stp     x22, x23, [sp, #256]
+
+	/* Save SP at offset 272 */
 	.if     \el == 0
 	mrs     x21, sp_el0
 	.else
-	add     x21, sp, #272
+	add     x21, sp, #288
 	.endif
-	mrs     x22, elr_el1
-	mrs     x23, spsr_el1
-	stp     x30, x21, [sp, #240]
-	stp     x22, x23, [sp, #256]
+	str     x21, [sp, #272]
 	.endm
 
 	.macro trap_exit, el
-	ldp     x21, x22, [sp, #256]    // load ELR, SPSR
+	/* Load ELR, SPSR from frame (offsets 248, 256) */
+	ldp     x21, x22, [sp, #248]
+
 	.if     \el == 0
-	ldr     x23, [sp, #248]         // load return stack pointer
+	ldr     x23, [sp, #272]         // load saved SP
 	.endif
+
 	pop     x0
 	pop     x1
 	pop     x2
@@ -532,11 +558,13 @@ ENDPROC(_libxenplat_setup_idmap_pgtable)
 	pop     x7
 	pop     x8
 	pop     x9
-	msr     elr_el1, x21            // set up the return data
-	msr     spsr_el1, x22
+
+	msr     elr_el1, x21            // restore ELR
+	msr     spsr_el1, x22           // restore SPSR
 	.if     \el == 0
 	msr     sp_el0, x23
 	.endif
+
 	pop     x10
 	pop     x11
 	pop     x12
@@ -557,7 +585,7 @@ ENDPROC(_libxenplat_setup_idmap_pgtable)
 	pop     x27
 	pop     x28
 	pop     x29
-	ldr     x30, [sp], #32
+	ldr     x30, [sp], #48          // restore LR and free remaining frame
 	.endm
 
 /*
@@ -578,8 +606,8 @@ ENTRY(vector_table)
 
 	/* Current EL with SPx */
 	ventry el1_sync                 // Synchronous EL1h
-	ventry el1_irq                  // IRQ EL1h    ventry el1_fiq_invalid
-	                                // FIQ EL1h
+	ventry el1_irq                  // IRQ EL1h
+	ventry el1_fiq_invalid          // FIQ EL1h
 	ventry el1_error_invalid        // Error EL1h
 
 	/* Lower EL using AArch64 */
@@ -602,6 +630,7 @@ END(vector_table)
 el1_sync:
 	trap_entry 1
 	mov     x0, sp
+	mrs     x1, far_el1
 	bl      uk_plat_native_except_err_handler
 	trap_exit 1
 	eret
@@ -620,6 +649,7 @@ ENDPROC(el1_irq)
 el0_sync:
 	trap_entry 0
 	mov     x0, sp
+	mrs     x1, far_el1
 	bl      uk_plat_native_except_err_handler
 	trap_exit 0
 	eret
@@ -642,42 +672,45 @@ ENDPROC(el0_irq)
 #define BAD_FIQ     2
 #define BAD_ERROR   3
 
-	.macro invalid, reason
+	.macro invalid, el, reason
+	trap_entry \el
 	mov     x0, sp
-	mov     x1, #\reason
+	mov     x1, #\el
+	mov     x2, #\reason
+	mrs     x3, far_el1
 	b       uk_plat_native_except_inv_handler
 	.endm
 
 el0_sync_invalid:
-	invalid BAD_SYNC
+	invalid 0, BAD_SYNC
 ENDPROC(el0_sync_invalid)
 
 el0_irq_invalid:
-	invalid BAD_IRQ
+	invalid 0, BAD_IRQ
 ENDPROC(el0_irq_invalid)
 
 el0_fiq_invalid:
-	invalid BAD_FIQ
+	invalid 0, BAD_FIQ
 ENDPROC(el0_fiq_invalid)
 
 el0_error_invalid:
-	invalid BAD_ERROR
+	invalid 0, BAD_ERROR
 ENDPROC(el0_error_invalid)
 
 el1_sync_invalid:
-	invalid BAD_SYNC
+	invalid 1, BAD_SYNC
 ENDPROC(el1_sync_invalid)
 
 el1_irq_invalid:
-	invalid BAD_IRQ
+	invalid 1, BAD_IRQ
 ENDPROC(el1_irq_invalid)
 
 el1_fiq_invalid:
-	invalid BAD_FIQ
+	invalid 1, BAD_FIQ
 ENDPROC(el1_fiq_invalid)
 
 el1_error_invalid:
-	invalid BAD_ERROR
+	invalid 1, BAD_ERROR
 ENDPROC(el1_error_invalid)
 
 ENTRY(thread_starter)

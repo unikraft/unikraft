@@ -1,3 +1,5 @@
+/* SPDX-License-Identifier: MIT */
+
 /*
  * There are two expected ways of including this header.
  *
@@ -15,6 +17,7 @@
  * will unilaterally #undef XEN_ERRNO().
  */
 
+/* SAF-8-safe inclusion procedure left to caller */
 #ifndef XEN_ERRNO
 
 /*
@@ -29,7 +32,7 @@
 
 #ifndef __ASSEMBLY__
 
-#define XEN_ERRNO(name, value) XEN_##name = value,
+#define XEN_ERRNO(name, value) XEN_##name = (value),
 enum xen_errno {
 
 #elif __XEN_INTERFACE_VERSION__ < 0x00040700
@@ -78,6 +81,7 @@ XEN_ERRNO(EBUSY,	16)	/* Device or resource busy */
 XEN_ERRNO(EEXIST,	17)	/* File exists */
 XEN_ERRNO(EXDEV,	18)	/* Cross-device link */
 XEN_ERRNO(ENODEV,	19)	/* No such device */
+XEN_ERRNO(ENOTDIR,	20)	/* Not a directory */
 XEN_ERRNO(EISDIR,	21)	/* Is a directory */
 XEN_ERRNO(EINVAL,	22)	/* Invalid argument */
 XEN_ERRNO(ENFILE,	23)	/* File table overflow */
@@ -102,6 +106,7 @@ XEN_ERRNO(EILSEQ,	84)	/* Illegal byte sequence */
 XEN_ERRNO(ERESTART,	85)	/* Interrupted system call should be restarted */
 #endif
 XEN_ERRNO(ENOTSOCK,	88)	/* Socket operation on non-socket */
+XEN_ERRNO(EMSGSIZE,	90)	/* Message too large. */
 XEN_ERRNO(EOPNOTSUPP,	95)	/* Operation not supported on transport endpoint */
 XEN_ERRNO(EADDRINUSE,	98)	/* Address already in use */
 XEN_ERRNO(EADDRNOTAVAIL, 99)	/* Cannot assign requested address */
@@ -109,6 +114,7 @@ XEN_ERRNO(ENOBUFS,	105)	/* No buffer space available */
 XEN_ERRNO(EISCONN,	106)	/* Transport endpoint is already connected */
 XEN_ERRNO(ENOTCONN,	107)	/* Transport endpoint is not connected */
 XEN_ERRNO(ETIMEDOUT,	110)	/* Connection timed out */
+XEN_ERRNO(ECONNREFUSED,	111)	/* Connection refused */
 
 #undef XEN_ERRNO
 #endif /* XEN_ERRNO */

@@ -1,23 +1,6 @@
+/* SPDX-License-Identifier: MIT */
 /*
  * fbif.h -- Xen virtual frame buffer device
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to
- * deal in the Software without restriction, including without limitation the
- * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
- * sell copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
- * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
- * DEALINGS IN THE SOFTWARE.
  *
  * Copyright (C) 2005 Anthony Liguori <aliguori@us.ibm.com>
  * Copyright (C) 2006 Red Hat, Inc., Markus Armbruster <armbru@redhat.com>
@@ -142,9 +125,9 @@ struct xenfb_page
     /*
      * Framebuffer page directory
      *
-     * Each directory page holds UK_PAGING_PAGE_SIZE / sizeof(*pd)
-     * framebuffer pages, and can thus map up to UK_PAGING_PAGE_SIZE *
-     * UK_PAGING_PAGE_SIZE / sizeof(*pd) bytes.  With UK_PAGING_PAGE_SIZE == 4096 and
+     * Each directory page holds PAGE_SIZE / sizeof(*pd)
+     * framebuffer pages, and can thus map up to PAGE_SIZE *
+     * PAGE_SIZE / sizeof(*pd) bytes.  With PAGE_SIZE == 4096 and
      * sizeof(unsigned long) == 4/8, that's 4 Megs 32 bit and 2 Megs
      * 64 bit.  256 directories give enough room for a 512 Meg
      * framebuffer with a max resolution of 12,800x10,240.  Should

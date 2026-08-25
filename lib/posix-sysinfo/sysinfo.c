@@ -36,6 +36,7 @@
 #include <errno.h>
 #include <string.h>
 #include <sys/utsname.h>
+#include <time.h>
 #include <uk/essentials.h>
 #include <uk/config.h>
 #include <sys/sysinfo.h>
@@ -125,6 +126,8 @@ long sysconf(int name)
 
 	if (name == _SC_PAGESIZE)
 		return __PAGE_SIZE;
+	if (name == _SC_CLK_TCK)
+		return CLOCKS_PER_SEC;
 
 #ifdef CONFIG_LIBPOSIX_USER
 	if (name == _SC_GETPW_R_SIZE_MAX)

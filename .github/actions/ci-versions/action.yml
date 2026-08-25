@@ -1,0 +1,14 @@
+name: 'ci-versions'
+description: 'Export tool versions shared across CI workflows.'
+
+runs:
+  using: composite
+  steps:
+    - name: "Export versions"
+      shell: bash
+      run: |
+        set -eu
+        {
+          echo 'CLANG_VERSION=21'
+          echo 'CODECHECKER_VERSION=6.27.3'
+        } >> "$GITHUB_ENV"

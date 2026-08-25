@@ -1,24 +1,7 @@
+/* SPDX-License-Identifier: MIT */
 /*
  * ioreq.h: I/O request definitions for device models
  * Copyright (c) 2004, Intel Corporation.
- * 
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to
- * deal in the Software without restriction, including without limitation the
- * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
- * sell copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
- * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
- * DEALINGS IN THE SOFTWARE.
  */
 
 #ifndef _IOREQ_H_
@@ -45,7 +28,7 @@
  *
  * For I/O type IOREQ_TYPE_PCI_CONFIG, the physical address is formatted
  * as follows:
- * 
+ *
  * 63....48|47..40|39..35|34..32|31........0
  * SEGMENT |BUS   |DEV   |FN    |OFFSET
  */
@@ -57,7 +40,7 @@ struct ioreq {
     uint32_t vp_eport;      /* evtchn for notifications to/from device model */
     uint16_t _pad0;
     uint8_t state:4;
-    uint8_t data_is_ptr:1;  /* if 1, data above is the guest paddr 
+    uint8_t data_is_ptr:1;  /* if 1, data above is the guest paddr
                              * of the real data to use. */
     uint8_t dir:1;          /* 1=read, 0=write */
     uint8_t df:1;
@@ -99,7 +82,7 @@ struct buffered_iopage {
 typedef struct buffered_iopage buffered_iopage_t;
 
 /*
- * ACPI Control/Event register locations. Location is controlled by a 
+ * ACPI Control/Event register locations. Location is controlled by a
  * version number in HVM_PARAM_ACPI_IOPORTS_LOCATION.
  */
 

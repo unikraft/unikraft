@@ -54,6 +54,7 @@ extern "C" {
  * Sysconf name values
  */
 #if CONFIG_LIBPOSIX_SYSINFO
+#define _SC_CLK_TCK           2
 #define _SC_OPEN_MAX          4
 #define _SC_PAGE_SIZE        30
 #define _SC_PAGESIZE         _SC_PAGE_SIZE
