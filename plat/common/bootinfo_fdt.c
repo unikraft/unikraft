@@ -54,7 +54,13 @@ static void fdt_bootinfo_mem_mrd(struct ukplat_bootinfo *bi, void *fdtp)
 
 	/* Check that we are not placed at the top of the memory region */
 	mrd.len = __BASE_ADDR - mem_base;
+
+	/* 0x80000000 is the default location for OpenSBI */
+#ifdef CONFIG_ARCH_RISCV_64
+	if (!mrd.len || mem_base == 0x80000000)
+#else
 	if (!mrd.len)
+#endif
 		goto end_mrd;
 
 	mrd.pbase = (__paddr_t)UK_PAGING_PAGE_ALIGN_DOWN(mem_base);

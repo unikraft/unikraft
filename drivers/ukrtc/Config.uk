@@ -1,5 +1,6 @@
 menu "Real Time Clock"
 
 source "$(KCONFIG_DRIV_BASE)/ukrtc/pl031/Config.uk"
+source "$(KCONFIG_DRIV_BASE)/ukrtc/goldfish/Config.uk"
 
 endmenu
