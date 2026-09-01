@@ -1,11 +1,11 @@
 SECTIONS
 {
-	.uk_tracepoints_list : {
+	.uk_tracepoints_list (INFO) : {
 		uk_tracepoints_start = .;
 		KEEP (*(.uk_tracepoints_list));
 		uk_tracepoints_end = .;
 	}
-	.uk_trace_keyvals : {
+	.uk_trace_keyvals (INFO) : {
 		KEEP (*(.uk_trace_keyvals));
 	}
 }
