@@ -375,7 +375,8 @@ void uk_print_console_write(struct uk_print_msg *msg)
 #endif /* CONFIG_LIBUKPRINT_PRINT_CALLER */
 			if (libname) {
 				vprint_cout(cons, LVLC_RESET LVLC_LIBNAME "[",
-					    sizeof(LVLC_RESET LVLC_LIBNAME));
+					sizeof(LVLC_RESET LVLC_LIBNAME "[")
+						- 1);
 				vprint_cout(cons, DECONST(char *, libname),
 					    strlen(libname));
 				vprint_cout(cons, "] ", 2);
@@ -385,7 +386,8 @@ void uk_print_console_write(struct uk_print_msg *msg)
 				char lnobuf[6];
 
 				vprint_cout(cons, LVLC_RESET LVLC_SRCNAME "<",
-					    sizeof(LVLC_RESET LVLC_SRCNAME));
+					sizeof(LVLC_RESET LVLC_SRCNAME "<")
+						- 1);
 				vprint_cout(cons, DECONST(char *, msg->srcname),
 					    strlen(msg->srcname));
 				vprint_cout(cons, " @ ", 3);
@@ -410,18 +412,24 @@ void uk_print_console_write(struct uk_print_msg *msg)
 		switch (lvl) {
 		case UK_PRINT_KLVL_CRIT:
 			vprint_cout(cons, LVLC_RESET LVLC_CRIT_MSG,
-				    sizeof(LVLC_RESET LVLC_CRIT_MSG));
+				    sizeof(LVLC_RESET LVLC_CRIT_MSG) - 1);
 			break;
 		case UK_PRINT_KLVL_ERR:
 			vprint_cout(cons, LVLC_RESET LVLC_ERROR_MSG,
-				    sizeof(LVLC_RESET LVLC_ERROR_MSG));
+				    sizeof(LVLC_RESET LVLC_ERROR_MSG) - 1);
 			break;
 		default:
-			vprint_cout(cons, LVLC_RESET, sizeof(LVLC_RESET));
+			vprint_cout(cons, LVLC_RESET, sizeof(LVLC_RESET) - 1);
 		}
-		vprint_cout(cons, (char *)lptr, llen);
-		vprint_cout(cons, LVLC_RESET, sizeof(LVLC_RESET));
-
+		/* Write the reset before the trailing '\n' so consoles that
+		 * flush on newline (e.g. Xen vpl011) keep the reset on the
+		 * same line and colors do not bleed to the next line.
+		 * Order: body -> reset -> '\n'.
+		 */
+		vprint_cout(cons, (char *)lptr, nlptr ? llen - 1 : llen);
+		vprint_cout(cons, LVLC_RESET, sizeof(LVLC_RESET) - 1);
+		if (nlptr)
+			vprint_cout(cons, "\n", 1);
 		len -= llen;
 		lptr = nlptr ? nlptr + 1 : lptr + llen;
 	}
@@ -501,7 +509,7 @@ __isr void uk_print_console_write_isr(struct uk_print_msg *msg)
 				vprint_cout_isr(cons,
 						LVLC_RESET LVLC_LIBNAME "[",
 						sizeof(LVLC_RESET
-						       LVLC_LIBNAME));
+						       LVLC_LIBNAME "[") - 1);
 				vprint_cout_isr(cons, DECONST(char *, libname),
 						strlen_isr(libname));
 				vprint_cout_isr(cons, "] ", 2);
@@ -513,7 +521,7 @@ __isr void uk_print_console_write_isr(struct uk_print_msg *msg)
 				vprint_cout_isr(cons,
 						LVLC_RESET LVLC_SRCNAME "<",
 						sizeof(LVLC_RESET
-						       LVLC_SRCNAME));
+						       LVLC_SRCNAME "<") - 1);
 				vprint_cout_isr(cons,
 						DECONST(char *, msg->srcname),
 						strlen_isr(msg->srcname));
@@ -541,17 +549,21 @@ __isr void uk_print_console_write_isr(struct uk_print_msg *msg)
 		switch (lvl) {
 		case UK_PRINT_KLVL_CRIT:
 			vprint_cout_isr(cons, LVLC_RESET LVLC_CRIT_MSG,
-					sizeof(LVLC_RESET LVLC_CRIT_MSG));
+					sizeof(LVLC_RESET LVLC_CRIT_MSG) - 1);
 			break;
 		case UK_PRINT_KLVL_ERR:
 			vprint_cout_isr(cons, LVLC_RESET LVLC_ERROR_MSG,
-					sizeof(LVLC_RESET LVLC_ERROR_MSG));
+					sizeof(LVLC_RESET LVLC_ERROR_MSG) - 1);
 			break;
 		default:
-			vprint_cout_isr(cons, LVLC_RESET, sizeof(LVLC_RESET));
+			vprint_cout_isr(cons, LVLC_RESET,
+					sizeof(LVLC_RESET) - 1);
 		}
-		vprint_cout_isr(cons, (char *)lptr, llen);
-		vprint_cout_isr(cons, LVLC_RESET, sizeof(LVLC_RESET));
+		/* Write the reset before the trailing '\n' (see non-ISR). */
+		vprint_cout_isr(cons, (char *)lptr, nlptr ? llen - 1 : llen);
+		vprint_cout_isr(cons, LVLC_RESET, sizeof(LVLC_RESET) - 1);
+		if (nlptr)
+			vprint_cout_isr(cons, "\n", 1);
 
 		len -= llen;
 		lptr = nlptr ? nlptr + 1 : lptr + llen;
