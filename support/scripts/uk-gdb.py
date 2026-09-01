@@ -36,10 +36,11 @@ import os
 import sys
 import tempfile
 import shutil
-import uk_trace.parse as parse
 
 scripts_dir = os.path.dirname(os.path.realpath(__file__))
 sys.path.append(scripts_dir)
+
+import uk_trace.parse as parse
 
 type_char = gdb.lookup_type("char")
 type_void = gdb.lookup_type("void")
@@ -59,14 +60,12 @@ def get_trace_buffer():
         gdb.write("Error getting the trace buffer. Is tracing enabled?\n")
         raise gdb.error
 
-    if trace_buff_writep == 0:
-        # This can happen as effect of compile optimization if none of
-        # tracepoints were called
-        used = 0
-    else:
-        used = trace_buff_writep - trace_buff_addr
+    # trace_buff_writep might be 0 when no trace sample has been emitted yet
+    # because of compiler optimization. Consider it as empty in that case.
+    used = trace_buff_writep - trace_buff_addr if trace_buff_writep else 0
 
-    return bytes(inf.read_memory(trace_buff_addr, used))
+    # gdb doesn't like reading 0 bytes
+    return bytes(inf.read_memory(trace_buff_addr, used)) if used else b""
 
 
 def save_traces(out):
@@ -80,7 +79,6 @@ def save_traces(out):
     # versions should just have modifications at the very end to keep
     # compatibility with previously collected data.
     pickler.dump(parse.get_keyvals(elf))
-    pickler.dump(elf)
     pickler.dump(PTR_SIZE)
     # We are saving raw trace buffer here. Another option is to pickle
     # already parsed samples. But in the chosen case it is a lot
