@@ -36,10 +36,11 @@ import os
 import sys
 import tempfile
 import shutil
-import uk_trace.parse as parse
 
 scripts_dir = os.path.dirname(os.path.realpath(__file__))
 sys.path.append(scripts_dir)
+
+import uk_trace.parse as parse
 
 type_char = gdb.lookup_type("char")
 type_void = gdb.lookup_type("void")
@@ -80,7 +81,6 @@ def save_traces(out):
     # versions should just have modifications at the very end to keep
     # compatibility with previously collected data.
     pickler.dump(parse.get_keyvals(elf))
-    pickler.dump(elf)
     pickler.dump(PTR_SIZE)
     # We are saving raw trace buffer here. Another option is to pickle
     # already parsed samples. But in the chosen case it is a lot
