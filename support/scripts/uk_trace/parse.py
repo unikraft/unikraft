@@ -207,9 +207,10 @@ def get_tp_definitions(tp_data, ptr_size):
 
 def get_tp_sections(elf):
     f = tempfile.NamedTemporaryFile()
-    objcopy_cmd = "objcopy -O binary %s " % elf
-    objcopy_cmd += "--only-section=.uk_tracepoints_list " + f.name
-    objcopy_cmd = objcopy_cmd.split()
+    # NOTE: When reading a cross-architecture ELF file, make sure the objcopy utility supports that architecture.
+    objcopy_cmd = ["objcopy",
+                   "--dump-section", ".uk_tracepoints_list=" + f.name,
+                   elf, "/dev/null"]
     subprocess.check_call(objcopy_cmd)
     return f.read()
 
