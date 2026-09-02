@@ -29,11 +29,12 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+
+import binascii
 import struct
 import sys
 import subprocess
 import re
-import tempfile
 
 TP_HEADER_MAGIC = "TRhd"
 TP_DEF_MAGIC = "TPde"
@@ -206,13 +207,16 @@ def get_tp_definitions(tp_data, ptr_size):
 
 
 def get_tp_sections(elf):
-    f = tempfile.NamedTemporaryFile()
-    objcopy_cmd = "objcopy -O binary %s " % elf
-    objcopy_cmd += "--only-section=.uk_tracepoints_list " + f.name
-    objcopy_cmd = objcopy_cmd.split()
-    subprocess.check_call(objcopy_cmd)
-    return f.read()
+    hexdump_reg = re.compile(r" *0x[0-9a-f]+(?P<hex>( [0-9a-f]{8}){1,4})")
+    readelf_cmd = ["readelf", "-x", ".uk_tracepoints_list", elf]
+    readelf_output = subprocess.check_output(readelf_cmd).decode()
 
+    hex = "".join(
+        m["hex"]
+        for line in readelf_output.splitlines()
+        if (m := hexdump_reg.match(line))
+    ).replace(" ", "")
+    return binascii.unhexlify(hex)
 
 def get_keyvals(elf):
     readelf_cmd = "readelf -p .uk_trace_keyvals %s" % elf
