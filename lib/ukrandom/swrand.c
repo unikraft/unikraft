@@ -96,7 +96,7 @@ int uk_swrand_cmdline_init(struct uk_random_driver **drv)
 
 	ctx.driver = *drv;
 
-	chacha_init(&ctx.chacha, seedv, iv, 0);
+	chacha_init(&ctx.chacha, seedv_cmdl, iv, 0);
 
 	return 0;
 }
