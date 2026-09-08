@@ -173,7 +173,7 @@ void uk_plat_xen_except_irq_ctx_set_regs(
 }
 
 __isr static inline
-__u64 uk_plat_xen_except_irq_ctx_get_irq(
+__u32 uk_plat_xen_except_irq_ctx_get_irq(
 	const struct uk_plat_xen_except_irq_ctx *ctx)
 {
 	return ctx->irq;
