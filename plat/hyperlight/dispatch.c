@@ -435,12 +435,16 @@ hyperlight_dispatch_prefault(void)
  *
  * Hyperlight's snapshot/restore preserves segment registers and
  * control registers (via CommonSpecialRegisters) but does NOT
- * save or restore MSRs like LSTAR, STAR, and SYSCALL_MASK.  The
- * standard Hyperlight guest uses OUT/HLT instead of SYSCALL, so
- * this was never needed.  Unikraft programs these MSRs during
- * boot (setup.c) to support ring-3 ELFs via elfloader.  After
- * snapshot/restore they default to 0, causing any SYSCALL to
- * jump to RIP=0.
+ * save or restore the declared guest MSRs (LSTAR, STAR,
+ * SYSCALL_MASK) — they are reset to their baseline (0) on restore.
+ * The standard Hyperlight guest uses OUT/HLT instead of SYSCALL, so
+ * this was never needed.  Unikraft programs these MSRs during boot
+ * (setup.c) to support ring-3 ELFs via elfloader.  After
+ * snapshot/restore they are 0, causing any SYSCALL to jump to RIP=0.
+ *
+ * EFER is NOT re-programmed here: hyperlight restores it (with SCE)
+ * as part of the special-register state, and it cannot be written by
+ * the guest under the 0.17.0 default-deny MSR filter — see setup.c.
  *
  * Called from the snapshot fixup path in hyperlight_dispatch_function.
  */
@@ -452,11 +456,6 @@ void __attribute__((used))
 hyperlight_dispatch_fixup_syscall(void)
 {
 #ifdef CONFIG_HAVE_SYSCALL
-	uk_arch_x86_64_wrmsrl(UK_ARCH_X86_64_MSR_EFER,
-		uk_arch_x86_64_rdmsrl(UK_ARCH_X86_64_MSR_EFER) |
-		UK_ARCH_X86_64_EFER_LMA |
-		UK_ARCH_X86_64_EFER_LME |
-		UK_ARCH_X86_64_EFER_SCE);
 	uk_arch_x86_64_wrmsrl(UK_ARCH_X86_64_MSR_STAR,
 		(0x08ULL << 48) | (0x08ULL << 32));
 	uk_arch_x86_64_wrmsrl(UK_ARCH_X86_64_MSR_LSTAR,

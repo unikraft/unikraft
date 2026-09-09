@@ -136,16 +136,21 @@ static void _ukplat_entry(struct ukplat_bootinfo *bi)
 	/*
 	 * Program SYSCALL MSRs so ring-3 apps (e.g. via elfloader's
 	 * execve) can transition to ring-0 via the syscall instruction.
-	 * Same setup as plat/kvm/x86/setup.c.
+	 * Same setup as plat/kvm/x86/setup.c, minus EFER.
+	 *
+	 * EFER is deliberately NOT touched here.  Hyperlight already
+	 * enters the guest with EFER = LME|LMA|SCE|NX (it is part of the
+	 * host-programmed special-register state), so SCE is on before we
+	 * run.  From hyperlight 0.17.0 the vCPU also runs behind a
+	 * default-deny KVM MSR filter that only permits the MSRs the host
+	 * declares via SandboxConfiguration::guest_msrs(); EFER cannot be
+	 * declared (it is sregs state, not a resettable MSR), so a guest
+	 * rdmsr/wrmsr of it faults with #GP.  STAR/LSTAR/SYSCALL_MASK are
+	 * declared by the host and remain writable here.
 	 */
 	{
 		extern void _ukplat_syscall(void);
 
-		uk_arch_x86_64_wrmsrl(UK_ARCH_X86_64_MSR_EFER,
-			uk_arch_x86_64_rdmsrl(UK_ARCH_X86_64_MSR_EFER) |
-			UK_ARCH_X86_64_EFER_LMA |
-			UK_ARCH_X86_64_EFER_LME |
-			UK_ARCH_X86_64_EFER_SCE);
 		uk_arch_x86_64_wrmsrl(UK_ARCH_X86_64_MSR_STAR,
 			(0x08ULL << 48) | (0x08ULL << 32));
 		uk_arch_x86_64_wrmsrl(UK_ARCH_X86_64_MSR_LSTAR,
