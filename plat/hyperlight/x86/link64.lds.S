@@ -19,12 +19,16 @@
 #define UK_SEGMENT_TLS_LOAD :data
 
 /*
- * Hyperlight loads guest code at BASE_ADDRESS (0x1000, defined in
- * hyperlight-host layout.rs).  Address 0x0 is a NULL guard page.
- * We link at the actual load address so absolute references in
- * non-PIE code resolve correctly without relocations.
+ * Hyperlight loads guest code at BASE_ADDRESS.  This kernel is a
+ * non-PIE ET_EXEC with no relocations, so it must be *linked* at the
+ * exact address Hyperlight loads it at — otherwise every absolute
+ * reference resolves to the wrong place and the guest faults on the
+ * first non-relative jump.
+ *
+ * BASE_ADDR must therefore track `SandboxMemoryLayout::BASE_ADDRESS`
+ * in hyperlight-host (src/mem/layout.rs).
  */
-#define BASE_ADDR 0x1000
+#define BASE_ADDR 0x4000
 
 /*
  * Program headers.  Hyperlight reads these to determine memory
