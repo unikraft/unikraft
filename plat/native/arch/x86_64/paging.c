@@ -22,7 +22,9 @@ int uk_plat_native_paging_init(void)
 {
 	__u32 eax, ebx, ecx, edx;
 	__u32 max_addr_bit;
+#ifndef CONFIG_PLAT_HYPERLIGHT
 	__u64 efer;
+#endif
 
 	/* Check for availability of extended features */
 	uk_arch_x86_64_cpuid(0x80000000, 0, &eax, &ebx, &ecx, &edx);
@@ -40,10 +42,20 @@ int uk_plat_native_paging_init(void)
 		return -ENOTSUP;
 	}
 
-	/* Enable the NX bit */
+	/*
+	 * Enable the NX bit.
+	 *
+	 * The hyperlight platform skips this: the host programs EFER (NX
+	 * included) as part of the guest special-register state, and from
+	 * hyperlight 0.17.0 the vCPU runs behind a default-deny KVM MSR
+	 * filter that faults (#GP) on any guest EFER access.  Rely on the
+	 * host-provided EFER there.  See plat/hyperlight/x86/setup.c.
+	 */
+#ifndef CONFIG_PLAT_HYPERLIGHT
 	efer = uk_arch_x86_64_rdmsrl(UK_ARCH_X86_64_MSR_EFER);
 	efer |= UK_ARCH_X86_64_EFER_NXE;
 	uk_arch_x86_64_wrmsrl(UK_ARCH_X86_64_MSR_EFER, efer);
+#endif
 
 #if UK_PLAT_NATIVE_PT_LEVELS == 5
 	uk_arch_x86_64_cpuid(0x7, 0, &eax, &ebx, &ecx, &edx);
