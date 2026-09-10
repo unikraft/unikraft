@@ -508,6 +508,14 @@ hyperlight_dispatch_function(void)
 		/*
 		 * Load RSP from the scratch exception stack top.
 		 * The value was queried from the host at init.
+		 *
+		 * On the normal dispatch path (ZF=0) the TLB is valid,
+		 * so this read of the BSS variable is correct.  On the
+		 * snapshot/restore path (ZF=1) the vCPU may be reused
+		 * with a STALE TLB (in-place MultiUseSandbox::restore
+		 * relocates the page tables into fresh scratch but does
+		 * not flush our TLB), so this read can return a stale
+		 * value — we re-load it below after flushing the TLB.
 		 */
 		"movq g_exn_stack_top(%%rip), %%rsp\n\t"
 
@@ -524,6 +532,16 @@ hyperlight_dispatch_function(void)
 		 */
 		"movq %%cr3, %%rax\n\t"
 		"movq %%rax, %%cr3\n\t"
+
+		/*
+		 * Re-load RSP from g_exn_stack_top now that the TLB is
+		 * fresh: the load above may have used a stale entry that
+		 * mapped the BSS to a pre-restore physical page, yielding
+		 * 0 and a wild RSP (→ #PF on the sidt below → triple
+		 * fault).  With the TLB flushed this reads the restored
+		 * value from the new page tables.
+		 */
+		"movq g_exn_stack_top(%%rip), %%rsp\n\t"
 
 		/* Save the original IDTR (10 bytes, 16 allocated). */
 		"subq $16, %%rsp\n\t"
