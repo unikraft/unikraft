@@ -50,30 +50,6 @@ __paddr_t pgarch_directmap_vaddr_to_paddr(__vaddr_t vaddr)
 	return (__paddr_t)(vaddr - PGARCH_DIRECTMAP_AREA_START);
 }
 
-/*
- * Page tables
- */
-static inline
-__vaddr_t pgarch_pt_pte_to_vaddr(struct uk_pagetable *pt __unused, __pte_t pte,
-				 unsigned int level __maybe_unused)
-{
-	return pgarch_directmap_paddr_to_vaddr(UK_PAL_PT_Lx_PTE_PADDR(pte, level));
-}
-
-static inline
-__vaddr_t pgarch_pt_map(struct uk_pagetable *pt __unused,
-			__paddr_t pt_paddr, unsigned int level __unused)
-{
-	return pgarch_directmap_paddr_to_vaddr(pt_paddr);
-}
-
-static inline
-__paddr_t pgarch_pt_unmap(struct uk_pagetable *pt __unused,
-			  __vaddr_t pt_vaddr, unsigned int level __unused)
-{
-	return pgarch_directmap_vaddr_to_paddr(pt_vaddr);
-}
-
 /* Temporary kernel mapping */
 static inline
 __vaddr_t pgarch_kmap(struct uk_pagetable *pt __unused,
