@@ -21,6 +21,7 @@
 #include <uk/falloc.h>
 #include <uk/paging/arch.h>
 #include <uk/paging.h>
+#include <uk/pt.h>
 #include <uk/plat/memory.h>
 #include <uk/print.h>
 
@@ -43,6 +44,13 @@ static int pg_page_mapx(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 static int pg_page_unmap(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 			 unsigned int level, __vaddr_t vaddr, __sz len,
 			 unsigned long flags);
+
+/* Returns the virtual address of the page table that a PTE links to */
+static inline __vaddr_t pg_pte_to_vaddr(__pte_t pte,
+					unsigned int level __maybe_unused)
+{
+	return uk_pt_frame_vaddr(UK_PAL_PT_Lx_PTE_PADDR(pte, level));
+}
 
 #ifdef CONFIG_LIBUKPAGING_STATS
 /* Don't update stats */
@@ -72,7 +80,7 @@ int uk_paging_pt_set_active(struct uk_pagetable *pt)
 {
 	int rc;
 
-	rc = uk_pal_pt_write_base(pt->pt_pbase);
+	rc = uk_pt_activate(&pt->pt);
 	if (rc)
 		return rc;
 
@@ -94,8 +102,8 @@ static int pg_pt_clone(struct uk_pagetable *pt_dst, struct uk_pagetable *pt_src,
 	unsigned int pte_idx = 0;
 	int rc;
 
-	UK_ASSERT(pt_src->pt_vbase != UK_PAL_VADDR_INV);
-	UK_ASSERT(pt_src->pt_pbase != UK_PAL_PADDR_INV);
+	UK_ASSERT(uk_pt_vbase(&pt_src->pt) != UK_PAL_VADDR_INV);
+	UK_ASSERT(uk_pt_pbase(&pt_src->pt) != UK_PAL_PADDR_INV);
 
 	if (pt_dst != pt_src)
 		memset(pt_dst, 0, sizeof(struct uk_pagetable));
@@ -103,7 +111,8 @@ static int pg_pt_clone(struct uk_pagetable *pt_dst, struct uk_pagetable *pt_src,
 	/* Use the same frame allocator for the new page table */
 	pt_dst->fa = pt_src->fa;
 
-	pt_vaddr_scache[lvl] = pt_svaddr = pt_src->pt_vbase;
+	pt_svaddr = uk_pt_vbase(&pt_src->pt);
+	pt_vaddr_scache[lvl] = pt_svaddr;
 
 	/* Allocate a new top-level page table */
 	rc = pg_pt_alloc(pt_dst, &pt_dvaddr, &pt_dpaddr_root, lvl);
@@ -121,7 +130,8 @@ static int pg_pt_clone(struct uk_pagetable *pt_dst, struct uk_pagetable *pt_src,
 		goto EXIT;
 
 	do {
-		rc = uk_pal_pte_read(pt_svaddr, lvl, pte_idx, &pte);
+		rc = uk_pt_pte_read_at(&pt_src->pt, pt_svaddr, lvl, pte_idx,
+				       &pte);
 		if (unlikely(rc))
 			goto EXIT_FREE;
 
@@ -133,15 +143,17 @@ static int pg_pt_clone(struct uk_pagetable *pt_dst, struct uk_pagetable *pt_src,
 			if (unlikely(rc))
 				goto EXIT_FREE;
 
-			pt_svaddr = pgarch_pt_pte_to_vaddr(pt_src, pte, lvl);
+			pt_svaddr = pg_pte_to_vaddr(pte, lvl);
 
 			/* Set the PTE in the destination page table to point
 			 * to the copy of the lower-level page table
 			 */
 			pte = uk_pal_pt_pte_create(pt_dpaddr, lvl, pte, lvl);
 
-			rc = uk_pal_pte_write(pt_vaddr_dcache[lvl], lvl,
-					      pte_idx, pte);
+			rc = uk_pt_pte_write_at(&pt_dst->pt,
+						pt_vaddr_dcache[lvl], lvl,
+						pte_idx, UK_PAL_VADDR_INV,
+						pte);
 			if (unlikely(rc)) {
 				pg_pt_free(pt_dst, pt_dvaddr, lvl - 1);
 				goto EXIT_FREE;
@@ -167,7 +179,8 @@ static int pg_pt_clone(struct uk_pagetable *pt_dst, struct uk_pagetable *pt_src,
 #endif /* CONFIG_LIBUKPAGING_STATS */
 
 		/* Copy whatever PTE we have here */
-		rc = uk_pal_pte_write(pt_dvaddr, lvl, pte_idx, pte);
+		rc = uk_pt_pte_write_at(&pt_dst->pt, pt_dvaddr, lvl, pte_idx,
+					UK_PAL_VADDR_INV, pte);
 		if (unlikely(rc))
 			goto EXIT_FREE;
 
@@ -200,8 +213,9 @@ EXIT:
 	 * but assume that the caller provided us an uninitialized page table or
 	 * dst and src are the same.
 	 */
-	pt_dst->pt_vbase = pt_vaddr_dcache[UK_PAL_PT_LEVELS - 1];
-	pt_dst->pt_pbase = pt_dpaddr_root;
+	rc = uk_pt_init(&pt_dst->pt, pt_dpaddr_root);
+	if (unlikely(rc))
+		goto EXIT_FREE;
 
 	return 0;
 
@@ -220,6 +234,8 @@ int uk_paging_pt_init(struct uk_pagetable *pt, __paddr_t start, __sz len)
 {
 	static __u8 initialized; /* = 0 on startup */
 	unsigned int lvl;
+	__vaddr_t pt_vaddr;
+	__paddr_t pt_paddr;
 	int rc;
 
 	/* If this is the first time we setup a new page table, perform
@@ -253,10 +269,15 @@ int uk_paging_pt_init(struct uk_pagetable *pt, __paddr_t start, __sz len)
 		return rc;
 
 	/* Allocate a new top-level page table */
-	rc = pg_pt_alloc(pt, &pt->pt_vbase, &pt->pt_pbase,
-			 UK_PAL_PT_LEVELS - 1);
+	rc = pg_pt_alloc(pt, &pt_vaddr, &pt_paddr, UK_PAL_PT_LEVELS - 1);
 	if (unlikely(rc))
 		return rc;
+
+	rc = uk_pt_init(&pt->pt, pt_paddr);
+	if (unlikely(rc)) {
+		pg_pt_free(pt, pt_vaddr, UK_PAL_PT_LEVELS - 1);
+		return rc;
+	}
 
 #if CONFIG_LIBUKPAGING_DIRECTMAP
 	/* FIXME: The direct-mapped page table is an architecture-specific
@@ -275,7 +296,7 @@ int uk_paging_pt_init(struct uk_pagetable *pt, __paddr_t start, __sz len)
 	 *    direct-mapped region there. It also requires mapping
 	 *    capabilities from pgarch.
 	 */
-	rc = pg_page_mapx(pt, pt->pt_vbase, UK_PAL_PT_LEVELS - 1,
+	rc = pg_page_mapx(pt, uk_pt_vbase(&pt->pt), UK_PAL_PT_LEVELS - 1,
 			  PGARCH_DIRECTMAP_AREA_START, /* vaddr */
 			  0x00000000, /* paddr */
 			  PGARCH_DIRECTMAP_AREA_SIZE, /* len */
@@ -322,84 +343,28 @@ int uk_paging_pt_free(struct uk_pagetable *pt, unsigned long flags)
 {
 	int rc;
 
-	UK_ASSERT(pt->pt_vbase != UK_PAL_VADDR_INV);
-	UK_ASSERT(pt->pt_pbase != UK_PAL_PADDR_INV);
+	UK_ASSERT(uk_pt_vbase(&pt->pt) != UK_PAL_VADDR_INV);
+	UK_ASSERT(uk_pt_pbase(&pt->pt) != UK_PAL_PADDR_INV);
 
-	rc = pg_page_unmap(pt, pt->pt_vbase, UK_PAL_PT_LEVELS - 1,
+	rc = pg_page_unmap(pt, uk_pt_vbase(&pt->pt), UK_PAL_PT_LEVELS - 1,
 			   UK_PAL_VADDR_INV, __SZ_MAX,
 			   flags & UK_PAGING_PAGE_FLAG_KEEP_FRAMES);
 	if (unlikely(rc))
 		return rc;
 
 	/* Also free the top-level page table */
-	pg_pt_free(pt, pt->pt_vbase, UK_PAL_PT_LEVELS - 1);
+	pg_pt_free(pt, uk_pt_vbase(&pt->pt), UK_PAL_PT_LEVELS - 1);
 
-	pt->pt_vbase = UK_PAL_VADDR_INV;
-	pt->pt_pbase = UK_PAL_PADDR_INV;
+	uk_pt_term(&pt->pt);
 
 	return 0;
-}
-
-static inline int pg_pt_walk(struct uk_pagetable *pt, __vaddr_t *pt_vaddr,
-			     __vaddr_t vaddr, unsigned int *level,
-			     unsigned int to_level, __pte_t *pte)
-{
-	unsigned int lvl = *level;
-	__pte_t lpte;
-	int rc;
-
-	while (lvl > to_level) {
-		rc = uk_pal_pte_read(*pt_vaddr, lvl,
-				     UK_PAL_PT_Lx_IDX(vaddr, lvl),
-				     &lpte);
-		if (unlikely(rc))
-			goto EXIT;
-
-		if (!UK_PAL_PT_Lx_PTE_PRESENT(lpte, lvl) ||
-		    UK_PAL_PAGE_Lx_IS(lpte, lvl))
-			goto EXIT;
-
-		*pt_vaddr = pgarch_pt_pte_to_vaddr(pt, lpte, lvl);
-		lvl--;
-	}
-
-	UK_ASSERT(lvl == to_level);
-	rc = uk_pal_pte_read(*pt_vaddr, lvl, UK_PAL_PT_Lx_IDX(vaddr, to_level),
-			     &lpte);
-
-EXIT:
-	*level = lvl;
-	*pte = lpte;
-
-	return rc;
 }
 
 int uk_paging_pt_walk(struct uk_pagetable *pt, __vaddr_t vaddr,
 		      unsigned int *level, __vaddr_t *pt_vaddr,
 		      __pte_t *pte)
 {
-	unsigned int lvl = UK_PAL_PT_LEVELS - 1;
-	unsigned int to_lvl = (level) ? *level : UK_PAL_PAGE_LEVEL;
-	__vaddr_t tmp_pt_vaddr = pt->pt_vbase;
-	__pte_t tmp_pte;
-	int rc;
-
-	UK_ASSERT(pt->pt_vbase != UK_PAL_VADDR_INV);
-	UK_ASSERT(pt->pt_pbase != UK_PAL_PADDR_INV);
-
-	UK_ASSERT(uk_pal_vaddr_isvalid(vaddr));
-	UK_ASSERT(to_lvl < UK_PAL_PT_LEVELS);
-
-	rc = pg_pt_walk(pt, &tmp_pt_vaddr, vaddr, &lvl, to_lvl, &tmp_pte);
-
-	if (pt_vaddr)
-		*pt_vaddr = tmp_pt_vaddr;
-	if (level)
-		*level = lvl;
-	if (pte)
-		*pte = tmp_pte;
-
-	return rc;
+	return uk_pt_walk(&pt->pt, vaddr, level, pt_vaddr, pte);
 }
 
 #define PG_Lx_L0_PAGES(lvl)					\
@@ -442,28 +407,21 @@ static inline void pg_ffree(struct uk_pagetable *pt, __paddr_t paddr,
 static inline int pg_pt_alloc(struct uk_pagetable *pt, __vaddr_t *pt_vaddr,
 			      __paddr_t *pt_paddr, unsigned int level)
 {
-	__pte_t invalid;
 	__paddr_t new_pt_paddr = UK_PAL_PADDR_INV;
 	__vaddr_t new_pt_vaddr;
-	unsigned int i, rc;
+	unsigned int rc;
 
 	UK_ASSERT(level < UK_PAL_PT_LEVELS);
-	invalid = UK_PAL_PT_Lx_PTE_INVALID(level);
 
 	rc = pg_falloc(pt, &new_pt_paddr, UK_PAL_PAGE_LEVEL);
 	if (unlikely(rc))
 		return rc;
 
-	new_pt_vaddr = pgarch_pt_map(pt, new_pt_paddr, level);
-	if (unlikely(new_pt_vaddr == UK_PAL_VADDR_INV))
-		goto EXIT_FREE;
+	new_pt_vaddr = uk_pt_frame_vaddr(new_pt_paddr);
 
-	/* Clear the page table */
-	for (i = 0; i < UK_PAL_PT_Lx_PTES(level); ++i) {
-		rc = uk_pal_pte_write(new_pt_vaddr, level, i, invalid);
-		if (unlikely(rc))
-			goto EXIT_FREE;
-	}
+	rc = uk_pt_table_create(new_pt_vaddr, level);
+	if (unlikely(rc))
+		goto EXIT_FREE;
 
 #ifdef CONFIG_LIBUKPAGING_STATS
 	pt->nr_pt_pages[level]++;
@@ -486,8 +444,7 @@ static inline void pg_pt_free(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 
 	UK_ASSERT(level < UK_PAL_PT_LEVELS);
 
-	pt_paddr = pgarch_pt_unmap(pt, pt_vaddr, level);
-	UK_ASSERT(pt_paddr != UK_PAL_PADDR_INV);
+	pt_paddr = uk_pt_frame_paddr(pt_vaddr);
 
 	pg_ffree(pt, pt_paddr, UK_PAL_PAGE_LEVEL);
 
@@ -566,7 +523,8 @@ static int pg_page_mapx(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 		 */
 		while (lvl > to_lvl) {
 			/* We are too high and need to walk further down */
-			rc = uk_pal_pte_read(pt_vaddr, lvl, pte_idx, &pte);
+			rc = uk_pt_pte_read_at(&pt->pt, pt_vaddr, lvl, pte_idx,
+					       &pte);
 			if (unlikely(rc))
 				return rc;
 			if (UK_PAL_PT_Lx_PTE_PRESENT(pte, lvl)) {
@@ -588,7 +546,7 @@ static int pg_page_mapx(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 					continue;
 				}
 
-				pt_vaddr = pgarch_pt_pte_to_vaddr(pt, pte, lvl);
+				pt_vaddr = pg_pte_to_vaddr(pte, lvl);
 			} else {
 				/* There is nothing here, not even a page table.
 				 * So allocate a new one and link it.
@@ -603,9 +561,10 @@ static int pg_page_mapx(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 				else
 					tmpl_level = lvl;
 
-				pte = uk_pal_pt_pte_create(pt_paddr, lvl, pte, tmpl_level);
-				rc = uk_pal_pte_write(pt_vaddr_cache[lvl], lvl,
-						      pte_idx, pte);
+				rc = uk_pt_table_link_at(&pt->pt,
+							 pt_vaddr_cache[lvl],
+							 lvl, vaddr, pt_paddr,
+							 pte, tmpl_level);
 				if (unlikely(rc)) {
 					pg_pt_free(pt, pt_vaddr, lvl - 1);
 					return rc;
@@ -627,7 +586,7 @@ static int pg_page_mapx(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 		/* At this point, we are at the target level and know that
 		 * pages can be mapped at this level.
 		 */
-		rc = uk_pal_pte_read(pt_vaddr, lvl, pte_idx, &pte);
+		rc = uk_pt_pte_read_at(&pt->pt, pt_vaddr, lvl, pte_idx, &pte);
 		if (unlikely(rc))
 			return rc;
 
@@ -728,7 +687,8 @@ TOO_BIG:
 
 		UK_ASSERT(UK_PAL_PAGE_Lx_ALIGNED(UK_PAL_PT_Lx_PTE_PADDR(pte, lvl), lvl));
 
-		rc = uk_pal_pte_write(pt_vaddr, lvl, pte_idx, pte);
+		rc = uk_pt_pte_write_at(&pt->pt, pt_vaddr, lvl, pte_idx,
+					UK_PAL_VADDR_INV, pte);
 		if (unlikely(rc)) {
 			if (alloc_pmem &&
 			    !UK_PAL_PT_Lx_PTE_PRESENT(orig_pte, lvl))
@@ -742,9 +702,9 @@ TOO_BIG:
 			pt->nr_lx_pages[lvl]++;
 #endif /* CONFIG_LIBUKPAGING_STATS */
 
-		if (UK_PAL_PT_Lx_PTE_PRESENT(orig_pte, lvl) &&
-		    pt == pg_active_pt)
-			uk_pal_tlb_flush_entry(vaddr);
+		/* Only a mapping that we replaced can be cached in the TLB */
+		if (UK_PAL_PT_Lx_PTE_PRESENT(orig_pte, lvl))
+			uk_pt_flush_entry(&pt->pt, vaddr);
 
 NEXT_PTE:
 		UK_ASSERT(len >= page_size);
@@ -844,13 +804,13 @@ int uk_paging_page_mapx(struct uk_pagetable *pt, __vaddr_t vaddr,
 	UK_ASSERT(!(flags & UK_PAGING_PAGE_FLAG_INTERN_STATS_KEEP));
 #endif /* CONFIG_LIBUKPAGING_STATS */
 
-	UK_ASSERT(pt->pt_vbase != UK_PAL_VADDR_INV);
-	UK_ASSERT(pt->pt_pbase != UK_PAL_PADDR_INV);
+	UK_ASSERT(uk_pt_vbase(&pt->pt) != UK_PAL_VADDR_INV);
+	UK_ASSERT(uk_pt_pbase(&pt->pt) != UK_PAL_PADDR_INV);
 
 	UK_ASSERT(vaddr <= __VADDR_MAX - len);
 
-	return pg_page_mapx(pt, pt->pt_vbase, UK_PAL_PT_LEVELS - 1, vaddr,
-			    paddr, len, attr, flags,
+	return pg_page_mapx(pt, uk_pt_vbase(&pt->pt), UK_PAL_PT_LEVELS - 1,
+			    vaddr, paddr, len, attr, flags,
 			    UK_PAL_PT_Lx_PTE_INVALID(UK_PAL_PAGE_LEVEL),
 			    UK_PAL_PAGE_LEVEL, mapx);
 }
@@ -858,31 +818,14 @@ int uk_paging_page_mapx(struct uk_pagetable *pt, __vaddr_t vaddr,
 static int pg_page_split(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 			 __vaddr_t vaddr, unsigned int level)
 {
-	unsigned int to_lvl;
+	unsigned int to_lvl __maybe_unused = level - 1;
 	__vaddr_t new_pt_vaddr;
 	__paddr_t new_pt_paddr;
-	__paddr_t paddr;
-	__pte_t pte;
-	unsigned long attr;
-	unsigned long flags;
 	int rc;
 
 	UK_ASSERT(level > UK_PAL_PAGE_LEVEL);
 	UK_ASSERT(UK_PAL_PAGE_Lx_HAS(level));
 	UK_ASSERT(UK_PAL_PAGE_Lx_ALIGNED(vaddr, level));
-
-	rc = uk_pal_pte_read(pt_vaddr, level, UK_PAL_PT_Lx_IDX(vaddr, level),
-			     &pte);
-	if (unlikely(rc))
-		return rc;
-
-	UK_ASSERT(UK_PAL_PAGE_Lx_IS(pte, level));
-
-	attr = uk_pal_attr_from_pte(pte, level);
-
-	/* Find the next smaller page size */
-	to_lvl = pg_largest_level(vaddr, 0, __SZ_MAX, level - 1);
-	UK_ASSERT(to_lvl <= level - 1);
 
 	/* Create a page table that will hold all mappings and potential
 	 * child tables.
@@ -891,32 +834,15 @@ static int pg_page_split(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 	if (unlikely(rc))
 		return rc;
 
-	flags = UK_PAGING_PAGE_FLAG_SIZE(to_lvl) |
-		UK_PAGING_PAGE_FLAG_FORCE_SIZE;
-#ifdef CONFIG_LIBUKPAGING_STATS
-	flags |= UK_PAGING_PAGE_FLAG_INTERN_STATS_KEEP;
-#endif /* CONFIG_LIBUKPAGING_STATS */
-
-	/* Create mappings of the next smaller page size that map the same
-	 * contiguous range of physical memory than the input page
+	/* Replace the page with mappings of the next smaller page size that
+	 * map the same contiguous range of physical memory
 	 */
-	paddr = UK_PAL_PT_Lx_PTE_PADDR(pte, level);
-
-	UK_ASSERT(vaddr <= __VADDR_MAX - UK_PAL_PAGE_Lx_SIZE(level));
-
-	rc = pg_page_mapx(pt, new_pt_vaddr, level - 1, vaddr, paddr,
-			  UK_PAL_PAGE_Lx_SIZE(level), attr, flags, pte,
-			  level, NULL);
-	if (unlikely(rc))
-		goto EXIT_FREE;
-
-	/* Update the original PTE to point to the split page */
-	pte = uk_pal_pt_pte_create(new_pt_paddr, level - 1, pte, level);
-
-	rc = uk_pal_pte_write(pt_vaddr, level,
-			      UK_PAL_PT_Lx_IDX(vaddr, level), pte);
-	if (unlikely(rc))
-		goto EXIT_FREE;
+	rc = uk_pt_table_split_at(&pt->pt, pt_vaddr, level, vaddr,
+				  new_pt_vaddr, new_pt_paddr);
+	if (unlikely(rc)) {
+		pg_pt_free(pt, new_pt_vaddr, level - 1);
+		return rc;
+	}
 
 #ifdef CONFIG_LIBUKPAGING_STATS
 	UK_ASSERT(pt->nr_lx_pages[level] > 0);
@@ -927,19 +853,6 @@ static int pg_page_split(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 #endif /* CONFIG_LIBUKPAGING_STATS */
 
 	return 0;
-
-EXIT_FREE:
-	flags = UK_PAGING_PAGE_FLAG_KEEP_FRAMES;
-#ifdef CONFIG_LIBUKPAGING_STATS
-	flags |= UK_PAGING_PAGE_FLAG_INTERN_STATS_KEEP;
-#endif /* CONFIG_LIBUKPAGING_STATS */
-
-	pg_page_unmap(pt, new_pt_vaddr, level - 1, UK_PAL_VADDR_INV,
-		      __SZ_MAX, flags);
-
-	pg_pt_free(pt, new_pt_vaddr, level - 1);
-
-	return rc;
 }
 
 static int pg_page_unmap(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
@@ -979,7 +892,7 @@ static int pg_page_unmap(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 	skip_pt_free = (flags & UK_PAGING_PAGE_FLAG_KEEP_PTES);
 
 	do {
-		rc = uk_pal_pte_read(pt_vaddr, lvl, pte_idx, &pte);
+		rc = uk_pt_pte_read_at(&pt->pt, pt_vaddr, lvl, pte_idx, &pte);
 		if (unlikely(rc))
 			return rc;
 
@@ -993,7 +906,7 @@ static int pg_page_unmap(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 				    lvl == to_lvl)
 					return -EFAULT;
 
-				pt_vaddr = pgarch_pt_pte_to_vaddr(pt, pte, lvl);
+				pt_vaddr = pg_pte_to_vaddr(pte, lvl);
 
 				pte_idx_cache[lvl] = pte_idx;
 
@@ -1053,12 +966,10 @@ static int pg_page_unmap(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 					UK_PAL_PT_Lx_PTE_CLEAR_PRESENT(pte, lvl) :
 					UK_PAL_PT_Lx_PTE_INVALID(lvl);
 
-			rc = uk_pal_pte_write(pt_vaddr, lvl, pte_idx, new_pte);
+			rc = uk_pt_pte_write_at(&pt->pt, pt_vaddr, lvl, pte_idx,
+						vaddr, new_pte);
 			if (unlikely(rc))
 				return rc;
-
-			if (vaddr != UK_PAL_VADDR_INV && pt == pg_active_pt)
-				uk_pal_tlb_flush_entry(vaddr);
 
 #ifdef CONFIG_LIBUKPAGING_STATS
 			if (!(flags & UK_PAGING_PAGE_FLAG_INTERN_STATS_KEEP)) {
@@ -1131,7 +1042,8 @@ static int pg_page_unmap(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 			 * invalid.
 			 */
 			while (i++ < UK_PAL_PT_Lx_PTES(plvl) - 1) {
-				rc = uk_pal_pte_read(pt_vaddr, plvl, i, &pte);
+				rc = uk_pt_pte_read_at(&pt->pt, pt_vaddr, plvl,
+						       i, &pte);
 				if (unlikely(rc))
 					return rc;
 
@@ -1146,7 +1058,8 @@ static int pg_page_unmap(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 
 			i = first_pte_idx[plvl];
 			do {
-				rc = uk_pal_pte_read(pt_vaddr, plvl, i, &pte);
+				rc = uk_pt_pte_read_at(&pt->pt, pt_vaddr, plvl,
+						       i, &pte);
 				if (unlikely(rc))
 					return rc;
 
@@ -1163,13 +1076,11 @@ static int pg_page_unmap(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 			/* At this point, we know that the page table does not
 			 * contain any valid entries and we can safely free it
 			 */
-			rc = uk_pal_pte_write(pt_vaddr, lvl, pte_idx,
-					      UK_PAL_PT_Lx_PTE_INVALID(lvl));
+			rc = uk_pt_pte_write_at(&pt->pt, pt_vaddr, lvl, pte_idx,
+						vaddr,
+						UK_PAL_PT_Lx_PTE_INVALID(lvl));
 			if (unlikely(rc))
 				return rc;
-
-			if (vaddr != UK_PAL_VADDR_INV && pt == pg_active_pt)
-				uk_pal_tlb_flush_entry(vaddr);
 
 			pg_pt_free(pt, pt_vaddr_cache[plvl], plvl);
 		}
@@ -1192,7 +1103,7 @@ static int pg_page_unmap(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 
 	} while (1);
 
-	if (vaddr == UK_PAL_VADDR_INV && pt == pg_active_pt)
+	if (vaddr == UK_PAL_VADDR_INV && uk_pt_isactive(&pt->pt))
 		uk_pal_tlb_flush();
 
 	return 0;
@@ -1220,11 +1131,11 @@ int uk_paging_page_unmap(struct uk_pagetable *pt, __vaddr_t vaddr,
 	UK_ASSERT(!(flags & UK_PAGING_PAGE_FLAG_INTERN_STATS_KEEP));
 #endif /* CONFIG_LIBUKPAGING_STATS */
 
-	UK_ASSERT(pt->pt_vbase != UK_PAL_VADDR_INV);
-	UK_ASSERT(pt->pt_pbase != UK_PAL_PADDR_INV);
+	UK_ASSERT(uk_pt_vbase(&pt->pt) != UK_PAL_VADDR_INV);
+	UK_ASSERT(uk_pt_pbase(&pt->pt) != UK_PAL_PADDR_INV);
 
-	return pg_page_unmap(pt, pt->pt_vbase, UK_PAL_PT_LEVELS - 1, vaddr, len,
-			     flags);
+	return pg_page_unmap(pt, uk_pt_vbase(&pt->pt), UK_PAL_PT_LEVELS - 1,
+			     vaddr, len, flags);
 }
 
 static int pg_page_set_attr(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
@@ -1234,7 +1145,7 @@ static int pg_page_set_attr(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 	unsigned int to_lvl = UK_PAGING_PAGE_FLAG_SIZE_TO_LEVEL(flags);
 	unsigned int lvl = level;
 	__vaddr_t pt_vaddr_cache[UK_PAL_PT_LEVELS];
-	__pte_t pte, new_pte;
+	__pte_t pte;
 	__sz page_size;
 	unsigned int pte_idx_cache[UK_PAL_PT_LEVELS];
 	unsigned int pte_idx;
@@ -1260,7 +1171,7 @@ static int pg_page_set_attr(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 	}
 
 	do {
-		rc = uk_pal_pte_read(pt_vaddr, lvl, pte_idx, &pte);
+		rc = uk_pt_pte_read_at(&pt->pt, pt_vaddr, lvl, pte_idx, &pte);
 		if (unlikely(rc))
 			return rc;
 
@@ -1273,7 +1184,7 @@ static int pg_page_set_attr(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 				    lvl == to_lvl)
 					return -EFAULT;
 
-				pt_vaddr = pgarch_pt_pte_to_vaddr(pt, pte, lvl);
+				pt_vaddr = pg_pte_to_vaddr(pte, lvl);
 
 				pte_idx_cache[lvl] = pte_idx;
 
@@ -1325,15 +1236,10 @@ static int pg_page_set_attr(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 			 * below the remaining len to change and the address we
 			 * want to change is aligned to the page size.
 			 */
-			new_pte = uk_pal_pte_create(UK_PAL_PT_Lx_PTE_PADDR(pte, lvl),
-						    new_attr, lvl, pte, lvl);
-
-			rc = uk_pal_pte_write(pt_vaddr, lvl, pte_idx, new_pte);
+			rc = uk_pt_set_attr_at(&pt->pt, pt_vaddr, lvl, vaddr,
+					       new_attr);
 			if (unlikely(rc))
 				return rc;
-
-			if (vaddr != UK_PAL_VADDR_INV && pt == pg_active_pt)
-				uk_pal_tlb_flush_entry(vaddr);
 		}
 
 		/* Bail out if there is nothing more to do */
@@ -1372,7 +1278,7 @@ static int pg_page_set_attr(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 
 	} while (1);
 
-	if (vaddr == UK_PAL_VADDR_INV && pt == pg_active_pt)
+	if (vaddr == UK_PAL_VADDR_INV && uk_pt_isactive(&pt->pt))
 		uk_pal_tlb_flush();
 
 	return 0;
@@ -1401,11 +1307,11 @@ int uk_paging_page_set_attr(struct uk_pagetable *pt, __vaddr_t vaddr,
 	UK_ASSERT(!(flags & UK_PAGING_PAGE_FLAG_INTERN_STATS_KEEP));
 #endif /* CONFIG_LIBUKPAGING_STATS */
 
-	UK_ASSERT(pt->pt_vbase != UK_PAL_VADDR_INV);
-	UK_ASSERT(pt->pt_pbase != UK_PAL_PADDR_INV);
+	UK_ASSERT(uk_pt_vbase(&pt->pt) != UK_PAL_VADDR_INV);
+	UK_ASSERT(uk_pt_pbase(&pt->pt) != UK_PAL_PADDR_INV);
 
-	return pg_page_set_attr(pt, pt->pt_vbase, UK_PAL_PT_LEVELS - 1, vaddr,
-				len, new_attr, flags);
+	return pg_page_set_attr(pt, uk_pt_vbase(&pt->pt), UK_PAL_PT_LEVELS - 1,
+				vaddr, len, new_attr, flags);
 }
 
 __paddr_t uk_paging_virt_to_phys(__vaddr_t address)
