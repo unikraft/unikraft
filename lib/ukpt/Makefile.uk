@@ -1,0 +1,7 @@
+$(eval $(call addlib_s,libukpt,$(CONFIG_LIBUKPT)))
+
+ASINCLUDES-$(CONFIG_LIBUKPT)  += -I$(LIBUKPT_BASE)/include
+CINCLUDES-$(CONFIG_LIBUKPT)   += -I$(LIBUKPT_BASE)/include
+CXXINCLUDES-$(CONFIG_LIBUKPT) += -I$(LIBUKPT_BASE)/include
+
+LIBUKPT_SRCS-y += $(LIBUKPT_BASE)/pt.c|isr
