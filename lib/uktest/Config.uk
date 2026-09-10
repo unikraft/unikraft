@@ -29,4 +29,8 @@ config LIBUKTEST_TEST_MYSELF
 	bool "Run self-test to check sanity"
 	default n
 
+config LIBUKTEST_STRICT_MODE
+	bool "Count failing FIX_ME tests"
+	default n
+
 endif # LIBUKTEST
