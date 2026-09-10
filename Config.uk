@@ -234,6 +234,13 @@ config LLVM_TARGET_ARCH
 #	  Number of jobs to run simultaneously.  If 0, determine
 #	  automatically according to number of CPUs on the host
 #	  system.
+
+config FUZZING_INTERFACE
+	bool "Add interface for fuzzing precision"
+	default n
+	help
+		Add additional checks and redirects to avoid false-positives
+		during fuzzing.
 endmenu
 
 config UK_NAME
