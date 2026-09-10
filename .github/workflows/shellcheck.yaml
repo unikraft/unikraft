@@ -26,7 +26,7 @@ jobs:
           scandir: support/scripts
           format: tty
 
-      - uses: mfinelli/setup-shfmt@v3
+      - uses: mfinelli/setup-shfmt@v4
 
       - name: Run Shfmt
         run: shfmt -i 0 -sr -fn -d support/scripts
