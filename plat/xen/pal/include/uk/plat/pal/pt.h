@@ -7,6 +7,7 @@
 #ifndef __UK_PLAT_PAL_PT_H__
 #define __UK_PLAT_PAL_PT_H__
 
+#include <uk/config.h>
 #include <uk/arch/types.h>
 #include <uk/plat/xen/pt.h>
 
@@ -41,7 +42,56 @@ extern "C" {
 #define UK_PAL_PT_Lx_PTE_SET_PADDR(pte, lvl, paddr)	    \
 	UK_PLAT_XEN_PT_Lx_PTE_SET_PADDR(pte, lvl, paddr)
 
-/* Xen platform does not currently support paging, do not define pt(e) ops */
+#if CONFIG_HAVE_PAGING
+
+static inline
+__pte_t uk_pal_pte_create(__paddr_t paddr, unsigned long attr,
+			  unsigned int level, __pte_t tmpl,
+			  unsigned int tmpl_level)
+{
+	return uk_plat_xen_pte_create(paddr, attr, level, tmpl, tmpl_level);
+}
+
+static inline
+int uk_pal_pte_read(__vaddr_t pt_vaddr, unsigned int lvl,
+		    unsigned int idx, __pte_t *pte)
+{
+	return uk_plat_xen_pte_read(pt_vaddr, lvl, idx, pte);
+}
+
+static inline
+int uk_pal_pte_write(__vaddr_t pt_vaddr, unsigned int lvl,
+		     unsigned int idx, __pte_t pte)
+{
+	return uk_plat_xen_pte_write(pt_vaddr, lvl, idx, pte);
+}
+
+static inline
+unsigned long uk_pal_attr_from_pte(__pte_t pte, unsigned int level)
+{
+	return uk_plat_xen_attr_from_pte(pte, level);
+}
+
+static inline
+__paddr_t uk_pal_pt_read_base(void)
+{
+	return uk_plat_xen_pt_read_base();
+}
+
+static inline
+int uk_pal_pt_write_base(__paddr_t pt_paddr)
+{
+	return uk_plat_xen_pt_write_base(pt_paddr);
+}
+
+static inline
+__pte_t uk_pal_pt_pte_create(__paddr_t pt_paddr, unsigned int level,
+			     __pte_t tmpl, unsigned int tmpl_level)
+{
+	return uk_plat_xen_pt_pte_create(pt_paddr, level, tmpl, tmpl_level);
+}
+
+#endif /* CONFIG_HAVE_PAGING */
 
 #endif /* !__ASSEMBLY__ */
 

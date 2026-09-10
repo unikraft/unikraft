@@ -73,6 +73,13 @@
 
 #include <uk/console/driver.h>
 #include <common/hypervisor.h>
+#if defined(__x86_64__)
+#include <xen-x86/hypercall.h>
+#elif defined(__aarch64__)
+#include <xen-arm/hypercall.h>
+#else
+#error "Unsupported architecture"
+#endif
 #include <uk/boot/earlytab.h>
 #include <uk/prio.h>
 #include <uk/plat/common/bootinfo.h>

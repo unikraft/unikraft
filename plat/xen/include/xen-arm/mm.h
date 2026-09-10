@@ -27,8 +27,11 @@
 #ifndef _ARCH_MM_H_
 #define _ARCH_MM_H_
 
+#include <uk/config.h>
 #include <uk/plat/common/sections.h>
+#include <uk/arch/arm64.h>
 #include <uk/arch/limits.h>
+#include <uk/plat/native/page.h>
 #include <uk/paging.h>
 
 #define PAGE_SIZE	UK_PAGING_PAGE_SIZE
@@ -36,6 +39,8 @@
 #define PAGE_SHIFT	UK_PAGING_PAGE_SHIFT
 
 #ifndef __ASSEMBLY__
+#include <stdint.h>
+
 typedef uint64_t paddr_t;
 typedef uint64_t lpae_t;
 
@@ -78,15 +83,6 @@ extern paddr_t _libxenplat_paddr_offset;
 #define FIX_XS_START    (FIX_XS_TOP - SZ_2M)
 #define FIX_GNT_TOP     (FIX_XS_START)
 #define FIX_GNT_START   (FIX_GNT_TOP - SZ_2M)
-
-/*
- * Memory types available.
- */
-#define MT_DEVICE_nGnRnE    0
-#define MT_DEVICE_nGnRE     1
-#define MT_DEVICE_GRE       2
-#define MT_NORMAL_NC        3
-#define MT_NORMAL           4
 
 /* SCTLR_EL1 - System Control Register */
 #define	SCTLR_RES0          0xc8222400  /* Reserved, write 0 */
@@ -176,8 +172,17 @@ extern paddr_t _libxenplat_paddr_offset;
 #define ATTR_IDX(x)     ((x) << 2)
 #define ATTR_IDX_MASK   (7 << 2)
 
-#define BLOCK_DEF_ATTR (ATTR_AF|ATTR_SH(ATTR_SH_IS)|ATTR_IDX(MT_NORMAL))
-#define BLOCK_DEV_ATTR (ATTR_AF|ATTR_SH(ATTR_SH_IS)|ATTR_IDX(MT_DEVICE_nGnRnE))
+#define XENPLAT_PT_ATTR_MEM						\
+	(UK_PAGING_PAGE_ATTR_PROT_READ |				\
+	 UK_PAGING_PAGE_ATTR_PROT_WRITE |				\
+	 UK_PAGING_PAGE_ATTR_PROT_EXEC |				\
+	 UK_ARCH_ARM64_PTE_ATTR_SH(UK_ARCH_ARM64_PTE_ATTR_SH_IS))
+
+#define XENPLAT_PT_ATTR_DEV						\
+	(UK_PAGING_PAGE_ATTR_PROT_READ |				\
+	 UK_PAGING_PAGE_ATTR_PROT_WRITE |				\
+	 UK_ARCH_ARM64_PTE_ATTR_SH(UK_ARCH_ARM64_PTE_ATTR_SH_IS) |	\
+	 UK_PLAT_NATIVE_PAGE_ATTR_TYPE_DEVICE_nGnRnE)
 
 #endif
 
@@ -215,8 +220,10 @@ extern paddr_t _libxenplat_paddr_offset;
 #define map_frames(f, n) (NULL)
 
 #ifndef __ASSEMBLY__
+/* The page tables that entry64.S reserves for us */
+extern lpae_t boot_l1_pgtable[];
+extern lpae_t fixmap_pgtable[];
 void arch_mm_prepare(unsigned long *start_pfn_p, unsigned long *max_pfn_p);
-void set_pgt_entry(lpae_t *ptr, lpae_t val);
 #endif
 
 #define arch_mm_init(a)
