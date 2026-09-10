@@ -1352,7 +1352,7 @@ sys_utimes(char *path, const struct timeval *times, int flags)
 		return EINVAL;
 
 	// Convert each element of timeval array to the timespec type
-	error = convert_timeval(&timespec_times[0], times ? times + 0 : NULL);
+	error = convert_timeval(&timespec_times[0], times ? &times[0] : NULL);
 	if (unlikely(error)) {
 		/*
 		 * convert_timeval calls clock_gettime which should not have
@@ -1368,7 +1368,7 @@ sys_utimes(char *path, const struct timeval *times, int flags)
 		return -error;
 	}
 
-	error = convert_timeval(&timespec_times[1], times ? times + 1 : NULL);
+	error = convert_timeval(&timespec_times[1], times ? &times[1] : NULL);
 	if (unlikely(error)) {
 		UK_ASSERT(error < 0);
 		return -error;

@@ -10,6 +10,7 @@
 #include <uk/essentials.h>
 #include <uk/plat/common/bootinfo.h>
 #include <uk/prio.h>
+#include <string.h>
 
 #if CONFIG_LIBUKLIBPARAM
 #include <uk/libparam.h>

@@ -96,11 +96,10 @@ endif
 COMPFLAGS-$(call gcc_version_ge,7,0)	+= -fPIE
 LDFLAGS-$(call gcc_version_ge,7,0)	+= -static-pie
 LDFLAGS-$(call gcc_version_ge,7,0)	+= -Wl,--no-dynamic-linker
-LDFLAGS-$(call gcc_version_ge,7,0)	+= -z notext -z norelro
-COMPFLAGS-$(call have_clang)	+= -fPIE
-LDFLAGS-$(call have_clang)	+= -static-pie
-LDFLAGS-$(call have_clang)	+= -Wl,--no-dynamic-linker
-LDFLAGS-$(call have_clang)	+= -z notext -z norelro
+ifneq ($(ARCH),arm64)
+LDFLAGS-$(call gcc_version_ge,7,0) += -z notext -z norelro
+LDFLAGS-$(call have_clang) += -z notext -z norelro
+endif
 SECT_STRIP_FLAGS-$(CONFIG_OPTIMIZE_PIE) += -R .dynamic
 SECT_STRIP_FLAGS-$(CONFIG_OPTIMIZE_PIE) += -R .dynsym
 SECT_STRIP_FLAGS-$(CONFIG_OPTIMIZE_PIE) += -R .dynstr
