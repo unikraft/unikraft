@@ -2,11 +2,15 @@ menuconfig LIBUKPAGING
 	bool "ukpaging: Virtual memory API"
 	depends on HAVE_PAGING
 	select LIBUKPAL
+	select LIBUKPT
 	select LIBUKFALLOC
 	select LIBUKFALLOCBUDDY
 	help
-		Provide low-level functions for working with page tables,
-		(un)mapping of pages, and changing of mapping flags
+		Provide functions for working with page tables, (un)mapping
+		of pages, and changing of mapping flags. Builds on the page
+		table primitives provided by libukpt, adding allocation of
+		physical memory, selection of page sizes and operations on
+		address ranges.
 
 if LIBUKPAGING
 config LIBUKPAGING_DIRECTMAP
