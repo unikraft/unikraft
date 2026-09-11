@@ -179,7 +179,7 @@ static int hyperlight_dispatch_inject_host_env(struct uk_init_ctx *ictx __unused
 	return 0;
 }
 
-uk_late_initcall(hyperlight_dispatch_inject_host_env, 0x1);
+uk_late_initcall(hyperlight_dispatch_inject_host_env, 0x0);
 
 /*
  * Re-inject host-provided environment variables.
