@@ -13,16 +13,7 @@
  * input stack, setting RIP to that address, and running the vCPU.
  *
  * The dispatch handler pops the FunctionCall from the input stack,
- * invokes the registered callback (if any), pushes a void result onto
- * the output stack, and halts via port 108.
- *
- * Callback registration:
- *   During boot, the kernel injects HL_DISPATCH_CALLBACK_PTR into the
- *   process environment — the hex address of g_dispatch_callback.
- *   A loaded ELF (e.g. hl_pydriver via app-elfloader) parses this env
- *   var and writes its callback function pointer there.  On each
- *   subsequent dispatch call, the kernel invokes that callback with
- *   the FunctionCall bytes.
+ * pushes a void result onto the output stack, and halts via port 108.
  */
 
 #include <stdio.h>
@@ -57,38 +48,13 @@ static int g_dispatch_ready;
  */
 __u64 g_exn_stack_top;
 
-/* ── Callback registration ─────────────────────────────────────── */
-
-typedef int (*hl_dispatch_fn_t)(const __u8 *fc, __u64 fc_len);
-static volatile hl_dispatch_fn_t g_dispatch_callback;
-
-/* Pointer/length of the current FunctionCall — set before the
- * callback is invoked so the application can read the raw bytes.
- */
-static const __u8 *g_fc_bytes;
-static __u64 g_fc_len;
-
-const __u8 *hyperlight_dispatch_get_fc(__u64 *out_len)
-{
-	if (out_len)
-		*out_len = g_fc_len;
-	return g_fc_bytes;
-}
-
 /* ── Environment variable injection ───────────────────────────── */
 
 /*
- * Inject kernel addresses into the process environment so loaded
- * ELFs (e.g. hl_pydriver via app-elfloader) can register their
- * dispatch callback and halt the VM without needing symbol
- * resolution against the kernel.
- *
- * Two env vars:
- *   HL_DISPATCH_CALLBACK_PTR  — address of g_dispatch_callback slot;
- *                               the driver writes its function pointer here.
- *   HL_DISPATCH_ENTRY         — address of hyperlight_dispatch_function;
- *                               the driver puts this in RAX before halting
- *                               so the host knows where to re-enter.
+ * Export the address of hl_call_get_env_vars so the loaded ELF (a
+ * runtime driver) can call it directly.  The driver runs on glibc,
+ * which has a separate environ from the kernel; calling this function
+ * is how it re-reads host-provided env vars before each call it serves.
  *
  * Runs as a late init call — after posix-environ is initialised
  * but before boot.c calls main() (the elfloader).
@@ -98,24 +64,8 @@ const __u8 *hyperlight_dispatch_get_fc(__u64 *out_len)
  */
 static int hyperlight_dispatch_inject_env(struct uk_init_ctx *ictx __unused)
 {
-	static char env_cb[64];
-	static char env_entry[64];
 	static char env_getenv[64];
 
-	snprintf(env_cb, sizeof(env_cb), "HL_DISPATCH_CALLBACK_PTR=0x%lx",
-		 (unsigned long)&g_dispatch_callback);
-	putenv(env_cb);
-
-	snprintf(env_entry, sizeof(env_entry), "HL_DISPATCH_ENTRY=0x%lx",
-		 (unsigned long)hyperlight_dispatch_function);
-	putenv(env_entry);
-
-	/*
-	 * Export the address of hl_call_get_env_vars so the loaded ELF
-	 * (driver) can call it directly.  The driver runs on glibc which
-	 * has a separate environ from the kernel; calling this function
-	 * is the only way to query host-provided env vars after boot.
-	 */
 	snprintf(env_getenv, sizeof(env_getenv),
 		 "HL_GET_ENV_VARS_FN=0x%lx",
 		 (unsigned long)hl_call_get_env_vars);
@@ -131,8 +81,8 @@ uk_late_initcall(hyperlight_dispatch_inject_env, 0x0);
 /*
  * Check whether a KEY=VALUE entry uses a reserved key prefix.
  * Keys starting with "HL_" are reserved for Hyperlight internals
- * (HL_DISPATCH_CALLBACK_PTR, HL_DISPATCH_ENTRY, etc.) and must not
- * be overwritten by host-provided environment variables.
+ * (HL_GET_ENV_VARS_FN) and must not be overwritten by host-provided
+ * environment variables.
  */
 static int is_reserved_env_key(const char *entry)
 {
@@ -280,46 +230,6 @@ void hyperlight_dispatch_init(const struct hyperlight_peb *peb)
 	g_dispatch_ready = 1;
 }
 
-/* ── Abort helper ──────────────────────────────────────────────── */
-
-/*
- * Signal a dispatch error to the host via the Abort port (102).
- *
- * The abort protocol sends bytes in chunks of up to 3 per outb:
- *   u32 LE = [chunk_len, b1, b2, b3]
- * Byte sequence: [error_code, message..., 0xFF terminator].
- *
- * The host accumulates bytes until the 0xFF terminator, then returns
- * GuestAborted to the caller of sandbox.call().  On the next call()
- * the host resets RIP to hyperlight_dispatch_function, so the guest
- * resumes fresh.
- */
-static void dispatch_send_abort(const char *msg)
-{
-	__u8 data[128];
-	__sz len = 0;
-
-	data[len++] = 1; /* error code: generic dispatch error */
-
-	while (*msg && len < sizeof(data) - 1)
-		data[len++] = (__u8)*msg++;
-
-	data[len++] = 0xFF; /* terminator */
-
-	/* Send in chunks of 3 bytes via port 102. */
-	__sz i = 0;
-	while (i < len) {
-		__sz remaining = len - i;
-		__sz chunk_len = remaining < 3 ? remaining : 3;
-		__u32 val = (__u32)chunk_len;
-		__sz j;
-		for (j = 0; j < chunk_len; j++)
-			val |= (__u32)data[i + j] << (8 * (j + 1));
-		hyperlight_out32(HYPERLIGHT_PORT_ABORT, val);
-		i += chunk_len;
-	}
-}
-
 /* ── Dispatch inner ─────────────────────────────────────────────── */
 
 void __attribute__((used))
@@ -387,31 +297,8 @@ hyperlight_dispatch_inner(void)
 
 	memcpy(fc_buf, (const void *)fc_raw, fc_len);
 
-	/* Make the FunctionCall bytes available to the callback */
-	g_fc_bytes = fc_buf;
-	g_fc_len = fc_len;
-
-	if (g_dispatch_callback) {
-		int dispatch_rc = g_dispatch_callback(fc_buf, fc_len);
-
-		g_fc_bytes = NULL;
-		g_fc_len = 0;
-
-		if (dispatch_rc != 0) {
-			/*
-			 * Abort the VM so the host's run() returns
-			 * Err(GuestAborted).  The host resets RIP on
-			 * the next call(), so the guest resumes fresh.
-			 */
-			dispatch_send_abort("dispatch callback failed");
-			return;
-		}
-	} else {
-		g_fc_bytes = NULL;
-		g_fc_len = 0;
-		uk_pr_warn("dispatch: no callback registered (fc_len=%lu)\n",
-			   (unsigned long)fc_len);
-	}
+	uk_pr_warn("dispatch: no consumer for a guest function (fc_len=%lu)\n",
+		   (unsigned long)fc_len);
 
 push_result:
 	hl_stack_push(g_output_stack, g_output_stack_size,

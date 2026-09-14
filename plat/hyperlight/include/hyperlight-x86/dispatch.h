@@ -10,8 +10,7 @@
  * After evolve, the host can invoke guest functions by pushing a
  * FunctionCall FlatBuffer onto the PEB input stack and setting RIP
  * to hyperlight_dispatch_function.  The dispatch handler pops the
- * call, invokes the registered callback, pushes a void result, and
- * halts via port 108.
+ * call, pushes a void result, and halts via port 108.
  */
 
 #ifndef __HYPERLIGHT_DISPATCH_H__
@@ -43,14 +42,5 @@ __u64 hyperlight_dispatch_max_call(void);
  * — halts the vCPU after pushing the result.
  */
 void hyperlight_dispatch_function(void) __attribute__((noreturn));
-
-/**
- * Get the current FunctionCall bytes during a dispatch callback.
- *
- * @param out_len  If non-NULL, receives the FunctionCall length.
- * @return         Pointer to the FunctionCall bytes, or NULL if not
- *                 inside a dispatch callback.
- */
-const __u8 *hyperlight_dispatch_get_fc(__u64 *out_len);
 
 #endif /* __HYPERLIGHT_DISPATCH_H__ */
