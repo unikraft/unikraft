@@ -13,7 +13,14 @@
  * input stack, setting RIP to that address, and running the vCPU.
  *
  * The dispatch handler pops the FunctionCall from the input stack,
- * pushes a void result onto the output stack, and halts via port 108.
+ * hands it to the cooperative step pump (step.c), pushes a void result
+ * onto the output stack, and halts via port 108.
+ *
+ * The pump is the sole consumer of guest function calls: it
+ * runs the scheduler until it would go idle and hands the vCPU back with
+ * a next-wakeup deadline.  Named calls (anything but `step`) are queued
+ * on /dev/hlcall for a driver blocked in read() on it, so the workload
+ * serves them on its own thread rather than on this dispatch stack.
  */
 
 #include <stdio.h>
@@ -32,6 +39,7 @@
 #include <hyperlight-x86/mem.h>
 #include <hyperlight-x86/outb.h>
 #include <hyperlight-x86/peb.h>
+#include <hyperlight-x86/step.h>
 
 /* ── PEB I/O stack pointers (cached from PEB at init) ─────────── */
 
@@ -232,6 +240,17 @@ void hyperlight_dispatch_init(const struct hyperlight_peb *peb)
 
 /* ── Dispatch inner ─────────────────────────────────────────────── */
 
+/* Push the pre-encoded void FunctionCallResult onto the output stack.
+ * Also used by the shutdown path when a step pump is in flight, so the
+ * host's in-progress `step` call completes normally when the guest
+ * process exits.
+ */
+void hyperlight_dispatch_push_void_result(void)
+{
+	hl_stack_push(g_output_stack, g_output_stack_size,
+		      HL_VOID_RESULT, sizeof(HL_VOID_RESULT));
+}
+
 void __attribute__((used))
 hyperlight_dispatch_inner(void)
 {
@@ -258,21 +277,6 @@ hyperlight_dispatch_inner(void)
 		goto push_result;
 	}
 
-	/*
-	 * Re-inject host-provided environment variables.
-	 *
-	 * On a normal boot this is redundant (the initcall already ran)
-	 * but cheap — one host call that returns an empty string.
-	 * After a snapshot restore the initcall does NOT re-run, so this
-	 * is the only path that picks up env vars the host set after
-	 * restore.
-	 *
-	 * Safe to call here: the GetEnvVars host call pushes/pops its
-	 * own frame on top of the input stack; the FunctionCall for this
-	 * dispatch remains below and is unaffected.
-	 */
-	hyperlight_dispatch_reinject_host_env();
-
 	/* Pop the FunctionCall from the input stack.
 	 * Copy immediately — the pointer is invalidated by any host call.
 	 */
@@ -297,12 +301,33 @@ hyperlight_dispatch_inner(void)
 
 	memcpy(fc_buf, (const void *)fc_raw, fc_len);
 
-	uk_pr_warn("dispatch: no consumer for a guest function (fc_len=%lu)\n",
+	/*
+	 * Re-inject host-provided environment variables.
+	 *
+	 * On a normal boot this is redundant (the initcall already ran)
+	 * but cheap — one host call that returns an empty string.
+	 * After a snapshot restore the initcall does NOT re-run, so this
+	 * is the only path that picks up env vars the host set after
+	 * restore.
+	 *
+	 * Skipped for the pump's own `step` entry: it carries no workload
+	 * of its own and can run thousands of times a second.
+	 */
+	if (!hyperlight_step_fc_is_pump(fc_buf, fc_len))
+		hyperlight_dispatch_reinject_host_env();
+
+#if CONFIG_HYPERLIGHT_STEP
+	hyperlight_step_pump(fc_buf, fc_len);
+#else /* !CONFIG_HYPERLIGHT_STEP */
+	/* No scheduler, so nothing can serve a guest function: the workload
+	 * of such a kernel is a native main() that already ran at boot.
+	 */
+	uk_pr_warn("dispatch: no scheduler to run a guest function (fc_len=%lu)\n",
 		   (unsigned long)fc_len);
+#endif /* !CONFIG_HYPERLIGHT_STEP */
 
 push_result:
-	hl_stack_push(g_output_stack, g_output_stack_size,
-		      HL_VOID_RESULT, sizeof(HL_VOID_RESULT));
+	hyperlight_dispatch_push_void_result();
 }
 
 /* ── Snapshot pre-fault ─────────────────────────────────────────── */

@@ -41,4 +41,20 @@ config HYPERLIGHT_DEBUG_PRINT
 	  shared memory infrastructure is set up. Useful for early
 	  boot debugging only.
 
+config HYPERLIGHT_STEP
+	bool
+	default y
+	depends on LIBUKSCHED
+	help
+	  Hand the vCPU back to the host whenever the scheduler would go
+	  idle, reporting the time until the next guest timer, instead of
+	  busy-waiting inside the VM.  The host repeatedly invokes the
+	  `step` guest function to drive execution forward and can snapshot
+	  the guest at any of those boundaries.  Named guest functions are
+	  queued on /dev/hlcall for a driver blocked in read() on it.
+
+	  This is how guest functions are served whenever a scheduler is
+	  present, so there is no prompt: a kernel with threads but without
+	  the step model could not run a guest function at all.
+
 endif

@@ -842,8 +842,9 @@ hostsock_poll_setup(posix_sock *sock)
 
 /*
  * Rescan all tracked sockets for readiness.  Called from the
- * platform's idle loop so Unikraft's scheduler can wake threads
- * that are blocked on socket I/O.
+ * platform's idle loop (and by the cooperative step pump on every
+ * re-entry) so Unikraft's scheduler can wake threads that are blocked
+ * on socket I/O.
  *
  * Returns 1 if any socket has pending events, 0 otherwise.
  */

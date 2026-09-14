@@ -24,6 +24,7 @@
 #include <uk/plat/common/bootinfo.h>
 
 #include <hyperlight-x86/outb.h>
+#include <hyperlight-x86/step.h>
 
 #ifdef CONFIG_LIBHOSTSOCK
 extern int hostsock_rescan_events(void);
@@ -32,16 +33,20 @@ extern int hostsock_rescan_events(void);
 /* Provided by dispatch.c */
 extern void hyperlight_dispatch_function(void)
 	__attribute__((noreturn));
+extern void hyperlight_dispatch_push_void_result(void);
 
-static int hyperlight_shutdown(void)
+/*
+ * Halt via port 108.  The host intercepts this VM exit.
+ * RAX = dispatch function address — the host stores this
+ * and sets RIP here for each call() after evolve().
+ * cli + hlt after outl is a backstop — the VM exit from
+ * outl already stops the vCPU.
+ *
+ * This is the bare halt: no result is pushed and no shutdown work is
+ * done.  The step model's yield thread uses it to signal boot complete.
+ */
+void __noreturn hyperlight_halt_to_host(void)
 {
-	/*
-	 * Halt via port 108.  The host intercepts this VM exit.
-	 * RAX = dispatch function address — the host stores this
-	 * and sets RIP here for each call() after evolve().
-	 * cli + hlt after outl is a backstop — the VM exit from
-	 * outl already stops the vCPU.
-	 */
 	__asm__ volatile(
 		/* Hyperlight checks RSP alignment after halt */
 		"andq $~0xf, %%rsp\n\t"
@@ -53,6 +58,22 @@ static int hyperlight_shutdown(void)
 		: : "r"((__u64)hyperlight_dispatch_function) : "rax", "rdx"
 	);
 	__builtin_unreachable();
+}
+
+static int hyperlight_shutdown(void)
+{
+	/*
+	 * Under a step pump this halt lands in the middle of the host's
+	 * `step` call (the workload's main thread exited and ukboot is
+	 * shutting the system down).  Complete that call with a void
+	 * result so the host reads a clean exit rather than a truncated
+	 * step; the missing `StepYield` report is what tells it the guest
+	 * is gone.
+	 */
+	if (hyperlight_step_active())
+		hyperlight_dispatch_push_void_result();
+
+	hyperlight_halt_to_host();
 }
 
 static int hyperlight_crash(void)
@@ -74,6 +95,13 @@ static const struct uk_pm_ops hyperlight_pm_ops = {
  */
 static void hyperlight_halt_irq(void)
 {
+	/* Under a step pump the idle thread yields the vCPU back to the
+	 * host here (and at boot, the first idle hands it over).  Only a
+	 * kernel without the step model falls through to the busy-wait.
+	 */
+	if (hyperlight_step_halt(0))
+		return;
+
 	uk_pal_enable_irq();
 #ifdef CONFIG_LIBHOSTSOCK
 	hostsock_rescan_events();

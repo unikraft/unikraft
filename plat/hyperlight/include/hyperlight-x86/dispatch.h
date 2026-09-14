@@ -10,7 +10,8 @@
  * After evolve, the host can invoke guest functions by pushing a
  * FunctionCall FlatBuffer onto the PEB input stack and setting RIP
  * to hyperlight_dispatch_function.  The dispatch handler pops the
- * call, pushes a void result, and halts via port 108.
+ * call, hands it to the cooperative step pump (step.h), pushes a void
+ * result, and halts via port 108.
  */
 
 #ifndef __HYPERLIGHT_DISPATCH_H__

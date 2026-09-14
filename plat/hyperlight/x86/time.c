@@ -30,6 +30,7 @@
 #include <uk/print.h>
 
 #include <hyperlight-x86/hcall.h>
+#include <hyperlight-x86/step.h>
 
 /* TSC state */
 static __u64 tsc_freq;	/* Hz */
@@ -179,6 +180,13 @@ void time_block_until(__snsec until)
 	__snsec next_rescan = 0;
 #endif
 	__snsec now;
+
+	/* Under a step pump the idle thread hands the vCPU back to the
+	 * host with this deadline instead of spinning on it; the host
+	 * re-enters the guest when it is due (or earlier, on I/O).
+	 */
+	if (hyperlight_step_halt((__nsec)until))
+		return;
 
 	while ((now = (__snsec)ukplat_monotonic_clock()) < until) {
 		uk_arch_x86_64_nop();
