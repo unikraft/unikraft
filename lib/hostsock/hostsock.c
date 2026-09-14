@@ -246,6 +246,29 @@ static int hostsock_check_ready(int host_fd, int events)
 	return (int)(__s16)(resp[4] | (resp[5] << 8));
 }
 
+static unsigned hostsock_publish_events(posix_sock *sock, int revents,
+				       int mask);
+
+/*
+ * Ask the host whether @sock is ready for @events (POLLIN and/or POLLOUT)
+ * and publish the answer as the socket's guest-side readiness state.
+ *
+ * Every readiness check must go through here, not just the idle-loop
+ * rescan: the poll layer waits on the published bits, and they are
+ * level-triggered state that only the host can refresh.  A bit left set
+ * after the host said "not ready" is a livelock -- a listener whose only
+ * pending connection was just accepted keeps POLLIN, so select() returns
+ * at once, accept() asks the host, gets EAGAIN, and round it goes, one
+ * host call per iteration, without the scheduler ever going idle.
+ */
+static int hostsock_ready(posix_sock *sock, int events)
+{
+	int revents = hostsock_check_ready(sock_fd(sock), events);
+
+	hostsock_publish_events(sock, revents, events);
+	return revents;
+}
+
 /* ── Socket operations ───────────────────────────────────────────── */
 
 static void *
@@ -323,7 +346,7 @@ hostsock_accept4(posix_sock *sock,
 	 * Unikraft's poll/scheduler layer handle the wait.
 	 */
 	{
-		int ready = hostsock_check_ready(sock_fd(sock), POLLIN);
+		int ready = hostsock_ready(sock, POLLIN);
 
 		if (!(ready & POLLIN))
 			return ERR2PTR(-EAGAIN);
@@ -407,7 +430,7 @@ hostsock_sendto(posix_sock *sock, const void *buf, size_t len,
 	 * the buffer.  Return EAGAIN and let the scheduler yield.
 	 */
 	{
-		int ready = hostsock_check_ready(sock_fd(sock), POLLOUT);
+		int ready = hostsock_ready(sock, POLLOUT);
 
 		if (!(ready & POLLOUT))
 			return -EAGAIN;
@@ -467,7 +490,7 @@ hostsock_recvfrom(posix_sock *sock, void *restrict buf, size_t len,
 	 * entire VM.  See the comment in hostsock_accept4.
 	 */
 	{
-		int ready = hostsock_check_ready(sock_fd(sock), POLLIN);
+		int ready = hostsock_ready(sock, POLLIN);
 
 		if (!(ready & POLLIN))
 			return -EAGAIN;
@@ -516,7 +539,7 @@ hostsock_write(posix_sock *sock, const struct iovec *iov, size_t iovcnt)
 {
 	/* Check writability — same guard as sendto. */
 	{
-		int ready = hostsock_check_ready(sock_fd(sock), POLLOUT);
+		int ready = hostsock_ready(sock, POLLOUT);
 
 		if (!(ready & POLLOUT))
 			return -EAGAIN;
@@ -752,19 +775,49 @@ hostsock_ioctl(posix_sock *sock __unused, int request __unused,
 	return -ENOTSUP;
 }
 
+/*
+ * Publish the host's answer as the socket's readiness state.
+ *
+ * The host poll result is authoritative and level-triggered, so a bit
+ * that came back clear must be *cleared*, not merely left alone.  Only
+ * ever setting bits latches a socket readable forever: POLLIN goes up
+ * on the first connection or byte and never comes down, so poll() and
+ * select() keep reporting the fd ready, the caller retries accept/recv,
+ * hostsock re-checks with the host, gets "not ready" and returns EAGAIN
+ * -- a livelock that never reaches the idle loop.  A listener that has
+ * just accepted its only pending connection hits this every time.
+ *
+ * Clear first: a set is what wakes waiters, so raising the new edge
+ * last avoids a spurious wake on a bit about to be dropped.
+ *
+ * Only the bits in @mask -- the ones the host was actually asked about --
+ * are touched, so a POLLIN-only check leaves POLLOUT as it was.
+ *
+ * Returns the events now set, so callers can tell whether this socket
+ * has anything to wake on.
+ */
+static unsigned hostsock_publish_events(posix_sock *sock, int revents,
+				       int mask)
+{
+	unsigned want = ((mask & POLLIN) ? UKFD_POLLIN : 0)
+		      | ((mask & POLLOUT) ? UKFD_POLLOUT : 0);
+	unsigned set = (((revents & POLLIN) ? UKFD_POLLIN : 0)
+		      | ((revents & POLLOUT) ? UKFD_POLLOUT : 0)) & want;
+	unsigned clr = want & ~set;
+
+	if (clr)
+		posix_sock_event_clear(sock, clr);
+	if (set)
+		posix_sock_event_set(sock, set);
+
+	return set;
+}
+
 static void
 hostsock_poll_setup(posix_sock *sock)
 {
 	/* Check real readiness via host poll(timeout=0). */
-	int revents = hostsock_check_ready(sock_fd(sock), POLLIN | POLLOUT);
-	unsigned events = 0;
-
-	if (revents & POLLIN)
-		events |= UKFD_POLLIN;
-	if (revents & POLLOUT)
-		events |= UKFD_POLLOUT;
-
-	posix_sock_event_set(sock, events);
+	hostsock_ready(sock, POLLIN | POLLOUT);
 	hostsock_track(sock);
 }
 
@@ -783,17 +836,9 @@ int hostsock_rescan_events(void)
 		posix_sock *sock = tracked_socks[i];
 		int revents = hostsock_check_ready(sock_fd(sock),
 						   POLLIN | POLLOUT);
-		unsigned events = 0;
 
-		if (revents & POLLIN)
-			events |= UKFD_POLLIN;
-		if (revents & POLLOUT)
-			events |= UKFD_POLLOUT;
-
-		if (events) {
-			posix_sock_event_set(sock, events);
+		if (hostsock_publish_events(sock, revents, POLLIN | POLLOUT))
 			woke = 1;
-		}
 	}
 
 	return woke;
