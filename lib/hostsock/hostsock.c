@@ -249,6 +249,18 @@ static int hostsock_check_ready(int host_fd, int events)
 static unsigned hostsock_publish_events(posix_sock *sock, int revents,
 				       int mask);
 
+/* An error condition on a socket makes it "ready" in every direction:
+ * poll(2) semantics, and what lets a blocked recv/send return the real
+ * error (or EOF) instead of waiting for data that can never arrive.  The
+ * host reports POLLNVAL for a socket it no longer has -- every connection
+ * that was open when a guest was snapshotted and restored elsewhere -- so
+ * without this a server parked in recv() on such a connection hangs
+ * forever and never gets back to accept().
+ */
+#define HOSTSOCK_ERR	(POLLERR | POLLHUP | POLLNVAL)
+#define HOSTSOCK_READY_IN	(POLLIN | HOSTSOCK_ERR)
+#define HOSTSOCK_READY_OUT	(POLLOUT | HOSTSOCK_ERR)
+
 /*
  * Ask the host whether @sock is ready for @events (POLLIN and/or POLLOUT)
  * and publish the answer as the socket's guest-side readiness state.
@@ -348,7 +360,7 @@ hostsock_accept4(posix_sock *sock,
 	{
 		int ready = hostsock_ready(sock, POLLIN);
 
-		if (!(ready & POLLIN))
+		if (!(ready & HOSTSOCK_READY_IN))
 			return ERR2PTR(-EAGAIN);
 	}
 
@@ -432,7 +444,7 @@ hostsock_sendto(posix_sock *sock, const void *buf, size_t len,
 	{
 		int ready = hostsock_ready(sock, POLLOUT);
 
-		if (!(ready & POLLOUT))
+		if (!(ready & HOSTSOCK_READY_OUT))
 			return -EAGAIN;
 	}
 
@@ -492,7 +504,7 @@ hostsock_recvfrom(posix_sock *sock, void *restrict buf, size_t len,
 	{
 		int ready = hostsock_ready(sock, POLLIN);
 
-		if (!(ready & POLLIN))
+		if (!(ready & HOSTSOCK_READY_IN))
 			return -EAGAIN;
 	}
 
@@ -541,7 +553,7 @@ hostsock_write(posix_sock *sock, const struct iovec *iov, size_t iovcnt)
 	{
 		int ready = hostsock_ready(sock, POLLOUT);
 
-		if (!(ready & POLLOUT))
+		if (!(ready & HOSTSOCK_READY_OUT))
 			return -EAGAIN;
 	}
 
@@ -803,7 +815,14 @@ static unsigned hostsock_publish_events(posix_sock *sock, int revents,
 		      | ((mask & POLLOUT) ? UKFD_POLLOUT : 0);
 	unsigned set = (((revents & POLLIN) ? UKFD_POLLIN : 0)
 		      | ((revents & POLLOUT) ? UKFD_POLLOUT : 0)) & want;
-	unsigned clr = want & ~set;
+	unsigned clr;
+
+	/* Error, hang-up or a vanished socket: wake every waiter so the
+	 * operation it retries reports the condition (see HOSTSOCK_ERR).
+	 */
+	if (revents & HOSTSOCK_ERR)
+		set = want;
+	clr = want & ~set;
 
 	if (clr)
 		posix_sock_event_clear(sock, clr);
