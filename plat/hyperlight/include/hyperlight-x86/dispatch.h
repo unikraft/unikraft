@@ -31,6 +31,12 @@ struct hyperlight_peb;
 void hyperlight_dispatch_init(const struct hyperlight_peb *peb);
 
 /**
+ * Largest FunctionCall the host can send: the PEB input stack size, read
+ * at init.  Every guest-side buffer that holds a call is sized from it.
+ */
+__u64 hyperlight_dispatch_max_call(void);
+
+/**
  * Dispatch entry point for guest function calls.
  *
  * Set as RIP by the host via dispatch_call_from_host.  Never returns

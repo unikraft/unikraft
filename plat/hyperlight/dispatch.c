@@ -31,6 +31,7 @@
 #include <uk/arch/types.h>
 #include <uk/arch/limits.h>
 #include <uk/arch/x86_64.h>
+#include <uk/alloc.h>
 #include <uk/assert.h>
 #include <uk/init.h>
 #include <uk/print.h>
@@ -247,6 +248,22 @@ static const __u8 HL_VOID_RESULT[] = {
 	0x04, 0x00, 0x04, 0x00, 0x04, 0x00, 0x00, 0x00,
 };
 
+/* ── Call size ─────────────────────────────────────────────────── */
+
+/*
+ * A FunctionCall arrives on the PEB input stack, so it can never be
+ * larger than that stack.  Its size is chosen by the host when it
+ * creates the sandbox and read from the PEB at init: it is the one
+ * limit on a call, and nothing in the guest guesses it separately.
+ * The dispatch copy below is sized from it, and so must be any other
+ * guest-side buffer that has to hold a whole call (the step queue, and
+ * through /dev/hlcall's ioctl the driver's read buffer).
+ */
+__u64 hyperlight_dispatch_max_call(void)
+{
+	return g_input_stack_size;
+}
+
 /* ── Public init ──────────────────────────────────────────────── */
 
 void hyperlight_dispatch_init(const struct hyperlight_peb *peb)
@@ -317,11 +334,12 @@ hyperlight_dispatch_inner(void)
 	 * the data.  We must copy it out before doing anything that might
 	 * trigger a host call.
 	 *
-	 * Static because dispatch is single-threaded (one vCPU) and the
-	 * dispatch entry runs on the exception stack, which is too small
-	 * for a 16 KiB stack allocation.
+	 * Heap-allocated on the first entry, at the size of the input stack
+	 * (see hyperlight_dispatch_max_call): the allocator is up by then,
+	 * dispatch is single-threaded (one vCPU), and the dispatch entry
+	 * runs on the exception stack, which is too small to hold a call.
 	 */
-	static __u8 fc_buf[16384];
+	static __u8 *fc_buf;
 	const __u8 *fc_raw;
 	__u64 fc_len;
 
@@ -353,8 +371,16 @@ hyperlight_dispatch_inner(void)
 		goto push_result;
 	}
 
-	if (fc_len > sizeof(fc_buf)) {
-		uk_pr_err("dispatch: FunctionCall too large (%lu bytes)\n",
+	if (!fc_buf) {
+		fc_buf = uk_malloc(uk_alloc_get_default(), g_input_stack_size);
+		if (unlikely(!fc_buf)) {
+			uk_pr_err("dispatch: no memory for a %lu-byte call buffer\n",
+				  (unsigned long)g_input_stack_size);
+			goto push_result;
+		}
+	}
+	if (unlikely(fc_len > g_input_stack_size)) {
+		uk_pr_err("dispatch: FunctionCall larger than the input stack (%lu bytes)\n",
 			  (unsigned long)fc_len);
 		goto push_result;
 	}
