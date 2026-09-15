@@ -67,7 +67,33 @@ endif
 
 # Strip quotes and then whitespaces
 qstrip = $(strip $(subst ",,$(1)))
-#"))
+
+# Determine source tree root based on this Makefile's location
+MAKEFILE_PATH := $(realpath $(lastword $(MAKEFILE_LIST)))
+SRCTREE := $(patsubst %/,%,$(dir $(MAKEFILE_PATH)))
+
+# Check for required build dependencies
+# skipped for `help`, `print-version`, `print-vars`, `properclean`, `distclean`
+PYTHON ?= python3
+_CHECKDEPS_SCRIPT := $(SRCTREE)/support/scripts/check-deps.py
+_CHECKDEPS_SKIP_TARGETS := help print-version print-vars properclean distclean
+ifneq ($(filter-out $(_CHECKDEPS_SKIP_TARGETS),$(or $(MAKECMDGOALS),default)),)
+ifneq ($(wildcard $(_CHECKDEPS_SCRIPT)),)
+_CHECKDEPS_FLAGS := --quiet
+ifneq ($(V),)
+ifneq ($(V),0)
+_CHECKDEPS_FLAGS :=
+endif
+endif
+ifneq ($(CROSS_COMPILE),)
+_CHECKDEPS_FLAGS += --cross-compile="$(call qstrip,$(CROSS_COMPILE))"
+endif
+_CHECKDEPS_RC := $(shell $(PYTHON) $(_CHECKDEPS_SCRIPT) $(_CHECKDEPS_FLAGS) >&2; echo $$?)
+ifneq ($(_CHECKDEPS_RC),0)
+$(error Some required build tools are missing or too old. Rerun with 'V=1' for full output, or run: $(PYTHON) $(_CHECKDEPS_SCRIPT))
+endif
+endif
+endif
 
 # Variables for use in Make constructs
 comma := ,
