@@ -58,6 +58,7 @@
 #ifndef __HYPERLIGHT_X86_STEP_H__
 #define __HYPERLIGHT_X86_STEP_H__
 
+#include <sys/ioctl.h>
 #include <uk/arch/types.h>
 #include <uk/config.h>
 #include <uk/essentials.h>
@@ -66,13 +67,21 @@
 extern "C" {
 #endif
 
-/**
- * ioctl on /dev/hlcall: store the largest call a read() can return, as a
- * __u64, at the argument.  A driver sizes its read buffer with it, so the
- * limit is set once, by the host (the PEB input stack size), and nobody
- * else hard-codes it.  The number spells 'H','L',1.
+/*
+ * The ioctls of /dev/hlcall, encoded the usual way (_IOR/_IOWR): the
+ * number carries the direction and the argument's size, so a driver
+ * built against a different layout of the argument gets ENOTTY rather
+ * than a partial write.  'H' is the device's type letter; the sequence
+ * number is the command.
  */
-#define HLCALL_IOC_MAXLEN 0x484c0001UL
+
+/**
+ * Store the largest call a read() can return, as a __u64, at the
+ * argument.  A driver sizes its buffers with it, so the limit is set
+ * once, by the host (the PEB input stack size), and nobody else
+ * hard-codes it.
+ */
+#define HLCALL_IOC_MAXLEN _IOR('H', 1, __u64)
 
 #if CONFIG_HYPERLIGHT_STEP
 
