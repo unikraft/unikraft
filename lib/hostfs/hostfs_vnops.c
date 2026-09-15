@@ -28,9 +28,6 @@
 
 #include "hostfs.h"
 
-/* Runtime chunk size — defined in hostfs.h, set at mount time. */
-size_t g_hostfs_chunk = HOSTFS_MAX_CHUNK;
-
 /* ── Helpers ──────────────────────────────────────────────────────── */
 
 /*
@@ -203,8 +200,8 @@ hostfs_read(struct vnode *vp __unused, struct vfscore_file *fp __unused,
 	while (uio->uio_resid > 0) {
 		size_t want = (size_t)uio->uio_resid;
 
-		if (want > g_hostfs_chunk)
-			want = g_hostfs_chunk;
+		if (want > hostfs_io.chunk)
+			want = hostfs_io.chunk;
 
 		struct hl_param p[4];
 
@@ -218,11 +215,11 @@ hostfs_read(struct vnode *vp __unused, struct vfscore_file *fp __unused,
 		p[3].type = HL_PV_HLULONG;
 		p[3].u64_val = want;
 
-		__u8 buf[4 + HOSTFS_MAX_CHUNK];
+		__u8 *buf = hostfs_io.rbuf;
 		__sz len;
 
 		if (hl_hcall_vecbytes("fs_read_bytes", p, 4,
-				      buf, sizeof(buf), &len) < 0)
+				      buf, hostfs_io.result_max, &len) < 0)
 			return EIO;
 
 		if (len < 4)
@@ -280,11 +277,11 @@ hostfs_write(struct vnode *vp, struct uio *uio, int ioflag)
 	int append = (ioflag & IO_APPEND) ? 1 : 0;
 
 	while (uio->uio_resid > 0) {
-		__u8 wbuf[HOSTFS_MAX_CHUNK];
+		__u8 *wbuf = hostfs_io.wbuf;
 		size_t want = (size_t)uio->uio_resid;
 
-		if (want > g_hostfs_chunk)
-			want = g_hostfs_chunk;
+		if (want > hostfs_io.chunk)
+			want = hostfs_io.chunk;
 
 		/* Gather from uio into wbuf. */
 		size_t filled = 0;
@@ -349,7 +346,7 @@ hostfs_readdir(struct vnode *vp, struct vfscore_file *fp,
 {
 	struct hostfs_node *np = vp->v_data;
 	struct hl_param p[2];
-	__u8 buf[8192];
+	__u8 *buf = hostfs_io.rbuf;
 	__sz len;
 
 	p[0].type = HL_PV_HLINT;
@@ -358,7 +355,8 @@ hostfs_readdir(struct vnode *vp, struct vfscore_file *fp,
 	p[1].str.ptr = np->hf_path;
 	p[1].str.len = strlen(np->hf_path);
 
-	if (hl_hcall_vecbytes("fs_list", p, 2, buf, sizeof(buf), &len) < 0)
+	if (hl_hcall_vecbytes("fs_list", p, 2, buf, hostfs_io.result_max,
+			      &len) < 0)
 		return EIO;
 
 	if (len < 8)
@@ -633,7 +631,7 @@ hostfs_readlink(struct vnode *vp, struct uio *uio)
 {
 	struct hostfs_node *np = vp->v_data;
 	struct hl_param p[2];
-	__u8 buf[1028]; /* 4-byte status + up to 1024 bytes of target */
+	__u8 *buf = hostfs_io.rbuf;
 	__sz len;
 
 	p[0].type = HL_PV_HLINT;
@@ -642,7 +640,8 @@ hostfs_readlink(struct vnode *vp, struct uio *uio)
 	p[1].str.ptr = np->hf_path;
 	p[1].str.len = strlen(np->hf_path);
 
-	if (hl_hcall_vecbytes("fs_readlink", p, 2, buf, sizeof(buf), &len) < 0)
+	if (hl_hcall_vecbytes("fs_readlink", p, 2, buf, hostfs_io.result_max,
+			      &len) < 0)
 		return EIO;
 
 	if (len < 4)

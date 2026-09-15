@@ -13,6 +13,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <uk/alloc.h>
+#include <uk/essentials.h>
 #include <vfscore/vnode.h>
 #include <vfscore/mount.h>
 
@@ -22,11 +24,41 @@
 
 extern struct vnops hostfs_vnops;
 
+struct hostfs_io hostfs_io;
+
+int hostfs_io_init(void)
+{
+	__u64 max = hl_hcall_max_payload();
+	__u64 chunk, preferred;
+	__u8 *blk;
+
+	if (hostfs_io.rbuf)
+		return 0;
+	if (unlikely(max <= HOSTFS_STATUS_LEN))
+		return EIO;
+
+	/* As much as a call carries, unless the host prefers less. */
+	chunk = max - HOSTFS_STATUS_LEN;
+	if (hl_hcall_ulong("GetHostFsChunkSize", NULL, 0, &preferred) == 0 &&
+	    preferred > 0 && preferred < chunk)
+		chunk = preferred;
+
+	blk = uk_malloc(uk_alloc_get_default(), max + chunk);
+	if (unlikely(!blk))
+		return ENOMEM;
+	hostfs_io.rbuf = blk;
+	hostfs_io.wbuf = blk + max;
+	hostfs_io.result_max = max;
+	hostfs_io.chunk = chunk;
+	return 0;
+}
+
 static int hostfs_mount(struct mount *mp, const char *dev,
 			int flags __unused, const void *data __unused)
 {
 	struct hostfs_node *root;
 	int mount_idx = 0;
+	int err;
 
 	if (dev && dev[0] != '\0') {
 		char *endp;
@@ -35,16 +67,9 @@ static int hostfs_mount(struct mount *mp, const char *dev,
 			mount_idx = (int)val;
 	}
 
-	/* Query chunk size from host (once — first mount wins). */
-	{
-		__u64 chunk;
-		if (hl_hcall_ulong("GetHostFsChunkSize", NULL, 0,
-				    &chunk) == 0 && chunk > 0) {
-			if (chunk > HOSTFS_MAX_CHUNK)
-				chunk = HOSTFS_MAX_CHUNK;
-			g_hostfs_chunk = (size_t)chunk;
-		}
-	}
+	err = hostfs_io_init();
+	if (err)
+		return err;
 
 	root = malloc(sizeof(*root));
 	if (!root)

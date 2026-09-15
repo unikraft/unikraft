@@ -4,23 +4,35 @@
 #ifndef __HOSTFS_H__
 #define __HOSTFS_H__
 
+#include <uk/arch/types.h>
 #include <vfscore/vnode.h>
 
 /*
- * Maximum bytes per host-call read/write chunk.
+ * Transfer sizing and buffers, set up by the first mount (hostfs_io_init):
  *
- * The actual chunk size is queried from the host at mount time via
- * GetHostFsChunkSize and stored in g_hostfs_chunk (capped to this
- * value).  Stack buffers use this compile-time maximum.
+ *   chunk       data bytes per fs_read_bytes / fs_write_bytes -- the
+ *               host's preference (GetHostFsChunkSize), never more than
+ *               one host call carries (hl_hcall_max_payload);
+ *   result_max  what any result can be, i.e. the size of rbuf.
+ *
+ * Every result carries an i32 status ahead of its payload.  The buffers
+ * are heap -- a payload does not fit a thread stack -- and shared: the
+ * single vCPU runs one host call at a time, and no hostfs operation
+ * yields while it holds them.
  */
-#define HOSTFS_MAX_CHUNK 32768
+#define HOSTFS_STATUS_LEN 4
 
-/*
- * Runtime chunk size — set at mount time from GetHostFsChunkSize,
- * capped to HOSTFS_MAX_CHUNK.  Defaults to HOSTFS_MAX_CHUNK if the
- * host function is not registered.
- */
-extern size_t g_hostfs_chunk;
+struct hostfs_io {
+	size_t chunk;
+	size_t result_max;
+	__u8 *rbuf;	/* results: fs_read_bytes, fs_list, fs_readlink */
+	__u8 *wbuf;	/* the fs_write_bytes payload, chunk bytes */
+};
+
+extern struct hostfs_io hostfs_io;
+
+/* Size the transfers and allocate the buffers; 0 or an errno. */
+int hostfs_io_init(void);
 
 /*
  * hostfs stores minimal per-node metadata.  Actual data lives on the
