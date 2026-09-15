@@ -31,20 +31,39 @@
 #include <hyperlight-x86/hcall.h>
 
 /*
- * Static I/O buffers — too large for the stack (64 KB each would overflow
- * musl's 80 KB default thread stack).  Single vCPU + spinlock in the hcall
- * path guarantees exclusive access.
+ * Transfer buffers, sized from the host's PEB stacks (hl_hcall_max_payload)
+ * when the first socket is created: the host decides how much one call
+ * carries, the guest never guesses.  Heap, not stack -- a payload does not
+ * fit a thread stack -- and shared: the single vCPU and the hcall spinlock
+ * keep every use exclusive, and no socket operation yields between
+ * filling a buffer and the host call that consumes it.
  */
-static __u8 g_recv_buf[4 + 7 + 16 + 65536]; /* header + addr + data */
-static __u8 g_send_buf[65536];
+static __u8 *g_recv_buf;	/* a net_recvfrom result */
+static __u8 *g_send_buf;	/* gathered iovecs for net_send */
+static __sz g_payload_max;	/* size of each; the most one call carries */
 
-/*
- * Maximum payload for a single hcall send — the FlatBuffer encoder
- * (g_generic_fc_buf) is 64 KiB, of which ~256 bytes are headers/metadata.
- * Cap user data at 60 KiB to leave headroom.  sendall() loops call
- * send() repeatedly, so the kernel returning a short count is correct.
+/* A net_recvfrom result is an i32 count, an optional address (7-byte
+ * prefix plus up to 16 address bytes, see unpack_addr), then the data.
  */
-#define HCALL_SEND_MAX  (60 * 1024)
+#define HOSTSOCK_RECV_HDR (4 + 7 + 16)
+
+static int hostsock_bufs_init(void)
+{
+	__u64 max = hl_hcall_max_payload();
+	__u8 *blk;
+
+	if (g_recv_buf)
+		return 0;
+	if (unlikely(max <= HOSTSOCK_RECV_HDR))
+		return -EIO;
+	blk = uk_malloc(uk_alloc_get_default(), 2 * max);
+	if (unlikely(!blk))
+		return -ENOMEM;
+	g_recv_buf = blk;
+	g_send_buf = blk + max;
+	g_payload_max = max;
+	return 0;
+}
 
 /* ── Tracked sockets for poll rescan ─────────────────────────────── */
 
@@ -465,8 +484,12 @@ hostsock_create(struct posix_socket_driver *d __unused,
 		int family, int type, int protocol)
 {
 	struct hostsock *hs;
-	int host_fd = hc_socket(family, type, protocol);
+	int host_fd, err;
 
+	err = hostsock_bufs_init();
+	if (unlikely(err))
+		return ERR2PTR(err);
+	host_fd = hc_socket(family, type, protocol);
 	if (host_fd < 0)
 		return ERR2PTR(host_fd);
 	hs = hs_new(host_fd, family, type, protocol);
@@ -637,9 +660,11 @@ hostsock_sendto(posix_sock *sock, const void *buf, size_t len,
 			return -EAGAIN;
 	}
 
-	/* Cap to hcall buffer capacity — sendall() loops will retry. */
-	if (len > HCALL_SEND_MAX)
-		len = HCALL_SEND_MAX;
+	/* Cap to what one call carries: a short send is legitimate, and
+	 * sendall() loops retry.
+	 */
+	if (len > g_payload_max)
+		len = g_payload_max;
 
 	if (dest_addr) {
 		/* sendto with destination */
@@ -706,11 +731,13 @@ hostsock_recvfrom(posix_sock *sock, void *restrict buf, size_t len,
 	struct hl_param p[2];
 	__sz rlen;
 
+	/* Ask for what a result carries beside its header. */
 	p[0].type = HL_PV_HLINT; p[0].i32_val = sock_fd(sock);
-	p[1].type = HL_PV_HLINT; p[1].i32_val = len > 65536 ? 65536 : len;
+	p[1].type = HL_PV_HLINT;
+	p[1].i32_val = MIN(len, g_payload_max - HOSTSOCK_RECV_HDR);
 
 	if (hl_hcall_vecbytes("net_recvfrom", p, 2,
-			      g_recv_buf, sizeof(g_recv_buf), &rlen) < 0)
+			      g_recv_buf, g_payload_max, &rlen) < 0)
 		return -EIO;
 
 	if (rlen < 4)
@@ -761,10 +788,10 @@ hostsock_write(posix_sock *sock, const struct iovec *iov, size_t iovcnt)
 	for (size_t i = 0; i < iovcnt; i++)
 		total += iov[i].iov_len;
 
-	if (total > sizeof(g_send_buf)) {
+	if (total > g_payload_max) {
 		uk_pr_warn("hostsock: write truncated from %zu to %zu bytes\n",
-			   total, sizeof(g_send_buf));
-		total = sizeof(g_send_buf);
+			   total, g_payload_max);
+		total = g_payload_max;
 	}
 
 	size_t off = 0;
@@ -966,10 +993,10 @@ hostsock_sendmsg(posix_sock *sock, const struct msghdr *msg, int flags)
 	for (size_t i = 0; i < (size_t)msg->msg_iovlen; i++)
 		total += msg->msg_iov[i].iov_len;
 
-	if (total > sizeof(g_send_buf)) {
+	if (total > g_payload_max) {
 		uk_pr_warn("hostsock: sendmsg truncated from %zu to %zu bytes\n",
-			   total, sizeof(g_send_buf));
-		total = sizeof(g_send_buf);
+			   total, g_payload_max);
+		total = g_payload_max;
 	}
 
 	size_t off = 0;
