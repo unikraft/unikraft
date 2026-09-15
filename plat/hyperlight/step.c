@@ -57,6 +57,8 @@ extern int hostsock_rescan_events(void);
 #define HL_STEP_CALL_DONE	(1 << 0) /* a queued named call finished */
 #define HL_STEP_CALL_REJECTED	(1 << 1) /* a named call had no reader */
 #define HL_STEP_HAS_DRIVER	(1 << 2) /* /dev/hlcall has been opened */
+#define HL_STEP_CALL_FAILED	(1 << 3) /* the driver reported the call failed */
+#define HL_STEP_EXITED		(1 << 4) /* the process exited; ns = its status */
 
 /* The guest function that drives the scheduler.  Any other name is an
  * application-level call for the /dev/hlcall reader.
@@ -138,7 +140,7 @@ static __u64 hl_call_cap;
 static __u64 hl_call_len;              /* 0 = nothing queued */
 static struct uk_thread *hl_call_reader; /* thread blocked in read() */
 static int hl_call_opened;             /* a driver has opened the device */
-static int hl_call_status;             /* DONE/REJECTED bits, consumed by the pump report */
+static int hl_call_status;             /* CALL_* bits, consumed by the pump report */
 
 /* Queue a named FunctionCall for the device reader.
  *
@@ -218,10 +220,26 @@ static int hlcall_read(struct device *dev __unused, struct uio *uio,
 	return 0;
 }
 
-static int hlcall_write(struct device *dev __unused, struct uio *uio __unused,
+/* The driver reports how the call it is serving went: a 32-bit status,
+ * 0 for success.  Written before the next read(), which marks the call
+ * done; a non-zero status flags it failed in that same report.  The
+ * kernel does not interpret the value beyond zero / non-zero.
+ */
+static int hlcall_write(struct device *dev __unused, struct uio *uio,
 			int flags __unused)
 {
-	return EPERM;
+	__s32 status;
+
+	if (unlikely(!uio->uio_iov || uio->uio_iovcnt < 1 ||
+		     uio->uio_iov->iov_len < sizeof(status)))
+		return EINVAL;
+	if (!hl_call_in_flight)
+		return EPERM;
+	memcpy(&status, uio->uio_iov->iov_base, sizeof(status));
+	if (status)
+		hl_call_status |= HL_STEP_CALL_FAILED;
+	uio->uio_resid -= (ssize_t)sizeof(status);
+	return 0;
 }
 
 /* HLCALL_IOC_MAXLEN: tell the driver how big a call can get, so it sizes
@@ -267,6 +285,34 @@ static int hlcall_register(struct uk_init_ctx *ictx __unused)
 
 devfs_initcall(hlcall_register);
 #endif /* CONFIG_LIBDEVFS */
+
+/* ── Exit status ─────────────────────────────────────────────────── */
+
+/* The exit status ukboot is shutting down with, captured from the term
+ * context on the way down.  Term handlers run in reverse init order, so
+ * this one is registered at the platform class to run after the library
+ * handlers: posix-process's (a late initcall) has by then replaced
+ * main()'s return value with the init process's exit status, which is
+ * the one that matters under the elfloader, where main() never returns.
+ */
+static int hl_exit_code;
+
+static int hl_exit_init(struct uk_init_ctx *ictx __unused)
+{
+	return 0;
+}
+
+static void hl_record_exit(struct uk_term_ctx *tctx)
+{
+	hl_exit_code = tctx->exit_code;
+}
+
+uk_plat_initcall(hl_exit_init, hl_record_exit);
+
+void hyperlight_step_report_exit(void)
+{
+	hl_step_report((__u64)(__u32)hl_exit_code, HL_STEP_EXITED);
+}
 
 /* ── Yield thread ────────────────────────────────────────────────── */
 
@@ -369,8 +415,10 @@ int hyperlight_step_halt(__nsec wakeup_time)
  *
  *   ns: nanoseconds until the next guest timer fires (0 = none pending;
  *       HL_STEP_DUE_NS = a timer is already due, re-poll at once).
- *   flags: HL_STEP_* bits -- what became of a queued named call, and
- *       whether a driver is listening on /dev/hlcall at all.
+ *       With HL_STEP_EXITED set it carries the process exit status.
+ *   flags: HL_STEP_* bits -- what became of a queued named call, whether
+ *       a driver is listening on /dev/hlcall at all, and whether the
+ *       process has exited.
  *
  * Failure is non-fatal: without a report the host sees the step as an
  * exit, which is the right reading of a host without `StepYield`.

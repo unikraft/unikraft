@@ -63,13 +63,15 @@ void __noreturn hyperlight_halt_to_host(void)
 static int hyperlight_shutdown(void)
 {
 	/*
-	 * Under a step pump this halt lands in the middle of the host's
-	 * `step` call (the workload's main thread exited and ukboot is
-	 * shutting the system down).  Complete that call with a void
-	 * result so the host reads a clean exit rather than a truncated
-	 * step; the missing `StepYield` report is what tells it the guest
-	 * is gone.
+	 * Tell the host the process is gone and with what status.  Under a
+	 * step pump this halt lands in the middle of the host's `step` call
+	 * (the workload's main thread exited and ukboot is shutting the
+	 * system down): complete that call with a void result too, so the
+	 * host reads a clean exit rather than a truncated step.  The report
+	 * goes first; it is a host call and must not sit on top of the
+	 * result.
 	 */
+	hyperlight_step_report_exit();
 	if (hyperlight_step_active())
 		hyperlight_dispatch_push_void_result();
 

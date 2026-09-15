@@ -41,8 +41,9 @@
  *                  thread.  Re-entering read() marks the call complete.
  *
  * The host learns the outcome of every step from the `StepYield` host
- * function, called just before the halt; a halt without it means the
- * guest process exited.
+ * function, called just before the halt.  When the guest process exits,
+ * the shutdown path reports its exit status the same way; a halt without
+ * any report also means the process is gone (status unknown).
  */
 
 #ifndef __HYPERLIGHT_X86_STEP_H__
@@ -103,6 +104,13 @@ int hyperlight_step_halt(__nsec wakeup_time);
 int hyperlight_step_active(void);
 
 /**
+ * Report the process exit status to the host (the `StepYield` report with
+ * the exited flag).  Called by the platform shutdown path before the
+ * final halt, whether or not a pump is in flight.
+ */
+void hyperlight_step_report_exit(void);
+
+/**
  * True if the size-prefixed FunctionCall @fc is the pump's own `step`
  * entry point rather than a named application call.
  */
@@ -118,6 +126,10 @@ static inline int hyperlight_step_halt(__nsec wakeup_time __unused)
 static inline int hyperlight_step_active(void)
 {
 	return 0;
+}
+
+static inline void hyperlight_step_report_exit(void)
+{
 }
 
 static inline int hyperlight_step_fc_is_pump(const __u8 *fc __unused,
