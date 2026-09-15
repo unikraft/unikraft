@@ -33,7 +33,13 @@
  *                  platform halt switches straight back and the pump
  *                  reports the deadline and returns to the halt.
  *
- *   /dev/hlcall    Named guest functions (anything but `step`) cannot run
+ *   resume         What the host calls instead of the first `step` after
+ *                  restoring the guest from a snapshot: a step that first
+ *                  refreshes the state clones must not share (the CSPRNG
+ *                  is reseeded).
+ *
+ *   /dev/hlcall    Named guest functions (anything but `step` and `resume`)
+ *                  cannot run
  *                  on the yield thread -- a call that blocks there
  *                  could never yield the vCPU.  They are queued on this
  *                  character device instead; a driver blocks in read()

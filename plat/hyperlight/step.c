@@ -27,6 +27,10 @@
 #include <devfs/device.h>
 #endif /* CONFIG_LIBDEVFS */
 
+#if CONFIG_LIBUKRANDOM
+#include <uk/random.h>
+#endif /* CONFIG_LIBUKRANDOM */
+
 #include <hyperlight-x86/dispatch.h>
 #include <hyperlight-x86/hcall.h>
 #include <hyperlight-x86/step.h>
@@ -60,10 +64,13 @@ extern int hostsock_rescan_events(void);
 #define HL_STEP_CALL_FAILED	(1 << 3) /* the driver reported the call failed */
 #define HL_STEP_EXITED		(1 << 4) /* the process exited; ns = its status */
 
-/* The guest function that drives the scheduler.  Any other name is an
- * application-level call for the /dev/hlcall reader.
+/* The guest function that drives the scheduler, and the one the host
+ * uses in its place for the first entry after restoring this guest from a
+ * snapshot.  Any other name is an application-level call for the
+ * /dev/hlcall reader.
  */
 static const char hl_step_fn_name[] = "step";
+static const char hl_resume_fn_name[] = "resume";
 
 /* ── FlatBuffer helpers (FunctionCall.function_name) ─────────────── */
 
@@ -372,6 +379,24 @@ uk_late_initcall(hl_yield_thread_create, 0x0);
 
 /* ── Pump ────────────────────────────────────────────────────────── */
 
+/* The host has just restored this guest from a snapshot.  Whatever the
+ * image carries that two guests restored from the same snapshot must not
+ * share is refreshed here, before anything else runs.  Today that is the
+ * CSPRNG: its state lives in guest memory, so without a reseed every
+ * clone would draw the same "random" bytes (the same UUIDs, tokens and
+ * TLS nonces) until the periodic reseed happened to fire.
+ */
+static void hl_resume(void)
+{
+#if CONFIG_LIBUKRANDOM
+	int rc = uk_random_reseed();
+
+	if (unlikely(rc))
+		uk_pr_err("hyperlight: CSPRNG reseed after restore failed: %d\n",
+			  rc);
+#endif /* CONFIG_LIBUKRANDOM */
+}
+
 int hyperlight_step_active(void)
 {
 	return hl_pump_active;
@@ -466,7 +491,9 @@ void hyperlight_step_pump(const __u8 *fc, __u64 fc_len)
 		return;
 	}
 
-	if (!hyperlight_step_fc_is_pump(fc, fc_len))
+	if (fc_name_is(fc, fc_len, hl_resume_fn_name))
+		hl_resume();
+	else if (!hyperlight_step_fc_is_pump(fc, fc_len))
 		hl_route_call(fc, fc_len);
 
 	hl_pump_active = 1;
