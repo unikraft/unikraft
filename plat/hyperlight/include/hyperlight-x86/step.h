@@ -48,10 +48,11 @@
  *                  on it and runs each call on its own schedulable
  *                  thread.  Re-entering read() marks the call complete.
  *
- * The host learns the outcome of every step from the `StepYield` host
- * function, called just before the halt.  When the guest process exits,
- * the shutdown path reports its exit status the same way; a halt without
- * any report also means the process is gone (status unknown).
+ * The guest reports to the host through named host functions, each one
+ * fact with typed arguments: Yield(ns) at every boundary, DriverReady(),
+ * CallStarted(), CallDone(status), CallRejected() and Exited(status)
+ * (see step.c).  A halt with neither a Yield nor an Exited means the
+ * process is gone with unknown status.
  */
 
 #ifndef __HYPERLIGHT_X86_STEP_H__
@@ -78,8 +79,8 @@ extern "C" {
 /**
  * Run one cooperative step: dispose of the in-flight FunctionCall, drive
  * the scheduler until it would go idle, then report the next-wakeup
- * deadline to the host via the `StepYield` host function and return so
- * the dispatch handler can push the void result and halt.
+ * deadline to the host via the `Yield` host function and return so the
+ * dispatch handler can push the void result and halt.
  *
  * @param fc      The FunctionCall FlatBuffer that entered the guest
  *                (a stable copy; the PEB input stack is reused by host
@@ -112,9 +113,9 @@ int hyperlight_step_halt(__nsec wakeup_time);
 int hyperlight_step_active(void);
 
 /**
- * Report the process exit status to the host (the `StepYield` report with
- * the exited flag).  Called by the platform shutdown path before the
- * final halt, whether or not a pump is in flight.
+ * Report the process exit status to the host (the `Exited` host
+ * function).  Called by the platform shutdown path before the final
+ * halt, whether or not a pump is in flight.
  */
 void hyperlight_step_report_exit(void);
 

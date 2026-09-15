@@ -57,15 +57,50 @@ extern void hostsock_resume(void);
  */
 #define HL_STEP_DUE_NS 1ULL
 
-/* Flags reported to the host with every step (the `StepYield` host
- * function's second argument), and once at boot complete.
+/* What the guest tells the host, each as a named host function: the
+ * protocol is the names and their typed arguments, nothing is encoded.
+ *
+ *   Yield(ns)         every thread is blocked; the next timer fires in ns
+ *                     (0: none).  Sent at every boundary, and once at boot
+ *                     complete.
+ *   DriverReady()     /dev/hlcall was opened: named calls are served.
+ *   CallStarted()     the reader took a named call.
+ *   CallDone(status)  that call returned: 0, or the status the driver
+ *                     wrote to the device.
+ *   CallRejected()    a named call had no reader, or did not fit.
+ *   Exited(status)    the process exited.
+ *
+ * After a restore, DriverReady and CallStarted are sent again if they
+ * hold, so the new host learns them (see hl_resume()).  Every send is
+ * best-effort: a host lacking one of these functions does not learn that
+ * fact, and nothing else breaks.
  */
-#define HL_STEP_CALL_DONE	(1 << 0) /* a queued named call finished */
-#define HL_STEP_CALL_REJECTED	(1 << 1) /* a named call had no reader */
-#define HL_STEP_HAS_DRIVER	(1 << 2) /* /dev/hlcall has been opened */
-#define HL_STEP_CALL_FAILED	(1 << 3) /* the driver reported the call failed */
-#define HL_STEP_EXITED		(1 << 4) /* the process exited; ns = its status */
-#define HL_STEP_CALL_IN_FLIGHT	(1 << 5) /* a named call is being served */
+static void hl_emit(const char *event)
+{
+	__s32 out;
+
+	(void)hl_hcall_int(event, NULL, 0, &out);
+}
+
+static void hl_emit_i32(const char *event, __s32 value)
+{
+	struct hl_param p[1];
+	__s32 out;
+
+	p[0].type = HL_PV_HLINT;
+	p[0].i32_val = value;
+	(void)hl_hcall_int(event, p, 1, &out);
+}
+
+static void hl_emit_u64(const char *event, __u64 value)
+{
+	struct hl_param p[1];
+	__s32 out;
+
+	p[0].type = HL_PV_HLULONG;
+	p[0].u64_val = value;
+	(void)hl_hcall_int(event, p, 1, &out);
+}
 
 /* The guest function that drives the scheduler, and the one the host
  * uses in its place for the first entry after restoring this guest from a
@@ -122,8 +157,6 @@ static int fc_name_is(const __u8 *b, __u64 len, const char *name)
 	return !memcmp(b + p + 4, name, nlen);
 }
 
-static void hl_step_report(__u64 ns, int flags);
-
 /* ── Pump state ──────────────────────────────────────────────────── */
 
 /* The yield thread: the guest thread that is "current" whenever the VM
@@ -150,7 +183,7 @@ static __u64 hl_call_cap;
 static __u64 hl_call_len;              /* 0 = nothing queued */
 static struct uk_thread *hl_call_reader; /* thread blocked in read() */
 static int hl_call_opened;             /* a driver has opened the device */
-static int hl_call_status;             /* CALL_* bits, consumed by the pump report */
+static __s32 hl_call_fail_status;      /* from the driver's write(); 0 = success */
 
 /* Queue a named FunctionCall for the device reader.
  *
@@ -162,13 +195,13 @@ static void hl_route_call(const __u8 *fc, __u64 fc_len)
 {
 	if (!hl_call_opened) {
 		uk_pr_warn("hyperlight: named call rejected, no /dev/hlcall reader\n");
-		hl_call_status |= HL_STEP_CALL_REJECTED;
+		hl_emit("CallRejected");
 		return;
 	}
 	if (unlikely(!hl_call_buf || fc_len > hl_call_cap)) {
 		uk_pr_err("hyperlight: cannot queue a %llu-byte named call\n",
 			  (unsigned long long)fc_len);
-		hl_call_status |= HL_STEP_CALL_REJECTED;
+		hl_emit("CallRejected");
 		return;
 	}
 	/* One call at a time: the host drives a named call to completion
@@ -191,6 +224,7 @@ static int hl_call_in_flight;
 static int hlcall_open(struct device *dev __unused, int mode __unused)
 {
 	hl_call_opened = 1;
+	hl_emit("DriverReady");
 	return 0;
 }
 
@@ -211,7 +245,8 @@ static int hlcall_read(struct device *dev __unused, struct uio *uio,
 
 	if (hl_call_in_flight) {
 		hl_call_in_flight = 0;
-		hl_call_status |= HL_STEP_CALL_DONE;
+		hl_emit_i32("CallDone", hl_call_fail_status);
+		hl_call_fail_status = 0;
 	}
 
 	while (!hl_call_len) {
@@ -225,15 +260,15 @@ static int hlcall_read(struct device *dev __unused, struct uio *uio,
 	memcpy(buf, hl_call_buf, n);
 	hl_call_len = 0;
 	hl_call_in_flight = 1;
+	hl_emit("CallStarted");
 	uio->uio_resid -= (ssize_t)n;
 
 	return 0;
 }
 
 /* The driver reports how the call it is serving went: a 32-bit status,
- * 0 for success.  Written before the next read(), which marks the call
- * done; a non-zero status flags it failed in that same report.  The
- * kernel does not interpret the value beyond zero / non-zero.
+ * 0 for success.  Written before the next read(), which reports the call
+ * done to the host with this status.  The kernel does not interpret it.
  */
 static int hlcall_write(struct device *dev __unused, struct uio *uio,
 			int flags __unused)
@@ -246,8 +281,7 @@ static int hlcall_write(struct device *dev __unused, struct uio *uio,
 	if (!hl_call_in_flight)
 		return EPERM;
 	memcpy(&status, uio->uio_iov->iov_base, sizeof(status));
-	if (status)
-		hl_call_status |= HL_STEP_CALL_FAILED;
+	hl_call_fail_status = status;
 	uio->uio_resid -= (ssize_t)sizeof(status);
 	return 0;
 }
@@ -321,7 +355,7 @@ uk_plat_initcall(hl_exit_init, hl_record_exit);
 
 void hyperlight_step_report_exit(void)
 {
-	hl_step_report((__u64)(__u32)hl_exit_code, HL_STEP_EXITED);
+	hl_emit_i32("Exited", hl_exit_code);
 }
 
 /* ── Yield thread ────────────────────────────────────────────────── */
@@ -332,13 +366,13 @@ static __noreturn void hl_yield_thread_fn(void)
 	uk_thread_block(uk_thread_current());
 	uk_sched_yield();
 
-	/* Tell the host this guest runs the step model and whether a driver
-	 * is listening for named calls, then hand the VM over.  Every later
-	 * entry comes back through hyperlight_dispatch_function on this
-	 * thread and reaches the pump.
+	/* Tell the host this guest runs the step model, then hand the VM
+	 * over.  (A driver that opened /dev/hlcall has already said so.)
+	 * Every later entry comes back through hyperlight_dispatch_function
+	 * on this thread and reaches the pump.
 	 */
 	hl_boot_halted = 1;
-	hl_step_report(0, 0);
+	hl_emit_u64("Yield", 0);
 	hyperlight_halt_to_host();
 }
 
@@ -406,6 +440,11 @@ static void hl_resume(void)
 #ifdef CONFIG_LIBHOSTSOCK
 	hostsock_resume();
 #endif /* CONFIG_LIBHOSTSOCK */
+	/* The new host has not heard these yet. */
+	if (hl_call_opened)
+		hl_emit("DriverReady");
+	if (hl_call_in_flight)
+		hl_emit("CallStarted");
 }
 
 int hyperlight_step_active(void)
@@ -447,36 +486,6 @@ int hyperlight_step_halt(__nsec wakeup_time)
 	return 0;
 }
 
-/* Report the outcome of a step to the host.
- *
- *   ns: nanoseconds until the next guest timer fires (0 = none pending;
- *       HL_STEP_DUE_NS = a timer is already due, re-poll at once).
- *       With HL_STEP_EXITED set it carries the process exit status.
- *   flags: HL_STEP_* bits -- what became of a queued named call, whether
- *       a driver is listening on /dev/hlcall at all, and whether the
- *       process has exited.
- *
- * Failure is non-fatal: without a report the host sees the step as an
- * exit, which is the right reading of a host without `StepYield`.
- */
-static void hl_step_report(__u64 ns, int flags)
-{
-	struct hl_param p[2];
-	__s32 out;
-
-	if (hl_call_opened)
-		flags |= HL_STEP_HAS_DRIVER;
-	if (hl_call_in_flight)
-		flags |= HL_STEP_CALL_IN_FLIGHT;
-
-	p[0].type = HL_PV_HLULONG;
-	p[0].u64_val = ns;
-	p[1].type = HL_PV_HLINT;
-	p[1].i32_val = flags;
-
-	(void)hl_hcall_int("StepYield", p, 2, &out);
-}
-
 void hyperlight_step_pump(const __u8 *fc, __u64 fc_len)
 {
 	struct uk_sched *s = uk_sched_current();
@@ -484,7 +493,6 @@ void hyperlight_step_pump(const __u8 *fc, __u64 fc_len)
 	unsigned long flags;
 	__nsec wakeup, now;
 	__u64 ns;
-	int status;
 
 	/* The const is dropped because uk_sched_thread_switch() needs a
 	 * mutable handle; the idle thread object is legitimately mutable.
@@ -540,11 +548,9 @@ void hyperlight_step_pump(const __u8 *fc, __u64 fc_len)
 	uk_lcpu_restore_irqf(flags);
 
 	wakeup = hl_pump_wakeup;
-	status = hl_call_status;
 	hl_pump_active = 0;
 	hl_pump_idle = NULL;
 	hl_pump_wakeup = 0;
-	hl_call_status = 0;
 
 	if (wakeup) {
 		now = ukplat_monotonic_clock();
@@ -553,5 +559,5 @@ void hyperlight_step_pump(const __u8 *fc, __u64 fc_len)
 		ns = 0;
 	}
 
-	hl_step_report(ns, status);
+	hl_emit_u64("Yield", ns);
 }
