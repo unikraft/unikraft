@@ -83,6 +83,27 @@ extern "C" {
  */
 #define HLCALL_IOC_MAXLEN _IOR('H', 1, __u64)
 
+/**
+ * Argument of HLCALL_IOC_GETENV.
+ */
+struct hlcall_env {
+	char *buf;	/* in: where to store the entries */
+	__u64 cap;	/* in: bytes available at buf */
+	__u64 len;	/* out: bytes stored, not counting the final NUL */
+};
+
+/**
+ * Fetch the host-provided environment, as the host has it now, into
+ * @buf -- KEY=VALUE entries separated by NUL and terminated by one; @len
+ * is the length without that terminator.  A driver runs it before each
+ * call it serves, so variables the host set since (after restoring a
+ * snapshot, typically) reach the process, whose libc environ the kernel
+ * cannot see.  Fails with ENOBUFS if the entries do not fit @cap;
+ * HLCALL_IOC_MAXLEN bytes always do, the entries arrive on the same PEB
+ * stack as a call.
+ */
+#define HLCALL_IOC_GETENV _IOWR('H', 2, struct hlcall_env)
+
 #if CONFIG_HYPERLIGHT_STEP
 
 /**

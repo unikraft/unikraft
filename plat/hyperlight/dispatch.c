@@ -56,142 +56,65 @@ static int g_dispatch_ready;
  */
 __u64 g_exn_stack_top;
 
-/* ── Environment variable injection ───────────────────────────── */
-
-/*
- * Export the address of hl_call_get_env_vars so the loaded ELF (a
- * runtime driver) can call it directly.  The driver runs on glibc,
- * which has a separate environ from the kernel; calling this function
- * is how it re-reads host-provided env vars before each call it serves.
- *
- * Runs as a late init call — after posix-environ is initialised
- * but before boot.c calls main() (the elfloader).
- *
- * TODO: Replace this raw-address mechanism with a cleaner interface
- * (vDSO export, syscall, or device ioctl).
- */
-static int hyperlight_dispatch_inject_env(struct uk_init_ctx *ictx __unused)
-{
-	static char env_getenv[64];
-
-	snprintf(env_getenv, sizeof(env_getenv),
-		 "HL_GET_ENV_VARS_FN=0x%lx",
-		 (unsigned long)hl_call_get_env_vars);
-	putenv(env_getenv);
-
-	return 0;
-}
-
-uk_late_initcall(hyperlight_dispatch_inject_env, 0x0);
-
 /* ── Host-provided environment variables ─────────────────────────── */
 
 /*
- * Check whether a KEY=VALUE entry uses a reserved key prefix.
- * Keys starting with "HL_" are reserved for Hyperlight internals
- * (HL_GET_ENV_VARS_FN) and must not be overwritten by host-provided
- * environment variables.
+ * Bring the host-provided environment into the process: GetEnvVars
+ * returns KEY=VALUE entries separated by NUL, and each is setenv()ed
+ * over whatever was there.  The buffer is sized from the PEB on first
+ * use -- the entries arrive on the input stack, so hl_hcall_max_payload()
+ * bytes always hold them -- and kept, since this runs often.
+ *
+ * Runs as a late initcall, after posix-environ and before the ELF
+ * loader's main(), so the loaded program starts with the variables; and
+ * again ahead of every named call (hyperlight_dispatch_inner), since the
+ * initcall does not re-run after a snapshot restore and that is how the
+ * variables the new host set get in.  A loaded program has a libc
+ * environ of its own that this cannot reach; drivers refresh it through
+ * the HLCALL_IOC_GETENV ioctl (step.c).
  */
-static int is_reserved_env_key(const char *entry)
+static void hyperlight_dispatch_apply_host_env(void)
 {
-	return (entry[0] == 'H' && entry[1] == 'L' && entry[2] == '_');
-}
-
-/*
- * Inject host-provided environment variables into the guest process.
- *
- * The host registers a GetEnvVars function that returns a NUL-separated
- * string of KEY=VALUE pairs.  This init call queries that function and
- * injects each pair via putenv().
- *
- * The buffer is static so putenv() pointers remain valid for the
- * lifetime of the process.
- *
- * Keys starting with HL_ are silently skipped — they are reserved
- * for Hyperlight internal use.
- *
- * Runs right after the dispatch env injection (priority 0x1) so both
- * internal and host-provided env vars are set before main().
- */
-static int hyperlight_dispatch_inject_host_env(struct uk_init_ctx *ictx __unused)
-{
-	static char env_buf[4096];
-	int len;
+	static char *buf;
+	static __sz cap;
 	char *p, *end;
+	int len;
 
-	len = hl_call_get_env_vars(env_buf, sizeof(env_buf));
-	if (len <= 0)
-		return 0; /* no env vars from host — not an error */
-
-	p = env_buf;
-	end = env_buf + len;
-	while (p < end) {
-		if (*p == '\0') {
-			p++;
-			continue;
+	if (!buf) {
+		cap = hl_hcall_max_payload();
+		buf = cap ? uk_malloc(uk_alloc_get_default(), cap) : NULL;
+		if (unlikely(!buf)) {
+			uk_pr_err("dispatch: no memory for the host environment\n");
+			return;
 		}
-		if (!is_reserved_env_key(p))
-			putenv(p);
-		p += strlen(p) + 1;
 	}
 
+	len = hl_call_get_env_vars(buf, cap);
+	if (len <= 0)
+		return; /* none, or no such host function: not an error */
+	if (unlikely((__sz)len >= cap)) {
+		uk_pr_err("dispatch: host environment (%d bytes) does not fit\n",
+			  len);
+		return;
+	}
+
+	for (p = buf, end = buf + len; p < end; p += strlen(p) + 1) {
+		char *eq = strchr(p, '=');
+
+		if (!eq || eq == p)
+			continue;
+		*eq = '\0';
+		setenv(p, eq + 1, 1);
+		*eq = '=';
+	}
+}
+
+static int hyperlight_dispatch_env_init(struct uk_init_ctx *ictx __unused)
+{
+	hyperlight_dispatch_apply_host_env();
 	return 0;
 }
-
-uk_late_initcall(hyperlight_dispatch_inject_host_env, 0x0);
-
-/*
- * Re-inject host-provided environment variables.
- *
- * Called at the start of every dispatch (hyperlight_dispatch_inner).
- * On a normal boot this is a no-op (the initcall already ran and the
- * host typically returns the same vars).  After a snapshot restore the
- * initcall does NOT re-run, so this is the path that picks up env vars
- * set by the host after restore.
- *
- * Uses setenv() instead of putenv() because the buffer is on the stack
- * and must not outlive this call.  setenv() copies both key and value.
- */
-static void hyperlight_dispatch_reinject_host_env(void)
-{
-	char buf[4096];
-	int len;
-	char *p, *end;
-
-	len = hl_call_get_env_vars(buf, sizeof(buf));
-	if (len <= 0)
-		return;
-
-	p = buf;
-	end = buf + len;
-	while (p < end) {
-		char *eq;
-
-		if (*p == '\0') {
-			p++;
-			continue;
-		}
-		if (is_reserved_env_key(p))
-			goto next;
-
-		eq = p;
-		while (*eq && *eq != '=')
-			eq++;
-		if (*eq == '=') {
-			*eq = '\0';
-			setenv(p, eq + 1, 1);
-			*eq = '=';
-		}
-next:
-		/* Advance past the NUL separator.  We may have
-		 * temporarily zeroed '=' above, but eq+1 points past
-		 * the value; find the original terminator.
-		 */
-		while (p < end && *p != '\0')
-			p++;
-		p++;
-	}
-}
+uk_late_initcall(hyperlight_dispatch_env_init, 0x0);
 
 /*
  * Void FunctionCallResult — pre-encoded FlatBuffer.
@@ -302,19 +225,14 @@ hyperlight_dispatch_inner(void)
 	memcpy(fc_buf, (const void *)fc_raw, fc_len);
 
 	/*
-	 * Re-inject host-provided environment variables.
-	 *
-	 * On a normal boot this is redundant (the initcall already ran)
-	 * but cheap — one host call that returns an empty string.
-	 * After a snapshot restore the initcall does NOT re-run, so this
-	 * is the only path that picks up env vars the host set after
-	 * restore.
-	 *
-	 * Skipped for the pump's own `step` entry: it carries no workload
-	 * of its own and can run thousands of times a second.
+	 * Bring the environment up to date ahead of a named call: after a
+	 * snapshot restore the initcall does not re-run, and this is what
+	 * picks up the variables the new host set.  Skipped for the pump's
+	 * own `step` entry: it carries no workload of its own and can run
+	 * thousands of times a second.
 	 */
 	if (!hyperlight_step_fc_is_pump(fc_buf, fc_len))
-		hyperlight_dispatch_reinject_host_env();
+		hyperlight_dispatch_apply_host_env();
 
 #if CONFIG_HYPERLIGHT_STEP
 	hyperlight_step_pump(fc_buf, fc_len);

@@ -287,17 +287,36 @@ static int hlcall_write(struct device *dev __unused, struct uio *uio,
 }
 
 /* HLCALL_IOC_MAXLEN: tell the driver how big a call can get, so it sizes
- * its read buffer from the host's number rather than a guess of its own.
+ * its buffers from the host's number rather than a guess of its own.
+ * HLCALL_IOC_GETENV: hand it the host's environment (see step.h).
  */
 static int hlcall_ioctl(struct device *dev __unused, unsigned long cmd,
 			void *arg)
 {
-	if (cmd != HLCALL_IOC_MAXLEN)
-		return ENOTTY;
 	if (unlikely(!arg))
 		return EINVAL;
-	*(__u64 *)arg = hl_call_cap;
-	return 0;
+
+	switch (cmd) {
+	case HLCALL_IOC_MAXLEN:
+		*(__u64 *)arg = hl_call_cap;
+		return 0;
+	case HLCALL_IOC_GETENV: {
+		struct hlcall_env *env = arg;
+		int len;
+
+		if (unlikely(!env->buf))
+			return EINVAL;
+		len = hl_call_get_env_vars(env->buf, env->cap);
+		if (len < 0)
+			return EIO;
+		if ((__u64)len >= env->cap)
+			return ENOBUFS;
+		env->len = len;
+		return 0;
+	}
+	default:
+		return ENOTTY;
+	}
 }
 
 static struct devops hlcall_devops = {
