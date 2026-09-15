@@ -65,36 +65,6 @@ static int hostsock_bufs_init(void)
 	return 0;
 }
 
-/* ── Tracked sockets for poll rescan ─────────────────────────────── */
-
-#define MAX_TRACKED 64
-static posix_sock *tracked_socks[MAX_TRACKED];
-static int tracked_count;
-
-static void hostsock_track(posix_sock *sock)
-{
-	for (int i = 0; i < tracked_count; i++)
-		if (tracked_socks[i] == sock)
-			return;
-	if (tracked_count < MAX_TRACKED) {
-		tracked_socks[tracked_count++] = sock;
-	} else {
-		uk_pr_warn("hostsock: too many tracked sockets (%d), "
-			   "socket won't participate in idle-loop wakeups\n",
-			   MAX_TRACKED);
-	}
-}
-
-static void hostsock_untrack(posix_sock *sock)
-{
-	for (int i = 0; i < tracked_count; i++) {
-		if (tracked_socks[i] == sock) {
-			tracked_socks[i] = tracked_socks[--tracked_count];
-			return;
-		}
-	}
-}
-
 /* ── Per-socket state ─────────────────────────────────────────────── */
 
 /*
@@ -121,6 +91,7 @@ struct hostsock {
 	socklen_t peer_len;
 	int backlog;			/* listen() argument */
 	int reuseaddr, reuseport;	/* SOL_SOCKET options to replay */
+	posix_sock *psock;		/* its file, once poll_setup() saw it */
 	struct uk_list_head list;	/* on hostsock_all */
 };
 
@@ -836,7 +807,6 @@ hostsock_close(posix_sock *sock)
 	struct hostsock *hs = hs_of(sock);
 	int err = 0;
 
-	hostsock_untrack(sock);
 	if (hs->state != HS_DEAD)
 		err = hc_close(hs->host_fd);
 	hs_free(hs);
@@ -1087,12 +1057,13 @@ hostsock_poll_setup(posix_sock *sock)
 {
 	/* Check real readiness via host poll(timeout=0). */
 	hostsock_ready(sock, POLLIN | POLLOUT);
-	hostsock_track(sock);
+	/* From here on the rescans below keep its events current. */
+	hs_of(sock)->psock = sock;
 }
 
 /*
- * Rescan all tracked sockets for readiness.  Called from the
- * platform's idle loop (and by the cooperative step pump on every
+ * Rescan every socket somebody has polled for readiness.  Called from
+ * the platform's idle loop (and by the cooperative step pump on every
  * re-entry) so Unikraft's scheduler can wake threads that are blocked
  * on socket I/O.
  *
@@ -1100,17 +1071,20 @@ hostsock_poll_setup(posix_sock *sock)
  */
 int hostsock_rescan_events(void)
 {
+	struct hostsock *hs;
 	int woke = 0;
 
-	for (int i = 0; i < tracked_count; i++) {
-		posix_sock *sock = tracked_socks[i];
+	uk_list_for_each_entry(hs, &hostsock_all, list) {
 		int revents;
 
-		/* Published once when it died; nothing more can happen. */
-		if (sock_dead(sock))
+		/* Never polled, or dead: published once then, nothing more
+		 * can happen to it.
+		 */
+		if (!hs->psock || hs->state == HS_DEAD)
 			continue;
-		revents = hostsock_check_ready(sock_fd(sock), POLLIN | POLLOUT);
-		if (hostsock_publish_events(sock, revents, POLLIN | POLLOUT))
+		revents = hostsock_check_ready(hs->host_fd, POLLIN | POLLOUT);
+		if (hostsock_publish_events(hs->psock, revents,
+					    POLLIN | POLLOUT))
 			woke = 1;
 	}
 
@@ -1187,9 +1161,9 @@ void hostsock_resume(void)
 		}
 	}
 	/* Wake whoever is parked on a connection that just died. */
-	for (int i = 0; i < tracked_count; i++)
-		if (sock_dead(tracked_socks[i]))
-			hostsock_publish_events(tracked_socks[i],
+	uk_list_for_each_entry(hs, &hostsock_all, list)
+		if (hs->psock && hs->state == HS_DEAD)
+			hostsock_publish_events(hs->psock,
 						POLLIN | POLLOUT | POLLHUP,
 						POLLIN | POLLOUT);
 }
