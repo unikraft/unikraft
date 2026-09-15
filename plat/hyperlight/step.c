@@ -46,6 +46,8 @@ extern void hyperlight_halt_to_host(void) __noreturn;
  * yielded via uk_file_poll).  Defined in lib/hostsock.
  */
 extern int hostsock_rescan_events(void);
+/* Re-create the guest's host sockets after a snapshot restore. */
+extern void hostsock_resume(void);
 #endif /* CONFIG_LIBHOSTSOCK */
 
 /* The relative delay reported when a deadline fell due while control was
@@ -379,12 +381,17 @@ uk_late_initcall(hl_yield_thread_create, 0x0);
 
 /* ── Pump ────────────────────────────────────────────────────────── */
 
-/* The host has just restored this guest from a snapshot.  Whatever the
- * image carries that two guests restored from the same snapshot must not
- * share is refreshed here, before anything else runs.  Today that is the
- * CSPRNG: its state lives in guest memory, so without a reseed every
- * clone would draw the same "random" bytes (the same UUIDs, tokens and
- * TLS nonces) until the periodic reseed happened to fire.
+/* The host has just restored this guest from a snapshot.  Two things are
+ * put right here, before anything else runs:
+ *
+ *   the CSPRNG is reseeded: its state lives in guest memory, so without
+ *   this every clone of one snapshot would draw the same "random" bytes
+ *   (the same UUIDs, tokens and TLS nonces) until the periodic reseed
+ *   happened to fire;
+ *
+ *   the host sockets are re-established: they belonged to the process
+ *   that took the snapshot, so listeners are opened and bound again and
+ *   connections are declared dead (see hostsock_resume()).
  */
 static void hl_resume(void)
 {
@@ -395,6 +402,9 @@ static void hl_resume(void)
 		uk_pr_err("hyperlight: CSPRNG reseed after restore failed: %d\n",
 			  rc);
 #endif /* CONFIG_LIBUKRANDOM */
+#ifdef CONFIG_LIBHOSTSOCK
+	hostsock_resume();
+#endif /* CONFIG_LIBHOSTSOCK */
 }
 
 int hyperlight_step_active(void)

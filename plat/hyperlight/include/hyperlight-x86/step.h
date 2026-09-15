@@ -35,8 +35,10 @@
  *
  *   resume         What the host calls instead of the first `step` after
  *                  restoring the guest from a snapshot: a step that first
- *                  refreshes the state clones must not share (the CSPRNG
- *                  is reseeded).
+ *                  puts the image right for its new host -- the CSPRNG is
+ *                  reseeded so clones diverge, and the host sockets are
+ *                  re-established (listeners bound again, connections
+ *                  declared dead) since they belonged to the old host.
  *
  *   /dev/hlcall    Named guest functions (anything but `step` and `resume`)
  *                  cannot run
