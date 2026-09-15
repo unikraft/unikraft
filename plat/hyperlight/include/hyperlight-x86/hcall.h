@@ -39,6 +39,16 @@ void hl_hcall_init(const struct hyperlight_peb *peb);
 int hl_hcall_ready(void);
 
 /**
+ * Largest payload one host call can carry, in either direction: a string
+ * or vecbytes parameter on the way out, a string or vecbytes result on the
+ * way back.  Derived from the PEB I/O stack sizes the host chose, less a
+ * reserve for the FlatBuffer framing and the other parameters, so a
+ * transfer of this size always fits and a buffer of this size never
+ * truncates a result.  Valid once hl_hcall_init() has run; 0 before.
+ */
+__u64 hl_hcall_max_payload(void);
+
+/**
  * Low-level PEB I/O stack push/pop.
  *
  * Shared by the hcall subsystem (guest→host calls) and the dispatch
@@ -73,13 +83,16 @@ int hl_call_get_cmdline(char *out_buf, __sz buf_sz);
 /**
  * Call GetEnvVars() to retrieve host-provided environment variables.
  *
- * Returns a NUL-separated string of KEY=VALUE pairs.  The caller
- * should split on '\0' and call putenv() for each entry.
+ * Stores KEY=VALUE entries separated by NUL, followed by a terminating
+ * NUL, and returns the length not counting that terminator -- with
+ * snprintf() semantics: a return value of @a buf_sz or more means the
+ * data did not fit and nothing was stored.  A buffer of
+ * hl_hcall_max_payload() bytes always suffices.
  *
- * @param out_buf   Buffer to receive the NUL-separated string
+ * @param out_buf   Buffer to receive the NUL-separated entries
  * @param buf_sz    Size of out_buf
- * @return          Total length of the returned data (including NULs),
- *                  or -1 on error, or 0 if no env vars are set.
+ * @return          Length of the data, or -1 on error; 0 if no
+ *                  variables are set.
  */
 int hl_call_get_env_vars(char *out_buf, __sz buf_sz);
 

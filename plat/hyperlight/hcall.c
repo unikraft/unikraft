@@ -21,6 +21,7 @@
  */
 
 #include <string.h>
+#include <uk/alloc.h>
 #include <uk/essentials.h>
 #include <uk/plat/spinlock.h>
 #include <uk/print.h>
@@ -66,6 +67,24 @@ void hl_hcall_init(const struct hyperlight_peb *peb)
 int hl_hcall_ready(void)
 {
 	return g_hcall_ready;
+}
+
+/*
+ * What a call needs on a stack besides its payload.  Outbound, the
+ * FunctionCall framing: a 36-byte root, a 4 + 4n parameter vector and
+ * some 46 bytes per parameter (HL_MAX_PARAMS of them at most), plus the
+ * function name and any other string parameter -- a hostfs path is at
+ * most 1024 bytes.  Inbound, the FunctionCallResult framing, under 64
+ * bytes.  Either way plus the 16 bytes of stack bookkeeping.  4 KiB
+ * covers all of it with room to spare.
+ */
+#define HL_HCALL_FRAMING 4096
+
+__u64 hl_hcall_max_payload(void)
+{
+	__u64 stack = MIN(g_input_stack_size, g_output_stack_size);
+
+	return stack > HL_HCALL_FRAMING ? stack - HL_HCALL_FRAMING : 0;
 }
 
 /* ── Shared-memory stack protocol ────────────────────────────────── */
@@ -602,17 +621,19 @@ int hl_call_get_env_vars(char *out_buf, __sz buf_sz)
 				    &str, &str_len) < 0)
 		goto out_env;
 
+	/* Too small: report what it takes, store nothing (snprintf). */
+	rc = (int)str_len;
 	if (str_len >= buf_sz)
 		goto out_env;
 
 	/*
-	 * Copy the raw bytes — the string contains embedded NULs as
-	 * separators between KEY=VALUE pairs.  Do NOT use strcpy/memcpy
-	 * with str_len+1 (the FlatBuffer string may or may not have a
-	 * trailing NUL).
+	 * Copy the raw bytes -- the string contains embedded NULs as
+	 * separators between KEY=VALUE pairs -- and terminate them
+	 * ourselves: whether the FlatBuffer string carries a trailing NUL
+	 * is not part of the contract.
 	 */
 	memcpy(out_buf, str, str_len);
-	rc = (int)str_len;
+	out_buf[str_len] = '\0';
 
 out_env:
 	ukplat_spin_unlock_irqrestore(&g_hcall_lock, irqf);
@@ -620,10 +641,12 @@ out_env:
 }
 
 /*
- * Buffered stdin — the host returns the entire buffer at once (no
- * params), so we cache it and hand out bytes on demand.
+ * Buffered stdin -- the host returns a chunk of whatever size it likes
+ * (no params), so we cache it and hand out bytes on demand.  The chunk
+ * arrives on the input stack, so a buffer that size holds any of them;
+ * allocated on the first read.
  */
-static char g_stdin_buf[8192];
+static char *g_stdin_buf;
 static __sz g_stdin_pos;
 static __sz g_stdin_len;
 static int  g_stdin_eof;
@@ -644,6 +667,13 @@ static int hl_stdin_fetch(void)
 
 	if (!g_hcall_ready || g_stdin_eof)
 		return 0;
+
+	if (!g_stdin_buf) {
+		g_stdin_buf = uk_malloc(uk_alloc_get_default(),
+					g_input_stack_size);
+		if (unlikely(!g_stdin_buf))
+			return 0;
+	}
 
 	fc_len = fb_encode_function_call(fc_buf, sizeof(fc_buf),
 					 "ReadStdin",
@@ -666,6 +696,12 @@ static int hl_stdin_fetch(void)
 				    &str, &str_len) < 0)
 		goto fail;
 
+	/* It came off the input stack: it fits a buffer that size. */
+	if (unlikely(str_len > g_input_stack_size))
+		goto fail;
+
+	memcpy(g_stdin_buf, str, str_len);
+
 	ukplat_spin_unlock_irqrestore(&g_hcall_lock, irqf);
 
 	if (str_len == 0) {
@@ -673,10 +709,6 @@ static int hl_stdin_fetch(void)
 		return 0;
 	}
 
-	if (str_len > sizeof(g_stdin_buf))
-		str_len = sizeof(g_stdin_buf);
-
-	memcpy(g_stdin_buf, str, str_len);
 	g_stdin_pos = 0;
 	g_stdin_len = str_len;
 	return (int)str_len;
@@ -1265,7 +1297,31 @@ static int fb_decode_result_vecbytes(const __u8 *buf, __u64 buf_len,
 
 /* ── Generic host call public API ────────────────────────────────── */
 
-static __u8 g_generic_fc_buf[65536];
+/*
+ * Encoder buffer for the generic calls, sized to the PEB output stack: a
+ * call that fits the stack fits here, whatever size the host chose.
+ *
+ * Allocated on first use rather than statically, and outside the lock:
+ * the allocator may log through the console, which is itself a host
+ * call.  Nothing uses the generic API before the allocator is up -- the
+ * boot-time queries above encode into small stack buffers with the
+ * fixed-layout encoders -- and the cooperative scheduler serialises the
+ * first use, as uk_malloc() does not yield.
+ */
+static __u8 *g_fc_buf;
+
+static int hl_fc_buf_get(void)
+{
+	if (likely(g_fc_buf))
+		return 0;
+	g_fc_buf = uk_malloc(uk_alloc_get_default(), g_output_stack_size);
+	if (unlikely(!g_fc_buf)) {
+		uk_pr_err("hcall: no memory for a %llu-byte encoder buffer\n",
+			  (unsigned long long)g_output_stack_size);
+		return -1;
+	}
+	return 0;
+}
 
 int hl_hcall_int(const char *func_name,
 		 const struct hl_param *params, int nparams,
@@ -1276,19 +1332,19 @@ int hl_hcall_int(const char *func_name,
 	__u64 rl;
 	unsigned long irqf;
 
-	if (!g_hcall_ready)
+	if (!g_hcall_ready || hl_fc_buf_get() < 0)
 		return -1;
 
 	ukplat_spin_lock_irqsave(&g_hcall_lock, irqf);
 
-	fc_len = fb_encode_generic(g_generic_fc_buf, sizeof(g_generic_fc_buf),
+	fc_len = fb_encode_generic(g_fc_buf, g_output_stack_size,
 				   func_name, HL_FCT_HOST, HL_RT_INT,
 				   params, nparams);
 	if (!fc_len)
 		goto err;
 
 	if (hl_stack_push(g_output_stack, g_output_stack_size,
-			  g_generic_fc_buf, fc_len) < 0)
+			  g_fc_buf, fc_len) < 0)
 		goto err;
 	hyperlight_out32(HYPERLIGHT_PORT_CALL_FUNCTION, 0);
 	if (hl_stack_pop(g_input_stack, &rd, &rl) < 0)
@@ -1312,19 +1368,19 @@ int hl_hcall_ulong(const char *func_name,
 	__u64 rl;
 	unsigned long irqf;
 
-	if (!g_hcall_ready)
+	if (!g_hcall_ready || hl_fc_buf_get() < 0)
 		return -1;
 
 	ukplat_spin_lock_irqsave(&g_hcall_lock, irqf);
 
-	fc_len = fb_encode_generic(g_generic_fc_buf, sizeof(g_generic_fc_buf),
+	fc_len = fb_encode_generic(g_fc_buf, g_output_stack_size,
 				   func_name, HL_FCT_HOST, HL_RT_ULONG,
 				   params, nparams);
 	if (!fc_len)
 		goto err;
 
 	if (hl_stack_push(g_output_stack, g_output_stack_size,
-			  g_generic_fc_buf, fc_len) < 0)
+			  g_fc_buf, fc_len) < 0)
 		goto err;
 	hyperlight_out32(HYPERLIGHT_PORT_CALL_FUNCTION, 0);
 	if (hl_stack_pop(g_input_stack, &rd, &rl) < 0)
@@ -1350,19 +1406,19 @@ int hl_hcall_string(const char *func_name,
 	__u64 sl;
 	unsigned long irqf;
 
-	if (!g_hcall_ready)
+	if (!g_hcall_ready || hl_fc_buf_get() < 0)
 		return -1;
 
 	ukplat_spin_lock_irqsave(&g_hcall_lock, irqf);
 
-	fc_len = fb_encode_generic(g_generic_fc_buf, sizeof(g_generic_fc_buf),
+	fc_len = fb_encode_generic(g_fc_buf, g_output_stack_size,
 				   func_name, HL_FCT_HOST, HL_RT_STRING,
 				   params, nparams);
 	if (!fc_len)
 		goto err;
 
 	if (hl_stack_push(g_output_stack, g_output_stack_size,
-			  g_generic_fc_buf, fc_len) < 0)
+			  g_fc_buf, fc_len) < 0)
 		goto err;
 	hyperlight_out32(HYPERLIGHT_PORT_CALL_FUNCTION, 0);
 	if (hl_stack_pop(g_input_stack, &rd, &rl) < 0)
@@ -1394,19 +1450,19 @@ int hl_hcall_vecbytes(const char *func_name,
 	__u64 vl;
 	unsigned long irqf;
 
-	if (!g_hcall_ready)
+	if (!g_hcall_ready || hl_fc_buf_get() < 0)
 		return -1;
 
 	ukplat_spin_lock_irqsave(&g_hcall_lock, irqf);
 
-	fc_len = fb_encode_generic(g_generic_fc_buf, sizeof(g_generic_fc_buf),
+	fc_len = fb_encode_generic(g_fc_buf, g_output_stack_size,
 				   func_name, HL_FCT_HOST, HL_RT_VECBYTES,
 				   params, nparams);
 	if (!fc_len)
 		goto err;
 
 	if (hl_stack_push(g_output_stack, g_output_stack_size,
-			  g_generic_fc_buf, fc_len) < 0)
+			  g_fc_buf, fc_len) < 0)
 		goto err;
 	hyperlight_out32(HYPERLIGHT_PORT_CALL_FUNCTION, 0);
 	if (hl_stack_pop(g_input_stack, &rd, &rl) < 0)
