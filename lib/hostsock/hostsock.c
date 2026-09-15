@@ -5,8 +5,9 @@
  * hostsock — Unikraft socket driver backed by Hyperlight host functions.
  *
  * Each socket operation makes a synchronous host call via hl_hcall_*.
- * The host manages the real sockets; the guest only holds an i32 fd
- * as driver-specific data.
+ * The host manages the real sockets; the guest holds the host-side id
+ * plus what it takes to re-create the socket after a snapshot restore
+ * (struct hostsock, hostsock_resume).
  *
  * Registers for AF_INET (2) and AF_INET6 (10).
  */
@@ -15,6 +16,7 @@
 #include <uk/alloc.h>
 #include <uk/errptr.h>
 #include <uk/print.h>
+#include <uk/list.h>
 
 #include <uk/socket_driver.h>
 
@@ -74,13 +76,104 @@ static void hostsock_untrack(posix_sock *sock)
 	}
 }
 
-/* ── Helpers ──────────────────────────────────────────────────────── */
+/* ── Per-socket state ─────────────────────────────────────────────── */
 
-/* The driver-specific data is just the host-side fd stored as (void *)(intptr_t). */
+/*
+ * What the guest knows about one of its host sockets.  The host holds the
+ * real socket; this is what it takes to put an equivalent one back after
+ * the guest is restored from a snapshot in a host that no longer has it
+ * (see hostsock_resume()).
+ */
+enum hostsock_state {
+	HS_FRESH,	/* created, not bound */
+	HS_BOUND,	/* bind() done */
+	HS_LISTENING,	/* listen() done */
+	HS_CONNECTED,	/* connect() done, or returned by accept() */
+	HS_DEAD,	/* a connection whose host end is gone: EOF / EPIPE */
+};
+
+struct hostsock {
+	int host_fd;			/* host-side id; -1 once HS_DEAD */
+	int family, type, protocol;	/* socket() arguments */
+	enum hostsock_state state;
+	struct sockaddr_storage local;	/* bind() address */
+	socklen_t local_len;
+	struct sockaddr_storage peer;	/* connect() / accept() peer */
+	socklen_t peer_len;
+	int backlog;			/* listen() argument */
+	int reuseaddr, reuseport;	/* SOL_SOCKET options to replay */
+	struct uk_list_head list;	/* on hostsock_all */
+};
+
+/* Every live socket, in creation order, for hostsock_resume(). */
+static UK_LIST_HEAD(hostsock_all);
+
+static inline struct hostsock *hs_of(posix_sock *sock)
+{
+	return (struct hostsock *)posix_sock_get_data(sock);
+}
+
 static inline int sock_fd(posix_sock *sock)
 {
-	return (int)(intptr_t)posix_sock_get_data(sock);
+	return hs_of(sock)->host_fd;
 }
+
+static inline int sock_dead(posix_sock *sock)
+{
+	return hs_of(sock)->state == HS_DEAD;
+}
+
+static struct hostsock *hs_new(int host_fd, int family, int type,
+			       int protocol)
+{
+	struct hostsock *hs;
+
+	hs = uk_calloc(uk_alloc_get_default(), 1, sizeof(*hs));
+	if (unlikely(!hs))
+		return NULL;
+	hs->host_fd = host_fd;
+	hs->family = family;
+	hs->type = type;
+	hs->protocol = protocol;
+	hs->state = HS_FRESH;
+	uk_list_add_tail(&hs->list, &hostsock_all);
+	return hs;
+}
+
+static void hs_free(struct hostsock *hs)
+{
+	uk_list_del(&hs->list);
+	uk_free(uk_alloc_get_default(), hs);
+}
+
+static void hs_remember(struct sockaddr_storage *dst, socklen_t *dst_len,
+			const struct sockaddr *addr, socklen_t addrlen)
+{
+	if (!addr || addrlen == 0) {
+		*dst_len = 0;
+		return;
+	}
+	if (addrlen > sizeof(*dst))
+		addrlen = sizeof(*dst);
+	memcpy(dst, addr, addrlen);
+	*dst_len = addrlen;
+}
+
+static int hs_recall(const struct sockaddr_storage *src, socklen_t src_len,
+		     struct sockaddr *addr, socklen_t *addrlen)
+{
+	if (!src_len)
+		return -ENOTCONN;
+	if (addr && addrlen) {
+		socklen_t n = *addrlen < src_len ? *addrlen : src_len;
+
+		memcpy(addr, src, n);
+		*addrlen = src_len;
+	}
+	return 0;
+}
+
+/* ── Helpers ──────────────────────────────────────────────────────── */
 
 /* Format an IPv4 address as "d.d.d.d". */
 static void fmt_ipv4(char *buf, size_t sz, const struct in_addr *addr)
@@ -275,10 +368,94 @@ static unsigned hostsock_publish_events(posix_sock *sock, int revents,
  */
 static int hostsock_ready(posix_sock *sock, int events)
 {
-	int revents = hostsock_check_ready(sock_fd(sock), events);
+	int revents;
 
+	/* A dead connection is ready for everything: the read returns EOF
+	 * and the write EPIPE, exactly what a parked thread must see.
+	 */
+	if (sock_dead(sock))
+		revents = POLLIN | POLLOUT | POLLHUP;
+	else
+		revents = hostsock_check_ready(sock_fd(sock), events);
 	hostsock_publish_events(sock, revents, events);
 	return revents;
+}
+
+/* ── Host calls shared by the socket ops and hostsock_resume() ───── */
+
+/* net_socket: a new host socket, or -errno. */
+static int hc_socket(int family, int type, int protocol)
+{
+	struct hl_param p[3];
+	__s32 ret;
+
+	p[0].type = HL_PV_HLINT; p[0].i32_val = family;
+	p[1].type = HL_PV_HLINT; p[1].i32_val = type;
+	p[2].type = HL_PV_HLINT; p[2].i32_val = protocol;
+	if (hl_hcall_int("net_socket", p, 3, &ret) < 0)
+		return -EIO;
+	return ret;
+}
+
+static int hc_close(int host_fd)
+{
+	struct hl_param p[1];
+	__s32 ret;
+
+	p[0].type = HL_PV_HLINT; p[0].i32_val = host_fd;
+	if (hl_hcall_int("net_close", p, 1, &ret) < 0)
+		return -EIO;
+	return 0;
+}
+
+static int hc_setsockopt(int host_fd, int level, int optname, int value)
+{
+	struct hl_param p[4];
+	__s32 ret;
+
+	p[0].type = HL_PV_HLINT; p[0].i32_val = host_fd;
+	p[1].type = HL_PV_HLINT; p[1].i32_val = level;
+	p[2].type = HL_PV_HLINT; p[2].i32_val = optname;
+	p[3].type = HL_PV_HLINT; p[3].i32_val = value;
+	if (hl_hcall_int("net_setsockopt", p, 4, &ret) < 0)
+		return -EIO;
+	return ret < 0 ? ret : 0;
+}
+
+/* net_bind / net_connect: both take (fd, family, addr, port). */
+static int hc_addr_op(const char *op, int host_fd,
+		      const struct sockaddr *addr, socklen_t addrlen)
+{
+	int family, port;
+	char addrbuf[64];
+	struct hl_param p[4];
+	__s32 ret;
+	int err;
+
+	err = format_addr(addr, addrlen, &family, addrbuf, sizeof(addrbuf),
+			  &port);
+	if (err)
+		return err;
+	p[0].type = HL_PV_HLINT;    p[0].i32_val = host_fd;
+	p[1].type = HL_PV_HLINT;    p[1].i32_val = family;
+	p[2].type = HL_PV_HLSTRING; p[2].str.ptr = addrbuf;
+				     p[2].str.len = strlen(addrbuf);
+	p[3].type = HL_PV_HLINT;    p[3].i32_val = port;
+	if (hl_hcall_int(op, p, 4, &ret) < 0)
+		return -EIO;
+	return ret < 0 ? ret : 0;
+}
+
+static int hc_listen(int host_fd, int backlog)
+{
+	struct hl_param p[2];
+	__s32 ret;
+
+	p[0].type = HL_PV_HLINT; p[0].i32_val = host_fd;
+	p[1].type = HL_PV_HLINT; p[1].i32_val = backlog;
+	if (hl_hcall_int("net_listen", p, 2, &ret) < 0)
+		return -EIO;
+	return ret < 0 ? ret : 0;
 }
 
 /* ── Socket operations ───────────────────────────────────────────── */
@@ -287,62 +464,51 @@ static void *
 hostsock_create(struct posix_socket_driver *d __unused,
 		int family, int type, int protocol)
 {
-	struct hl_param p[3];
-	__s32 ret;
+	struct hostsock *hs;
+	int host_fd = hc_socket(family, type, protocol);
 
-	p[0].type = HL_PV_HLINT; p[0].i32_val = family;
-	p[1].type = HL_PV_HLINT; p[1].i32_val = type;
-	p[2].type = HL_PV_HLINT; p[2].i32_val = protocol;
-
-	if (hl_hcall_int("net_socket", p, 3, &ret) < 0)
-		return ERR2PTR(-EIO);
-
-	if (ret < 0)
-		return ERR2PTR(ret);
-
-	return (void *)(intptr_t)ret;
+	if (host_fd < 0)
+		return ERR2PTR(host_fd);
+	hs = hs_new(host_fd, family, type, protocol);
+	if (unlikely(!hs)) {
+		hc_close(host_fd);
+		return ERR2PTR(-ENOMEM);
+	}
+	return hs;
 }
 
 static int
 hostsock_bind(posix_sock *sock,
 	      const struct sockaddr *addr, socklen_t addrlen)
 {
-	int family, port;
-	char addrbuf[64];
+	struct hostsock *hs = hs_of(sock);
+	int err;
 
-	int err = format_addr(addr, addrlen, &family, addrbuf,
-			      sizeof(addrbuf), &port);
+	if (hs->state == HS_DEAD)
+		return -EPIPE;
+	err = hc_addr_op("net_bind", hs->host_fd, addr, addrlen);
 	if (err)
 		return err;
-
-	struct hl_param p[4];
-	__s32 ret;
-
-	p[0].type = HL_PV_HLINT;    p[0].i32_val = sock_fd(sock);
-	p[1].type = HL_PV_HLINT;    p[1].i32_val = family;
-	p[2].type = HL_PV_HLSTRING; p[2].str.ptr = addrbuf;
-				     p[2].str.len = strlen(addrbuf);
-	p[3].type = HL_PV_HLINT;    p[3].i32_val = port;
-
-	if (hl_hcall_int("net_bind", p, 4, &ret) < 0)
-		return -EIO;
-
-	return ret < 0 ? ret : 0;
+	hs_remember(&hs->local, &hs->local_len, addr, addrlen);
+	if (hs->state == HS_FRESH)
+		hs->state = HS_BOUND;
+	return 0;
 }
 
 static int
 hostsock_listen(posix_sock *sock, int backlog)
 {
-	struct hl_param p[2];
-	__s32 ret;
+	struct hostsock *hs = hs_of(sock);
+	int err;
 
-	p[0].type = HL_PV_HLINT; p[0].i32_val = sock_fd(sock);
-	p[1].type = HL_PV_HLINT; p[1].i32_val = backlog;
-
-	if (hl_hcall_int("net_listen", p, 2, &ret) < 0)
-		return -EIO;
-
-	return ret < 0 ? ret : 0;
+	if (hs->state == HS_DEAD)
+		return -EPIPE;
+	err = hc_listen(hs->host_fd, backlog);
+	if (err)
+		return err;
+	hs->backlog = backlog;
+	hs->state = HS_LISTENING;
+	return 0;
 }
 
 static void *
@@ -351,6 +517,14 @@ hostsock_accept4(posix_sock *sock,
 		 socklen_t *restrict addrlen,
 		 int flags __unused)
 {
+	struct hostsock *parent = hs_of(sock), *hs;
+	struct sockaddr_storage peer;
+	socklen_t peer_len = sizeof(peer);
+
+	/* A listener that could not be re-created after a restore. */
+	if (parent->state == HS_DEAD)
+		return ERR2PTR(-EIO);
+
 	/*
 	 * Check readiness before calling the host's accept.  A blocking
 	 * host call freezes the entire VM (single vCPU), so we must never
@@ -369,7 +543,7 @@ hostsock_accept4(posix_sock *sock,
 	__sz len;
 
 	p[0].type = HL_PV_HLINT;
-	p[0].i32_val = sock_fd(sock);
+	p[0].i32_val = parent->host_fd;
 
 	if (hl_hcall_vecbytes("net_accept", p, 1, buf, sizeof(buf), &len) < 0)
 		return ERR2PTR(-EIO);
@@ -382,37 +556,46 @@ hostsock_accept4(posix_sock *sock,
 	if (new_fd < 0)
 		return ERR2PTR(new_fd);
 
-	if (addr && addrlen && len > 4)
-		unpack_addr(buf, len, 4, addr, addrlen);
+	/* Keep the peer: it is all getpeername() can answer once the host
+	 * end is gone after a restore.
+	 */
+	if (len > 4)
+		unpack_addr(buf, len, 4, (struct sockaddr *)&peer, &peer_len);
+	else
+		peer_len = 0;
+	if (addr && addrlen && peer_len) {
+		socklen_t n = *addrlen < peer_len ? *addrlen : peer_len;
 
-	return (void *)(intptr_t)new_fd;
+		memcpy(addr, &peer, n);
+		*addrlen = peer_len;
+	}
+
+	hs = hs_new(new_fd, parent->family, parent->type, parent->protocol);
+	if (unlikely(!hs)) {
+		hc_close(new_fd);
+		return ERR2PTR(-ENOMEM);
+	}
+	hs->state = HS_CONNECTED;
+	hs_remember(&hs->peer, &hs->peer_len, (struct sockaddr *)&peer,
+		    peer_len);
+	return hs;
 }
 
 static int
 hostsock_connect(posix_sock *sock,
 		 const struct sockaddr *addr, socklen_t addrlen)
 {
-	int family, port;
-	char addrbuf[64];
+	struct hostsock *hs = hs_of(sock);
+	int err;
 
-	int err = format_addr(addr, addrlen, &family, addrbuf,
-			      sizeof(addrbuf), &port);
+	if (hs->state == HS_DEAD)
+		return -EPIPE;
+	err = hc_addr_op("net_connect", hs->host_fd, addr, addrlen);
 	if (err)
 		return err;
-
-	struct hl_param p[4];
-	__s32 ret;
-
-	p[0].type = HL_PV_HLINT;    p[0].i32_val = sock_fd(sock);
-	p[1].type = HL_PV_HLINT;    p[1].i32_val = family;
-	p[2].type = HL_PV_HLSTRING; p[2].str.ptr = addrbuf;
-				     p[2].str.len = strlen(addrbuf);
-	p[3].type = HL_PV_HLINT;    p[3].i32_val = port;
-
-	if (hl_hcall_int("net_connect", p, 4, &ret) < 0)
-		return -EIO;
-
-	return ret < 0 ? ret : 0;
+	hs_remember(&hs->peer, &hs->peer_len, addr, addrlen);
+	hs->state = HS_CONNECTED;
+	return 0;
 }
 
 static int
@@ -420,6 +603,9 @@ hostsock_shutdown(posix_sock *sock, int how)
 {
 	struct hl_param p[2];
 	__s32 ret;
+
+	if (sock_dead(sock))
+		return 0;
 
 	p[0].type = HL_PV_HLINT; p[0].i32_val = sock_fd(sock);
 	p[1].type = HL_PV_HLINT; p[1].i32_val = how;
@@ -435,6 +621,9 @@ hostsock_sendto(posix_sock *sock, const void *buf, size_t len,
 		int flags __unused,
 		const struct sockaddr *dest_addr, socklen_t addrlen)
 {
+	if (sock_dead(sock))
+		return -EPIPE;
+
 	/*
 	 * Check writability before calling the host's send/sendto.
 	 * A blocking send on a full socket buffer freezes the VM's
@@ -497,6 +686,12 @@ hostsock_recvfrom(posix_sock *sock, void *restrict buf, size_t len,
 		  int flags __unused,
 		  struct sockaddr *from, socklen_t *restrict fromlen)
 {
+	/* The host end went away with the process that was checkpointed:
+	 * end of file, the same as a peer that closed.
+	 */
+	if (sock_dead(sock))
+		return 0;
+
 	/*
 	 * Check readiness — a blocking recv host call would freeze the
 	 * entire VM.  See the comment in hostsock_accept4.
@@ -549,6 +744,9 @@ hostsock_recvfrom(posix_sock *sock, void *restrict buf, size_t len,
 static ssize_t
 hostsock_write(posix_sock *sock, const struct iovec *iov, size_t iovcnt)
 {
+	if (sock_dead(sock))
+		return -EPIPE;
+
 	/* Check writability — same guard as sendto. */
 	{
 		int ready = hostsock_ready(sock, POLLOUT);
@@ -608,18 +806,14 @@ hostsock_read(posix_sock *sock, const struct iovec *iov, size_t iovcnt)
 static int
 hostsock_close(posix_sock *sock)
 {
+	struct hostsock *hs = hs_of(sock);
+	int err = 0;
+
 	hostsock_untrack(sock);
-
-	struct hl_param p[1];
-	__s32 ret;
-
-	p[0].type = HL_PV_HLINT;
-	p[0].i32_val = sock_fd(sock);
-
-	if (hl_hcall_int("net_close", p, 1, &ret) < 0)
-		return -EIO;
-
-	return 0;
+	if (hs->state != HS_DEAD)
+		err = hc_close(hs->host_fd);
+	hs_free(hs);
+	return err;
 }
 
 static int
@@ -630,6 +824,12 @@ hostsock_getpeername(posix_sock *sock,
 	struct hl_param p[1];
 	__u8 buf[32];
 	__sz len;
+
+	if (sock_dead(sock)) {
+		struct hostsock *hs = hs_of(sock);
+
+		return hs_recall(&hs->peer, hs->peer_len, addr, addrlen);
+	}
 
 	p[0].type = HL_PV_HLINT;
 	p[0].i32_val = sock_fd(sock);
@@ -661,6 +861,12 @@ hostsock_getsockname(posix_sock *sock,
 	__u8 buf[32];
 	__sz len;
 
+	if (sock_dead(sock)) {
+		struct hostsock *hs = hs_of(sock);
+
+		return hs_recall(&hs->local, hs->local_len, addr, addrlen);
+	}
+
 	p[0].type = HL_PV_HLINT;
 	p[0].i32_val = sock_fd(sock);
 
@@ -689,6 +895,15 @@ hostsock_getsockopt(posix_sock *sock, int level, int optname,
 	struct hl_param p[3];
 	__s32 ret;
 
+	/* Nothing left to ask about; report no pending error. */
+	if (sock_dead(sock)) {
+		if (optval && optlen && *optlen >= sizeof(int)) {
+			*(int *)optval = 0;
+			*optlen = sizeof(int);
+		}
+		return 0;
+	}
+
 	p[0].type = HL_PV_HLINT; p[0].i32_val = sock_fd(sock);
 	p[1].type = HL_PV_HLINT; p[1].i32_val = level;
 	p[2].type = HL_PV_HLINT; p[2].i32_val = optname;
@@ -712,10 +927,18 @@ static int
 hostsock_setsockopt(posix_sock *sock, int level, int optname,
 		    const void *optval, socklen_t optlen)
 {
+	struct hostsock *hs = hs_of(sock);
 	int value = 0;
 
 	if (optval && optlen >= sizeof(int))
 		value = *(const int *)optval;
+	if (hs->state == HS_DEAD)
+		return 0;
+	/* Remembered so a re-created listener gets them again. */
+	if (level == SOL_SOCKET && optname == SO_REUSEADDR)
+		hs->reuseaddr = value;
+	else if (level == SOL_SOCKET && optname == SO_REUSEPORT)
+		hs->reuseport = value;
 
 	struct hl_param p[4];
 	__s32 ret;
@@ -854,14 +1077,94 @@ int hostsock_rescan_events(void)
 
 	for (int i = 0; i < tracked_count; i++) {
 		posix_sock *sock = tracked_socks[i];
-		int revents = hostsock_check_ready(sock_fd(sock),
-						   POLLIN | POLLOUT);
+		int revents;
 
+		/* Published once when it died; nothing more can happen. */
+		if (sock_dead(sock))
+			continue;
+		revents = hostsock_check_ready(sock_fd(sock), POLLIN | POLLOUT);
 		if (hostsock_publish_events(sock, revents, POLLIN | POLLOUT))
 			woke = 1;
 	}
 
 	return woke;
+}
+
+/* ── Snapshot restore ────────────────────────────────────────────── */
+
+/* Open, bind and listen a socket equal to @hs on the fresh host, with
+ * the reuse options the guest had set plus SO_REUSEADDR, since the old
+ * incarnation's connections may linger in TIME_WAIT on the same port.
+ */
+static void hs_recreate(struct hostsock *hs)
+{
+	int id = hc_socket(hs->family, hs->type, hs->protocol);
+
+	if (id < 0)
+		goto dead;
+	if (hs->reuseaddr || hs->state != HS_FRESH)
+		hc_setsockopt(id, SOL_SOCKET, SO_REUSEADDR, 1);
+	if (hs->reuseport)
+		hc_setsockopt(id, SOL_SOCKET, SO_REUSEPORT, 1);
+	if (hs->state != HS_FRESH &&
+	    hc_addr_op("net_bind", id, (struct sockaddr *)&hs->local,
+		       hs->local_len) < 0)
+		goto close_dead;
+	if (hs->state == HS_LISTENING && hc_listen(id, hs->backlog) < 0)
+		goto close_dead;
+	hs->host_fd = id;
+	return;
+
+close_dead:
+	hc_close(id);
+dead:
+	uk_pr_err("hostsock: cannot re-create a %s socket after restore\n",
+		  hs->state == HS_LISTENING ? "listening" :
+		  hs->state == HS_BOUND ? "bound" : "fresh");
+	hs->host_fd = -1;
+	hs->state = HS_DEAD;
+}
+
+/*
+ * The host has restored this guest from a snapshot.  Every host socket
+ * the guest held belonged to the process that took the snapshot, so:
+ *
+ *   listeners and bound sockets are opened, bound and listened again
+ *   under the same address -- a server keeps accepting without knowing
+ *   anything happened;
+ *
+ *   unbound sockets are opened again;
+ *
+ *   connections cannot come back, their peers are gone with the old host,
+ *   so they become HS_DEAD: reads return EOF, writes EPIPE, getpeername()
+ *   still answers, and any thread parked on one is woken so a server gets
+ *   back to accept().
+ */
+void hostsock_resume(void)
+{
+	struct hostsock *hs;
+
+	uk_list_for_each_entry(hs, &hostsock_all, list) {
+		switch (hs->state) {
+		case HS_CONNECTED:
+			hs->host_fd = -1;
+			hs->state = HS_DEAD;
+			break;
+		case HS_FRESH:
+		case HS_BOUND:
+		case HS_LISTENING:
+			hs_recreate(hs);
+			break;
+		case HS_DEAD:
+			break;
+		}
+	}
+	/* Wake whoever is parked on a connection that just died. */
+	for (int i = 0; i < tracked_count; i++)
+		if (sock_dead(tracked_socks[i]))
+			hostsock_publish_events(tracked_socks[i],
+						POLLIN | POLLOUT | POLLHUP,
+						POLLIN | POLLOUT);
 }
 
 /* ── Driver registration ─────────────────────────────────────────── */
