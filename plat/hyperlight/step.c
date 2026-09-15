@@ -65,6 +65,7 @@ extern void hostsock_resume(void);
 #define HL_STEP_HAS_DRIVER	(1 << 2) /* /dev/hlcall has been opened */
 #define HL_STEP_CALL_FAILED	(1 << 3) /* the driver reported the call failed */
 #define HL_STEP_EXITED		(1 << 4) /* the process exited; ns = its status */
+#define HL_STEP_CALL_IN_FLIGHT	(1 << 5) /* a named call is being served */
 
 /* The guest function that drives the scheduler, and the one the host
  * uses in its place for the first entry after restoring this guest from a
@@ -183,10 +184,10 @@ static void hl_route_call(const __u8 *fc, __u64 fc_len)
 		uk_thread_wake(hl_call_reader);
 }
 
-#if CONFIG_LIBDEVFS
 /* A call has been handed to the reader and not yet completed. */
 static int hl_call_in_flight;
 
+#if CONFIG_LIBDEVFS
 static int hlcall_open(struct device *dev __unused, int mode __unused)
 {
 	hl_call_opened = 1;
@@ -465,6 +466,8 @@ static void hl_step_report(__u64 ns, int flags)
 
 	if (hl_call_opened)
 		flags |= HL_STEP_HAS_DRIVER;
+	if (hl_call_in_flight)
+		flags |= HL_STEP_CALL_IN_FLIGHT;
 
 	p[0].type = HL_PV_HLULONG;
 	p[0].u64_val = ns;
