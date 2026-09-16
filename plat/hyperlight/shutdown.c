@@ -164,4 +164,13 @@ static int hyperlight_register_pm_ops(struct ukplat_bootinfo __unused *bi)
 	return uk_lcpu_pm_ops_register(&hyperlight_lcpu_pm_ops);
 }
 
-UK_BOOT_EARLYTAB_ENTRY(hyperlight_register_pm_ops, UK_PRIO_EARLIEST);
+/* After plat/native's registration, which runs at UK_PRIO_EARLIEST too:
+ * the later one wins, and native's halt_irq is `sti; hlt`, which under
+ * Hyperlight is not an idle wait but the guest halting for good -- the
+ * host reads the hlt as the entry completing, from the middle of the
+ * idle loop.  Only the untimed idle reaches the hook (the timed one calls
+ * time_block_until() directly), so a guest with a timer pending never
+ * noticed.
+ */
+UK_BOOT_EARLYTAB_ENTRY(hyperlight_register_pm_ops,
+		       UK_PRIO_AFTER(UK_PRIO_EARLIEST));
