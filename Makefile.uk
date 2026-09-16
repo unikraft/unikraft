@@ -6,6 +6,11 @@
 
 COMPFLAGS    += -nostdlib
 COMPFLAGS    += -U __linux__ -U __FreeBSD__ -U __sun__ -nostdinc
+
+CFLAGS-$(call have_gcc)       += -std=gnu17
+CFLAGS-$(call have_clang)     += -std=gnu17
+CXXFLAGS-$(call have_gcc)     += -std=gnu++17
+CXXFLAGS-$(call have_clang)   += -std=gnu++17
 COMPFLAGS-$(call have_gcc)	+= -fno-tree-sra -fno-split-stack
 
 ifneq ($(HAVE_STACKPROTECTOR),y)
