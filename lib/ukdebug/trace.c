@@ -42,7 +42,6 @@ char uk_trace_buffer[CONFIG_LIBUKDEBUG_TRACE_BUFFER_SIZE];
 size_t uk_trace_buffer_free = CONFIG_LIBUKDEBUG_TRACE_BUFFER_SIZE;
 char *uk_trace_buffer_writep = uk_trace_buffer;
 
-
 /* Store a string in format "key = value" in the section
  * .uk_trace_keyvals. This can be anything what you want trace.py
  * script to know about, and what you do not want to consume any space
@@ -53,10 +52,16 @@ char *uk_trace_buffer_writep = uk_trace_buffer;
  *
  *     $ readelf -p .uk_trace_keyvals <your_image.gdb>
  */
-#define TRACE_DEFINE_KEY(key, val)			\
-	__attribute((__section__(			\
-		".uk_trace_keyvals,\"\",@note#")))	\
-	static const char key[] __used =		\
-		#key " = " #val
+#if defined(__arm__) || defined(__aarch64__)
+#define __UK_TRACE_KEYVALS_SECTION                                             \
+	__attribute((__section__(".uk_trace_keyvals,\"\",%note//")))
+#else
+#define __UK_TRACE_KEYVALS_SECTION                                             \
+	__attribute((__section__(".uk_trace_keyvals,\"\",@note#")))
+#endif
+
+#define TRACE_DEFINE_KEY(key, val)                                             \
+	__UK_TRACE_KEYVALS_SECTION                                             \
+	static const char key[] __used = #key " = " #val
 
 TRACE_DEFINE_KEY(format_version, 1);
