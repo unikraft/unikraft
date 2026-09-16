@@ -18,8 +18,9 @@
  * eliminating the need for frequency guessing entirely.
  *
  * Wall-clock epoch is obtained from the host via GetWallClockNs at
- * boot so the guest can report real timestamps.  If the host does
- * not register the function, wall time falls back to monotonic.
+ * boot so the guest can report real timestamps, and again on a resume
+ * (hyperlight_time_resync).  If the host does not register the
+ * function, wall time falls back to monotonic.
  */
 
 #include <uk/arch/x86_64.h>
@@ -129,6 +130,17 @@ __nsec ukplat_monotonic_clock(void)
 __nsec ukplat_wall_clock(void)
 {
 	return wall_clock_boot_ns + ukplat_monotonic_clock();
+}
+
+void hyperlight_time_resync(void)
+{
+	__u64 now = hl_call_get_wall_clock_ns();
+
+	/* The monotonic clock carried on from the snapshot; the epoch it
+	 * counts from is what has to move.
+	 */
+	if (now)
+		wall_clock_boot_ns = now - ukplat_monotonic_clock();
 }
 
 void ukplat_time_init(void)

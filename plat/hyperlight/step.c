@@ -34,6 +34,7 @@
 #include <hyperlight-x86/dispatch.h>
 #include <hyperlight-x86/hcall.h>
 #include <hyperlight-x86/step.h>
+#include <hyperlight-x86/time.h>
 
 /* Provided by shutdown.c: the raw port-108 halt with the dispatch entry
  * in RAX, without the shutdown machinery (no term functions, no result).
@@ -419,7 +420,10 @@ uk_late_initcall(hl_yield_thread_create, 0x0);
  *
  *   the host sockets are re-established: they belonged to the process
  *   that took the snapshot, so listeners are opened and bound again and
- *   connections are declared dead (see hostsock_resume()).
+ *   connections are declared dead (see hostsock_resume());
+ *
+ *   the wall clock is re-anchored on the host's: the guest's kept
+ *   counting from the snapshot, not through the time spent on disk.
  */
 static void hl_resume(void)
 {
@@ -433,6 +437,8 @@ static void hl_resume(void)
 #ifdef CONFIG_LIBHOSTSOCK
 	hostsock_resume();
 #endif /* CONFIG_LIBHOSTSOCK */
+	/* The wall clock stopped with the snapshot; the host's did not. */
+	hyperlight_time_resync();
 	/* The new host has not heard these yet. */
 	if (hl_call_opened)
 		hl_emit("DriverReady");
