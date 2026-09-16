@@ -584,12 +584,28 @@ hostsock_connect(posix_sock *sock,
 
 	if (hs->state == HS_DEAD)
 		return -EPIPE;
+	/* The host starts the handshake and answers -EINPROGRESS while it is
+	 * under way, as a non-blocking connect(2) does; posix-socket then
+	 * polls for writability and reads SO_ERROR, so the thread parks and
+	 * the vCPU is not held for the peer.  The peer is recorded at once:
+	 * it is what getpeername() and a restore need, and a handshake still
+	 * pending at a snapshot could not complete on the new host anyway.
+	 */
 	err = hc_addr_op("net_connect", hs->host_fd, addr, addrlen);
-	if (err)
+	if (err && err != -EINPROGRESS)
 		return err;
 	hs_remember(&hs->peer, &hs->peer_len, addr, addrlen);
 	hs->state = HS_CONNECTED;
-	return 0;
+	/* The readiness published at creation is an unconnected socket's:
+	 * writable and hung up, as the host reports a closed TCP socket.
+	 * The handshake makes it stale, and the poll layer trusts the
+	 * published bits, so a poll for POLLOUT would return at once with
+	 * SO_ERROR still 0 and the caller would believe it connected.
+	 * Refresh from the host now: nothing is ready until it says so.
+	 */
+	if (err == -EINPROGRESS)
+		hostsock_ready(sock, POLLIN | POLLOUT);
+	return err;
 }
 
 static int
