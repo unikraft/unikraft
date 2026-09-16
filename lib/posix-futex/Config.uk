@@ -10,6 +10,11 @@ menuconfig LIBPOSIX_FUTEX
 		Linux-compatible futex calls
 
 if LIBPOSIX_FUTEX
+config LIBPOSIX_FUTEX_MAX_ENTRIES
+	int "Maximum number of futex addresses with queuing discipline"
+	range 1 256
+	default 256
+
 config LIBPOSIX_FUTEX_DEBUG
 	bool "Enable debug messages"
 	default n

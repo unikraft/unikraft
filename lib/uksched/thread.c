@@ -250,6 +250,7 @@ static void _uk_thread_struct_init(struct uk_thread *t,
 	t->dtor = dtor;
 	t->exec_time = 0;
 	t->wait_ticket = UK_WAITQ_TICKET_INIT_VALUE;
+	t->prio = UK_THREAD_PRIO_MIN;
 
 	if (auxsp) {
 		t->flags |= UK_THREADF_AUXSP;

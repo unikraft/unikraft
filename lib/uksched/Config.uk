@@ -23,4 +23,12 @@ config LIBUKSCHED_STATS
 	help
 		Provide scheduler stats via ukstore
 
+config LIBUKSCHED_MAX_PRIO
+	int "Maximum thread priority value"
+	range 1 255
+	default 239
+	help
+		Maximum priority value that can be assigned to a thread
+		via sched_setattr(). Must be >= 1.
+
 endif
