@@ -143,6 +143,8 @@ static int virtio_blkdev_request_set_sglist(struct uk_blkdev_queue *queue,
 	req = virtio_blk_req->req;
 	vbdev = queue->vbd;
 	start_data = (__uptr)req->aio_buf;
+	if (have_data && req->nb_sectors > __SZ_MAX / sector_size)
+		return -EOVERFLOW;
 	data_size = req->nb_sectors * sector_size;
 	segment_max_size = vbdev->max_size_segment;
 
@@ -209,7 +211,8 @@ static int virtio_blkdev_request_write(struct uk_blkdev_queue *queue,
 	if (req->nb_sectors == 0)
 		return -EINVAL;
 
-	if (req->start_sector + req->nb_sectors > cap->sectors)
+	if (req->start_sector >= cap->sectors ||
+	    req->nb_sectors > cap->sectors - req->start_sector)
 		return -EINVAL;
 
 	if (req->nb_sectors > cap->max_sectors_per_req)
@@ -659,13 +662,21 @@ static int virtio_blkdev_queues_alloc(struct virtio_blk_device *vbdev,
 	int rc = 0;
 	__u16 i = 0;
 	int vq_avail = 0;
-	__u16 qdesc_size[conf->nb_queues];
+	__u16 *qdesc_size;
 
-	if (conf->nb_queues > vbdev->max_vqueue_pairs) {
+	if (!conf->nb_queues) {
+		uk_pr_err("At least one queue is required\n");
+		return -EINVAL;
+	}
+	if (conf->nb_queues > CONFIG_LIBUKBLKDEV_MAXNBQUEUES ||
+	    conf->nb_queues > vbdev->max_vqueue_pairs) {
 		uk_pr_err("Queue number not supported: %"__PRIu16"\n",
 				conf->nb_queues);
 		return -ENOTSUP;
 	}
+	qdesc_size = uk_malloc(a, conf->nb_queues * sizeof(*qdesc_size));
+	if (!qdesc_size)
+		return -ENOMEM;
 
 	vbdev->nb_queues = conf->nb_queues;
 	vq_avail = virtio_find_vqs(vbdev->vdev, conf->nb_queues, qdesc_size);
@@ -694,6 +705,7 @@ static int virtio_blkdev_queues_alloc(struct virtio_blk_device *vbdev,
 		vbdev->qs[i].max_nb_desc = qdesc_size[i];
 
 exit:
+	uk_free(a, qdesc_size);
 	return rc;
 }
 
@@ -792,7 +804,7 @@ static int virtio_blkdev_feature_negotiate(struct virtio_blk_device *vbdev)
 	struct uk_blkdev_cap *cap;
 	__u64 host_features = 0;
 	__sector sectors;
-	__sector ssize;
+	__u32 blk_size;
 	__u16 num_queues;
 	__u32 max_segments;
 	__u32 max_size_segment;
@@ -813,19 +825,19 @@ static int virtio_blkdev_feature_negotiate(struct virtio_blk_device *vbdev)
 		goto exit;
 	}
 
-	if (!VIRTIO_FEATURE_HAS(host_features, VIRTIO_BLK_F_BLK_SIZE)) {
-		ssize = DEFAULT_SECTOR_SIZE;
-	} else {
+	if (VIRTIO_FEATURE_HAS(host_features, VIRTIO_BLK_F_BLK_SIZE)) {
 		rc = virtio_config_get(vbdev->vdev,
 				__offsetof(struct virtio_blk_config, blk_size),
-				&ssize,
-				sizeof(ssize),
+				&blk_size,
+				sizeof(blk_size),
 				1);
 		if (unlikely(rc)) {
 			uk_pr_err("Failed to get ssize from the device %d\n",
 					rc);
 			goto exit;
 		}
+		if (!blk_size)
+			uk_pr_warn("Device reports zero optimal block size\n");
 	}
 
 	/* If the device does not support multi-queues,
@@ -840,6 +852,11 @@ static int virtio_blkdev_feature_negotiate(struct virtio_blk_device *vbdev)
 					1);
 		if (unlikely(rc)) {
 			uk_pr_err("Failed to read max-queues\n");
+			goto exit;
+		}
+		if (!num_queues) {
+			uk_pr_err("Device exposes no request queues\n");
+			rc = -EINVAL;
 			goto exit;
 		}
 	} else
@@ -859,6 +876,7 @@ static int virtio_blkdev_feature_negotiate(struct virtio_blk_device *vbdev)
 		max_segments = 1;
 
 	/* We need extra sg elements for head (header) and tail (status). */
+	max_segments = MIN(max_segments, (__u32)__U16_MAX - 2);
 	max_segments += 2;
 
 	if (VIRTIO_FEATURE_HAS(host_features, VIRTIO_BLK_F_SIZE_MAX)) {
@@ -872,16 +890,26 @@ static int virtio_blkdev_feature_negotiate(struct virtio_blk_device *vbdev)
 					rc);
 			goto exit;
 		}
+		if (!max_size_segment) {
+			uk_pr_err("Device reports zero maximum segment size\n");
+			rc = -EINVAL;
+			goto exit;
+		}
 	} else
 		max_size_segment = __PAGE_SIZE;
 
-	cap->ssize = ssize;
+	/* Virtio-blk protocol sector fields always use 512-byte units.
+	 * blk_size is only the preferred I/O size and libukblkdev has no
+	 * separate capability for it.
+	 */
+	cap->ssize = DEFAULT_SECTOR_SIZE;
 	cap->sectors = sectors;
 	cap->ioalign = sizeof(void *);
 	cap->mode = (VIRTIO_FEATURE_HAS(
 			host_features, VIRTIO_BLK_F_RO)) ? O_RDONLY : O_RDWR;
 	cap->max_sectors_per_req =
-			max_size_segment / ssize * (max_segments - 2);
+			(__sector)max_size_segment / DEFAULT_SECTOR_SIZE *
+			(max_segments - 2);
 
 	vbdev->max_vqueue_pairs = num_queues;
 	vbdev->max_segments = max_segments;
@@ -895,9 +923,10 @@ static int virtio_blkdev_feature_negotiate(struct virtio_blk_device *vbdev)
 	vbdev->vdev->features &= host_features;
 	virtio_feature_set(vbdev->vdev);
 
-	virtio_dev_status_update(vbdev->vdev, (VIRTIO_CONFIG_STATUS_ACK |
-					       VIRTIO_CONFIG_STATUS_DRIVER |
-					       VIRTIO_CONFIG_STATUS_FEATURES_OK));
+	rc = virtio_dev_status_update(vbdev->vdev,
+				      VIRTIO_CONFIG_STATUS_ACK |
+				      VIRTIO_CONFIG_STATUS_DRIVER |
+				      VIRTIO_CONFIG_STATUS_FEATURES_OK);
 
 exit:
 	return rc;
@@ -960,6 +989,7 @@ out:
 	return rc;
 err_negotiate_feature:
 	virtio_dev_status_update(vbdev->vdev, VIRTIO_CONFIG_STATUS_FAIL);
+	uk_blkdev_drv_unregister(&vbdev->blkdev);
 err_out:
 	uk_free(a, vbdev);
 	goto out;

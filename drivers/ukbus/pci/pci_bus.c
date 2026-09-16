@@ -52,8 +52,13 @@
  */
 
 #include <string.h>
+#include <errno.h>
+#include <uk/errptr.h>
 #include <uk/print.h>
 #include <uk/bus/pci.h>
+#if CONFIG_LIBUKPAGING
+#include <uk/bus/platform.h>
+#endif /* CONFIG_LIBUKPAGING */
 
 extern int arch_pci_probe(struct uk_alloc *pha);
 
@@ -120,6 +125,223 @@ struct pci_driver *pci_find_driver(struct pci_device_id *id)
 		}
 	}
 	return NULL; /* no driver found */
+}
+
+static inline __u64 pci_bar_size32(__u32 mask)
+{
+	if (!mask)
+		return 0;
+
+	return ((__u32)~mask) + 1;
+}
+
+static inline __u64 pci_bar_size64(__u64 mask)
+{
+	if (!mask)
+		return 0;
+
+	return (~mask) + 1;
+}
+
+static inline int pci_bar_size_valid(__u64 size, __u64 min_size)
+{
+	return size >= min_size && !(size & (size - 1));
+}
+
+int pci_device_probe_bar(struct pci_device *dev, unsigned int bar)
+{
+	struct pci_bar *pbar;
+	__u32 attrs, mem_type, off, orig, probe;
+	__u64 mask, pbase, size;
+
+	UK_ASSERT(dev);
+
+	if (bar >= PCI_BAR_COUNT)
+		return -EINVAL;
+
+	pbar = &dev->bar[bar];
+	memset(pbar, 0, sizeof(*pbar));
+	pbar->index = bar;
+
+	off = PCI_BASE_ADDRESS_0 + bar * sizeof(__u32);
+	orig = pci_config_read32(dev, off);
+	if (orig == __U32_MAX)
+		return 0;
+
+	pci_config_write32(dev, off, __U32_MAX);
+	probe = pci_config_read32(dev, off);
+	pci_config_write32(dev, off, orig);
+	if (!probe)
+		return 0;
+	attrs = orig ? orig : probe;
+
+	if (attrs & PCI_BASE_ADDRESS_SPACE_IO) {
+		mask = probe & PCI_BASE_ADDRESS_IO_MASK;
+		pbase = orig & PCI_BASE_ADDRESS_IO_MASK;
+		size = pci_bar_size32(mask);
+		if (!pci_bar_size_valid(size, sizeof(__u32)) ||
+		    (pbase & (size - 1)))
+			return -EINVAL;
+		if (!pbase)
+			return 0;
+		pbar->type = PCI_BAR_IO;
+		pbar->pbase = pbase;
+		pbar->vbase = (__vaddr_t)pbase;
+		pbar->size = size;
+		pbar->flags = attrs & ~PCI_BASE_ADDRESS_IO_MASK;
+		return 0;
+	}
+
+	mem_type = attrs & PCI_BASE_ADDRESS_MEM_TYPE_MASK;
+	if (mem_type != PCI_BASE_ADDRESS_MEM_TYPE_32 &&
+	    mem_type != PCI_BASE_ADDRESS_MEM_TYPE_1M &&
+	    mem_type != PCI_BASE_ADDRESS_MEM_TYPE_64)
+		return -EINVAL;
+
+	if (mem_type == PCI_BASE_ADDRESS_MEM_TYPE_64) {
+		__u32 off_hi, orig_hi, probe_hi;
+
+		if (bar == PCI_BAR_COUNT - 1)
+			return -EINVAL;
+
+		off_hi = off + sizeof(__u32);
+		orig_hi = pci_config_read32(dev, off_hi);
+		pci_config_write32(dev, off, __U32_MAX);
+		pci_config_write32(dev, off_hi, __U32_MAX);
+		probe = pci_config_read32(dev, off);
+		probe_hi = pci_config_read32(dev, off_hi);
+		pci_config_write32(dev, off_hi, orig_hi);
+		pci_config_write32(dev, off, orig);
+
+		mask = ((__u64)probe_hi << 32) |
+		       (probe & PCI_BASE_ADDRESS_MEM_MASK);
+		pbase = ((__u64)orig_hi << 32) |
+			(orig & PCI_BASE_ADDRESS_MEM_MASK);
+		pbar->is_64 = 1;
+	} else {
+		if (mem_type == PCI_BASE_ADDRESS_MEM_TYPE_1M) {
+			mask = (probe & PCI_BASE_ADDRESS_MEM_1M_MASK) |
+			       ~((__u64)PCI_BASE_ADDRESS_MEM_1M_MASK | 0xf);
+			pbase = orig & PCI_BASE_ADDRESS_MEM_1M_MASK;
+		} else {
+			mask = probe & PCI_BASE_ADDRESS_MEM_MASK;
+			pbase = orig & PCI_BASE_ADDRESS_MEM_MASK;
+		}
+	}
+	size = pbar->is_64 ? pci_bar_size64(mask) : pci_bar_size32(mask);
+	if (!pci_bar_size_valid(size, 16) || (pbase & (size - 1)))
+		return -EINVAL;
+	if (!pbase)
+		return 0;
+
+	pbar->type = PCI_BAR_MEM;
+	pbar->pbase = pbase;
+	pbar->size = size;
+	pbar->flags = attrs & ~PCI_BASE_ADDRESS_MEM_MASK;
+	return 0;
+}
+
+int pci_device_probe_bars(struct pci_device *dev)
+{
+	unsigned int i;
+	__u16 cmd;
+	int rc = 0;
+
+	UK_ASSERT(dev);
+
+	cmd = pci_config_read16(dev, PCI_COMMAND);
+	if (cmd & PCI_COMMAND_DECODE_ENABLE)
+		pci_config_write16(dev, PCI_COMMAND,
+				   cmd & ~PCI_COMMAND_DECODE_ENABLE);
+
+	for (i = 0; i < PCI_BAR_COUNT; i++) {
+		rc = pci_device_probe_bar(dev, i);
+		if (unlikely(rc))
+			break;
+		if (dev->bar[i].is_64)
+			i++;
+	}
+
+	if (cmd & PCI_COMMAND_DECODE_ENABLE)
+		pci_config_write16(dev, PCI_COMMAND, cmd);
+
+	return rc;
+}
+
+int pci_device_map_bar(struct pci_device *dev, unsigned int bar)
+{
+	struct pci_bar *pbar;
+#if CONFIG_LIBUKPAGING
+	__vaddr_t vaddr;
+#endif /* CONFIG_LIBUKPAGING */
+
+	UK_ASSERT(dev);
+
+	if (bar >= PCI_BAR_COUNT)
+		return -EINVAL;
+
+	pbar = &dev->bar[bar];
+	if (pbar->type == PCI_BAR_NONE)
+		return -ENODEV;
+	if (!pbar->size || !pbar->pbase)
+		return -EINVAL;
+
+	if (pbar->type == PCI_BAR_IO) {
+		if (pbar->pbase > __U16_MAX ||
+		    pbar->size > (__u64)__U16_MAX + 1 - pbar->pbase)
+			return -ERANGE;
+		pbar->vbase = (__vaddr_t)pbar->pbase;
+		return 0;
+	}
+	if (pbar->vbase)
+		return 0;
+	if (pbar->size > __U64_MAX - pbar->pbase)
+		return -ERANGE;
+
+#if CONFIG_LIBUKPAGING
+	vaddr = uk_bus_pf_devmap(pbar->pbase, pbar->size);
+	if (unlikely(PTRISERR(vaddr)))
+		return PTR2ERR(vaddr);
+	pbar->vbase = vaddr;
+#else /* !CONFIG_LIBUKPAGING */
+	pbar->vbase = (__vaddr_t)pbar->pbase;
+#endif /* !CONFIG_LIBUKPAGING */
+
+	return 0;
+}
+
+int pci_device_enable(struct pci_device *dev)
+{
+	__u16 cmd;
+	unsigned int i;
+
+	UK_ASSERT(dev);
+
+	cmd = pci_config_read16(dev, PCI_COMMAND);
+	cmd |= PCI_COMMAND_MASTER;
+	for (i = 0; i < PCI_BAR_COUNT; i++) {
+		if (dev->bar[i].type == PCI_BAR_IO)
+			cmd |= PCI_COMMAND_IO;
+		else if (dev->bar[i].type == PCI_BAR_MEM)
+			cmd |= PCI_COMMAND_MEMORY;
+	}
+	pci_config_write16(dev, PCI_COMMAND, cmd);
+
+	return 0;
+}
+
+void pci_device_intx(struct pci_device *dev, int enable)
+{
+	__u16 cmd;
+
+	UK_ASSERT(dev);
+
+	cmd = pci_config_read16(dev, PCI_COMMAND);
+	if (enable)
+		cmd &= ~PCI_COMMAND_INTX_DISABLE;
+	else
+		cmd |= PCI_COMMAND_INTX_DISABLE;
+	pci_config_write16(dev, PCI_COMMAND, cmd);
 }
 
 static int pci_probe(void)
