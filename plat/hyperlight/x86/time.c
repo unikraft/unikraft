@@ -13,9 +13,9 @@
  * hw-interrupts enabled, PIT port writes are no-ops and the host
  * uses a timer thread + irqfd instead.
  *
- * TODO: Adopt Hyperlight's paravirtualized guest clock (PR #1422)
- * which provides pre-computed scaling factors via a clock page,
- * eliminating the need for frequency guessing entirely.
+ * The TSC frequency comes from CPUID where the hypervisor reports it,
+ * else from the host (GetTscHz, measured against the host's own clock;
+ * the guest runs on the same unscaled counter), else a guess.
  *
  * Wall-clock epoch is obtained from the host via GetWallClockNs at
  * boot so the guest can report real timestamps, and again on a resume
@@ -102,7 +102,16 @@ static void discover_tsc_freq(void)
 		return;
 	}
 
-	/* Fallback — no calibration hardware available */
+	/* The host runs on the same TSC (Hyperlight does not scale it) and
+	 * can measure it against its own clock; ask before guessing.
+	 */
+	if (hl_hcall_ulong("GetTscHz", __NULL, 0, &tsc_freq) == 0 && tsc_freq) {
+		uk_pr_info("TSC frequency from the host: %llu Hz\n",
+			   (unsigned long long)tsc_freq);
+		return;
+	}
+
+	/* Fallback — no calibration source at all */
 	tsc_freq = 2500000000ULL;
 	uk_pr_warn("TSC frequency unknown, assuming 2.5 GHz\n");
 }
