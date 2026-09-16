@@ -50,9 +50,10 @@
  *
  * The guest reports to the host through named host functions, each one
  * fact with typed arguments: Yield(ns) at every boundary, DriverReady(),
- * CallStarted(), CallDone(status), CallRejected() and Exited(status)
- * (see step.c).  A halt with neither a Yield nor an Exited means the
- * process is gone with unknown status.
+ * CallStarted(), CallDone(status) and CallRejected() (see step.c), plus
+ * Exited(status) from the shutdown path of every kernel on this platform
+ * (shutdown.c).  A halt with neither a Yield nor an Exited means the
+ * guest went down without a word.
  */
 
 #ifndef __HYPERLIGHT_X86_STEP_H__
@@ -143,13 +144,6 @@ int hyperlight_step_halt(__nsec wakeup_time);
 int hyperlight_step_active(void);
 
 /**
- * Report the process exit status to the host (the `Exited` host
- * function).  Called by the platform shutdown path before the final
- * halt, whether or not a pump is in flight.
- */
-void hyperlight_step_report_exit(void);
-
-/**
  * True if the size-prefixed FunctionCall @fc is the pump's own `step`
  * entry point rather than a named application call.
  */
@@ -165,10 +159,6 @@ static inline int hyperlight_step_halt(__nsec wakeup_time __unused)
 static inline int hyperlight_step_active(void)
 {
 	return 0;
-}
-
-static inline void hyperlight_step_report_exit(void)
-{
 }
 
 static inline int hyperlight_step_fc_is_pump(const __u8 *fc __unused,

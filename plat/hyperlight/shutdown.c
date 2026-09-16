@@ -17,12 +17,14 @@
  */
 
 #include <uk/boot/earlytab.h>
+#include <uk/init.h>
 #include <uk/lcpu.h>
 #include <uk/lcpu/pm.h>
 #include <uk/pm.h>
 #include <uk/prio.h>
 #include <uk/plat/common/bootinfo.h>
 
+#include <hyperlight-x86/hcall.h>
 #include <hyperlight-x86/outb.h>
 #include <hyperlight-x86/step.h>
 
@@ -60,18 +62,55 @@ void __noreturn hyperlight_halt_to_host(void)
 	__builtin_unreachable();
 }
 
+/* ── Exit status ─────────────────────────────────────────────────── */
+
+/* The exit status ukboot is shutting down with, captured from the term
+ * context on the way down.  Term handlers run in reverse init order, so
+ * this one is registered at the platform class to run after the library
+ * handlers: posix-process's (a late initcall) has by then replaced
+ * main()'s return value with the init process's exit status, which is
+ * the one that matters under the elfloader, where main() never returns.
+ */
+static int hl_exit_code;
+
+static int hl_exit_init(struct uk_init_ctx *ictx __unused)
+{
+	return 0;
+}
+
+static void hl_record_exit(struct uk_term_ctx *tctx)
+{
+	hl_exit_code = tctx->exit_code;
+}
+
+uk_plat_initcall(hl_exit_init, hl_record_exit);
+
+/* Tell the host the process is gone and with what status: the `Exited`
+ * host function, sent by every kernel on this platform, whether or not
+ * it runs the step model.  Best-effort, like the step model's events: a
+ * host without the function reads the halt as an exit of unknown status.
+ */
+static void hyperlight_report_exit(void)
+{
+	struct hl_param p[1];
+	__s32 out;
+
+	p[0].type = HL_PV_HLINT;
+	p[0].i32_val = hl_exit_code;
+	(void)hl_hcall_int("Exited", p, 1, &out);
+}
+
 static int hyperlight_shutdown(void)
 {
 	/*
-	 * Tell the host the process is gone and with what status.  Under a
-	 * step pump this halt lands in the middle of the host's `step` call
-	 * (the workload's main thread exited and ukboot is shutting the
-	 * system down): complete that call with a void result too, so the
-	 * host reads a clean exit rather than a truncated step.  The report
-	 * goes first; it is a host call and must not sit on top of the
-	 * result.
+	 * Under a step pump this halt lands in the middle of the host's
+	 * `step` call (the workload's main thread exited and ukboot is
+	 * shutting the system down): complete that call with a void result
+	 * too, so the host reads a clean exit rather than a truncated step.
+	 * The report goes first; it is a host call and must not sit on top
+	 * of the result.
 	 */
-	hyperlight_step_report_exit();
+	hyperlight_report_exit();
 	if (hyperlight_step_active())
 		hyperlight_dispatch_push_void_result();
 

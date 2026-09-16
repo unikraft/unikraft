@@ -68,7 +68,9 @@ extern void hostsock_resume(void);
  *   CallDone(status)  that call returned: 0, or the status the driver
  *                     wrote to the device.
  *   CallRejected()    a named call had no reader, or did not fit.
- *   Exited(status)    the process exited.
+ *
+ * Exited(status), the process exit, is not the step model's: every
+ * kernel on this platform sends it from the shutdown path (shutdown.c).
  *
  * After a restore, DriverReady and CallStarted are sent again if they
  * hold, so the new host learns them (see hl_resume()).  Every send is
@@ -348,34 +350,6 @@ static int hlcall_register(struct uk_init_ctx *ictx __unused)
 
 devfs_initcall(hlcall_register);
 #endif /* CONFIG_LIBDEVFS */
-
-/* ── Exit status ─────────────────────────────────────────────────── */
-
-/* The exit status ukboot is shutting down with, captured from the term
- * context on the way down.  Term handlers run in reverse init order, so
- * this one is registered at the platform class to run after the library
- * handlers: posix-process's (a late initcall) has by then replaced
- * main()'s return value with the init process's exit status, which is
- * the one that matters under the elfloader, where main() never returns.
- */
-static int hl_exit_code;
-
-static int hl_exit_init(struct uk_init_ctx *ictx __unused)
-{
-	return 0;
-}
-
-static void hl_record_exit(struct uk_term_ctx *tctx)
-{
-	hl_exit_code = tctx->exit_code;
-}
-
-uk_plat_initcall(hl_exit_init, hl_record_exit);
-
-void hyperlight_step_report_exit(void)
-{
-	hl_emit_i32("Exited", hl_exit_code);
-}
 
 /* ── Yield thread ────────────────────────────────────────────────── */
 
