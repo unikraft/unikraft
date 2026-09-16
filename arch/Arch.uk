@@ -5,4 +5,6 @@ else ifeq ($(CONFIG_ARCH_ARM_64),y)
 CONFIG_UK_ARCH := arm64
 else ifeq ($(CONFIG_ARCH_ARM_32),y)
 CONFIG_UK_ARCH := arm
+else ifeq ($(CONFIG_ARCH_RISCV_64),y)
+CONFIG_UK_ARCH := riscv64
 endif

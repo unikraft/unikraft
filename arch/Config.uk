@@ -2,6 +2,7 @@ choice
 	prompt "Architecture"
 	default ARCH_ARM_32 if HOST_ARCH = "arm"
 	default ARCH_ARM_64 if HOST_ARCH = "arm64"
+	default ARCH_RISCV_64 if HOST_ARCH= "riscv64"
 	default ARCH_X86_64
 	help
 	  Select the target CPU architecture.
@@ -15,6 +16,9 @@ config ARCH_ARM_64
 config ARCH_ARM_32
 	bool "Armv7 compatible (32 bits)"
 	select LIBISRLIB
+config ARCH_RISCV_64
+	bool "RISCV64 compatible (64 bits)"
+	select LIBISRLIB
 
 endchoice
 
@@ -27,7 +31,6 @@ endif
 if (ARCH_ARM_64)
 	source "$(UK_BASE)/arch/arm/arm64/Config.uk"
 endif
-
 config STACK_SIZE_PAGE_ORDER
 	int
 	prompt "Stack size page order"

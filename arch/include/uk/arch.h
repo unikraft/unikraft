@@ -47,6 +47,21 @@ __u64 uk_arch_read_sp(void);
  */
 void uk_arch_spinwait(void);
 
+__u8 uk_arch_ioreg_read8(const volatile __u8 *address);
+
+__u16 uk_arch_ioreg_read16(const volatile __u16 *address);
+
+__u32 uk_arch_ioreg_read32(const volatile __u32 *address);
+
+__u64 uk_arch_ioreg_read64(const volatile __u64 *address);
+
+void uk_arch_ioreg_write8(const volatile __u8 *address, __u8 value);
+
+void uk_arch_ioreg_write16(const volatile __u16 *address, __u16 value);
+
+void uk_arch_ioreg_write32(const volatile __u32 *address, __u32 value);
+
+void uk_arch_ioreg_write64(const volatile __u64 *address, __u64 value);
 /**
  * Switch stack pointer to given value and jump to address.
  *

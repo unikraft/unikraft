@@ -1,0 +1,3 @@
+uk_intctlr_probe
+plic_handle_irq
+plic_ack_irq

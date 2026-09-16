@@ -1,0 +1,7 @@
+config HAVE_PLIC
+	bool
+
+config LIBUKINTCTLR_PLIC
+	bool "RISC-V PLIC"
+	depends on (HAVE_INTCTLR && ARCH_RISCV_64)
+	select LIBUKINTCTLR

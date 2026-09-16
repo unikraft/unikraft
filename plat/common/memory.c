@@ -35,7 +35,7 @@
 #include <stddef.h>
 #include <uk/plat/common/sections.h>
 #include <uk/plat/common/bootinfo.h>
-#include <uk/asm/limits.h>
+#include <uk/arch/limits.h>
 #include <uk/alloc.h>
 #include <uk/paging.h>
 
