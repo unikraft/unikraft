@@ -210,13 +210,13 @@ You can find some common project examples below:
 
 | | Example |
 |-|:-|
-| ![](https://raw.githubusercontent.com/unikraft/catalog/main/.github/icons/c.svg) | [Simple "Hello, world!" application written in C](https://github.com/unikraft/catalog/tree/main/examples/helloworld-c) |
-| ![](https://raw.githubusercontent.com/unikraft/catalog/main/.github/icons/cpp.svg) | [Simple "Hello, world!" application written in C++](https://github.com/unikraft/catalog/tree/main/examples/helloworld-cpp) |
-| ![](https://raw.githubusercontent.com/unikraft/catalog/main/.github/icons/rust-white.svg#gh-dark-mode-only)![](https://raw.githubusercontent.com/unikraft/catalog/main/.github/icons/rust-black.svg#gh-light-mode-only) | [Simple "Hello, world!" application written in Rust built via `cargo`](https://github.com/unikraft/catalog/tree/main/examples/helloworld-rs) |
-| ![](https://raw.githubusercontent.com/unikraft/catalog/main/.github/icons/js.svg) | [Simple NodeJS 18 HTTP Web Server with `http`](https://github.com/unikraft/catalog/tree/main/examples/http-node18) |
-| ![](https://raw.githubusercontent.com/unikraft/catalog/main/.github/icons/go.svg) | [Simple Go 1.21 HTTP Web Server with `net/http`](https://github.com/unikraft/catalog/tree/main/examples/http-go1.21) |
-| ![](https://raw.githubusercontent.com/unikraft/catalog/main/.github/icons/python3.svg) | [Simple Flask 3.0 HTTP Web Server](https://github.com/unikraft/catalog/tree/main/examples/http-python3.10-flask3.0) |
-| ![](https://raw.githubusercontent.com/unikraft/catalog/main/.github/icons/python3.svg) | [Simple Python 3.10 HTTP Web Server with `http.server.HTTPServer`](https://github.com/unikraft/catalog/tree/main/examples/http-python3.10) |
+| ![](https://raw.githubusercontent.com/unikraft/catalog/main/.github/icons/c.svg) | [Simple "Hello, world!" application written in C](https://github.com/unikraft/catalog/tree/main/examples/helloworld-gcc13.2) |
+| ![](https://raw.githubusercontent.com/unikraft/catalog/main/.github/icons/cpp.svg) | [Simple "Hello, world!" application written in C++](https://github.com/unikraft/catalog/tree/main/examples/httpserver-g%2B%2B13.2) |
+| ![](https://raw.githubusercontent.com/unikraft/catalog/main/.github/icons/rust-white.svg#gh-dark-mode-only)![](https://raw.githubusercontent.com/unikraft/catalog/main/.github/icons/rust-black.svg#gh-light-mode-only) | [Simple "Hello, world!" application written in Rust built via `cargo`](https://github.com/unikraft/catalog/tree/main/examples/helloworld-rust1.75) |
+| ![](https://raw.githubusercontent.com/unikraft/catalog/main/.github/icons/js.svg) | [Simple NodeJS 18 HTTP Web Server with `http`](https://github.com/unikraft/catalog/tree/main/examples/httpserver-nodejs18) |
+| ![](https://raw.githubusercontent.com/unikraft/catalog/main/.github/icons/go.svg) | [Simple Go 1.21 HTTP Web Server with `net/http`](https://github.com/unikraft/catalog/tree/main/examples/httpserver-go1.21) |
+| ![](https://raw.githubusercontent.com/unikraft/catalog/main/.github/icons/python3.svg) | [Simple Flask 3.0 HTTP Web Server](https://github.com/unikraft/catalog/tree/main/examples/flask3.0-python3.10) |
+| ![](https://raw.githubusercontent.com/unikraft/catalog/main/.github/icons/python3.svg) | [Simple Python 3.10 HTTP Web Server with `http.server.HTTPServer`](https://github.com/unikraft/catalog/tree/main/examples/httpserver-python3.10) |
 
 Find [more examples and applications in our community catalog][unikraft-catalog]!
 
