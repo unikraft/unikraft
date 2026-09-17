@@ -96,6 +96,7 @@ static void handle_self(struct uk_signal *sig, const struct kern_sigaction *ks,
 	ucontext_t ucontext;
 	struct posix_process *this_process;
 	stack_t *altstack;
+	bool on_altstack;
 	__uptr ulsp;
 
 	UK_ASSERT(sig);
@@ -120,8 +121,13 @@ static void handle_self(struct uk_signal *sig, const struct kern_sigaction *ks,
 	 * while we are executing on it, neither sigaction() modifies
 	 * sa_flags->SA_ONSTACK.
 	 */
-	if ((ks->ks_flags & SA_ONSTACK) && !(altstack->ss_flags & SS_DISABLE)) {
-		UK_ASSERT(altstack->ss_sp);
+	/* An SA_ONSTACK handler runs on the alternate stack when one is
+	 * installed, else on the current stack, as on Linux.  The choice is
+	 * remembered: the flag is released below only if it was taken here.
+	 */
+	on_altstack = (ks->ks_flags & SA_ONSTACK) &&
+		      !(altstack->ss_flags & SS_DISABLE) && altstack->ss_sp;
+	if (on_altstack) {
 		UK_ASSERT(!(altstack->ss_flags & SS_ONSTACK));
 
 		altstack->ss_flags |= SS_ONSTACK;
@@ -154,9 +160,8 @@ static void handle_self(struct uk_signal *sig, const struct kern_sigaction *ks,
 		pprocess_signal_jmp_handler(&handler_ctx, execenv);
 	}
 
-	if (ks->ks_flags & SA_ONSTACK) {
+	if (on_altstack) {
 		UK_ASSERT(altstack->ss_flags & SS_ONSTACK);
-		UK_ASSERT(!(altstack->ss_flags & SS_DISABLE));
 		altstack->ss_flags &= ~SS_ONSTACK;
 	}
 }
@@ -425,5 +430,16 @@ void sys_error_handler(struct ukarch_execenv *ee __unused, long arg)
 
 err_panic:
 	/* FIXME: Cascading faulting */
-	UK_CRASH("Cannot deliver SIGSEGV for pf at 0x%lx\n", error->vaddr);
+	{
+		/* Computed first: KERN_SIGACTION() asserts, and an assertion
+		 * inside UK_CRASH's own arguments would not expand.
+		 */
+		int masked = IS_MASKED(pthread, error->signum);
+		int ignored = IS_IGNORED(pproc, error->signum);
+		unsigned long handler = (unsigned long)
+			KERN_SIGACTION(pproc, error->signum)->ks_handler;
+		UK_CRASH("Cannot deliver signal %d for pf at 0x%lx: tid %d, masked %d, ignored %d, handler 0x%lx\n",
+			 error->signum, error->vaddr, pthread->tid, masked,
+			 ignored, handler);
+	}
 }
