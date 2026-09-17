@@ -117,9 +117,16 @@ static int hyperlight_shutdown(void)
 	hyperlight_halt_to_host();
 }
 
+/* Port 102 is Abort.  Since Hyperlight 0.17 the word carries up to three
+ * bytes of an abort message: the low byte is their count, the next ones
+ * the bytes, and 0xFF ends the message and stops the vCPU.  A bare 0xFF
+ * reads as "three zero bytes", the host resumes the guest, and execution
+ * falls off the end of this function into whatever follows it: a crash
+ * turned into a busy loop.  One byte, the terminator.
+ */
 static int hyperlight_crash(void)
 {
-	hyperlight_out32(102, 0xFF); /* port 102 = Abort */
+	hyperlight_out32(102, 0x0000FF01);
 	__builtin_unreachable();
 }
 
