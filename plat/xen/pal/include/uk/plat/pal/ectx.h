@@ -25,6 +25,10 @@
 #if !__ASSEMBLY__
 struct uk_pal_ectx;
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 static inline void uk_pal_ectx_sanitize(struct uk_pal_ectx *state)
 {
 	uk_plat_native_ectx_sanitize((struct uk_plat_native_ectx *)state);
@@ -49,6 +53,10 @@ static inline void uk_pal_ectx_assert_equal(struct uk_pal_ectx *state)
 {
 	uk_plat_native_ectx_assert_equal((struct uk_plat_native_ectx *)state);
 }
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* !__ASSEMBLY__ */
 #endif /* __UK_PLAT_PAL_ECTX_H__ */
