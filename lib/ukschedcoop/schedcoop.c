@@ -156,10 +156,19 @@ static void schedcoop_thread_remove(struct uk_sched *s, struct uk_thread *t)
 {
 	struct schedcoop *c = uksched2schedcoop(s);
 
-	/* Remove from run_queue */
-	if (t != uk_thread_current()
-	    && uk_thread_is_runnable(t))
+	if (t == uk_thread_current())
+		return;
+	/* A runnable thread sits on the run queue; a blocked one with a
+	 * wake-up time sits on the sleep queue (schedcoop_thread_blocked),
+	 * and must leave it as well: otherwise the scheduler wakes it when
+	 * its time comes, after it has been terminated and released -- a
+	 * process exiting while another of its threads sleeps in
+	 * nanosleep(2) ended with the scheduler switching to a dead thread.
+	 */
+	if (uk_thread_is_runnable(t))
 		UK_TAILQ_REMOVE(&c->run_queue, t, queue);
+	else if (t->wakeup_time > 0)
+		UK_TAILQ_REMOVE(&c->sleep_queue, t, queue);
 }
 
 static void schedcoop_thread_blocked(struct uk_sched *s, struct uk_thread *t)
