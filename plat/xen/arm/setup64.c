@@ -42,6 +42,9 @@
 #include <uk/lcpu.h>
 #include <uk/paging.h>
 #include <uk/plat/common/bootinfo.h>
+#ifdef CONFIG_XEN_STATIC_SHM
+#include <xen-arm/shm.h>
+#endif
 
 /*
  * This structure contains start-of-day info, such as pagetable base
@@ -68,6 +71,19 @@ void *HYPERVISOR_dtb;
 paddr_t _libxenplat_paddr_offset;
 
 uk_smccc_conduit_func smccc_psci_call;
+
+#ifdef CONFIG_XEN_STATIC_SHM
+static struct pgtable_pool shm_pool = {
+	.l3_tables = shm_l3_pgtable,
+	.l2_table  = shm_l2_pgtable,
+	.base_va   = FIX_SHM_START,
+	.top_va    = FIX_SHM_TOP,
+	.next_va   = FIX_SHM_START,
+};
+
+struct uk_shm_entry shm_entries[UK_SHM_MAX_ENTRIES];
+int shm_count;
+#endif /* CONFIG_XEN_STATIC_SHM */
 
 static int hvm_get_parameter(int idx, uint64_t *value)
 {
@@ -149,6 +165,83 @@ void get_xenbus(void)
 	uk_pr_debug("xenbus mfn(pfn?) = %lx\n",
 				HYPERVISOR_start_info->store_mfn);
 }
+
+#ifdef CONFIG_XEN_STATIC_SHM
+static void get_shm(void)
+{
+	const void *dtb = HYPERVISOR_dtb;
+	int node, lenp, parent, naddr, nsz;
+	const fdt64_t *reg;
+	__u64 paddr, size;
+	unsigned long vaddr;
+	const char *id;
+
+	node = -1;
+	while (1) {
+		node = fdt_node_offset_by_compatible(dtb, node,
+						     "xen,shared-memory-v1");
+		if (node < 0)
+			break;
+
+		parent = fdt_parent_offset(dtb, node);
+		if (parent < 0) {
+			uk_pr_err("%s: cannot find parent node\n", __func__);
+			continue;
+		}
+		naddr = fdt_address_cells(dtb, parent);
+		nsz = fdt_size_cells(dtb, parent);
+		if (naddr != 2 || nsz != 2) {
+			uk_pr_err("%s: unsupported cells: addr=%d size=%d\n",
+				  __func__, naddr, nsz);
+			return;
+		}
+
+		reg = fdt_getprop(dtb, node, "reg", &lenp);
+		if (!reg || lenp < (int)(sizeof(fdt64_t) * 2)) {
+			uk_pr_err("%s: bad reg property\n", __func__);
+			continue;
+		}
+
+		paddr = fdt64_ld(&reg[0]);
+		size = fdt64_ld(&reg[1]);
+
+		id = fdt_getprop(dtb, node, "xen,id", NULL);
+		if (!id) {
+			uk_pr_err("%s: missing xen,id, skipping\n", __func__);
+			continue;
+		}
+		if (strlen(id) >= UK_SHM_ID_MAXLEN) {
+			uk_pr_err("%s: id '%s' exceeds max len (+null) (%d), skipping\n",
+				  __func__, id, UK_SHM_ID_MAXLEN);
+			continue;
+		}
+
+		if (shm_count >= UK_SHM_MAX_ENTRIES) {
+			uk_pr_err("%s: too many shm entries\n", __func__);
+			return;
+		}
+
+		vaddr = create_mapping(paddr, paddr + size,
+				       BLOCK_DEF_ATTR | ATTR_AP(ATTR_AP_RO)
+				       | ATTR_XN, &shm_pool);
+		if (!vaddr) {
+			uk_pr_err("%s: create_mapping failed pa=0x%lx\n",
+				  __func__, (unsigned long)paddr);
+			return;
+		}
+
+		shm_entries[shm_count].vaddr = vaddr;
+		shm_entries[shm_count].size = size;
+		snprintf(shm_entries[shm_count].id, UK_SHM_ID_MAXLEN,
+			 "%s", id);
+		shm_count++;
+
+		uk_pr_debug("%s: shm id=%s pa=0x%lx sz=0x%lx va=0x%lx\n",
+			    __func__, id, (unsigned long)paddr,
+			    (unsigned long)size, vaddr);
+	}
+}
+#endif /* CONFIG_XEN_STATIC_SHM */
 
 /*
  * Map device_tree (paddr) to FIX_FDT_START (vaddr)
@@ -410,6 +503,10 @@ void _libxenplat_armentry(void *dtb_pointer, paddr_t physical_offset)
 
 	/* Do early init */
 	uk_boot_early_init(bi);
+
+#ifdef CONFIG_XEN_STATIC_SHM
+	get_shm();
+#endif
 
 	uk_boot_entry();
 }

@@ -30,6 +30,7 @@
 #include <uk/plat/common/sections.h>
 #include <uk/arch/limits.h>
 #include <uk/paging.h>
+#include <uk/bitops.h>
 
 #define PAGE_SIZE	UK_PAGING_PAGE_SIZE
 #define PAGE_MASK	UK_PAGING_PAGE_MASK
@@ -78,6 +79,20 @@ extern paddr_t _libxenplat_paddr_offset;
 #define FIX_XS_START    (FIX_XS_TOP - SZ_2M)
 #define FIX_GNT_TOP     (FIX_XS_START)
 #define FIX_GNT_START   (FIX_GNT_TOP - SZ_2M)
+#ifdef CONFIG_XEN_STATIC_SHM
+#define SHM_REGION_SIZE     (CONFIG_XEN_SHM_REGION_SIZE_MB * 0x100000UL)
+
+#if (CONFIG_XEN_SHM_REGION_SIZE_MB % 2) != 0
+#error "CONFIG_XEN_SHM_REGION_SIZE_MB must be a multiple of 2"
+#endif
+
+/* SHM uses a dedicated L1 entry (L1[254]), separate from fixmap (L1[255]) */
+#define FIX_SHM_TOP     (PAGE_OFFSET - (1UL << L1_SHIFT))
+#define FIX_SHM_START   (FIX_SHM_TOP - SHM_REGION_SIZE)
+
+/* L3 tables needed for shm region (one per 2MB block) */
+#define SHM_NR_L3_TABLES (SHM_REGION_SIZE / SZ_2M)
+#endif /* CONFIG_XEN_STATIC_SHM */
 
 /*
  * Memory types available.
@@ -176,6 +191,13 @@ extern paddr_t _libxenplat_paddr_offset;
 #define ATTR_IDX(x)     ((x) << 2)
 #define ATTR_IDX_MASK   (7 << 2)
 
+/*
+ * Upper attributes fields in Stage 1 VMSAv8-A Block and Page descriptor
+ */
+#define ATTR_UXN        UK_BIT_ULL(54)  /* Unprivileged Execute Never */
+#define ATTR_PXN        UK_BIT_ULL(53)  /* Privileged Execute Never */
+#define ATTR_XN         (ATTR_UXN | ATTR_PXN)  /* Execute Never (both) */
+
 #define BLOCK_DEF_ATTR (ATTR_AF|ATTR_SH(ATTR_SH_IS)|ATTR_IDX(MT_NORMAL))
 #define BLOCK_DEV_ATTR (ATTR_AF|ATTR_SH(ATTR_SH_IS)|ATTR_IDX(MT_DEVICE_nGnRnE))
 
@@ -217,6 +239,44 @@ extern paddr_t _libxenplat_paddr_offset;
 #ifndef __ASSEMBLY__
 void arch_mm_prepare(unsigned long *start_pfn_p, unsigned long *max_pfn_p);
 void set_pgt_entry(lpae_t *ptr, lpae_t val);
+
+#define pte_addr_end(addr, end)						\
+({	unsigned long __boundary = ((addr) + L3_SIZE) & L3_MASK;	\
+	unsigned long __end = (end);					\
+	(__boundary - 1 < __end - 1) ? __boundary : __end;		\
+})
+
+#define pmd_addr_end(addr, end)						\
+({	unsigned long __boundary = ((addr) + L2_SIZE) & L2_MASK;	\
+	unsigned long __end = (end);					\
+	(__boundary - 1 < __end - 1) ? __boundary : __end;		\
+})
+
+/**
+ * Page table pool descriptor.
+ * Describes a set of pre-allocated L2/L3 tables for a fixed VA region.
+ */
+struct pgtable_pool {
+	lpae_t (*l3_tables)[Ln_ENTRIES];  /* Array of L3 page tables */
+	lpae_t *l2_table;                 /* L2 page table */
+	unsigned long base_va;            /* Start of the VA region */
+	unsigned long top_va;             /* End of the VA region */
+	unsigned long next_va;            /* Next available VA */
+};
+
+/*
+ * Pool-based page table mapping functions.
+ * Used for mapping reserved memory regions (e.g. Xen static shared memory)
+ * with pre-allocated L2/L3 page tables.
+ */
+unsigned long create_mapping(paddr_t start_paddr, paddr_t end_paddr,
+			     __u64 attr, struct pgtable_pool *pool);
+
+#ifdef CONFIG_XEN_STATIC_SHM
+extern lpae_t shm_l2_pgtable[Ln_ENTRIES];
+extern lpae_t shm_l3_pgtable[SHM_NR_L3_TABLES][Ln_ENTRIES];
+#endif /* CONFIG_XEN_STATIC_SHM */
+
 #endif
 
 #define arch_mm_init(a)
