@@ -308,3 +308,28 @@ The Unikraft name, logo and its mascot are trademark of [Unikraft GmbH](https://
 [unikraft-kraftfile-syntax]: https://unikraft.org/docs/cli/reference/kraftfile/latest
 [github-codespaces-catalog]: https://codespaces.new/unikraft/catalog
 [kraft]: https://github.com/unikraft/kraftkit
+
+## Running Unikraft on QEMU through Docker
+
+Running QEMU through Docker is useful when the host system provides an older
+QEMU version or when testing against a specific QEMU release.
+
+### Prerequisites
+
+- Docker installed
+- A locally compiled Unikraft application image
+- A QEMU container image available locally or from Docker Hub
+
+### Running a local build
+
+A locally built Unikraft image can be executed by mounting the build output
+inside a container that provides the desired QEMU version:
+
+```bash
+docker run --rm -it \
+  --network host \
+  -v $(pwd):/work \
+  <qemu-docker-image> \
+  qemu-system-x86_64 \
+  -kernel /work/build/<unikraft-binary> \
+  -nographic
