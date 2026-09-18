@@ -115,27 +115,31 @@ To configure the application to run under `9pfs` we follow the steps below:
 
 1. Enter the configuration interface by running:
 
-   ```console
-   $ make menuconfig
-   ```
+```console
+make menuconfig
+```
+   
+1. Go to `Library Configuration --->` and enable `vfscore - VFS Core Interface`.
+2. Under `vfscore: Configuration --->`
+select `Automatically mount a root filesystem (/)`.
+3. Select `Default root filesystem -> 9pfs`.
+4. Set the `Default root device` option to `rootfs` (which is the default value).
+5. We want to run Unikraft with QEMU / KVM, so we must select KVM guest in the
+`Platform Configuration` menu.
+For `9pfs` we also need to enable, in the KVM guest options menu,
+`Virtio --->`, then `Virtio PCI device support`.
+6. Save the configuration and exit the interface.
 
-1. Under `Library Configuration`, select `vfscore:` `VFS Core Interface`.
-1. Under `vfscore: Configuration  --->` select `Automatically mount a root filesystem (/)`.
-1. Select `Default root filesystem -> 9pfs`.
-1. Set the `Default root device` option to `rootfs` (which is the default value).
-1. We want to run Unikraft with QEMU / KVM, so we must select KVM guest in the `Platform Configuration` menu.
-For `9pfs` we also need to enable, in the KVM guest options menu, `Virtio --->`, then `Virtio PCI device support`.
-1. Save the configuration and exit the interface.
 1. Create a new folder in the current directory by running:
 
-   ```console
-   $ mkdir rootfs
-   ```
+```console
+mkdir rootfs
+```
 
 The complete command for running this program with `qemu` is:
 
 ```console
-$ qemu-system-x86_64 \
+qemu-system-x86_64 \
 -fsdev local,id=myid,path=./rootfs/,security_model=none \
 -device virtio-9p-pci,fsdev=myid,mount_tag=rootfs \
 -kernel build/app-helloworld_kvm-x86_64 \
