@@ -85,7 +85,7 @@ UK_SYSCALL_R_DEFINE(int, sysinfo, struct sysinfo *, info)
 	unsigned int mem_unit = 1;
 #endif /* CONFIG_LIBUKPAGING */
 
-	if (!info)
+	if (unlikely(!info))
 		return -EFAULT;
 
 	memset(info, 0, sizeof(*info));
@@ -179,13 +179,11 @@ UK_SYSCALL_R_DEFINE(int, uname, struct utsname *, buf)
 
 UK_SYSCALL_R_DEFINE(int, sethostname, const char*, name, size_t, len)
 {
-	if (name == NULL) {
+	if (unlikely(!name))
 		return -EFAULT;
-	}
 
-	if (len + 1 > sizeof(utsname.nodename)) {
+	if (unlikely(len + 1 > sizeof(utsname.nodename)))
 		return -EINVAL;
-	}
 
 	memcpy(utsname.nodename, name, len);
 	utsname.nodename[len] = '\0';
@@ -199,11 +197,11 @@ int gethostname(char *name, size_t len)
 	int rc;
 
 	rc = uname(&buf);
-	if (rc)
+	if (unlikely(rc != 0))
 		return -1;
 
 	node_len = strlen(buf.nodename) + 1;
-	if (node_len > len) {
+	if (unlikely(node_len > len)) {
 		errno = ENAMETOOLONG;
 		return -1;
 	}
