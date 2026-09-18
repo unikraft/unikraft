@@ -13,6 +13,24 @@
 extern "C" {
 #endif
 
+#ifdef CONFIG_FUZZING_INTERFACE
+#define FUZZING_MEMCHECK(buffer, size, permission) \
+	do { \
+		if (permission == 'r') { \
+			if (uk_nofault_probe_r(buffer, size, 0) != size) { \
+				return -EINVAL; \
+			} \
+		} \
+		else if (permission == 'w') { \
+			if (uk_nofault_probe_rw(buffer, size, 0) != size) { \
+				return -EINVAL; \
+			} \
+		} \
+	while ()
+#else
+#define FUZZING_MEMCHECK(buffer, size, permission)
+#endif
+
 /* Forces probing of the entire range. On a fault skips the offending page. */
 #define UK_NOFAULTF_CONTINUE	0x01
 
