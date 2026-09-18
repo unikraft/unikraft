@@ -141,13 +141,13 @@ uk_list_del_init(struct uk_list_head *entry)
 	(!uk_list_empty(ptr) ? uk_list_last_entry(ptr, type, member) : NULL)
 
 #define	uk_list_next_entry(ptr, member)					\
-	uk_list_entry(((ptr)->member.next), typeof(*(ptr)), member)
+	uk_list_entry(((ptr)->member.next), __typeof__(*(ptr)), member)
 
 #define	uk_list_safe_reset_next(ptr, n, member) \
 	((n) = uk_list_next_entry(ptr, member))
 
 #define	uk_list_prev_entry(ptr, member)					\
-	uk_list_entry(((ptr)->member.prev), typeof(*(ptr)), member)
+	uk_list_entry(((ptr)->member.prev), __typeof__(*(ptr)), member)
 
 #define	uk_list_for_each(p, head)				\
 	for (p = (head)->next; p != (head); p = (p)->next)
@@ -156,44 +156,44 @@ uk_list_del_init(struct uk_list_head *entry)
 	for (p = (head)->next, n = (p)->next; p != (head); p = n, n = (p)->next)
 
 #define uk_list_for_each_entry(p, h, field)				\
-	for (p = uk_list_entry((h)->next, typeof(*p), field);		\
+	for (p = uk_list_entry((h)->next, __typeof__(*p), field);	\
 	     &(p)->field != (h);					\
-	     p = uk_list_entry((p)->field.next, typeof(*p), field))
+	     p = uk_list_entry((p)->field.next, __typeof__(*p), field))
 
 #define uk_list_for_each_entry_safe(p, n, h, field)			\
-	for (p = uk_list_entry((h)->next, typeof(*p), field),		\
-		     n = uk_list_entry((p)->field.next, typeof(*p), field); \
+	for (p = uk_list_entry((h)->next, __typeof__(*p), field),	\
+		     n = uk_list_entry((p)->field.next, __typeof__(*p), field);\
 	     &(p)->field != (h);					\
-	     p = n, n = uk_list_entry(n->field.next, typeof(*n), field))
+	     p = n, n = uk_list_entry(n->field.next, __typeof__(*n), field))
 
 #define	uk_list_for_each_entry_from(p, h, field) \
 	for ( ; &(p)->field != (h); \
-	    p = uk_list_entry((p)->field.next, typeof(*p), field))
+	    p = uk_list_entry((p)->field.next, __typeof__(*p), field))
 
 #define	uk_list_for_each_entry_continue(p, h, field)			\
 	for (p = uk_list_next_entry((p), field); &(p)->field != (h);	\
 	    p = uk_list_next_entry((p), field))
 
 #define	uk_list_for_each_entry_safe_from(pos, n, head, member)		\
-	for (n = uk_list_entry((pos)->member.next, typeof(*pos), member); \
+	for (n = uk_list_entry((pos)->member.next, __typeof__(*pos), member); \
 	     &(pos)->member != (head);					\
-	     pos = n, n = uk_list_entry(n->member.next, typeof(*n), member))
+	     pos = n, n = uk_list_entry(n->member.next, __typeof__(*n), member))
 
 #define	uk_list_for_each_entry_reverse(p, h, field)			\
-	for (p = uk_list_entry((h)->prev, typeof(*p), field);		\
+	for (p = uk_list_entry((h)->prev, __typeof__(*p), field);	\
 	     &(p)->field != (h);					\
-	     p = uk_list_entry((p)->field.prev, typeof(*p), field))
+	     p = uk_list_entry((p)->field.prev, __typeof__(*p), field))
 
 #define	uk_list_for_each_entry_safe_reverse(p, n, h, field)		\
-	for (p = uk_list_entry((h)->prev, typeof(*p), field),		\
-		     n = uk_list_entry((p)->field.prev, typeof(*p), field); \
+	for (p = uk_list_entry((h)->prev, __typeof__(*p), field),	\
+		     n = uk_list_entry((p)->field.prev, __typeof__(*p), field);\
 	     &(p)->field != (h);					\
-	     p = n, n = uk_list_entry(n->field.prev, typeof(*n), field))
+	     p = n, n = uk_list_entry(n->field.prev, __typeof__(*n), field))
 
 #define	uk_list_for_each_entry_continue_reverse(p, h, field)		\
-	for (p = uk_list_entry((p)->field.prev, typeof(*p), field);	\
+	for (p = uk_list_entry((p)->field.prev, __typeof__(*p), field);	\
 	     &(p)->field != (h);					\
-	     p = uk_list_entry((p)->field.prev, typeof(*p), field))
+	     p = uk_list_entry((p)->field.prev, __typeof__(*p), field))
 
 #define	uk_list_for_each_prev(p, h) for (p = (h)->prev; p != (h); p = (p)->prev)
 
