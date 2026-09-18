@@ -64,7 +64,8 @@ int uk_plat_native_paging_init(void)
 	tgran4 = (reg >> UK_ARCH_ARM64_ID_AA64MMFR0_EL1_TGRAN4_SHIFT) &
 		  UK_ARCH_ARM64_ID_AA64MMFR0_EL1_TGRAN4_MASK;
 
-	if (unlikely(tgran4 != UK_ARCH_ARM64_ID_AA64MMFR0_EL1_TGRAN4_SUPPORTED))
+	if (unlikely(tgran4 ==
+		     UK_ARCH_ARM64_ID_AA64MMFR0_EL1_TGRAN4_NOSUPPORTED))
 		UK_CRASH("4KiB granule not supported\n");
 
 	return 0;
