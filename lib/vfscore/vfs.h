@@ -451,7 +451,7 @@ int sys_readlink(char *path, char *buf, size_t bufsize, ssize_t *size);
  *	- (0):  Completed successfully
  *	- (<0): Negative value with error code
  */
-int sys_utimes(char *path, const struct timeval *times, int flags);
+int sys_utimes(char *path, const struct timeval times[2], int flags);
 
 /**
  * Changes last access and modification times with nanoseconds
