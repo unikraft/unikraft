@@ -192,7 +192,7 @@ int virtiofs_dev_vqsetup(struct uk_virtiofs_dev *dev)
 	r = virtio_config_get(dev->vdev,
 			      __offsetof(struct virtio_fs_config,
 					 num_request_queues),
-			      &nq_req, sizeof(nq_req), 1);
+			      &nq_req, sizeof(nq_req), sizeof(nq_req));
 	UK_ASSERT(r <= 0);
 	if (unlikely(r))
 		return r;
