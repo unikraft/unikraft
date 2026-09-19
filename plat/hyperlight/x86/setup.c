@@ -176,13 +176,21 @@ static void _ukplat_entry(struct ukplat_bootinfo *bi)
 	 * hands free regions to the frame allocator and clears their
 	 * permission flags, making them invisible to memregion_alloc.
 	 */
-	bstack = ukplat_memregion_alloc(__STACK_SIZE, UKPLAT_MEMRT_STACK,
+	/* Boot stack: a fixed 1 MiB, independent of
+	 * CONFIG_STACK_SIZE_PAGE_ORDER (which sizes runtime thread stacks and
+	 * may be larger).  The boot stack is used only until the scheduler
+	 * starts the main thread, and the pre-paging boot memory cannot fit a
+	 * large one.
+	 */
+	const __sz boot_stack_size = (__sz)__PAGE_SIZE << 8;
+
+	bstack = ukplat_memregion_alloc(boot_stack_size, UKPLAT_MEMRT_STACK,
 					UKPLAT_MEMRF_READ |
 					UKPLAT_MEMRF_WRITE);
 	if (unlikely(!bstack))
 		UK_CRASH("Boot stack alloc failed\n");
 
-	bstack = (void *)((__uptr)bstack + __STACK_SIZE);
+	bstack = (void *)((__uptr)bstack + boot_stack_size);
 
 	/*
 	 * Pre-fault the new boot stack for CoW before switching.
@@ -194,7 +202,7 @@ static void _ukplat_entry(struct ukplat_bootinfo *bi)
 		volatile __u8 *p = (volatile __u8 *)bstack;
 		__sz i;
 
-		for (i = __PAGE_SIZE; i <= __STACK_SIZE; i += __PAGE_SIZE) {
+		for (i = __PAGE_SIZE; i <= boot_stack_size; i += __PAGE_SIZE) {
 			__u8 tmp = *(p - i);
 			*(volatile __u8 *)(p - i) = tmp;
 		}
