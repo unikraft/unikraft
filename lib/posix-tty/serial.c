@@ -26,28 +26,42 @@ static const char SERIAL_VOLID[] = "serial_vol";
 #define SERIAL_TERMIOS_CFLAGS (CREAD|CS8|B38400)
 #define SERIAL_TERMIOS_LFLAGS (ICANON|ECHO)
 
-/* Linux only fills in 19 chars; bincompat might expect this */
+/* Linux fills in 19 control chars; copy exactly that many to and from the
+ * caller's buffer, which the guest sizes to its own libc's struct termios. */
 #define KNCCS 19
 
-/* Values taken from termios(3) from Linux man-pages 6.05 */
-static const char SERIAL_TERMIOS_CONTROL_CHARS[KNCCS] = {
-	[VDISCARD] = 017,
-	[VEOF] = SERIAL_EOT,
-	[VEOL] = 0,
-	[VEOL2] = 0,
-	[VERASE] = 0177,
-	[VINTR] = 003,
-	[VKILL] = 025,
-	[VLNEXT] = 026,
-	[VMIN] = 1,
-	[VQUIT] = 034,
-	[VREPRINT] = 022,
-	[VSTART] = 021,
-	[VSTOP] = 023,
-	[VSUSP] = 032,
-	[VSWTC] = 0,
-	[VTIME] = 0,
-	[VWERASE] = 027,
+/*
+ * Line settings, mutable: a program switches the terminal to raw mode
+ * (ICANON/ECHO off) to take over echo and line editing, then reads them
+ * back with TCGETS.  Echoing input regardless of ECHO would show every
+ * character twice for a program that does its own echo -- an interactive
+ * shell's line editor, say.  Initialised to the cooked defaults;
+ * control-char values from termios(3), Linux man-pages 6.05.
+ */
+static struct termios serial_termios = {
+	.c_iflag = SERIAL_TERMIOS_IFLAGS,
+	.c_oflag = SERIAL_TERMIOS_OFLAGS,
+	.c_cflag = SERIAL_TERMIOS_CFLAGS,
+	.c_lflag = SERIAL_TERMIOS_LFLAGS,
+	.c_cc = {
+		[VDISCARD] = 017,
+		[VEOF] = SERIAL_EOT,
+		[VEOL] = 0,
+		[VEOL2] = 0,
+		[VERASE] = 0177,
+		[VINTR] = 003,
+		[VKILL] = 025,
+		[VLNEXT] = 026,
+		[VMIN] = 1,
+		[VQUIT] = 034,
+		[VREPRINT] = 022,
+		[VSTART] = 021,
+		[VSTOP] = 023,
+		[VSUSP] = 032,
+		[VSWTC] = 0,
+		[VTIME] = 0,
+		[VWERASE] = 027,
+	},
 };
 
 /* TODO: Some consoles require both a newline and a carriage return to
@@ -130,13 +144,16 @@ static ssize_t serial_read(const struct uk_file *f,
 		if (*last == SERIAL_EOT) {
 			total--;
 			uk_file_event_clear(f, UKFD_POLLIN);
-			if (bytes_read > 1)
+			if (bytes_read > 1 && (serial_termios.c_lflag & ECHO))
 				_console_out(buf, bytes_read - 1);
 			break;
 		}
 
-		/* Echo the input to the console (NOT stdout!) */
-		_console_out(buf, bytes_read);
+		/* Echo the input to the console (NOT stdout!), unless a
+		 * program turned ECHO off to do its own -- otherwise every
+		 * character would appear twice. */
+		if (serial_termios.c_lflag & ECHO)
+			_console_out(buf, bytes_read);
 
 		if (*last == '\n')
 			break;
@@ -189,18 +206,26 @@ static int serial_ctl(const struct uk_file *f __maybe_unused,
 		{
 			struct termios *tc = (struct termios *)arg1;
 
-			tc->c_iflag = SERIAL_TERMIOS_IFLAGS;
-			tc->c_oflag = SERIAL_TERMIOS_OFLAGS;
-			tc->c_cflag = SERIAL_TERMIOS_CFLAGS;
-			tc->c_lflag = SERIAL_TERMIOS_LFLAGS;
-			memcpy(tc->c_cc, SERIAL_TERMIOS_CONTROL_CHARS, KNCCS);
+			tc->c_iflag = serial_termios.c_iflag;
+			tc->c_oflag = serial_termios.c_oflag;
+			tc->c_cflag = serial_termios.c_cflag;
+			tc->c_lflag = serial_termios.c_lflag;
+			memcpy(tc->c_cc, serial_termios.c_cc, KNCCS);
 			return 0;
 		}
 		case TCSETS:
 		case TCSETSW:
 		case TCSETSF:
-			uk_pr_warn_once("Serial file settings stubbed\n");
+		{
+			const struct termios *tc = (const struct termios *)arg1;
+
+			serial_termios.c_iflag = tc->c_iflag;
+			serial_termios.c_oflag = tc->c_oflag;
+			serial_termios.c_cflag = tc->c_cflag;
+			serial_termios.c_lflag = tc->c_lflag;
+			memcpy(serial_termios.c_cc, tc->c_cc, KNCCS);
 			return 0;
+		}
 		case TIOCGWINSZ:
 		{
 			struct winsize *winsz = (struct winsize *)arg1;
