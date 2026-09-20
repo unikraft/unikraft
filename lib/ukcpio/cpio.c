@@ -417,6 +417,42 @@ extract_section(struct cpio_ilist *ilist,
 }
 
 /**
+ * Advances past an end-of-archive marker to the next archive in the buffer.
+ *
+ * The initramfs buffer format allows several cpio archives to be
+ * concatenated, separated by an arbitrary amount of zero padding; a
+ * "TRAILER!!!" record therefore only ends the archive it belongs to.
+ *
+ * @param headerp
+ *  Pointer to the trailer header; gets advanced to the next archive's first
+ *  header, or set to NULL if no further archive follows.
+ * @param eof
+ *  Pointer to the first byte after end of file.
+ */
+static void
+skip_to_next_archive(const struct uk_cpio_header **headerp, const char *eof)
+{
+	const struct uk_cpio_header *header = *headerp;
+	const char *next;
+
+	/* End-of-archive markers carry no data */
+	next = (const char *)UKCPIO_NEXT(header,
+					 UKCPIO_U32FIELD(header->namesize),
+					 UKCPIO_U32FIELD(header->filesize));
+	while (next < eof && !*next)
+		next++;
+	next = UKCPIO_ALIGN_UP(next);
+
+	/* Resume only if another archive actually follows */
+	if (next + sizeof(*header) > eof ||
+	    !ukcpio_valid_magic((const struct uk_cpio_header *)next)) {
+		*headerp = NULL;
+		return;
+	}
+	*headerp = (const struct uk_cpio_header *)next;
+}
+
+/**
  * Extracts a CPIO section to the dest directory.
  *
  * @param headerp
@@ -447,7 +483,13 @@ process_section(struct cpio_ilist *ilist,
 		return -UKCPIO_INVALID_HEADER;
 	}
 	if (unlikely(UKCPIO_ISLAST(header))) {
-		*headerp = NULL;
+		/*
+		 * Hard link tracking is archive-local: concatenated archives
+		 * are generated independently and reuse inode numbers, so
+		 * drop the list along with the archive that filled it.
+		 */
+		UK_SLIST_INIT(&ilist->elms);
+		skip_to_next_archive(headerp, eof);
 		return UKCPIO_SUCCESS;
 	}
 	return extract_section(ilist, headerp, fullpath, eof, prefixlen);
@@ -461,6 +503,7 @@ ukcpio_extract(const char *dest, const void *buf, size_t buflen)
 	};
 	enum ukcpio_error error = UKCPIO_SUCCESS;
 	const struct uk_cpio_header *header = buf;
+	const char *eof = (const char *)buf + buflen;
 	size_t max_alloc, destlen;
 	char pathbuf[PATH_MAX];
 	struct uk_alloc *a;
@@ -514,7 +557,7 @@ ukcpio_extract(const char *dest, const void *buf, size_t buflen)
 	while (header && error == UKCPIO_SUCCESS) {
 		error = process_section(&ilist,
 					&header, pathbuf,
-					(char *)header + buflen, destlen);
+					eof, destlen);
 	}
 
 	uk_free(a, region_base);
