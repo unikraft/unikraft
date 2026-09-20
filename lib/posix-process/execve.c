@@ -123,13 +123,19 @@ UK_SYSCALL_R_E_DEFINE(int, execve, const char *, pathname,
 	 * corrupting it or wasting space. Use the threads's
 	 * stack allocator for the new stack.
 	 */
-	stack_new = uk_malloc(this_thread->_mem.stack_a, STACK_SIZE);
+#if CONFIG_LIBPOSIX_PROCESS_EXECVE_STACK_SIZE_PAGES
+	const __sz exec_stack_size =
+		(__sz)CONFIG_LIBPOSIX_PROCESS_EXECVE_STACK_SIZE_PAGES * __PAGE_SIZE;
+#else
+	const __sz exec_stack_size = STACK_SIZE;
+#endif
+	stack_new = uk_malloc(this_thread->_mem.stack_a, exec_stack_size);
 	if (unlikely(!stack_new)) {
 		uk_pr_err("Could not allocate stack\n");
 		return -ENOMEM;
 	}
 
-	loader_args.stack_size = STACK_SIZE;
+	loader_args.stack_size = exec_stack_size;
 	loader_args.ctx.sp = ukarch_gen_sp((__uptr)stack_new,
 					   loader_args.stack_size);
 
