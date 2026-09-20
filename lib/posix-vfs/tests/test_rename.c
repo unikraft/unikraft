@@ -16,6 +16,15 @@
 /* All test cases operate below this directory of the (writable) root fs */
 #define RN_ROOT "/uktest-rename"
 
+/* TODO: import these into nolibc */
+#ifndef RENAME_NOREPLACE
+#define RENAME_NOREPLACE 1
+#endif /* RENAME_NOREPLACE */
+
+#ifndef RENAME_EXCHANGE
+#define RENAME_EXCHANGE 2
+#endif /* RENAME_EXCHANGE */
+
 /* Set if the tests cannot run because there is no writable root filesystem */
 static int rn_skip;
 
@@ -79,6 +88,134 @@ UK_TESTCASE(posix_vfs_rename_testsuite, posix_vfs_test_rename_same_mount)
 					  RN_ROOT "/same/b/g"));
 	UK_TEST_EXPECT(!rn_exists(RN_ROOT "/same/a/f"));
 	UK_TEST_EXPECT(rn_exists(RN_ROOT "/same/b/g"));
+}
+
+UK_TESTCASE(posix_vfs_rename_testsuite, posix_vfs_test_rename_file_over_file)
+{
+	if (unlikely(rn_skip))
+		return;
+
+	UK_TEST_EXPECT_ZERO(rn_mkdir(RN_ROOT "/ff"));
+	UK_TEST_EXPECT_ZERO(rn_mkfile(RN_ROOT "/ff/a"));
+	UK_TEST_EXPECT_ZERO(rn_mkfile(RN_ROOT "/ff/b"));
+
+	/* A file may replace another file */
+	UK_TEST_EXPECT_ZERO(uk_sys_rename(RN_ROOT "/ff/a", RN_ROOT "/ff/b"));
+	UK_TEST_EXPECT(!rn_exists(RN_ROOT "/ff/a"));
+	UK_TEST_EXPECT(rn_exists(RN_ROOT "/ff/b"));
+}
+
+UK_TESTCASE(posix_vfs_rename_testsuite, posix_vfs_test_rename_file_over_dir)
+{
+	if (unlikely(rn_skip))
+		return;
+
+	UK_TEST_EXPECT_ZERO(rn_mkdir(RN_ROOT "/fd"));
+	UK_TEST_EXPECT_ZERO(rn_mkdir(RN_ROOT "/fd/full"));
+	UK_TEST_EXPECT_ZERO(rn_mkfile(RN_ROOT "/fd/full/keep"));
+	UK_TEST_EXPECT_ZERO(rn_mkdir(RN_ROOT "/fd/empty"));
+	UK_TEST_EXPECT_ZERO(rn_mkfile(RN_ROOT "/fd/f"));
+
+	/* A non-directory must never replace a directory, empty or not */
+	UK_TEST_EXPECT_SNUM_EQ(uk_sys_rename(RN_ROOT "/fd/f",
+					     RN_ROOT "/fd/full"),
+			       -EISDIR);
+	UK_TEST_EXPECT_SNUM_EQ(uk_sys_rename(RN_ROOT "/fd/f",
+					     RN_ROOT "/fd/empty"),
+			       -EISDIR);
+	UK_TEST_EXPECT(rn_exists(RN_ROOT "/fd/f"));
+	UK_TEST_EXPECT(rn_exists(RN_ROOT "/fd/full/keep"));
+	UK_TEST_EXPECT(rn_exists(RN_ROOT "/fd/empty"));
+}
+
+UK_TESTCASE(posix_vfs_rename_testsuite, posix_vfs_test_rename_dir_over_file)
+{
+	if (unlikely(rn_skip))
+		return;
+
+	UK_TEST_EXPECT_ZERO(rn_mkdir(RN_ROOT "/df"));
+	UK_TEST_EXPECT_ZERO(rn_mkdir(RN_ROOT "/df/d"));
+	UK_TEST_EXPECT_ZERO(rn_mkfile(RN_ROOT "/df/d/keep"));
+	UK_TEST_EXPECT_ZERO(rn_mkfile(RN_ROOT "/df/f"));
+
+	/* A directory must never replace a non-directory */
+	UK_TEST_EXPECT_SNUM_EQ(uk_sys_rename(RN_ROOT "/df/d",
+					     RN_ROOT "/df/f"),
+			       -ENOTDIR);
+	UK_TEST_EXPECT(rn_exists(RN_ROOT "/df/d/keep"));
+	UK_TEST_EXPECT(rn_exists(RN_ROOT "/df/f"));
+}
+
+UK_TESTCASE(posix_vfs_rename_testsuite, posix_vfs_test_rename_dir_over_dir)
+{
+	if (unlikely(rn_skip))
+		return;
+
+	UK_TEST_EXPECT_ZERO(rn_mkdir(RN_ROOT "/dd"));
+	UK_TEST_EXPECT_ZERO(rn_mkdir(RN_ROOT "/dd/src"));
+	UK_TEST_EXPECT_ZERO(rn_mkfile(RN_ROOT "/dd/src/s"));
+	UK_TEST_EXPECT_ZERO(rn_mkdir(RN_ROOT "/dd/full"));
+	UK_TEST_EXPECT_ZERO(rn_mkfile(RN_ROOT "/dd/full/keep"));
+	UK_TEST_EXPECT_ZERO(rn_mkdir(RN_ROOT "/dd/empty"));
+
+	/* A directory must not replace a non-empty directory */
+	UK_TEST_EXPECT_SNUM_EQ(uk_sys_rename(RN_ROOT "/dd/src",
+					     RN_ROOT "/dd/full"),
+			       -ENOTEMPTY);
+	UK_TEST_EXPECT(rn_exists(RN_ROOT "/dd/src/s"));
+	UK_TEST_EXPECT(rn_exists(RN_ROOT "/dd/full/keep"));
+
+	/* ... but may replace an empty one */
+	UK_TEST_EXPECT_ZERO(uk_sys_rename(RN_ROOT "/dd/src",
+					  RN_ROOT "/dd/empty"));
+	UK_TEST_EXPECT(!rn_exists(RN_ROOT "/dd/src"));
+	UK_TEST_EXPECT(rn_exists(RN_ROOT "/dd/empty/s"));
+}
+
+UK_TESTCASE(posix_vfs_rename_testsuite, posix_vfs_test_rename_dir_over_parent)
+{
+	if (unlikely(rn_skip))
+		return;
+
+	UK_TEST_EXPECT_ZERO(rn_mkdir(RN_ROOT "/par"));
+	UK_TEST_EXPECT_ZERO(rn_mkdir(RN_ROOT "/par/a"));
+	UK_TEST_EXPECT_ZERO(rn_mkdir(RN_ROOT "/par/a/b"));
+	UK_TEST_EXPECT_ZERO(rn_mkfile(RN_ROOT "/par/a/f"));
+
+	/* The destination is the (non-empty) parent of the source */
+	UK_TEST_EXPECT_SNUM_EQ(uk_sys_rename(RN_ROOT "/par/a/b",
+					     RN_ROOT "/par/a"),
+			       -ENOTEMPTY);
+	UK_TEST_EXPECT_SNUM_EQ(uk_sys_rename(RN_ROOT "/par/a/f",
+					     RN_ROOT "/par/a"),
+			       -EISDIR);
+	UK_TEST_EXPECT(rn_exists(RN_ROOT "/par/a/b"));
+	UK_TEST_EXPECT(rn_exists(RN_ROOT "/par/a/f"));
+}
+
+UK_TESTCASE(posix_vfs_rename_testsuite, posix_vfs_test_rename_flags)
+{
+	if (unlikely(rn_skip))
+		return;
+
+	UK_TEST_EXPECT_ZERO(rn_mkdir(RN_ROOT "/flg"));
+	UK_TEST_EXPECT_ZERO(rn_mkdir(RN_ROOT "/flg/d"));
+	UK_TEST_EXPECT_ZERO(rn_mkfile(RN_ROOT "/flg/d/inner"));
+	UK_TEST_EXPECT_ZERO(rn_mkfile(RN_ROOT "/flg/f"));
+
+	/* RENAME_NOREPLACE fails on an existing destination */
+	UK_TEST_EXPECT_SNUM_EQ(uk_sys_renameat(NULL, RN_ROOT "/flg/f", NULL,
+					       RN_ROOT "/flg/d",
+					       RENAME_NOREPLACE),
+			       -EEXIST);
+
+	/* RENAME_EXCHANGE may swap a file with a directory */
+	UK_TEST_EXPECT_ZERO(uk_sys_renameat(NULL, RN_ROOT "/flg/f", NULL,
+					    RN_ROOT "/flg/d",
+					    RENAME_EXCHANGE));
+	UK_TEST_EXPECT(rn_exists(RN_ROOT "/flg/f/inner"));
+	UK_TEST_EXPECT(rn_exists(RN_ROOT "/flg/d"));
+	UK_TEST_EXPECT(!rn_exists(RN_ROOT "/flg/d/inner"));
 }
 
 UK_TESTCASE(posix_vfs_rename_testsuite, posix_vfs_test_rename_exdev_mount)

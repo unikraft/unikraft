@@ -1334,10 +1334,52 @@ void ramfs_dentry_xchg(struct ramfs_dentry *da, struct ramfs_dentry *db,
 		ramfs_node_relink(db->target.node, pb);
 }
 
-static inline
-void ramfs_dentry_move(struct ramfs_dentry *sd, struct ramfs_dentry *dd,
-		       struct ramfs_node *src, struct ramfs_node *dest)
+/**
+ * Check whether the source dentry `sd` may replace the existing destination
+ * dentry `dd`, as required by POSIX rename():
+ * - a non-directory can only replace a non-directory
+ * - a directory can only replace an empty directory
+ *
+ * Replacing a node drops its link, which may free an entire directory tree.
+ *
+ * @param n Directory containing `sd`, locked by the caller
+ * @param sd Source dentry
+ * @param dd Destination dentry
+ *
+ * @return
+ *   == 0: `dd` may be replaced by `sd`
+ *    < 0: Negative errno
+ */
+static
+int ramfs_rename_check_replace(const struct ramfs_node *n,
+			       const struct ramfs_dentry *sd,
+			       const struct ramfs_dentry *dd)
 {
+	const int sd_isdir = (ramfs_dentry_type(sd) == DT_DIR);
+	const int dd_isdir = (ramfs_dentry_type(dd) == DT_DIR);
+
+	if (!sd_isdir)
+		return dd_isdir ? -EISDIR : 0;
+	if (!dd_isdir)
+		return -ENOTDIR;
+
+	/* The destination directory may be the one containing `sd`, which is
+	 * never empty and already locked by the caller; do not lock it again.
+	 */
+	if (dd->target.node == n || !ramfs_dir_isempty(dd->target.node))
+		return -ENOTEMPTY;
+	return 0;
+}
+
+static inline
+int ramfs_dentry_move(struct ramfs_dentry *sd, struct ramfs_dentry *dd,
+		      struct ramfs_node *src, struct ramfs_node *dest)
+{
+	int r = ramfs_rename_check_replace(src, sd, dd);
+
+	if (unlikely(r))
+		return r;
+
 	ramfs_dentry_release_target(dd);
 	dd->type = sd->type;
 	dd->target = sd->target;
@@ -1345,6 +1387,7 @@ void ramfs_dentry_move(struct ramfs_dentry *sd, struct ramfs_dentry *dd,
 		ramfs_node_relink(dd->target.node, dest);
 	ramfs_dir_remove(src, sd);
 	ramfs_obj_free(sd);
+	return 0;
 }
 
 static inline
@@ -1417,7 +1460,7 @@ int ramfs_live_fs_rename(struct ramfs_node *n,
 			ramfs_dentry_xchg(sd, dd, n, dest);
 		else
 			/* Replace dest node; reuse dest dentry */
-			ramfs_dentry_move(sd, dd, n, dest);
+			ret = ramfs_dentry_move(sd, dd, n, dest);
 	} else {
 		/* Destination does not exist */
 		if (flags & RENAME_EXCHANGE)
