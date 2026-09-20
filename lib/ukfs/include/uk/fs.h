@@ -317,6 +317,7 @@ typedef int (*uk_fs_unlink_func)(const struct uk_file *f,
  * - a non-directory cannot replace a directory (-EISDIR)
  * - a directory cannot replace a non-directory (-ENOTDIR)
  * - a directory can only replace an empty directory (-ENOTEMPTY)
+ * A directory cannot be moved into its own subtree (-EINVAL).
  *
  * If any active references are held to the filesystem node(s) being moved,
  * these must remain valid during and after the `rename()`, continuing to

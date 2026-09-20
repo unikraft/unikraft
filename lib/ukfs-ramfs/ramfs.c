@@ -1421,6 +1421,100 @@ int ramfs_dentry_newname(struct ramfs_dentry *sd, const char *name, size_t len,
 	return 0;
 }
 
+/* Deepest directory nesting followed when walking up the tree */
+#define RAMFS_MAX_DEPTH 4096
+
+/**
+ * Check whether directory `dir` is directory `n` or one of its ancestors.
+ *
+ * The walk is bounded, so that it terminates even if a loop was created in the
+ * parent chain by concurrent renames (see `ramfs_rename_check_loop()`). In this
+ * case, the nesting is assumed to be too deep and `dir` an ancestor of `n`, so
+ * that the caller rejects the rename.
+ *
+ * @param dir Directory to look for
+ * @param n Directory whose chain of parents is searched
+ *
+ * @return
+ *   != 0: `dir` is `n` or an ancestor of `n`
+ *   == 0: Otherwise
+ */
+static
+int ramfs_dir_is_within(const struct ramfs_node *dir, struct ramfs_node *n)
+{
+	struct ramfs_node *parent;
+	unsigned int depth = 0;
+	int ret = 0;
+
+	ramfs_live_acquire(n);
+	while (n != dir) {
+		if (unlikely(++depth > RAMFS_MAX_DEPTH))
+			break;
+
+		uk_spin_lock(&n->dir_data.plock);
+		parent = n->dir_data.parent;
+		/* Try to acquire a strong ref on parent; if fails, parent is
+		 * being cleaned up and `n` will be unlinked soon; stop here.
+		 */
+		if (parent && !ramfs_node_try_acquire(parent))
+			parent = NULL;
+		uk_spin_unlock(&n->dir_data.plock);
+
+		if (!parent)
+			goto out;
+		ramfs_live_release(n);
+		n = parent;
+	}
+	ret = 1;
+out:
+	ramfs_live_release(n);
+	return ret;
+}
+
+/**
+ * Check that renaming `sd` under `n` to `dest` does not move a directory
+ * below itself. This would detach it from the filesystem tree, leaking it
+ * together with everything below it.
+ *
+ * NOTE: This check is not atomic with the following moves. The VFS only
+ * locks the directories involved in a rename, so concurrent renames of
+ * directories in different subtrees may still create a loop.
+ *
+ * @param n Directory containing `sd`
+ * @param sd Source dentry
+ * @param dest Destination directory
+ * @param dd Existing destination dentry or NULL
+ * @param flags Rename flags
+ *
+ * @return
+ *   == 0: The rename does not create a loop
+ *   == -EINVAL: The rename would create a loop
+ */
+static
+int ramfs_rename_check_loop(struct ramfs_node *n, const struct ramfs_dentry *sd,
+			    struct ramfs_node *dest,
+			    const struct ramfs_dentry *dd, unsigned int flags)
+{
+	/* Renaming within a directory cannot create a loop */
+	if (n == dest)
+		return 0;
+
+	/* `sd` moves into `dest` and cannot be one of its ancestors */
+	if (ramfs_dentry_type(sd) == DT_DIR &&
+	    ramfs_dir_is_within(sd->target.node, dest))
+		return -EINVAL;
+
+	/* On exchange, `dd` moves into `n` and cannot be one of its ancestors.
+	 * Without exchange, an ancestor `dd` is never empty, so replacing it
+	 * is rejected when validating the destination.
+	 */
+	if (dd && (flags & RENAME_EXCHANGE) &&
+	    ramfs_dentry_type(dd) == DT_DIR &&
+	    ramfs_dir_is_within(dd->target.node, n))
+		return -EINVAL;
+	return 0;
+}
+
 static
 int ramfs_live_fs_rename(struct ramfs_node *n,
 			 const char *name, size_t nlen,
@@ -1447,6 +1541,11 @@ int ramfs_live_fs_rename(struct ramfs_node *n,
 		return -ENOENT;
 
 	dd = ramfs_dir_find(dest, dname, dlen);
+
+	ret = ramfs_rename_check_loop(n, sd, dest, dd, flags);
+	if (unlikely(ret))
+		return ret;
+
 	if (dd) {
 		/* Destination exists */
 		if (ramfs_dentry_same_file(sd, dd))

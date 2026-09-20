@@ -193,6 +193,77 @@ UK_TESTCASE(posix_vfs_rename_testsuite, posix_vfs_test_rename_dir_over_parent)
 	UK_TEST_EXPECT(rn_exists(RN_ROOT "/par/a/f"));
 }
 
+UK_TESTCASE(posix_vfs_rename_testsuite, posix_vfs_test_rename_dir_into_itself)
+{
+	if (unlikely(rn_skip))
+		return;
+
+	UK_TEST_EXPECT_ZERO(rn_mkdir(RN_ROOT "/loop"));
+	UK_TEST_EXPECT_ZERO(rn_mkdir(RN_ROOT "/loop/a"));
+	UK_TEST_EXPECT_ZERO(rn_mkdir(RN_ROOT "/loop/a/b"));
+	UK_TEST_EXPECT_ZERO(rn_mkdir(RN_ROOT "/loop/a/b/c"));
+	UK_TEST_EXPECT_ZERO(rn_mkfile(RN_ROOT "/loop/a/b/c/f"));
+
+	/* A directory cannot be moved below itself, at any depth */
+	UK_TEST_EXPECT_SNUM_EQ(uk_sys_rename(RN_ROOT "/loop/a",
+					     RN_ROOT "/loop/a/x"),
+			       -EINVAL);
+	UK_TEST_EXPECT_SNUM_EQ(uk_sys_rename(RN_ROOT "/loop/a",
+					     RN_ROOT "/loop/a/b/x"),
+			       -EINVAL);
+	UK_TEST_EXPECT_SNUM_EQ(uk_sys_rename(RN_ROOT "/loop/a",
+					     RN_ROOT "/loop/a/b/c/x"),
+			       -EINVAL);
+	UK_TEST_EXPECT_SNUM_EQ(uk_sys_rename(RN_ROOT "/loop/a/b",
+					     RN_ROOT "/loop/a/b/c/x"),
+			       -EINVAL);
+
+	/* The tree must be left untouched */
+	UK_TEST_EXPECT(rn_exists(RN_ROOT "/loop/a/b/c/f"));
+}
+
+UK_TESTCASE(posix_vfs_rename_testsuite, posix_vfs_test_rename_dir_exchange_loop)
+{
+	if (unlikely(rn_skip))
+		return;
+
+	UK_TEST_EXPECT_ZERO(rn_mkdir(RN_ROOT "/xl"));
+	UK_TEST_EXPECT_ZERO(rn_mkdir(RN_ROOT "/xl/a"));
+	UK_TEST_EXPECT_ZERO(rn_mkdir(RN_ROOT "/xl/a/b"));
+	UK_TEST_EXPECT_ZERO(rn_mkfile(RN_ROOT "/xl/a/b/f"));
+
+	/* Exchanging a directory with one of its descendants is a loop, too */
+	UK_TEST_EXPECT_SNUM_EQ(uk_sys_renameat(NULL, RN_ROOT "/xl/a", NULL,
+					       RN_ROOT "/xl/a/b",
+					       RENAME_EXCHANGE),
+			       -EINVAL);
+	UK_TEST_EXPECT_SNUM_EQ(uk_sys_renameat(NULL, RN_ROOT "/xl/a/b", NULL,
+					       RN_ROOT "/xl/a",
+					       RENAME_EXCHANGE),
+			       -EINVAL);
+	UK_TEST_EXPECT(rn_exists(RN_ROOT "/xl/a/b/f"));
+}
+
+UK_TESTCASE(posix_vfs_rename_testsuite, posix_vfs_test_rename_dir_move)
+{
+	if (unlikely(rn_skip))
+		return;
+
+	UK_TEST_EXPECT_ZERO(rn_mkdir(RN_ROOT "/mv"));
+	UK_TEST_EXPECT_ZERO(rn_mkdir(RN_ROOT "/mv/a"));
+	UK_TEST_EXPECT_ZERO(rn_mkdir(RN_ROOT "/mv/a/b"));
+	UK_TEST_EXPECT_ZERO(rn_mkfile(RN_ROOT "/mv/a/b/f"));
+	UK_TEST_EXPECT_ZERO(rn_mkdir(RN_ROOT "/mv/c"));
+
+	/* Moving a directory up, down and sideways in the tree is fine */
+	UK_TEST_EXPECT_ZERO(uk_sys_rename(RN_ROOT "/mv/a/b", RN_ROOT "/mv/b"));
+	UK_TEST_EXPECT_ZERO(uk_sys_rename(RN_ROOT "/mv/b", RN_ROOT "/mv/c/b"));
+	UK_TEST_EXPECT_ZERO(uk_sys_rename(RN_ROOT "/mv/c", RN_ROOT "/mv/a/c"));
+	UK_TEST_EXPECT(rn_exists(RN_ROOT "/mv/a/c/b/f"));
+	UK_TEST_EXPECT(rn_exists(RN_ROOT "/mv/a/c/b/../b/f"));
+	UK_TEST_EXPECT(!rn_exists(RN_ROOT "/mv/c"));
+}
+
 UK_TESTCASE(posix_vfs_rename_testsuite, posix_vfs_test_rename_flags)
 {
 	if (unlikely(rn_skip))
