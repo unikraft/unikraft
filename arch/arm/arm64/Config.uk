@@ -149,6 +149,12 @@ endchoice
 menu "Armv8-A Extensions"
 	depends on MCPU_ARM64_NONE
 
+config ARM64_FEAT_LSE
+	bool "Armv8.1 Large System Extensions"
+	help
+	  Emit LSE atomics inline instead of LL/SC loops. Needs an
+	  Armv8.1+ CPU.
+
 config ARM64_FEAT_PAUTH
 	bool "Armv8.3 Pointer Authentication"
 	select LIBUKRANDOM
