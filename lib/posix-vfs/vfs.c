@@ -1561,6 +1561,15 @@ int uk_sys_renameat(const struct uk_file *olddir, const char *oldpath,
 		goto out_dest;
 	}
 
+	/* The filesystem rename operation requires both directories to reside
+	 * on the same filesystem instance. Each mount, including bind mounts
+	 * and mounts of the same filesystem type, has its own volume state.
+	 */
+	if (unlikely(sdir->vol != ddir->vol)) {
+		ret = -EXDEV;
+		goto out_dest;
+	}
+
 	vfs_rename_lock(sdir, ddir);
 	ret = vfs_check_perms(sdir, W_OK);
 	if (unlikely(ret))
