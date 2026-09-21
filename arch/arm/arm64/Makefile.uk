@@ -34,6 +34,12 @@ CXXINCLUDES += -I$(CONFIG_UK_BASE)/arch/arm64/include
 # Define these in the order of arch revision, to allow march
 # to be overwritten to the highest version required by the
 # selected extensions.
+ifeq ($(CONFIG_ARM64_FEAT_LSE),y)
+# GCC-6+ / Clang-3.9+, no version check needed
+ARCH_REV := armv8-a
+ARCH_OPT := $(ARCH_OPT)+lse
+endif
+
 ifeq ($(CONFIG_ARM64_FEAT_PAUTH),y)
 # Min GCC >= 9 to avoid dealing with deprecated
 # msign-return-address here and in macros
