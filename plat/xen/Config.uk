@@ -35,9 +35,19 @@ if (PLAT_XEN)
 # Hidden option for pulling arm64 platform dependencies
 config PLAT_XEN_ARM64
 	bool
+	select HAVE_PAGING
+	select LIBXENPLAT_PAGING
 	select LIBUKPLAT_NATIVE_AUXSP
 	select LIBUKPLAT_NATIVE_EXCEPT
+	select LIBUKPLAT_NATIVE_PAGING
+	select LIBUKPLAT_NATIVE_TLB
 	select LIBUKSMCCC
+
+# Hidden option: this platform implements the paging PAL
+config LIBXENPLAT_PAGING
+	bool
+	depends on HAVE_PAGING
+	depends on LIBUKPLAT_NATIVE_PAGING
 
 # Invisible option to switch between PV and PVH mode
 config XEN_HVMLITE
