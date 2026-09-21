@@ -7,6 +7,7 @@
 #ifndef __UK_PLAT_PAL_PAGE_H__
 #define __UK_PLAT_PAL_PAGE_H__
 
+#include <uk/config.h>
 #include <uk/plat/xen/page.h>
 
 #ifdef __cplusplus
