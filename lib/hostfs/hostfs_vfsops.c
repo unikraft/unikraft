@@ -87,8 +87,17 @@ static int hostfs_mount(struct mount *mp, const char *dev,
 	return 0;
 }
 
-static int hostfs_unmount(struct mount *mp __unused, int flags __unused)
+static int hostfs_unmount(struct mount *mp, int flags)
 {
+	/* Every dentry under the root, an open file's or a cwd's, holds a
+	 * reference on it, and vfscore would free the mount from under
+	 * them: refuse, unless forced.
+	 */
+	if (mp->m_root->d_refcnt > 1 && !(flags & MNT_FORCE))
+		return EBUSY;
+
+	/* Releases the root, whose inactive frees its hostfs_node. */
+	vfscore_release_mp_dentries(mp);
 	return 0;
 }
 
