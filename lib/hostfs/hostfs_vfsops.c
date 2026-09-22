@@ -84,6 +84,7 @@ static int hostfs_mount(struct mount *mp, const char *dev,
 	mp->m_root->d_vnode->v_type = VDIR;
 	mp->m_root->d_vnode->v_mode = S_IFDIR | 0755;
 
+	hostfs_mnt_add(mp, mount_idx);
 	return 0;
 }
 
@@ -96,6 +97,7 @@ static int hostfs_unmount(struct mount *mp, int flags)
 	if (mp->m_root->d_refcnt > 1 && !(flags & MNT_FORCE))
 		return EBUSY;
 
+	hostfs_mnt_del(mp);
 	/* Releases the root, whose inactive frees its hostfs_node. */
 	vfscore_release_mp_dentries(mp);
 	return 0;

@@ -5,6 +5,8 @@
 #define __HOSTFS_H__
 
 #include <uk/arch/types.h>
+#include <uk/list.h>
+#include <vfscore/mount.h>
 #include <vfscore/vnode.h>
 
 /*
@@ -46,5 +48,23 @@ struct hostfs_node {
 	int	hf_type;	/* VREG or VDIR */
 	int	hf_mount_idx;	/* mount index for host calls */
 };
+
+/*
+ * The hostfs mounts, in mount order, as hostfs_vfsops registers them.
+ * hostfs_resume() walks them after a snapshot restore to make the table
+ * match what the host now serves.
+ */
+struct hostfs_mnt {
+	struct uk_list_head list;
+	struct mount *mp;
+	int idx;		/* the host's index for this mount */
+	int stale_rc;		/* why hostfs_resume() could not drop it */
+};
+
+void hostfs_mnt_add(struct mount *mp, int idx);
+void hostfs_mnt_del(struct mount *mp);
+
+/* Make the hostfs mounts match the host's after a snapshot restore. */
+void hostfs_resume(void);
 
 #endif /* __HOSTFS_H__ */

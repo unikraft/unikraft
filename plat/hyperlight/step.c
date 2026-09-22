@@ -42,6 +42,13 @@
  */
 extern void hyperlight_halt_to_host(void) __noreturn;
 
+#ifdef CONFIG_LIBHOSTFS
+/* Make the hostfs mounts match the host's after a snapshot restore.
+ * Defined in lib/hostfs.
+ */
+extern void hostfs_resume(void);
+#endif /* CONFIG_LIBHOSTFS */
+
 #ifdef CONFIG_LIBHOSTSOCK
 /* Re-poll every host-proxied socket and post readiness events, waking any
  * thread parked on one (a blocking recv/accept that returned EAGAIN and
@@ -419,6 +426,11 @@ uk_late_initcall(hl_yield_thread_create, 0x0);
  *   (the same UUIDs, tokens and TLS nonces) until the periodic reseed
  *   happened to fire;
  *
+ *   the hostfs mounts are made to match the host's: the mount table is
+ *   guest memory and describes the snapshot's mounts, not the ones this
+ *   host serves, which may be more, fewer or others (see
+ *   hostfs_resume());
+ *
  *   the host sockets are re-established: they belonged to the process
  *   that took the snapshot, so listeners are opened and bound again and
  *   connections are declared dead (see hostsock_resume());
@@ -438,6 +450,9 @@ static void hl_resume(void)
 		uk_pr_err("hyperlight: CSPRNG reseed after restore failed: %d\n",
 			  rc);
 #endif /* CONFIG_LIBUKRANDOM */
+#ifdef CONFIG_LIBHOSTFS
+	hostfs_resume();
+#endif /* CONFIG_LIBHOSTFS */
 #ifdef CONFIG_LIBHOSTSOCK
 	hostsock_resume();
 #endif /* CONFIG_LIBHOSTSOCK */
