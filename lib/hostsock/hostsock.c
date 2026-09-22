@@ -436,6 +436,18 @@ static int hc_addr_op(const char *op, int host_fd,
 	return ret < 0 ? ret : 0;
 }
 
+/* net_disconnect: connect(2) with AF_UNSPEC on a datagram socket. */
+static int hc_disconnect(int host_fd)
+{
+	struct hl_param p[1];
+	__s32 ret;
+
+	p[0].type = HL_PV_HLINT; p[0].i32_val = host_fd;
+	if (hl_hcall_int("net_disconnect", p, 1, &ret) < 0)
+		return -EIO;
+	return ret < 0 ? ret : 0;
+}
+
 static int hc_listen(int host_fd, int backlog)
 {
 	struct hl_param p[2];
@@ -584,6 +596,27 @@ hostsock_connect(posix_sock *sock,
 
 	if (hs->state == HS_DEAD)
 		return -EPIPE;
+	/* connect(2) with AF_UNSPEC dissolves a datagram socket's association
+	 * (POSIX, and Linux, where glibc's getaddrinfo() relies on it to probe
+	 * every candidate through one socket: it disconnects between an IPv6
+	 * and an IPv4 candidate so the next connect picks a source address of
+	 * the new family).  The host forgets the peer; the socket keeps the
+	 * address the guest bound, and a restore re-creates it as such.
+	 */
+	if (addr && addrlen >= sizeof(addr->sa_family) &&
+	    addr->sa_family == AF_UNSPEC) {
+		/* The low byte is the type; the upper bits are SOCK_NONBLOCK
+		 * and SOCK_CLOEXEC.
+		 */
+		if ((hs->type & 0xff) != SOCK_DGRAM)
+			return -EOPNOTSUPP;
+		err = hc_disconnect(hs->host_fd);
+		if (err)
+			return err;
+		hs->peer_len = 0;
+		hs->state = hs->local_len ? HS_BOUND : HS_FRESH;
+		return 0;
+	}
 	/* The host starts the handshake and answers -EINPROGRESS while it is
 	 * under way, as a non-blocking connect(2) does; posix-socket then
 	 * polls for writability and reads SO_ERROR, so the thread parks and
