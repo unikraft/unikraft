@@ -33,6 +33,7 @@
 
 #include <hyperlight-x86/dispatch.h>
 #include <hyperlight-x86/hcall.h>
+#include <hyperlight-x86/resolv.h>
 #include <hyperlight-x86/step.h>
 #include <hyperlight-x86/time.h>
 
@@ -423,7 +424,10 @@ uk_late_initcall(hl_yield_thread_create, 0x0);
  *   connections are declared dead (see hostsock_resume());
  *
  *   the wall clock is re-anchored on the host's: the guest's kept
- *   counting from the snapshot, not through the time spent on disk.
+ *   counting from the snapshot, not through the time spent on disk;
+ *
+ *   the resolver configuration is fetched again: the snapshot carries
+ *   the file of the machine that took it (see resolv.c).
  */
 static void hl_resume(void)
 {
@@ -439,6 +443,10 @@ static void hl_resume(void)
 #endif /* CONFIG_LIBHOSTSOCK */
 	/* The wall clock stopped with the snapshot; the host's did not. */
 	hyperlight_time_resync();
+	/* The snapshot carries the resolver configuration of the machine
+	 * that took it; this host may have another for the guest.
+	 */
+	hyperlight_resolv_apply();
 	/* The new host has not heard these yet. */
 	if (hl_call_opened)
 		hl_emit("DriverReady");
