@@ -23,9 +23,11 @@
  * This runs at a boundary, with every guest thread parked, on the resume
  * entry: nothing is using the mounts meanwhile.  A file left open across
  * the snapshot on a mount that then vanished keeps its dentries, so the
- * unmount fails with EBUSY and that mount stays; its host calls fail as
- * they did before, and the next restore without the file gets it right.
- * A mount under another keeps the outer one busy the same way, so the
+ * unmount fails with EBUSY and that mount stays, dead: the host serves
+ * its new mounts under the indices now, so the stale mount's nodes fail
+ * with ESTALE rather than reach another mount's directory (see
+ * hostfs_stale()), and the next restore that finds it free drops it.  A
+ * mount under another keeps the outer one busy the same way, so the
  * unmount pass repeats until nothing more comes off.
  */
 
@@ -54,7 +56,7 @@
 /* Every hostfs mount, in mount order. */
 static UK_LIST_HEAD(hostfs_mnts);
 
-void hostfs_mnt_add(struct mount *mp, int idx)
+struct hostfs_mnt *hostfs_mnt_add(struct mount *mp, int idx)
 {
 	struct hostfs_mnt *m;
 
@@ -65,12 +67,14 @@ void hostfs_mnt_add(struct mount *mp, int idx)
 		 */
 		uk_pr_err("hostfs: no memory to register mount %s\n",
 			  mp->m_path);
-		return;
+		return NULL;
 	}
 	m->mp = mp;
 	m->idx = idx;
 	m->stale_rc = 0;
+	m->dead = 0;
 	uk_list_add_tail(&m->list, &hostfs_mnts);
+	return m;
 }
 
 void hostfs_mnt_del(struct mount *mp)
@@ -220,7 +224,7 @@ void hostfs_resume(void)
 						    list) {
 			struct hostfs_want *w = hostfs_want_for(want, n, m);
 
-			if (w && w->idx == m->idx &&
+			if (w && !m->dead && w->idx == m->idx &&
 			    (w->flags & MNT_RDONLY) ==
 			    (unsigned long)(m->mp->m_flags & MNT_RDONLY)) {
 				w->satisfied = 1;
@@ -241,7 +245,11 @@ void hostfs_resume(void)
 			break;
 	} while (1);
 
-	/* What would not come off stays: keep it rather than double it. */
+	/* What would not come off stays, dead: the host no longer serves
+	 * it, so its nodes fail (see hostfs_stale()); and its path is
+	 * taken, so the host's entry for it, if any, waits for a restore
+	 * that finds the mount free.
+	 */
 	uk_list_for_each_entry(m, &hostfs_mnts, list) {
 		struct hostfs_want *w = hostfs_want_for(want, n, m);
 
@@ -250,6 +258,7 @@ void hostfs_resume(void)
 		uk_pr_err("hostfs: %s stays mounted after restore, %s: %d\n",
 			  m->mp->m_path, w ? "changed" : "gone", m->stale_rc);
 		m->stale_rc = 0;
+		m->dead = 1;
 		if (w)
 			w->satisfied = 1;
 	}

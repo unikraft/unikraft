@@ -37,6 +37,22 @@ extern struct hostfs_io hostfs_io;
 int hostfs_io_init(void);
 
 /*
+ * The hostfs mounts, in mount order, as hostfs_vfsops registers them.
+ * hostfs_resume() walks them after a snapshot restore to make the table
+ * match what the host now serves.
+ */
+struct hostfs_mnt {
+	struct uk_list_head list;
+	struct mount *mp;
+	int idx;		/* the host's index for this mount */
+	int stale_rc;		/* why hostfs_resume() could not drop it */
+	int dead;		/* kept past a restore that dropped it */
+};
+
+struct hostfs_mnt *hostfs_mnt_add(struct mount *mp, int idx);
+void hostfs_mnt_del(struct mount *mp);
+
+/*
  * hostfs stores minimal per-node metadata.  Actual data lives on the
  * host; every operation goes through an hl_hcall_* round-trip.
  *
@@ -47,22 +63,18 @@ struct hostfs_node {
 	char	hf_path[1024];	/* host-relative path */
 	int	hf_type;	/* VREG or VDIR */
 	int	hf_mount_idx;	/* mount index for host calls */
+	struct hostfs_mnt *hf_mnt;	/* the mount, for hostfs_stale() */
 };
 
 /*
- * The hostfs mounts, in mount order, as hostfs_vfsops registers them.
- * hostfs_resume() walks them after a snapshot restore to make the table
- * match what the host now serves.
+ * A mount a restore could not drop, because a file held it, has no host
+ * behind its index any more: the host serves its new mounts there.  Its
+ * nodes fail with ESTALE instead of reaching another mount's directory.
  */
-struct hostfs_mnt {
-	struct uk_list_head list;
-	struct mount *mp;
-	int idx;		/* the host's index for this mount */
-	int stale_rc;		/* why hostfs_resume() could not drop it */
-};
-
-void hostfs_mnt_add(struct mount *mp, int idx);
-void hostfs_mnt_del(struct mount *mp);
+static inline int hostfs_stale(const struct hostfs_node *np)
+{
+	return np->hf_mnt && np->hf_mnt->dead;
+}
 
 /* Make the hostfs mounts match the host's after a snapshot restore. */
 void hostfs_resume(void);

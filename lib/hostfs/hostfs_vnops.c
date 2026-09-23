@@ -108,6 +108,9 @@ hostfs_lookup(struct vnode *dvp, const char *name, struct vnode **vpp)
 	int is_dir = 0, is_file = 0;
 	int err;
 
+	if (hostfs_stale(dnp))
+		return ESTALE;
+
 	build_path(path, sizeof(path), dnp, name);
 
 	err = host_stat(dnp->hf_mount_idx, path, &size, &mode,
@@ -122,6 +125,7 @@ hostfs_lookup(struct vnode *dvp, const char *name, struct vnode **vpp)
 	strlcpy(np->hf_path, path, sizeof(np->hf_path));
 	np->hf_type = is_dir ? VDIR : VREG;
 	np->hf_mount_idx = dnp->hf_mount_idx;
+	np->hf_mnt = dnp->hf_mnt;
 
 	/* Allocate a vnode via the VFS layer. Use a monotonic counter
 	 * as inode number since hostfs has no real inodes. */
@@ -161,6 +165,9 @@ hostfs_create(struct vnode *dvp, const char *name, mode_t mode __unused)
 	struct hostfs_node *dnp = dvp->v_data;
 	char path[1024];
 
+	if (hostfs_stale(dnp))
+		return ESTALE;
+
 	build_path(path, sizeof(path), dnp, name);
 
 	/*
@@ -196,6 +203,9 @@ hostfs_read(struct vnode *vp __unused, struct vfscore_file *fp __unused,
 	    struct uio *uio, int ioflag __unused)
 {
 	struct hostfs_node *np = vp->v_data;
+
+	if (hostfs_stale(np))
+		return ESTALE;
 
 	while (uio->uio_resid > 0) {
 		size_t want = (size_t)uio->uio_resid;
@@ -276,6 +286,9 @@ hostfs_write(struct vnode *vp, struct uio *uio, int ioflag)
 	struct hostfs_node *np = vp->v_data;
 	int append = (ioflag & IO_APPEND) ? 1 : 0;
 
+	if (hostfs_stale(np))
+		return ESTALE;
+
 	while (uio->uio_resid > 0) {
 		__u8 *wbuf = hostfs_io.wbuf;
 		size_t want = (size_t)uio->uio_resid;
@@ -348,6 +361,9 @@ hostfs_readdir(struct vnode *vp, struct vfscore_file *fp,
 	struct hl_param p[2];
 	__u8 *buf = hostfs_io.rbuf;
 	__sz len;
+
+	if (hostfs_stale(np))
+		return ESTALE;
 
 	p[0].type = HL_PV_HLINT;
 	p[0].i32_val = np->hf_mount_idx;
@@ -428,6 +444,9 @@ hostfs_getattr(struct vnode *vp, struct vattr *attr)
 	int is_dir = 0, is_file = 0;
 	int err;
 
+	if (hostfs_stale(np))
+		return ESTALE;
+
 	err = host_stat(np->hf_mount_idx, np->hf_path, &size, &mode,
 			&is_dir, &is_file);
 	if (err)
@@ -451,6 +470,9 @@ static int
 hostfs_setattr(struct vnode *vp, struct vattr *attr)
 {
 	struct hostfs_node *np = vp->v_data;
+
+	if (hostfs_stale(np))
+		return ESTALE;
 
 	if (attr->va_mask & AT_MODE) {
 		struct hl_param p[3];
@@ -486,6 +508,9 @@ hostfs_mkdir(struct vnode *dvp, const char *name, mode_t mode __unused)
 	struct hl_param p[2];
 	__s32 ret;
 
+	if (hostfs_stale(dnp))
+		return ESTALE;
+
 	build_path(path, sizeof(path), dnp, name);
 
 	p[0].type = HL_PV_HLINT;
@@ -509,6 +534,9 @@ hostfs_remove(struct vnode *dvp __unused, struct vnode *vp,
 	struct hostfs_node *np = vp->v_data;
 	struct hl_param p[2];
 	__s32 ret;
+
+	if (hostfs_stale(np))
+		return ESTALE;
 
 	p[0].type = HL_PV_HLINT;
 	p[0].i32_val = np->hf_mount_idx;
@@ -540,6 +568,9 @@ hostfs_rename(struct vnode *dvp, struct vnode *vp, const char *sname __unused,
 	struct hostfs_node *np = vp->v_data;
 	struct hostfs_node *tdnp = tdvp->v_data;
 	char new_path[1024];
+
+	if (hostfs_stale(dnp))
+		return ESTALE;
 
 	build_path(new_path, sizeof(new_path), tdnp, tname);
 
@@ -576,6 +607,9 @@ hostfs_link(struct vnode *tdvp, struct vnode *svp, const char *name)
 	struct hostfs_node *tdnp = tdvp->v_data;
 	char dst_path[1024];
 
+	if (hostfs_stale(snp))
+		return ESTALE;
+
 	build_path(dst_path, sizeof(dst_path), tdnp, name);
 
 	struct hl_param p[3];
@@ -603,6 +637,9 @@ hostfs_symlink(struct vnode *dvp, const char *name, const char *oldpath)
 {
 	struct hostfs_node *dnp = dvp->v_data;
 	char link_path[1024];
+
+	if (hostfs_stale(dnp))
+		return ESTALE;
 
 	build_path(link_path, sizeof(link_path), dnp, name);
 
@@ -633,6 +670,9 @@ hostfs_readlink(struct vnode *vp, struct uio *uio)
 	struct hl_param p[2];
 	__u8 *buf = hostfs_io.rbuf;
 	__sz len;
+
+	if (hostfs_stale(np))
+		return ESTALE;
 
 	p[0].type = HL_PV_HLINT;
 	p[0].i32_val = np->hf_mount_idx;
@@ -692,6 +732,9 @@ hostfs_truncate(struct vnode *vp, off_t length)
 	struct hostfs_node *np = vp->v_data;
 	struct hl_param p[3];
 	__s32 ret;
+
+	if (hostfs_stale(np))
+		return ESTALE;
 
 	p[0].type = HL_PV_HLINT;
 	p[0].i32_val = np->hf_mount_idx;

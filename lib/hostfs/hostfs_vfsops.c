@@ -79,12 +79,12 @@ static int hostfs_mount(struct mount *mp, const char *dev,
 	root->hf_path[0] = '\0'; /* root is "" (relative to host mount) */
 	root->hf_type = VDIR;
 	root->hf_mount_idx = mount_idx;
+	root->hf_mnt = hostfs_mnt_add(mp, mount_idx);
 
 	mp->m_root->d_vnode->v_data = root;
 	mp->m_root->d_vnode->v_type = VDIR;
 	mp->m_root->d_vnode->v_mode = S_IFDIR | 0755;
 
-	hostfs_mnt_add(mp, mount_idx);
 	return 0;
 }
 
