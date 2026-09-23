@@ -40,7 +40,8 @@
 #include <xen-arm/setup.h>
 #include <uk/arch.h>
 #include <uk/lcpu.h>
-#include <uk/paging.h>
+#include <common/fixmap.h>
+#include <common/pt.h>
 #include <uk/plat/common/bootinfo.h>
 
 /*
@@ -58,8 +59,6 @@ shared_info_t *HYPERVISOR_shared_info;
 union start_info_union start_info_union;
 
 extern char shared_info_page[PAGE_SIZE];
-extern lpae_t boot_l1_pgtable[512];
-extern lpae_t fixmap_pgtable[512];
 
 void *HYPERVISOR_dtb;
 /*
@@ -91,10 +90,7 @@ static xen_pfn_t map_console(xen_pfn_t mfn)
 	phys = PFN_PHYS(mfn);
 	uk_pr_debug("%s, phys = 0x%lx\n", __func__, phys);
 
-	set_pgt_entry(&fixmap_pgtable[l2_pgt_idx(FIX_CON_START)],
-		  ((phys & L2_MASK) | BLOCK_DEF_ATTR | L2_BLOCK));
-
-	return (xen_pfn_t) (FIX_CON_START + (phys & L2_OFFSET));
+	return (xen_pfn_t)uk_plat_xen_fixmap_set(UK_PLAT_XEN_FIXMAP_CON, phys);
 }
 
 static xen_pfn_t map_xenbus(xen_pfn_t mfn)
@@ -104,10 +100,7 @@ static xen_pfn_t map_xenbus(xen_pfn_t mfn)
 	phys = PFN_PHYS(mfn);
 	uk_pr_debug("%s, phys = 0x%lx\n", __func__, phys);
 
-	set_pgt_entry(&fixmap_pgtable[l2_pgt_idx(FIX_XS_START)],
-		  ((phys & L2_MASK) | BLOCK_DEF_ATTR | L2_BLOCK));
-
-	return (xen_pfn_t) (FIX_XS_START + (phys & L2_OFFSET));
+	return (xen_pfn_t)uk_plat_xen_fixmap_set(UK_PLAT_XEN_FIXMAP_XS, phys);
 }
 
 static void get_console(void)
@@ -159,12 +152,7 @@ static void *map_fdt(paddr_t device_tree)
 	 * FIXME: To deal with the 2M alignment, only 4KB space is usable
 	 * because device_tree is aligned to a (2M - 4KB) address.
 	 */
-	set_pgt_entry(&boot_l1_pgtable[l1_pgt_idx(FIX_FDT_START)],
-		  (to_phys(fixmap_pgtable) | L1_TABLE));
-	set_pgt_entry(&fixmap_pgtable[l2_pgt_idx(FIX_FDT_START)],
-		  ((device_tree & L2_MASK) | BLOCK_DEF_ATTR | L2_BLOCK));
-
-	return (void *)(FIX_FDT_START + (device_tree & L2_OFFSET));
+	return uk_plat_xen_fixmap_set(UK_PLAT_XEN_FIXMAP_FDT, device_tree);
 }
 
 static inline void _get_cmdline(struct ukplat_bootinfo *bi)
@@ -198,10 +186,10 @@ int uk_intctlr_plat_probe(void *arg)
 	gic->dist_mem_addr = to_virt((long)fdt64_ld(gic->dist_mem_addr));
 	gic->rdist_mem_addr = to_virt((long)fdt64_ld(gic->rdist_mem_addr));
 #else
-	set_pgt_entry(&fixmap_pgtable[l2_pgt_idx(FIX_GIC_START)],
-		      ((gic->dist_mem_addr & L2_MASK) |
-			BLOCK_DEV_ATTR | L2_BLOCK));
-	gic->dist_mem_addr = (FIX_GIC_START + (gic->dist_mem_addr & L2_OFFSET));
+	gic->dist_mem_addr =
+		(__u64)uk_plat_xen_fixmap_set(UK_PLAT_XEN_FIXMAP_GIC,
+					      gic->dist_mem_addr);
+	/* The redistributor is in the same window */
 	gic->rdist_mem_addr = (FIX_GIC_START + (gic->rdist_mem_addr &
 						L2_OFFSET));
 #endif
@@ -243,11 +231,11 @@ static int _get_ramdisk(struct ukplat_bootinfo *bi, void *fdtp)
 	initrd_base = initrd_addr(fdt_initrd_start[0], start_len);
 	initrd_end = initrd_addr(fdt_initrd_end[0], end_len);
 
-	mrd.vbase = (__vaddr_t)to_virt(UK_PAGING_PAGE_ALIGN_DOWN(initrd_base));
+	mrd.vbase = (__vaddr_t)to_virt(UK_PAL_PAGE_ALIGN_DOWN(initrd_base));
 	mrd.pbase = (__paddr_t)mrd.vbase;
-	mrd.pg_off = initrd_base - UK_PAGING_PAGE_ALIGN_DOWN(initrd_base);
+	mrd.pg_off = initrd_base - UK_PAL_PAGE_ALIGN_DOWN(initrd_base);
 	mrd.len = initrd_end - initrd_base;
-	mrd.pg_count = UK_PAGING_PAGE_COUNT(mrd.pg_off + mrd.len);
+	mrd.pg_count = DIV_ROUND_UP(mrd.pg_off + mrd.len, UK_PAL_PAGE_SIZE);
 	mrd.type = UKPLAT_MEMRT_INITRD;
 	mrd.flags = UKPLAT_MEMRF_READ;
 
@@ -320,7 +308,7 @@ static int _init_mem(struct ukplat_bootinfo *const bi, paddr_t physical_offset)
 	    .pbase = (__paddr_t)HYPERVISOR_dtb,
 	    .len = fdt_size,
 	    .pg_off = 0,
-	    .pg_count = UK_PAGING_PAGE_COUNT(fdt_size),
+	    .pg_count = DIV_ROUND_UP(fdt_size, UK_PAL_PAGE_SIZE),
 	    .type = UKPLAT_MEMRT_DEVICETREE,
 	    .flags = UKPLAT_MEMRF_READ,
 	};
@@ -360,6 +348,13 @@ void _libxenplat_armentry(void *dtb_pointer, paddr_t physical_offset)
 	memset(__bss_start, 0, _end - __bss_start);
 
 	_libxenplat_paddr_offset = physical_offset;
+
+	if (unlikely(xenplat_pt_init(to_phys(boot_l1_pgtable),
+				     _libxenplat_paddr_offset)))
+		BUG();
+
+	if (unlikely(uk_plat_xen_fixmap_init()))
+		BUG();
 
 	dtb_pointer = map_fdt((paddr_t) dtb_pointer);
 
