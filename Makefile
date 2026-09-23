@@ -1084,8 +1084,10 @@ endif
 #For print-sloc-stats, default MODE is buildlog
 print-sloc-stats:
 	@$(info [SLoC stats])
-	@test -f $(BUILD_DIR)/build.log || \
-        { echo "ERROR: build.log not found, run 'make' with 'V=1 2>&1 | tee $(BUILD_DIR)/build.log' first"; exit 1; }
+	@if [ "$(if $(MODE),$(MODE),buildlog)" = "buildlog" ]; then \
+		test -f "$(BUILD_DIR)/build.log" || \
+		{ echo "ERROR: build.log not found, run 'make' with 'V=1 2>&1 | tee $(BUILD_DIR)/build.log' first"; exit 1; }; \
+	fi
 	@$(call measure_sloc_stats,$(if$(MODE),$(MODE),buildlog))
 
 print-loc: images
