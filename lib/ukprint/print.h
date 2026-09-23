@@ -11,6 +11,14 @@
 #include <uk/config.h>
 #include <uk/essentials.h>
 
+#if CONFIG_LIBUKPRINT_PRINT_TIME
+#include <uk/plat/time.h>
+#define UK_PRINT_MSG_ARGS_TIMESTAMP(_msg, _timestamp)	\
+	(_msg).timestamp = (_timestamp)
+#else
+#define UK_PRINT_MSG_ARGS_TIMESTAMP(_msg, _timestamp)
+#endif /* CONFIG_LIBUKPRINT_PRINT_TIME */
+
 #if CONFIG_LIBUKPRINT_PRINT_SRCNAME
 #define UK_PRINT_MSG_ARGS_SRCNAME(_msg, _srcname, _srcline)	\
 	(_msg).srcname = (_srcname);				\
@@ -38,6 +46,8 @@
 		UK_PRINT_MSG_ARGS_SRCNAME((_msg), (_srcname),		\
 					  (_srcline));			\
 		UK_PRINT_MSG_ARGS_CALLER((_msg));			\
+		UK_PRINT_MSG_ARGS_TIMESTAMP(_msg, 			\
+					    ukplat_monotonic_clock());	\
 		va_copy((_msg).ap, (_ap));				\
 	} while (0)
 
