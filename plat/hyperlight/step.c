@@ -211,6 +211,7 @@ static __s32 hl_call_fail_status;      /* from the driver's write(); 0 = success
 static __u8 *hl_result_buf;            /* the result the driver wrote */
 static __u64 hl_result_cap;            /* hl_hcall_max_payload(): what CallResult carries */
 static __u64 hl_result_len;            /* 0 = none */
+static __u8 *hl_reply_buf;             /* a HostCall reply, hl_call_cap bytes */
 
 /* Queue a named FunctionCall for the device reader.
  *
@@ -250,10 +251,10 @@ static int hl_call_in_flight;
 #if CONFIG_LIBDEVFS
 static int hlcall_open(struct device *dev __unused, int mode __unused)
 {
-	/* The result buffer is allocated when a driver first opens the
-	 * device, once host calls are up and their payload size known.
-	 * Without it a result is refused (EMSGSIZE); a status alone still
-	 * goes through.
+	/* The buffers for results and host call replies are allocated when
+	 * a driver first opens the device, once host calls are up and their
+	 * payload size known.  Without them a result is refused (EMSGSIZE)
+	 * and a host call fails (ENOMEM); a status alone still goes through.
 	 */
 	if (!hl_result_buf) {
 		hl_result_cap = hl_hcall_max_payload();
@@ -264,6 +265,12 @@ static int hlcall_open(struct device *dev __unused, int mode __unused)
 				  (unsigned long long)hl_result_cap);
 			hl_result_cap = 0;
 		}
+	}
+	if (!hl_reply_buf && hl_call_cap) {
+		hl_reply_buf = uk_malloc(uk_alloc_get_default(), hl_call_cap);
+		if (unlikely(!hl_reply_buf))
+			uk_pr_err("hyperlight: no memory for a %llu-byte host call reply\n",
+				  (unsigned long long)hl_call_cap);
 	}
 	hl_call_opened = 1;
 	hl_emit("DriverReady");
@@ -368,6 +375,52 @@ static int hlcall_write(struct device *dev __unused, struct uio *uio,
 	return 0;
 }
 
+/* HLCALL_IOC_HOSTCALL: HostCall(name, args) on the host, the reply into
+ * the driver's buffer.  See step.h.
+ */
+static int hl_host_call(struct hlcall_hostcall *hc)
+{
+	struct hl_param p[2];
+	__u64 max = hl_hcall_max_payload();
+	__sz len = 0;
+
+	/* An empty name is the host's to interpret (the library lists its
+	 * functions for it); a missing one is not.
+	 */
+	if (unlikely(!hc->name || !hc->out || (hc->args_len && !hc->args)))
+		return EINVAL;
+	if (!hl_call_in_flight)
+		return EPERM;
+	/* Both travel in one host call: together at most its payload.  The
+	 * encoder sizes them in 32 bits, so this also keeps it from
+	 * wrapping.
+	 */
+	if (hc->name_len > max || hc->args_len > max ||
+	    hc->name_len + hc->args_len > max)
+		return E2BIG;
+	if (unlikely(!hl_reply_buf))
+		return ENOMEM;
+	p[0].type = HL_PV_HLSTRING;
+	p[0].str.ptr = hc->name;
+	p[0].str.len = (__u32)hc->name_len;
+	p[1].type = HL_PV_HLVECBYTES;
+	p[1].vec.ptr = hc->args;
+	p[1].vec.len = (__u32)hc->args_len;
+	/* Into a kernel buffer as large as the input stack, so the reply
+	 * arrives whole, and only then into the driver's: writing there
+	 * may fault, and must not happen while the host call holds its lock
+	 * and the input stack it is reading from.
+	 */
+	if (hl_hcall_vecbytes("HostCall", p, 2, hl_reply_buf, hl_call_cap,
+			      &len) < 0)
+		return EIO;
+	hc->out_len = len;
+	if (len > hc->out_cap)
+		return ENOBUFS;
+	memcpy(hc->out, hl_reply_buf, len);
+	return 0;
+}
+
 /* HLCALL_IOC_MAXLEN: tell the driver how big a call can get, so it sizes
  * its buffers from the host's number rather than a guess of its own.
  * HLCALL_IOC_GETENV: hand it the host's environment (see step.h).
@@ -382,6 +435,8 @@ static int hlcall_ioctl(struct device *dev __unused, unsigned long cmd,
 	case HLCALL_IOC_MAXLEN:
 		*(__u64 *)arg = hl_call_cap;
 		return 0;
+	case HLCALL_IOC_HOSTCALL:
+		return hl_host_call(arg);
 	case HLCALL_IOC_GETENV: {
 		struct hlcall_env *env = arg;
 		int len;

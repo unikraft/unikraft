@@ -105,6 +105,34 @@ struct hlcall_env {
  */
 #define HLCALL_IOC_GETENV _IOWR('H', 2, struct hlcall_env)
 
+/**
+ * Argument of HLCALL_IOC_HOSTCALL.
+ */
+struct hlcall_hostcall {
+	const char *name;	/* in: the function the embedder registered */
+	__u64 name_len;		/* in: its length, no NUL needed */
+	const __u8 *args;	/* in: the arguments, opaque to the kernel */
+	__u64 args_len;		/* in */
+	__u8 *out;		/* in: where to store the reply */
+	__u64 out_cap;		/* in: bytes available at out */
+	__u64 out_len;		/* out: bytes stored */
+};
+
+/**
+ * Call a function the embedder registered with the host, by name, and
+ * wait for its reply: the host function `HostCall(name, args) -> bytes`,
+ * which the host dispatches to the embedder's function of that name.  The
+ * kernel passes both ways through as they are; what the bytes mean (the
+ * arguments' encoding, how the reply says success or failure) is between
+ * the driver and the host library.  Only while a call is in flight: a
+ * host function runs on behalf of a call.  E2BIG if the name and the
+ * arguments together exceed what a host call carries; EIO if the host
+ * has no HostCall or could not deliver it; ENOBUFS, with @out_len the
+ * reply's size, if it does not fit @out_cap.  A call-sized buffer
+ * (HLCALL_IOC_MAXLEN) always holds it.
+ */
+#define HLCALL_IOC_HOSTCALL _IOWR('H', 3, struct hlcall_hostcall)
+
 #if CONFIG_HYPERLIGHT_STEP
 
 /**
