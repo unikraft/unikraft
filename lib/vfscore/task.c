@@ -74,10 +74,19 @@ path_conv(const char *wd, const char *cpath, char *full)
 		*tgt++ = *src++;
 		len = 1;
 	} else {
+		/* The loop below resolves a leading "." or ".." against wd
+		 * as it is, so no separator goes in front of one; any other
+		 * first component, a dotfile (".profile") included, is a
+		 * name in wd and needs one, unless wd already ends in '/'.
+		 */
+		size_t first = strcspn(path, "/");
+		int dot = path[0] == '.' &&
+			  (first == 1 || (first == 2 && path[1] == '.'));
+
 		strlcpy(full, wd, PATH_MAX);
 		len = strlen(wd);
 		tgt += len;
-		if (len > 1 && path[0] != '.') {
+		if (len > 1 && !dot && full[len - 1] != '/') {
 			*tgt = '/';
 			tgt++;
 			len++;
