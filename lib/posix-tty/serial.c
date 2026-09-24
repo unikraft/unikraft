@@ -101,6 +101,11 @@ static inline __ssz _console_out(const char *buf, __sz len)
 	return len;
 }
 
+#if CONFIG_LIBPOSIX_TTY_SERIAL_EOF_FINAL
+/* The console reached the end of its input, for good. */
+static int serial_eof;
+#endif /* CONFIG_LIBPOSIX_TTY_SERIAL_EOF_FINAL */
+
 static ssize_t serial_read(const struct uk_file *f,
 			   const struct iovec *iov, size_t iovcnt,
 			   size_t off, long flags __unused)
@@ -110,6 +115,11 @@ static ssize_t serial_read(const struct uk_file *f,
 	UK_ASSERT(f->vol == SERIAL_VOLID);
 	if (unlikely(off))
 		return -ESPIPE;
+
+#if CONFIG_LIBPOSIX_TTY_SERIAL_EOF_FINAL
+	if (serial_eof)
+		return 0;
+#endif /* CONFIG_LIBPOSIX_TTY_SERIAL_EOF_FINAL */
 
 	if (!uk_file_poll_immediate(f, UKFD_POLLIN))
 		return 0;
@@ -138,12 +148,21 @@ static ssize_t serial_read(const struct uk_file *f,
 		/*
 		 * EOT (Ctrl-D) signals end-of-input.  Strip the EOT
 		 * byte from the returned data — real terminals do the
-		 * same — and clear POLLIN so the next read returns 0
-		 * (the POSIX EOF convention).
+		 * same — and have the next read return 0 (the POSIX EOF
+		 * convention): by clearing POLLIN, or with
+		 * CONFIG_LIBPOSIX_TTY_SERIAL_EOF_FINAL by remembering it.
 		 */
 		if (*last == SERIAL_EOT) {
 			total--;
+#if CONFIG_LIBPOSIX_TTY_SERIAL_EOF_FINAL
+			/* No more input will come: stdin stays readable,
+			 * as a file or a pipe at its end does, so poll()
+			 * and select() report the EOF a read returns.
+			 */
+			serial_eof = 1;
+#else /* !CONFIG_LIBPOSIX_TTY_SERIAL_EOF_FINAL */
 			uk_file_event_clear(f, UKFD_POLLIN);
+#endif /* !CONFIG_LIBPOSIX_TTY_SERIAL_EOF_FINAL */
 			if (bytes_read > 1 && (serial_termios.c_lflag & ECHO))
 				_console_out(buf, bytes_read - 1);
 			break;
@@ -159,6 +178,11 @@ static ssize_t serial_read(const struct uk_file *f,
 			break;
 	}
 
+#if CONFIG_LIBPOSIX_TTY_SERIAL_EOF_FINAL
+	/* POLLIN stays set at the end, so it cannot mean "try again". */
+	if (serial_eof)
+		return total;
+#endif /* CONFIG_LIBPOSIX_TTY_SERIAL_EOF_FINAL */
 	if (total || !uk_file_poll_immediate(f, UKFD_POLLIN))
 		return total;
 	else

@@ -16,6 +16,20 @@ config LIBPOSIX_TTY_SERIAL
 	bool "Provide file driver for the serial console"
 	select LIBUKCONSOLE
 
+config LIBPOSIX_TTY_SERIAL_EOF_FINAL
+	bool "End of input on the serial console is final"
+	depends on LIBPOSIX_TTY_SERIAL
+	default y if PLAT_HYPERLIGHT
+	help
+	  Treat an end of input (EOT, ^D) from the console as the end of
+	  stdin for good, as it is on a platform whose console input is a
+	  host buffer drained once: stdin then stays readable to poll() and
+	  select(), and every read() returns 0 at once, as for the end of a
+	  file or a pipe.  Without it an EOT ends one read, as on an
+	  interactive terminal, and stdin reports no input until more
+	  arrives: a program that polls stdin after the end then waits for
+	  input that never comes.
+
 config LIBPOSIX_TTY_STDIO
 	bool "Open standard I/O files at boot (fd 0, 1, 2)"
 	select LIBPOSIX_FDTAB

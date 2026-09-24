@@ -61,10 +61,11 @@ static __ssz hyperlight_console_out(struct uk_console *dev __unused,
  * bytes from that buffer.
  *
  * When the buffer is fully drained, we inject an EOT (Ctrl-D, 0x04)
- * byte.  The serial TTY driver recognises EOT and clears POLLIN on
- * the file, so the next read(2) returns 0 — the POSIX signal for
- * end-of-file.  Without this, serial_read returns -EAGAIN and the
- * caller busy-loops forever.
+ * byte.  The serial TTY driver recognises EOT as the end of input, so
+ * the next read(2) returns 0 -- the POSIX signal for end-of-file; with
+ * CONFIG_LIBPOSIX_TTY_SERIAL_EOF_FINAL (on for this platform) every
+ * later read does too and stdin stays readable to poll().  Without the
+ * EOT, serial_read returns -EAGAIN and the caller busy-loops forever.
  */
 static __ssz hyperlight_console_in(struct uk_console *dev __unused,
 				   char *buf, __sz len)
