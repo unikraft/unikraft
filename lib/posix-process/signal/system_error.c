@@ -41,6 +41,16 @@ int sys_error_handler_except(int signum,
 	if (!auxsp || SP_IN_AUXSP(curr_sp, auxsp))
 		return UK_EVENT_NOT_HANDLED;
 
+	/* Nor is a fault taken on an exception stack the application's: an
+	 * exception handler faulted (a page fault handler reading a file
+	 * for a file-backed mapping, say), a kernel bug to report, not a
+	 * signal to deliver to whatever the outer exception interrupted.
+	 */
+	if (curr_sp >= uk_pal_except_get_except_stack_base() &&
+	    curr_sp < uk_pal_except_get_except_stack_base() +
+		      CONFIG_UKPLAT_CPU_MAXCOUNT * 3 * CPU_EXCEPT_STACK_SIZE)
+		return UK_EVENT_NOT_HANDLED;
+
 	/* Prepare execution stack. Use the aux stack, as it's
 	 * the stack handle_self() expects to be opreating on.
 	 */
@@ -60,6 +70,15 @@ int sys_error_handler_except(int signum,
 				 uk_lcpu_except_err_ctx_get_regs(trap_ctx),
 				 handler_sp,
 				 sys_error_handler, (long)handler_desc);
+#if CONFIG_ARCH_X86_64 && CONFIG_LIBUKPLAT_NATIVE_PAL
+	/* The native x86_64 error handler turned IST off for the handlers
+	 * it raises (see uk_plat_native_except_err_handler), and this one
+	 * does not return to it: restore IST as it leaves -- only now, once
+	 * the trampoline's context is written, since a fault writing it
+	 * would take the trap stack from its top again.
+	 */
+	uk_lcpu_except_pop_nested();
+#endif /* CONFIG_ARCH_X86_64 && CONFIG_LIBUKPLAT_NATIVE_PAL */
 	ukarch_ctx_jump(&ctx);
 	UK_BUG(); /* noreturn */
 
