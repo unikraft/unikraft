@@ -74,6 +74,8 @@ extern void hostsock_resume(void);
  *                     complete.
  *   DriverReady()     /dev/hlcall was opened: named calls are served.
  *   CallStarted()     the reader took a named call.
+ *   CallResult(bytes) what that call returned, when the driver wrote a
+ *                     result with its status; sent just before CallDone.
  *   CallDone(status)  that call returned: 0, or the status the driver
  *                     wrote to the device.
  *   CallRejected()    a named call had no reader, or did not fit.
@@ -100,6 +102,17 @@ static void hl_emit_i32(const char *event, __s32 value)
 
 	p[0].type = HL_PV_HLINT;
 	p[0].i32_val = value;
+	(void)hl_hcall_int(event, p, 1, &out);
+}
+
+static void hl_emit_bytes(const char *event, const __u8 *buf, __u64 len)
+{
+	struct hl_param p[1];
+	__s32 out;
+
+	p[0].type = HL_PV_HLVECBYTES;
+	p[0].vec.ptr = buf;
+	p[0].vec.len = (__u32)len;
 	(void)hl_hcall_int(event, p, 1, &out);
 }
 
@@ -195,6 +208,9 @@ static __u64 hl_call_len;              /* 0 = nothing queued */
 static struct uk_thread *hl_call_reader; /* thread blocked in read() */
 static int hl_call_opened;             /* a driver has opened the device */
 static __s32 hl_call_fail_status;      /* from the driver's write(); 0 = success */
+static __u8 *hl_result_buf;            /* the result the driver wrote */
+static __u64 hl_result_cap;            /* hl_hcall_max_payload(): what CallResult carries */
+static __u64 hl_result_len;            /* 0 = none */
 
 /* Queue a named FunctionCall for the device reader.
  *
@@ -234,6 +250,21 @@ static int hl_call_in_flight;
 #if CONFIG_LIBDEVFS
 static int hlcall_open(struct device *dev __unused, int mode __unused)
 {
+	/* The result buffer is allocated when a driver first opens the
+	 * device, once host calls are up and their payload size known.
+	 * Without it a result is refused (EMSGSIZE); a status alone still
+	 * goes through.
+	 */
+	if (!hl_result_buf) {
+		hl_result_cap = hl_hcall_max_payload();
+		hl_result_buf = hl_result_cap ?
+			uk_malloc(uk_alloc_get_default(), hl_result_cap) : NULL;
+		if (unlikely(!hl_result_buf)) {
+			uk_pr_err("hyperlight: no memory for a %llu-byte call result\n",
+				  (unsigned long long)hl_result_cap);
+			hl_result_cap = 0;
+		}
+	}
 	hl_call_opened = 1;
 	hl_emit("DriverReady");
 	return 0;
@@ -256,6 +287,10 @@ static int hlcall_read(struct device *dev __unused, struct uio *uio,
 
 	if (hl_call_in_flight) {
 		hl_call_in_flight = 0;
+		if (hl_result_len) {
+			hl_emit_bytes("CallResult", hl_result_buf, hl_result_len);
+			hl_result_len = 0;
+		}
 		hl_emit_i32("CallDone", hl_call_fail_status);
 		hl_call_fail_status = 0;
 	}
@@ -278,22 +313,58 @@ static int hlcall_read(struct device *dev __unused, struct uio *uio,
 }
 
 /* The driver reports how the call it is serving went: a 32-bit status,
- * 0 for success.  Written before the next read(), which reports the call
- * done to the host with this status.  The kernel does not interpret it.
+ * 0 for success, optionally followed by what the call returned.  Written
+ * before the next read(), which sends the result (CallResult) and then
+ * reports the call done with the status (CallDone).  The kernel
+ * interprets neither.  A result travels as a host call's parameter, so it
+ * is at most hl_hcall_max_payload() bytes; a larger one is refused
+ * (EMSGSIZE) rather than lost on the way.
  */
 static int hlcall_write(struct device *dev __unused, struct uio *uio,
 			int flags __unused)
 {
+	__u8 *st;
+	__u64 total = 0, pos = 0;
 	__s32 status;
+	int i;
 
-	if (unlikely(!uio->uio_iov || uio->uio_iovcnt < 1 ||
-		     uio->uio_iov->iov_len < sizeof(status)))
+	if (unlikely(!uio->uio_iov || uio->uio_iovcnt < 1))
 		return EINVAL;
 	if (!hl_call_in_flight)
 		return EPERM;
-	memcpy(&status, uio->uio_iov->iov_base, sizeof(status));
+	for (i = 0; i < uio->uio_iovcnt; i++)
+		total += uio->uio_iov[i].iov_len;
+	if (unlikely(total < sizeof(status)))
+		return EINVAL;
+	if (total - sizeof(status) > hl_result_cap)
+		return EMSGSIZE;
+
+	/* The status, then the result, gathered from however many iovecs
+	 * the driver wrote them with.
+	 */
+	st = (__u8 *)&status;
+	for (i = 0; i < uio->uio_iovcnt; i++) {
+		const __u8 *b = uio->uio_iov[i].iov_base;
+		__u64 n = uio->uio_iov[i].iov_len;
+
+		while (n) {
+			__u64 k;
+
+			if (pos < sizeof(status)) {
+				k = MIN(n, sizeof(status) - pos);
+				memcpy(st + pos, b, k);
+			} else {
+				k = n;
+				memcpy(hl_result_buf + (pos - sizeof(status)), b, k);
+			}
+			pos += k;
+			b += k;
+			n -= k;
+		}
+	}
 	hl_call_fail_status = status;
-	uio->uio_resid -= (ssize_t)sizeof(status);
+	hl_result_len = total - sizeof(status);
+	uio->uio_resid -= (ssize_t)total;
 	return 0;
 }
 
