@@ -131,11 +131,18 @@ void uk_plat_native_except_push_nested(void)
 	__u32 idx;
 
 	idx = uk_lcpu_get_current_idx_in_except();
+	/* The index comes from the stack pointer, which names a CPU only on
+	 * the exception stacks: called from anywhere else (a crash report
+	 * on a thread's stack), there is no level to count.
+	 */
+	if (unlikely(idx >= CONFIG_UKPLAT_CPU_MAXCOUNT))
+		return;
 
 	disable_nesting = &idt_ist_disable_nesting[idx];
 	UK_ASSERT(*disable_nesting < __U8_MAX);
 
-	if (*disable_nesting++)
+	/* Count the level; only the outermost one disables IST. */
+	if ((*disable_nesting)++)
 		return;
 
 	idt = cpu_idt[idx];
@@ -159,11 +166,14 @@ void uk_plat_native_except_pop_nested(void)
 	__u32 idx;
 
 	idx = uk_lcpu_get_current_idx_in_except();
+	if (unlikely(idx >= CONFIG_UKPLAT_CPU_MAXCOUNT))
+		return;
 
 	disable_nesting = &idt_ist_disable_nesting[idx];
-	UK_ASSERT(*disable_nesting > 1);
+	UK_ASSERT(*disable_nesting > 0);
 
-	if (--*disable_nesting != 0)
+	/* Only the outermost level restores IST. */
+	if (--(*disable_nesting) != 0)
 		return;
 
 	idt = cpu_idt[idx];
