@@ -383,6 +383,43 @@ static int hlcall_write(struct device *dev __unused, struct uio *uio,
 	return 0;
 }
 
+/* Whether @len bytes at @s are well-formed UTF-8: no overlong forms, no
+ * surrogates, nothing past U+10FFFF.  HostCall's name is a string on the
+ * host, whose decoding fails the whole entry on one that is not.
+ */
+static int hl_utf8_valid(const __u8 *s, __u64 len)
+{
+	const __u8 *end = s + len;
+
+	while (s < end) {
+		__u8 c = *s++;
+		__u32 cp, min;
+		int n;
+
+		if (c < 0x80)
+			continue;
+		if ((c & 0xe0) == 0xc0) {
+			n = 1; cp = c & 0x1f; min = 0x80;
+		} else if ((c & 0xf0) == 0xe0) {
+			n = 2; cp = c & 0x0f; min = 0x800;
+		} else if ((c & 0xf8) == 0xf0) {
+			n = 3; cp = c & 0x07; min = 0x10000;
+		} else {
+			return 0;
+		}
+		if (end - s < n)
+			return 0;
+		while (n--) {
+			if ((*s & 0xc0) != 0x80)
+				return 0;
+			cp = (cp << 6) | (*s++ & 0x3f);
+		}
+		if (cp < min || cp > 0x10ffff || (cp >= 0xd800 && cp <= 0xdfff))
+			return 0;
+	}
+	return 1;
+}
+
 /* HLCALL_IOC_HOSTCALL: HostCall(name, args) on the host, the reply into
  * the driver's buffer.  See step.h.
  */
@@ -419,6 +456,9 @@ static int hl_host_call(struct hlcall_hostcall *arg)
 	 * one host call at a time.
 	 */
 	memcpy(hl_args_buf, hc.name, hc.name_len);
+	/* Checked on the copy, which the driver cannot change under us. */
+	if (!hl_utf8_valid(hl_args_buf, hc.name_len))
+		return EILSEQ;
 	if (hc.args_len)
 		memcpy(hl_args_buf + hc.name_len, hc.args, hc.args_len);
 	p[0].type = HL_PV_HLSTRING;

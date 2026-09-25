@@ -125,8 +125,11 @@ struct hlcall_hostcall {
  * kernel passes both ways through as they are; what the bytes mean (the
  * arguments' encoding, how the reply says success or failure) is between
  * the driver and the host library.  Only while a call is in flight: a
- * host function runs on behalf of a call.  E2BIG if the name and the
- * arguments together exceed what a host call carries; EIO if the host
+ * host function runs on behalf of a call.  EINVAL if the name, the output
+ * buffer, or arguments said to be there are missing; E2BIG if the name
+ * and the arguments together exceed what a host call carries; EILSEQ if
+ * the name is not UTF-8 (the host takes it as a string); ENOMEM if the
+ * kernel's buffers for host calls could not be allocated; EIO if the host
  * has no HostCall or could not deliver it; ENOBUFS, with @out_len the
  * reply's size, if it does not fit @out_cap.  A call-sized buffer
  * (HLCALL_IOC_MAXLEN) always holds it.
