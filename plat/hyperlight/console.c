@@ -77,7 +77,7 @@ static __ssz hyperlight_console_in(struct uk_console *dev __unused,
 
 	n = hl_call_read_stdin(buf, len);
 	if (n == 0 && len > 0) {
-		buf[0] = '\004'; /* EOT — triggers POLLIN clear */
+		buf[0] = '\004'; /* EOT: the end of input, see above */
 		return 1;
 	}
 	return (__ssz)n;
