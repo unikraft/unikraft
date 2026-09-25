@@ -103,7 +103,7 @@ void uk_plat_xen_except_irq_ctx_set_regs(
 	struct uk_plat_xen_except_irq_ctx *ctx,
 	struct uk_plat_native_regs *regs);
 
-__u64 uk_plat_xen_except_irq_ctx_get_irq(
+__u32 uk_plat_xen_except_irq_ctx_get_irq(
 	const struct uk_plat_xen_except_irq_ctx *ctx);
 
 void uk_plat_xen_except_irq_ctx_set_irq(
