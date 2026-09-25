@@ -212,6 +212,7 @@ static __u8 *hl_result_buf;            /* the result the driver wrote */
 static __u64 hl_result_cap;            /* hl_hcall_max_payload(): what CallResult carries */
 static __u64 hl_result_len;            /* 0 = none */
 static __u8 *hl_reply_buf;             /* a HostCall reply, hl_call_cap bytes */
+static __u8 *hl_args_buf;              /* a HostCall's name and args, hl_hcall_max_payload() */
 
 /* Queue a named FunctionCall for the device reader.
  *
@@ -271,6 +272,13 @@ static int hlcall_open(struct device *dev __unused, int mode __unused)
 		if (unlikely(!hl_reply_buf))
 			uk_pr_err("hyperlight: no memory for a %llu-byte host call reply\n",
 				  (unsigned long long)hl_call_cap);
+	}
+	if (!hl_args_buf && hl_hcall_max_payload()) {
+		hl_args_buf = uk_malloc(uk_alloc_get_default(),
+					hl_hcall_max_payload());
+		if (unlikely(!hl_args_buf))
+			uk_pr_err("hyperlight: no memory for a %llu-byte host call\n",
+				  (unsigned long long)hl_hcall_max_payload());
 	}
 	hl_call_opened = 1;
 	hl_emit("DriverReady");
@@ -378,8 +386,12 @@ static int hlcall_write(struct device *dev __unused, struct uio *uio,
 /* HLCALL_IOC_HOSTCALL: HostCall(name, args) on the host, the reply into
  * the driver's buffer.  See step.h.
  */
-static int hl_host_call(struct hlcall_hostcall *hc)
+static int hl_host_call(struct hlcall_hostcall *arg)
 {
+	/* Read once: what is checked is what is used, whatever the driver's
+	 * struct holds by the time the copies below are made.
+	 */
+	struct hlcall_hostcall hc = *arg;
 	struct hl_param p[2];
 	__u64 max = hl_hcall_max_payload();
 	__sz len = 0;
@@ -387,7 +399,7 @@ static int hl_host_call(struct hlcall_hostcall *hc)
 	/* An empty name is the host's to interpret (the library lists its
 	 * functions for it); a missing one is not.
 	 */
-	if (unlikely(!hc->name || !hc->out || (hc->args_len && !hc->args)))
+	if (unlikely(!hc.name || !hc.out || (hc.args_len && !hc.args)))
 		return EINVAL;
 	if (!hl_call_in_flight)
 		return EPERM;
@@ -395,17 +407,26 @@ static int hl_host_call(struct hlcall_hostcall *hc)
 	 * encoder sizes them in 32 bits, so this also keeps it from
 	 * wrapping.
 	 */
-	if (hc->name_len > max || hc->args_len > max ||
-	    hc->name_len + hc->args_len > max)
+	if (hc.name_len > max || hc.args_len > max ||
+	    hc.name_len + hc.args_len > max)
 		return E2BIG;
-	if (unlikely(!hl_reply_buf))
+	if (unlikely(!hl_reply_buf || !hl_args_buf))
 		return ENOMEM;
+	/* The name and args are copied in first, as the reply is copied out
+	 * last: the host call reads its parameters holding a spinlock with
+	 * interrupts off, where a fault on the driver's memory could not be
+	 * served.  The vnode lock around this ioctl keeps both buffers to
+	 * one host call at a time.
+	 */
+	memcpy(hl_args_buf, hc.name, hc.name_len);
+	if (hc.args_len)
+		memcpy(hl_args_buf + hc.name_len, hc.args, hc.args_len);
 	p[0].type = HL_PV_HLSTRING;
-	p[0].str.ptr = hc->name;
-	p[0].str.len = (__u32)hc->name_len;
+	p[0].str.ptr = (const char *)hl_args_buf;
+	p[0].str.len = (__u32)hc.name_len;
 	p[1].type = HL_PV_HLVECBYTES;
-	p[1].vec.ptr = hc->args;
-	p[1].vec.len = (__u32)hc->args_len;
+	p[1].vec.ptr = hl_args_buf + hc.name_len;
+	p[1].vec.len = (__u32)hc.args_len;
 	/* Into a kernel buffer as large as the input stack, so the reply
 	 * arrives whole, and only then into the driver's: writing there
 	 * may fault, and must not happen while the host call holds its lock
@@ -414,10 +435,10 @@ static int hl_host_call(struct hlcall_hostcall *hc)
 	if (hl_hcall_vecbytes("HostCall", p, 2, hl_reply_buf, hl_call_cap,
 			      &len) < 0)
 		return EIO;
-	hc->out_len = len;
-	if (len > hc->out_cap)
+	arg->out_len = len;
+	if (len > hc.out_cap)
 		return ENOBUFS;
-	memcpy(hc->out, hl_reply_buf, len);
+	memcpy(hc.out, hl_reply_buf, len);
 	return 0;
 }
 
