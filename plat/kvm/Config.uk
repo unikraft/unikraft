@@ -14,7 +14,6 @@ menuconfig PLAT_KVM
 	select HAVE_FDT if ARCH_ARM_64
 	imply LIBFDT if ARCH_ARM_64
 	imply LIBUKOFW if ARCH_ARM_64
-	select ELF64_TO_32 if ARCH_X86_64
 	select LIBUKRELOC if OPTIMIZE_PIE
 	select HAVE_PAGING
 	select LIBUKPLAT_NATIVE_PAL
