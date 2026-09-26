@@ -32,6 +32,17 @@ config LIBVFSCORE_NONLARGEFILE
 		If lib/syscall_shim is enabled and this option is not selected, only
 		the 64-bit version of the system calls are registered.
 
+config LIBVFSCORE_AUTOMOUNT_EXTRACT_BORROW
+	bool "Extracted initrd files reference the initrd"
+	depends on LIBUKCPIO
+	default n
+	help
+		Files the "extract" driver creates from initrd0 or the embedded
+		initrd reference their contents in the archive instead of copying
+		them, on a file system that supports it (ramfs): a file takes
+		memory of its own only once it is changed. The initrd has to stay
+		mapped for as long as the files exist.
+
 menuconfig LIBVFSCORE_AUTOMOUNT_CI
 	bool "Compiled-in filesystem table (up to 4 entries, earliest prio)"
 	help
