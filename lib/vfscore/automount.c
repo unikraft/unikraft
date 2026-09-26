@@ -557,7 +557,14 @@ static int vfscore_extract_volume(const struct vfscore_volume *vv)
 
 	uk_pr_info("Extracting initrd @ %p (%"__PRIsz" bytes, source: \"%s\") to %s...\n",
 		   vbase, vlen, vv->sdev, vv->path);
+#if CONFIG_LIBVFSCORE_AUTOMOUNT_EXTRACT_BORROW
+	/* Both sources stay mapped: initrd0 is never given back to the
+	 * allocator, and the embedded one is part of the image.
+	 */
+	rc = ukcpio_extract_borrowed(vv->path, vbase, vlen);
+#else /* !CONFIG_LIBVFSCORE_AUTOMOUNT_EXTRACT_BORROW */
 	rc = ukcpio_extract(vv->path, vbase, vlen);
+#endif /* !CONFIG_LIBVFSCORE_AUTOMOUNT_EXTRACT_BORROW */
 	if (unlikely(rc)) {
 		uk_pr_crit("Failed to extract cpio archive to %s: %d\n",
 			   vv->path, rc);
