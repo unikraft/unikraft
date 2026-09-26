@@ -222,6 +222,120 @@ int ukplat_mem_init(void)
 }
 
 /*
+ * After a restore the frame allocator gets its memory a chunk at a time.
+ *
+ * Its metadata (a bitmap per zone and level, a header in each free block)
+ * lives in the scratch it manages, which the restore released: every page
+ * of it written costs the host a fresh page.  Writing it for the whole
+ * budget took about a millisecond per restore, mostly for memory the next
+ * request never maps.  So the allocator takes its memory from the scratch
+ * bump allocator HL_FA_CHUNK at a time, up to the same budget as before:
+ * when an allocation finds it full, the wrappers below add a chunk and
+ * retry.  Taking the chunks as needed, rather than reserving the budget
+ * up front, keeps them next to the copy-on-write pages, so a restore
+ * touches as few of the host's (huge) pages as it can.  The wrappers run
+ * in the page fault handler, hence ukfallocbuddy's addmem has to be
+ * ISR-safe.
+ */
+#define HL_FA_CHUNK (512UL << 10)
+
+/* Pieces smaller than this are not worth a zone of their own. */
+#define HL_FA_MIN_ZONE (64UL << 10)
+
+/* What the allocator may still take from scratch. */
+static __sz hl_fa_budget;
+
+static int (*hl_fa_falloc)(struct uk_falloc *fa, __paddr_t *paddr,
+			   unsigned long frames, unsigned long flags);
+static int (*hl_fa_falloc_from_range)(struct uk_falloc *fa, __paddr_t *paddr,
+				      unsigned long frames, unsigned long flags,
+				      __paddr_t min, __paddr_t max);
+
+/*
+ * Add [start, start + len) to the frame allocator as zones that are each
+ * a naturally aligned power of two.  The buddy allocator merges a freed
+ * block with its buddy when the buddy starts inside the zone, without
+ * checking that it ends there: in a zone whose end is not aligned to the
+ * block, the merged block would reach past it.  In an aligned power-of-two
+ * zone a buddy that starts inside also ends inside.
+ */
+static int hl_fa_add_range(__paddr_t start, __sz len)
+{
+	int rc;
+
+	while (len >= HL_FA_MIN_ZONE) {
+		/* The largest power of two @start is aligned to and @len holds. */
+		__sz size = start ? (__sz)1 << __builtin_ctzl(start) : len;
+
+		while (size > len)
+			size >>= 1;
+		if (size >= HL_FA_MIN_ZONE) {
+			rc = uk_paging_pt_add_mem(&hyperlight_pt, start, size);
+			if (unlikely(rc))
+				return rc;
+		}
+		start += size;
+		len -= size;
+	}
+	return 0;
+}
+
+/*
+ * Give the allocator a chunk of scratch large enough for an aligned block
+ * of @frames: a power of two, at least twice that, on a multiple of its
+ * size.  add_mem puts a zone's metadata at its start, so the upper half of
+ * such a chunk is an aligned free block.  The scratch skipped to reach that
+ * boundary is added too, as smaller zones.
+ */
+static int hl_fa_grow(unsigned long frames)
+{
+	struct uk_falloc *fa = hyperlight_pt.fa;
+	__sz size = HL_FA_CHUNK, len;
+	__paddr_t start;
+	__u64 bump;
+
+	while (size < (__sz)frames * __PAGE_SIZE * 2)
+		size <<= 1;
+	bump = *(volatile __u64 *)HL_SCRATCH_ALLOC_GVA;
+	len = ALIGN_UP(bump, size) - bump + size;
+	if (len > hl_fa_budget)
+		return -ENOMEM;
+	start = hl_scratch_alloc_pages(len / __PAGE_SIZE);
+	hl_fa_budget -= len;
+
+	/* The budget already counts in the totals (see
+	 * hyperlight_paging_reinit()); add_mem counts it again.
+	 */
+	fa->total_memory -= len;
+	fa->free_memory -= len;
+	return hl_fa_add_range(start, len);
+}
+
+static int hl_falloc_grow(struct uk_falloc *fa, __paddr_t *paddr,
+			  unsigned long frames, unsigned long flags)
+{
+	__paddr_t want = *paddr;
+	int rc = hl_fa_falloc(fa, paddr, frames, flags);
+
+	if (rc == -ENOMEM && hl_fa_grow(frames) == 0) {
+		*paddr = want;
+		rc = hl_fa_falloc(fa, paddr, frames, flags);
+	}
+	return rc;
+}
+
+static int hl_falloc_from_range_grow(struct uk_falloc *fa, __paddr_t *paddr,
+				     unsigned long frames, unsigned long flags,
+				     __paddr_t min, __paddr_t max)
+{
+	int rc = hl_fa_falloc_from_range(fa, paddr, frames, flags, min, max);
+
+	if (rc == -ENOMEM && hl_fa_grow(frames) == 0)
+		rc = hl_fa_falloc_from_range(fa, paddr, frames, flags, min, max);
+	return rc;
+}
+
+/*
  * Re-initialise the paging frame allocator after snapshot restore.
  *
  * The frame allocator (FA) struct, zone metadata, bitmaps, and free-list
@@ -240,15 +354,16 @@ int ukplat_mem_init(void)
  * values.
  *
  * Called ONLY from hyperlight_dispatch_function's snapshot fixup path
- * (ZF=1 dispatch), after pre-faulting .data/.bss and restoring the
- * kernel IDT.  This means every call follows a snapshot restore, so
- * we always perform the full reinit unconditionally.
+ * (ZF=1 dispatch), after pre-faulting and restoring the kernel IDT.
+ * This means every call follows a snapshot restore, so we always
+ * perform the full reinit unconditionally.
  */
 void hyperlight_paging_reinit(void)
 {
+	struct uk_falloc *fa;
 	__paddr_t cr3;
 	__sz fa_size, fa_struct_size;
-	__u64 fa_pages, bump_pos, max_avail, available;
+	__u64 bump_pos, max_avail, available;
 	__paddr_t scratch_block;
 	int rc;
 
@@ -269,34 +384,39 @@ void hyperlight_paging_reinit(void)
 
 	available = max_avail - bump_pos;
 	fa_size = (__sz)((available * 3 / 4) & ~((__u64)__PAGE_SIZE - 1));
+	fa_struct_size = ALIGN_UP(uk_fallocbuddy_size(), __PAGE_SIZE);
 
-	if (fa_size < 16 * __PAGE_SIZE) {
+	if (fa_size < fa_struct_size + HL_FA_CHUNK * 2) {
 		uk_pr_warn("paging reinit: not enough scratch (%lu bytes)\n",
 			   (unsigned long)fa_size);
 		return;
 	}
 
-	fa_pages = fa_size / __PAGE_SIZE;
-	scratch_block = hl_scratch_alloc_pages(fa_pages);
-
-	/* Place the FA struct at the start of the scratch block and
-	 * add the remainder as allocatable frames — same layout as
-	 * pgarch_pt_init(), but without re-creating a PML4.
+	/* The FA struct gets page(s) of its own; hl_fa_grow() takes the rest
+	 * of the budget as it is needed.
 	 */
-	hyperlight_pt.fa = (struct uk_falloc *)
-		pgarch_directmap_paddr_to_vaddr(scratch_block);
-
-	fa_struct_size = ALIGN_UP(uk_fallocbuddy_size(), 8);
-
-	rc = uk_fallocbuddy_init(hyperlight_pt.fa);
+	scratch_block = hl_scratch_alloc_pages(fa_struct_size / __PAGE_SIZE);
+	fa = (struct uk_falloc *)pgarch_directmap_paddr_to_vaddr(scratch_block);
+	rc = uk_fallocbuddy_init(fa);
 	if (unlikely(rc)) {
 		uk_pr_warn("paging reinit: fallocbuddy_init failed: %d\n", rc);
 		return;
 	}
+	hyperlight_pt.fa = fa;
+	hl_fa_budget = fa_size - fa_struct_size;
 
-	rc = uk_paging_pt_add_mem(&hyperlight_pt,
-				  scratch_block + fa_struct_size,
-				  fa_size - fa_struct_size);
+	/* sysinfo() and sysconf() report the totals: count the budget from
+	 * the start, so they show the memory the allocator can reach.
+	 */
+	fa->total_memory = hl_fa_budget;
+	fa->free_memory = hl_fa_budget;
+
+	hl_fa_falloc = fa->falloc;
+	hl_fa_falloc_from_range = fa->falloc_from_range;
+	fa->falloc = hl_falloc_grow;
+	fa->falloc_from_range = hl_falloc_from_range_grow;
+
+	rc = hl_fa_grow(1);
 	if (unlikely(rc)) {
 		uk_pr_warn("paging reinit: add_mem failed: %d\n", rc);
 		return;
