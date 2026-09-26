@@ -95,6 +95,10 @@ static void hyperlight_report_exit(void)
 	struct hl_param p[1];
 	__s32 out;
 
+	/* A call the process returned from before exiting has not been
+	 * reported yet: that goes out with a Yield, and none follows.
+	 */
+	hyperlight_step_flush();
 	p[0].type = HL_PV_HLINT;
 	p[0].i32_val = hl_exit_code;
 	(void)hl_hcall_int("Exited", p, 1, &out);

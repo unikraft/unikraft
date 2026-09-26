@@ -69,15 +69,21 @@ extern void hostsock_resume(void);
 /* What the guest tells the host, each as a named host function: the
  * protocol is the names and their typed arguments, nothing is encoded.
  *
- *   Yield(ns)         every thread is blocked; the next timer fires in ns
+ *   Yield(ns, flags, status, result)
+ *                     every thread is blocked; the next timer fires in ns
  *                     (0: none).  Sent at every boundary, and once at boot
- *                     complete.
+ *                     complete.  It also carries what the entry saw of the
+ *                     call in flight, so a call costs no exit of its own:
+ *                     HL_YIELD_STARTED, the reader took the call and it
+ *                     is still running; HL_YIELD_DONE, it returned, with
+ *                     status (0, or what the driver wrote to the device)
+ *                     and result (what it returned; empty: nothing).
  *   DriverReady()     /dev/hlcall was opened: named calls are served.
- *   CallStarted()     the reader took a named call.
- *   CallResult(bytes) what that call returned, when the driver wrote a
- *                     result with its status; sent just before CallDone.
- *   CallDone(status)  that call returned: 0, or the status the driver
- *                     wrote to the device.
+ *   CallStarted()     the reader took a named call; sent on its own only
+ *                     when no Yield follows (hyperlight_step_flush()).
+ *   CallDone(status, result)
+ *                     that call returned; likewise on its own only when no
+ *                     Yield follows.
  *   CallRejected()    a named call had no reader, or did not fit.
  *
  * Exited(status), the process exit, is not the step model's: every
@@ -95,35 +101,65 @@ static void hl_emit(const char *event)
 	(void)hl_hcall_int(event, NULL, 0, &out);
 }
 
-static void hl_emit_i32(const char *event, __s32 value)
+static void hl_emit_done(__s32 status, const __u8 *buf, __u64 len)
 {
-	struct hl_param p[1];
+	struct hl_param p[2];
 	__s32 out;
 
 	p[0].type = HL_PV_HLINT;
-	p[0].i32_val = value;
-	(void)hl_hcall_int(event, p, 1, &out);
+	p[0].i32_val = status;
+	p[1].type = HL_PV_HLVECBYTES;
+	p[1].vec.ptr = buf;
+	p[1].vec.len = (__u32)len;
+	(void)hl_hcall_int("CallDone", p, 2, &out);
 }
 
-static void hl_emit_bytes(const char *event, const __u8 *buf, __u64 len)
-{
-	struct hl_param p[1];
-	__s32 out;
+#define HL_YIELD_STARTED 1
+#define HL_YIELD_DONE    2
 
-	p[0].type = HL_PV_HLVECBYTES;
-	p[0].vec.ptr = buf;
-	p[0].vec.len = (__u32)len;
-	(void)hl_hcall_int(event, p, 1, &out);
+/* What the entry saw of the call in flight, for its Yield. */
+static int hl_start_pending;
+static int hl_done_pending;
+static __s32 hl_call_fail_status;      /* from the driver's write(); 0 = success */
+static __u8 *hl_result_buf;            /* the result the driver wrote */
+static __u64 hl_result_len;            /* 0 = none */
+
+/* The call's report went out: clear it, and the result it carried. */
+static void hl_step_forget_pending(void)
+{
+	if (hl_done_pending) {
+		hl_result_len = 0;
+		hl_call_fail_status = 0;
+	}
+	hl_done_pending = 0;
+	hl_start_pending = 0;
 }
 
-static void hl_emit_u64(const char *event, __u64 value)
+/* A boundary: every thread is blocked and the next timer fires in @ns
+ * (0: none), with what this entry saw of the call in flight.  The call's
+ * start is reported only if it is still running: a return implies it.
+ */
+static void hl_emit_yield(__u64 ns)
 {
-	struct hl_param p[1];
-	__s32 out;
+	struct hl_param p[4];
+	__s32 out, flags = 0;
+
+	if (hl_done_pending)
+		flags = HL_YIELD_DONE;
+	else if (hl_start_pending)
+		flags = HL_YIELD_STARTED;
 
 	p[0].type = HL_PV_HLULONG;
-	p[0].u64_val = value;
-	(void)hl_hcall_int(event, p, 1, &out);
+	p[0].u64_val = ns;
+	p[1].type = HL_PV_HLINT;
+	p[1].i32_val = flags;
+	p[2].type = HL_PV_HLINT;
+	p[2].i32_val = hl_done_pending ? hl_call_fail_status : 0;
+	p[3].type = HL_PV_HLVECBYTES;
+	p[3].vec.ptr = hl_done_pending && hl_result_len ? hl_result_buf : (const __u8 *)"";
+	p[3].vec.len = hl_done_pending ? (__u32)hl_result_len : 0;
+	(void)hl_hcall_int("Yield", p, 4, &out);
+	hl_step_forget_pending();
 }
 
 /* The guest function that drives the scheduler, and the one the host
@@ -207,10 +243,7 @@ static __u64 hl_call_cap;
 static __u64 hl_call_len;              /* 0 = nothing queued */
 static struct uk_thread *hl_call_reader; /* thread blocked in read() */
 static int hl_call_opened;             /* a driver has opened the device */
-static __s32 hl_call_fail_status;      /* from the driver's write(); 0 = success */
-static __u8 *hl_result_buf;            /* the result the driver wrote */
-static __u64 hl_result_cap;            /* hl_hcall_max_payload(): what CallResult carries */
-static __u64 hl_result_len;            /* 0 = none */
+static __u64 hl_result_cap;            /* hl_hcall_max_payload(): what CallDone carries */
 static __u8 *hl_reply_buf;             /* a HostCall reply, hl_call_cap bytes */
 static __u8 *hl_args_buf;              /* a HostCall's name and args, hl_hcall_max_payload() */
 
@@ -300,14 +333,10 @@ static int hlcall_read(struct device *dev __unused, struct uio *uio,
 	buf = uio->uio_iov->iov_base;
 	cap = uio->uio_iov->iov_len;
 
+	/* Reported with the entry's Yield (hl_emit_yield()). */
 	if (hl_call_in_flight) {
 		hl_call_in_flight = 0;
-		if (hl_result_len) {
-			hl_emit_bytes("CallResult", hl_result_buf, hl_result_len);
-			hl_result_len = 0;
-		}
-		hl_emit_i32("CallDone", hl_call_fail_status);
-		hl_call_fail_status = 0;
+		hl_done_pending = 1;
 	}
 
 	while (!hl_call_len) {
@@ -321,7 +350,7 @@ static int hlcall_read(struct device *dev __unused, struct uio *uio,
 	memcpy(buf, hl_call_buf, n);
 	hl_call_len = 0;
 	hl_call_in_flight = 1;
-	hl_emit("CallStarted");
+	hl_start_pending = 1;
 	uio->uio_resid -= (ssize_t)n;
 
 	return 0;
@@ -329,8 +358,8 @@ static int hlcall_read(struct device *dev __unused, struct uio *uio,
 
 /* The driver reports how the call it is serving went: a 32-bit status,
  * 0 for success, optionally followed by what the call returned.  Written
- * before the next read(), which sends the result (CallResult) and then
- * reports the call done with the status (CallDone).  The kernel
+ * before the next read(), which reports the call done with the status
+ * and the result, one host call (CallDone).  The kernel
  * interprets neither.  A result travels as a host call's parameter, so it
  * is at most hl_hcall_max_payload() bytes; a larger one is refused
  * (EMSGSIZE) rather than lost on the way.
@@ -561,7 +590,7 @@ static __noreturn void hl_yield_thread_fn(void)
 	 * on this thread and reaches the pump.
 	 */
 	hl_boot_halted = 1;
-	hl_emit_u64("Yield", 0);
+	hl_emit_yield(0);
 	hyperlight_halt_to_host();
 }
 
@@ -768,5 +797,17 @@ void hyperlight_step_pump(const __u8 *fc, __u64 fc_len)
 		ns = 0;
 	}
 
-	hl_emit_u64("Yield", ns);
+	hl_emit_yield(ns);
+}
+
+/* Report the call's start or return on its own: for a path that ends the
+ * entry without a Yield (the process exiting).
+ */
+void hyperlight_step_flush(void)
+{
+	if (hl_done_pending)
+		hl_emit_done(hl_call_fail_status, hl_result_buf, hl_result_len);
+	else if (hl_start_pending)
+		hl_emit("CallStarted");
+	hl_step_forget_pending();
 }

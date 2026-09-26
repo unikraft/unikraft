@@ -49,8 +49,9 @@
  *                  thread.  Re-entering read() marks the call complete.
  *
  * The guest reports to the host through named host functions, each one
- * fact with typed arguments: Yield(ns) at every boundary, DriverReady(),
- * CallStarted(), CallDone(status) and CallRejected() (see step.c), plus
+ * fact with typed arguments: Yield(ns, flags, status, result) at every
+ * boundary, carrying what the entry saw of the call in flight,
+ * DriverReady() and CallRejected() (see step.c), plus
  * Exited(status) from the shutdown path of every kernel on this platform
  * (shutdown.c).  A halt with neither a Yield nor an Exited means the
  * guest went down without a word.
@@ -180,7 +181,17 @@ int hyperlight_step_active(void);
  */
 int hyperlight_step_fc_is_pump(const __u8 *fc, __u64 fc_len);
 
+/**
+ * Report the call in flight's start or return on its own host call, for a
+ * path that ends the entry without the pump's Yield (the process exiting).
+ */
+void hyperlight_step_flush(void);
+
 #else /* !CONFIG_HYPERLIGHT_STEP */
+
+static inline void hyperlight_step_flush(void)
+{
+}
 
 static inline int hyperlight_step_halt(__nsec wakeup_time __unused)
 {
