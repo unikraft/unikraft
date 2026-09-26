@@ -378,7 +378,8 @@ ramfs_truncate(struct vnode *vp, off_t length)
 	} else if ((size_t) length > np->rn_bufsize) {
 		/* TODO: this could use a page level allocator */
 		new_size = UK_PAGING_PAGE_ALIGN_UP(length);
-		new_buf = malloc(new_size);
+		/* Zeroed: past its old end the file reads as zeros. */
+		new_buf = calloc(1, new_size);
 		if (!new_buf)
 			return EIO;
 		if (np->rn_size != 0) {
@@ -389,6 +390,11 @@ ramfs_truncate(struct vnode *vp, off_t length)
 		np->rn_buf = (char *) new_buf;
 		np->rn_bufsize = new_size;
 		np->rn_owns_buf = true;
+	} else if ((size_t) length > np->rn_size) {
+		/* Growing inside the buffer: what an earlier truncate cut off
+		 * must not come back.
+		 */
+		memset(np->rn_buf + np->rn_size, 0, length - np->rn_size);
 	}
 	np->rn_size = length;
 	vp->v_size = length;
@@ -504,6 +510,12 @@ ramfs_write(struct vnode *vp, struct uio *uio, int ioflag)
 			}
 			np->rn_buf = (char *) new_buf;
 			np->rn_bufsize = new_size;
+		} else if (uio->uio_offset > (off_t) np->rn_size) {
+			/* Writing past the end inside the buffer: the gap
+			 * reads as zeros, not what a truncate cut off.
+			 */
+			memset(np->rn_buf + np->rn_size, 0,
+			       uio->uio_offset - np->rn_size);
 		}
 		np->rn_size = end_pos;
 		vp->v_size = end_pos;
