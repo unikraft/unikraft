@@ -33,6 +33,7 @@
 #include <uk/assert.h>
 #include <uk/init.h>
 #include <uk/print.h>
+#include <uk/plat/native/except.h>
 
 #include <hyperlight-x86/dispatch.h>
 #include <hyperlight-x86/hcall.h>
@@ -250,8 +251,24 @@ push_result:
 
 /* ── Snapshot pre-fault ─────────────────────────────────────────── */
 
+/* Write one byte of every page of [start, start + len). */
+static void hyperlight_dispatch_touch(void *start, __sz len,
+				      int contents __unused,
+				      void *arg __unused)
+{
+	__uptr p = (__uptr)start & ~(__uptr)(__PAGE_SIZE - 1);
+	__uptr end = (__uptr)start + len;
+
+	for (; p < end; p += __PAGE_SIZE) {
+		__u8 tmp = *(volatile __u8 *)p;
+
+		*(volatile __u8 *)p = tmp;
+	}
+}
+
 /*
- * Pre-fault all writable kernel pages after snapshot restore.
+ * Pre-fault the kernel pages exception delivery writes, after snapshot
+ * restore.
  *
  * Snapshot/restore marks every writable page Copy-on-Write (PTE
  * read-only + AVL bit 9).  The first write triggers a page fault.
@@ -265,23 +282,18 @@ push_result:
  *
  * This function runs under a temporary IDT whose #PF entry uses
  * IST=0 (current RSP on the scratch stack, always writable).  It
- * pre-faults all kernel .data and .bss pages — including the IST
- * stacks, IDT, TSS, and GDT arrays — so the full Unikraft IDT/IST
- * mechanism works for subsequent CoW faults.
+ * pre-faults what delivering an exception writes — the IST stacks,
+ * the IDT, the nesting state, the TSS and the GDT — so the full
+ * Unikraft IDT/IST mechanism works for subsequent CoW faults.  The rest
+ * of .data and .bss faults in when first written, if ever: each page
+ * pre-faulted costs a copy and a fresh scratch page on every restore.
  *
  * Called from hyperlight_dispatch_function's snapshot-restore path.
  */
 void __attribute__((used))
 hyperlight_dispatch_prefault(void)
 {
-	extern char _data[], _end[];
-	volatile __u8 *p;
-
-	for (p = (volatile __u8 *)_data; p < (volatile __u8 *)_end;
-	     p += __PAGE_SIZE) {
-		__u8 tmp = *p;
-		*(volatile __u8 *)p = tmp;
-	}
+	uk_plat_native_except_state(hyperlight_dispatch_touch, NULL);
 }
 
 /* ── SYSCALL MSR fixup ─────────────────────────────────────────── */
