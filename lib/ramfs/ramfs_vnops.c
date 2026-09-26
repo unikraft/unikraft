@@ -41,6 +41,7 @@
 #include <dirent.h>
 #include <sys/param.h>
 #include <sys/ioctl.h>
+#include <vfscore/borrow.h>
 
 #include <errno.h>
 #include <string.h>
@@ -375,7 +376,8 @@ ramfs_truncate(struct vnode *vp, off_t length)
 			np->rn_buf = NULL;
 			np->rn_bufsize = 0;
 		}
-	} else if ((size_t) length > np->rn_bufsize) {
+	} else if ((size_t) length > np->rn_bufsize ||
+		   ((size_t) length > np->rn_size && !np->rn_owns_buf)) {
 		/* TODO: this could use a page level allocator */
 		new_size = UK_PAGING_PAGE_ALIGN_UP(length);
 		/* Zeroed: past its old end the file reads as zeros. */
@@ -492,6 +494,22 @@ ramfs_write(struct vnode *vp, struct uio *uio, int ioflag)
 	if (ioflag & IO_APPEND)
 		uio->uio_offset = np->rn_size;
 
+	/* A borrowed buffer (see ramfs_set_file_data()) may be read-only:
+	 * copy it before the first change.
+	 */
+	if (np->rn_buf && !np->rn_owns_buf) {
+		size_t new_size = UK_PAGING_PAGE_ALIGN_UP(np->rn_size);
+		void *new_buf = new_size ? calloc(1, new_size) : NULL;
+
+		if (new_size && !new_buf)
+			return EIO;
+		if (new_size)
+			memcpy(new_buf, np->rn_buf, np->rn_size);
+		np->rn_buf = (char *) new_buf;
+		np->rn_bufsize = new_size;
+		np->rn_owns_buf = true;
+	}
+
 	if ((size_t) uio->uio_offset + uio->uio_resid > (size_t) vp->v_size) {
 		/* Expand the file size before writing to it */
 		off_t end_pos = uio->uio_offset + uio->uio_resid;
@@ -564,6 +582,7 @@ ramfs_rename(struct vnode *dvp1, struct vnode *vp1, const char *name1 __unused,
 			np->rn_buf = old_np->rn_buf;
 			np->rn_size = old_np->rn_size;
 			np->rn_bufsize = old_np->rn_bufsize;
+			np->rn_owns_buf = old_np->rn_owns_buf;
 			old_np->rn_buf = NULL;
 		}
 		/* Remove source file */
@@ -685,11 +704,17 @@ ramfs_inactive(struct vnode *vp)
 	return 0;
 }
 
-static int ramfs_ioctl(struct vnode *dvp __unused,
+static int ramfs_ioctl(struct vnode *dvp,
 			 struct vfscore_file *fp __unused,
 			 unsigned long com,
-			 void *data __unused)
+			 void *data)
 {
+	if (com == VFSCORE_IOC_BORROW) {
+		const struct vfscore_borrow *b = data;
+
+		return ramfs_set_file_data(dvp, b->data, b->len);
+	}
+
 	/**
 	 * HACK: In binary compatibility mode, Ruby tries to set O_ASYNC,
 	 * which Unikraft does not yet support. If the `ioctl` call returns
