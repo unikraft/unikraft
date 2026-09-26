@@ -217,6 +217,87 @@ static int fc_name_is(const __u8 *b, __u64 len, const char *name)
 	return !memcmp(b + p + 4, name, nlen);
 }
 
+/* Where field @vtoff (a vtable byte offset: 4 is the first field) of the
+ * table at @tbl lies in @b, or 0 if absent or out of bounds.
+ */
+static __u64 fb_field_at(const __u8 *b, __u64 len, __u64 tbl, __u16 vtoff)
+{
+	__u64 vt;
+	__u16 vsize, off;
+
+	if (tbl + 4 > len)
+		return 0;
+	vt = tbl - (__s32)fb_u32(b, tbl);
+	if (vt + 4 > len)
+		return 0;
+	vsize = fb_u16(b, vt);
+	if (vtoff + 2 > vsize || vt + vtoff + 2 > len)
+		return 0;
+	off = fb_u16(b, vt + vtoff);
+	return off && tbl + off < len ? tbl + off : 0;
+}
+
+/* The table a uoffset at @pos points to, or 0. */
+static __u64 fb_deref(const __u8 *b, __u64 len, __u64 pos)
+{
+	__u64 t;
+
+	if (!pos || pos + 4 > len)
+		return 0;
+	t = pos + fb_u32(b, pos);
+	return t + 4 <= len ? t : 0;
+}
+
+/* The last parameter of the size-prefixed FunctionCall @b when it is a
+ * u64 (hlulong): the host's environment version, which it appends to
+ * Exec, GuestExec and Call.  0 when there is none.
+ */
+static __u64 fc_env_version(const __u8 *b, __u64 len)
+{
+	__u64 root, params, count, elem, value, field, v = 0;
+	__u64 tf;
+
+	if (!b || len < 8)
+		return 0;
+	root = 4 + fb_u32(b, 4);
+	/* FunctionCall.parameters, then its last Parameter. */
+	params = fb_deref(b, len, fb_field_at(b, len, root, 6));
+	if (!params)
+		return 0;
+	count = fb_u32(b, params);
+	if (!count || params + 4 + 4 * count > len)
+		return 0;
+	elem = fb_deref(b, len, params + 4 + 4 * (count - 1));
+	if (!elem)
+		return 0;
+	/* Parameter.value_type 4 is hlulong; Parameter.value its table. */
+	tf = fb_field_at(b, len, elem, 4);
+	if (!tf || b[tf] != 4)
+		return 0;
+	value = fb_deref(b, len, fb_field_at(b, len, elem, 6));
+	if (!value)
+		return 0;
+	/* hlulong.value; absent means its default, 0. */
+	field = fb_field_at(b, len, value, 4);
+	if (field && field + 8 <= len)
+		memcpy(&v, b + field, sizeof(v));
+	return v;
+}
+
+/* The environment version the call in @fc carries (see
+ * fc_env_version()); for dispatch.c, which applies the environment ahead
+ * of named calls.
+ */
+__u64 hyperlight_step_fc_env_version(const __u8 *fc, __u64 fc_len)
+{
+	return fc_env_version(fc, fc_len);
+}
+
+int hyperlight_step_fc_is_resume(const __u8 *fc, __u64 fc_len)
+{
+	return fc_name_is(fc, fc_len, "resume");
+}
+
 /* ── Pump state ──────────────────────────────────────────────────── */
 
 /* The yield thread: the guest thread that is "current" whenever the VM
@@ -247,6 +328,49 @@ static __u64 hl_result_cap;            /* hl_hcall_max_payload(): what CallDone 
 static __u8 *hl_reply_buf;             /* a HostCall reply, hl_call_cap bytes */
 static __u8 *hl_args_buf;              /* a HostCall's name and args, hl_hcall_max_payload() */
 
+/* The host's environment as the kernel last fetched it, and its version:
+ * HLCALL_IOC_GETENV answers from here, with no host call, while the call
+ * in flight carries the same version.  The host bumps it whenever the
+ * environment changes, and on every restore.
+ */
+static __u64 hl_call_env_version;
+static char *hl_env_cache;
+static __u64 hl_env_cache_len;
+static __u64 hl_env_cache_version;
+
+/* The host's environment for @version, fetched with GetEnvVars only when
+ * the version is not the one the copy was fetched under (0: always).
+ * Returns 1 if it was fetched, 0 if the copy stood, -1 if it cannot be
+ * had; *buf is NUL-terminated, *len without the final NUL.
+ */
+int hyperlight_step_env(__u64 version, const char **buf, __sz *len)
+{
+	__u64 cap = hl_hcall_max_payload();
+	int n;
+
+	if (!hl_env_cache) {
+		hl_env_cache = cap ? uk_malloc(uk_alloc_get_default(), cap) : NULL;
+		if (unlikely(!hl_env_cache))
+			return -1;
+	}
+	if (version && version == hl_env_cache_version) {
+		*buf = hl_env_cache;
+		*len = hl_env_cache_len;
+		return 0;
+	}
+	n = hl_call_get_env_vars(hl_env_cache, cap);
+	if (n < 0 || (__u64)n >= cap) {
+		hl_env_cache_version = 0;
+		return -1;
+	}
+	hl_env_cache[n] = '\0';
+	hl_env_cache_len = n;
+	hl_env_cache_version = version;
+	*buf = hl_env_cache;
+	*len = hl_env_cache_len;
+	return 1;
+}
+
 /* Queue a named FunctionCall for the device reader.
  *
  * A guest that never opens the device (a plain Linux binary run under the
@@ -275,6 +399,7 @@ static void hl_route_call(const __u8 *fc, __u64 fc_len)
 	}
 	memcpy(hl_call_buf, fc, fc_len);
 	hl_call_len = fc_len;
+	hl_call_env_version = fc_env_version(fc, fc_len);
 	if (hl_call_reader)
 		uk_thread_wake(hl_call_reader);
 }
@@ -529,15 +654,16 @@ static int hlcall_ioctl(struct device *dev __unused, unsigned long cmd,
 		return hl_host_call(arg);
 	case HLCALL_IOC_GETENV: {
 		struct hlcall_env *env = arg;
-		int len;
+		const char *buf;
+		__sz len;
 
 		if (unlikely(!env->buf))
 			return EINVAL;
-		len = hl_call_get_env_vars(env->buf, env->cap);
-		if (len < 0)
+		if (hyperlight_step_env(hl_call_env_version, &buf, &len) < 0)
 			return EIO;
-		if ((__u64)len >= env->cap)
+		if (len >= env->cap)
 			return ENOBUFS;
+		memcpy(env->buf, buf, len + 1);
 		env->len = len;
 		return 0;
 	}

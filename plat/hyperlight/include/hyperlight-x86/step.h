@@ -100,7 +100,10 @@ struct hlcall_env {
  * is the length without that terminator.  A driver runs it before each
  * call it serves, so variables the host set since (after restoring a
  * snapshot, typically) reach the process, whose libc environ the kernel
- * cannot see.  Fails with ENOBUFS if the entries do not fit @cap;
+ * cannot see.  The kernel answers from its own copy while the call in
+ * flight carries the environment version it fetched under, so only a
+ * changed environment costs a host call.  Fails with ENOBUFS if the
+ * entries do not fit @cap;
  * HLCALL_IOC_MAXLEN bytes always do, the entries arrive on the same PEB
  * stack as a call.
  */
@@ -180,6 +183,18 @@ int hyperlight_step_active(void);
  * entry point rather than a named application call.
  */
 int hyperlight_step_fc_is_pump(const __u8 *fc, __u64 fc_len);
+
+/**
+ * The host's environment for @version, fetched only when it changed (see
+ * step.c).  1 if fetched, 0 if the kernel's copy stood, -1 on failure.
+ */
+int hyperlight_step_env(__u64 version, const char **buf, __sz *len);
+
+/** The environment version a named call carries (0: none). */
+__u64 hyperlight_step_fc_env_version(const __u8 *fc, __u64 fc_len);
+
+/** True if @fc is the host's `resume` entry. */
+int hyperlight_step_fc_is_resume(const __u8 *fc, __u64 fc_len);
 
 /**
  * Report the call in flight's start or return on its own host call, for a

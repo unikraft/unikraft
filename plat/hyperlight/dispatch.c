@@ -74,11 +74,40 @@ __u64 g_exn_stack_top;
  * environ of its own that this cannot reach; drivers refresh it through
  * the HLCALL_IOC_GETENV ioctl (step.c).
  */
+/* setenv() each KEY=VALUE entry of @buf (@len bytes, NUL-separated). */
+static void hyperlight_dispatch_setenv(char *buf, __sz len)
+{
+	char *p, *end;
+
+	for (p = buf, end = buf + len; p < end; p += strlen(p) + 1) {
+		char *eq = strchr(p, '=');
+
+		if (!eq || eq == p)
+			continue;
+		*eq = '\0';
+		setenv(p, eq + 1, 1);
+		*eq = '=';
+	}
+}
+
+#if CONFIG_HYPERLIGHT_STEP
+/* Only when the environment changed: the call carries the host's version
+ * of it, and the step model keeps the copy it last fetched.
+ */
+static void hyperlight_dispatch_apply_host_env_version(__u64 version)
+{
+	const char *buf;
+	__sz len;
+
+	if (hyperlight_step_env(version, &buf, &len) == 1 && len)
+		hyperlight_dispatch_setenv((char *)buf, len);
+}
+#endif /* CONFIG_HYPERLIGHT_STEP */
+
 static void hyperlight_dispatch_apply_host_env(void)
 {
 	static char *buf;
 	static __sz cap;
-	char *p, *end;
 	int len;
 
 	if (!buf) {
@@ -98,16 +127,7 @@ static void hyperlight_dispatch_apply_host_env(void)
 			  len);
 		return;
 	}
-
-	for (p = buf, end = buf + len; p < end; p += strlen(p) + 1) {
-		char *eq = strchr(p, '=');
-
-		if (!eq || eq == p)
-			continue;
-		*eq = '\0';
-		setenv(p, eq + 1, 1);
-		*eq = '=';
-	}
+	hyperlight_dispatch_setenv(buf, len);
 }
 
 static int hyperlight_dispatch_env_init(struct uk_init_ctx *ictx __unused)
@@ -232,12 +252,19 @@ hyperlight_dispatch_inner(void)
 	 * own `step` entry: it carries no workload of its own and can run
 	 * thousands of times a second.
 	 */
-	if (!hyperlight_step_fc_is_pump(fc_buf, fc_len))
-		hyperlight_dispatch_apply_host_env();
-
 #if CONFIG_HYPERLIGHT_STEP
+	/* A named call carries the host's environment version: the kernel
+	 * fetches only when it changed.  `resume` skips it: the host gives
+	 * the first call after a restore a new version.
+	 */
+	if (!hyperlight_step_fc_is_pump(fc_buf, fc_len) &&
+	    !hyperlight_step_fc_is_resume(fc_buf, fc_len))
+		hyperlight_dispatch_apply_host_env_version(
+			hyperlight_step_fc_env_version(fc_buf, fc_len));
+
 	hyperlight_step_pump(fc_buf, fc_len);
 #else /* !CONFIG_HYPERLIGHT_STEP */
+	hyperlight_dispatch_apply_host_env();
 	/* No scheduler, so nothing can serve a guest function: the workload
 	 * of such a kernel is a native main() that already ran at boot.
 	 */
