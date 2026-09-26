@@ -760,3 +760,26 @@ __isr int uk_plat_native_except_init(void)
 
 	return 0;
 }
+
+/*
+ * The memory the CPU and the handlers write while delivering an
+ * exception: the IST stacks, the IDT (whose IST fields a nested
+ * exception turns off and back on), the nesting state, the TSS and the
+ * GDT.  A platform that makes kernel data copy-on-write (Hyperlight after
+ * a snapshot restore) has to make these writable before the first
+ * exception, since the CPU cannot deliver one onto a stack it cannot
+ * write; the rest can fault in when first written.  Calls @fn once per
+ * object; @contents is 0 for the IST stacks, whose contents do not matter
+ * between exceptions.
+ */
+void uk_plat_native_except_state(void (*fn)(void *start, __sz len,
+					    int contents, void *arg),
+				 void *arg)
+{
+	fn(lcpu_except_stack, sizeof(lcpu_except_stack), 0, arg);
+	fn(cpu_idt, sizeof(cpu_idt), 1, arg);
+	fn(idt_ist_disable_nesting, sizeof(idt_ist_disable_nesting), 1, arg);
+	fn(idt_ist_saved, sizeof(idt_ist_saved), 1, arg);
+	fn(cpu_tss, sizeof(cpu_tss), 1, arg);
+	fn(cpu_gdt64, sizeof(cpu_gdt64), 1, arg);
+}

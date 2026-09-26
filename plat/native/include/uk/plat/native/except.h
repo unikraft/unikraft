@@ -134,6 +134,17 @@ __isr __uptr uk_plat_native_except_get_except_stack_base(void);
 
 __isr void uk_plat_native_except_push_nested(void);
 __isr void uk_plat_native_except_pop_nested(void);
+
+#if CONFIG_ARCH_X86_64
+/* The memory exception delivery writes, one call to @fn per object (see
+ * arch/x86_64/except.c); @contents is 0 where the contents do not matter
+ * between exceptions.  For a platform that makes kernel data
+ * copy-on-write, to make these writable up front.
+ */
+void uk_plat_native_except_state(void (*fn)(void *start, __sz len,
+					    int contents, void *arg),
+				 void *arg);
+#endif /* CONFIG_ARCH_X86_64 */
 #endif /* CONFIG_LIBUKPLAT_NATIVE_EXCEPT */
 
 #ifdef __cplusplus

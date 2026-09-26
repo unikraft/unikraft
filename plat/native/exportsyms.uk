@@ -42,3 +42,4 @@ uk_plat_native_wrfsbasefn
 uk_plat_native_sentry
 uk_plat_native_sstackp
 uk_plat_native_sarg
+uk_plat_native_except_state
