@@ -200,13 +200,21 @@ int ukplat_mem_init(void)
 	 * covers these GPAs (the host set that up), but the guest's
 	 * CR3 page tables don't — they only cover the snapshot and
 	 * scratch regions.  We identity-map the initrd so VA = GPA.
+	 *
+	 * With 4 KiB pages only: a snapshot takes the pages the guest maps,
+	 * and Hyperlight's page table walk does not handle large pages (it
+	 * reads a 2 MiB page as a page table).  Files extracted from the
+	 * initrd reference it (CONFIG_LIBVFSCORE_AUTOMOUNT_EXTRACT_BORROW),
+	 * so it has to survive a snapshot whole.
 	 */
 	ukplat_memregion_foreach(&mrd, UKPLAT_MEMRT_INITRD, 0, 0) {
 		unsigned long pages = mrd->pg_count;
 
 		rc = uk_paging_page_map(&hyperlight_pt,
 					mrd->vbase, mrd->pbase, pages,
-					UK_PAGING_PAGE_ATTR_PROT_READ, 0);
+					UK_PAGING_PAGE_ATTR_PROT_READ,
+					UK_PAGING_PAGE_FLAG_FORCE_SIZE |
+					UK_PAGING_PAGE_FLAG_SIZE(UK_PAGING_PAGE_LEVEL));
 		if (unlikely(rc)) {
 			uk_pr_err("Failed to map initrd at %lx: %d\n",
 				  (unsigned long)mrd->vbase, rc);
