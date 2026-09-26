@@ -27,7 +27,6 @@
  * compute the scratch region base addresses.
  */
 
-#include <string.h>
 #include <uk/assert.h>
 #include <uk/essentials.h>
 #include <uk/event.h>
@@ -141,6 +140,23 @@ static __u64 cow_walk_to_pte(__u64 gva)
 }
 
 /*
+ * Copy a page without SSE registers: the exception entry saves only the
+ * general-purpose ones, so an SSE register this handler changed would
+ * reach the code that faulted — typically mid-way through a vectorised
+ * store, the very write that raised the fault.  memcpy() uses them, and
+ * memcpy_isr() copies a byte at a time.
+ */
+static inline void cow_copy_page(void *dst, const void *src)
+{
+	unsigned long n = HL_PAGE_SIZE / 8;
+
+	__asm__ volatile("rep movsq"
+			 : "+D"(dst), "+S"(src), "+c"(n)
+			 :
+			 : "memory");
+}
+
+/*
  * Handle a CoW page fault.
  * Returns 1 if resolved (CoW copy performed), 0 if not a CoW fault.
  */
@@ -169,7 +185,7 @@ static int cow_handle_fault(__u64 fault_addr, unsigned long error_code)
 	new_gpa = hl_scratch_alloc_pages(1);
 	new_gva = cow_phys_to_virt(new_gpa);
 	page_base = fault_addr & ~(HL_PAGE_SIZE - 1);
-	memcpy((void *)new_gva, (void *)page_base, HL_PAGE_SIZE);
+	cow_copy_page((void *)new_gva, (const void *)page_base);
 
 	/* New PTE: writable, no CoW bit, new physical address.
 	 * Preserve NX — only pages executable before remain so after.

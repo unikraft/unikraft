@@ -17,6 +17,7 @@ menuconfig PLAT_HYPERLIGHT
 	select LIBUKPLAT_NATIVE_LCPU_PM if LIBUKLCPU
 	select HAVE_INTCTLR
 	select LIBUKINTCTLR_HYPERLIGHT
+	select LIBISRLIB
 	help
 	  Create a Unikraft image that runs as a Hyperlight guest.
 	  Hyperlight is a lightweight Virtual Machine Manager (VMM)
