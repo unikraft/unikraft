@@ -251,18 +251,27 @@ push_result:
 
 /* ── Snapshot pre-fault ─────────────────────────────────────────── */
 
-/* Write one byte of every page of [start, start + len). */
-static void hyperlight_dispatch_touch(void *start, __sz len,
-				      int contents __unused,
+/* Make every page of [start, start + len) writable. */
+static void hyperlight_dispatch_touch(void *start, __sz len, int contents,
 				      void *arg __unused)
 {
 	__uptr p = (__uptr)start & ~(__uptr)(__PAGE_SIZE - 1);
 	__uptr end = (__uptr)start + len;
 
 	for (; p < end; p += __PAGE_SIZE) {
-		__u8 tmp = *(volatile __u8 *)p;
-
-		*(volatile __u8 *)p = tmp;
+		/* Pages whose contents do not matter get a fresh page; one
+		 * shared with other data (the object's first and last) is
+		 * copied like the rest.
+		 */
+		if (!contents && p >= (__uptr)start &&
+		    p + __PAGE_SIZE <= end) {
+			hyperlight_cow_fresh(p);
+			continue;
+		}
+		{
+			__u8 tmp = *(volatile __u8 *)p;
+			*(volatile __u8 *)p = tmp;
+		}
 	}
 }
 
@@ -284,7 +293,9 @@ static void hyperlight_dispatch_touch(void *start, __sz len,
  * IST=0 (current RSP on the scratch stack, always writable).  It
  * pre-faults what delivering an exception writes — the IST stacks,
  * the IDT, the nesting state, the TSS and the GDT — so the full
- * Unikraft IDT/IST mechanism works for subsequent CoW faults.  The rest
+ * Unikraft IDT/IST mechanism works for subsequent CoW faults.  The IST
+ * stacks' contents do not matter, so they get fresh pages instead of
+ * copies, and the host backs only the ones an exception uses.  The rest
  * of .data and .bss faults in when first written, if ever: each page
  * pre-faulted costs a copy and a fresh scratch page on every restore.
  *

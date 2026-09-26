@@ -78,6 +78,12 @@ extern __u64 hl_scratch_base_gva;
 __u64 hl_scratch_alloc_pages(__u64 n);
 
 /*
+ * Give the copy-on-write page at @va a fresh scratch page, without
+ * copying its contents.  Defined in cow.c.
+ */
+void hyperlight_cow_fresh(__u64 va);
+
+/*
  * Boot-time CoW page fault handler (entry64.S).
  *
  * Self-contained assembly that resolves CoW faults by walking page

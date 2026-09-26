@@ -198,6 +198,30 @@ static int cow_handle_fault(__u64 fault_addr, unsigned long error_code)
 }
 
 /*
+ * Give a copy-on-write page a fresh scratch page without copying it, for
+ * memory whose contents do not matter.  Unlike a copy, this does not
+ * touch the new page: the host backs it only when the guest first writes
+ * it, so memory that is rarely used (most of an exception stack) costs
+ * nothing on a restore.
+ */
+void hyperlight_cow_fresh(__u64 va)
+{
+	__u64 pte_addr = cow_walk_to_pte(va);
+	__u64 pte, new_gpa;
+
+	if (!pte_addr)
+		return;
+	pte = cow_read_pte(pte_addr);
+	if (!(pte & PTE_PRESENT) || !(pte & PTE_AVL_COW))
+		return;
+
+	new_gpa = hl_scratch_alloc_pages(1);
+	cow_write_pte(pte_addr, new_gpa |
+		      (pte & ~(PTE_ADDR_MASK | PTE_AVL_COW)) | PTE_RW);
+	__asm__ volatile("invlpg (%0)" : : "r"(va) : "memory");
+}
+
+/*
  * uk_event handler for page faults.  Registered at UK_PRIO_EARLIEST
  * so CoW faults are resolved before any other handler sees them.
  */
