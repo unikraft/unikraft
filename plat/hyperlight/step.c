@@ -47,6 +47,7 @@ extern void hyperlight_halt_to_host(void) __noreturn;
  * Defined in lib/hostfs.
  */
 extern void hostfs_resume(void);
+extern void hostfs_resume_list(const char *mounts, __sz mounts_len);
 #endif /* CONFIG_LIBHOSTFS */
 
 #ifdef CONFIG_LIBHOSTSOCK
@@ -760,6 +761,69 @@ uk_late_initcall(hl_yield_thread_create, 0x0);
 
 /* ── Pump ────────────────────────────────────────────────────────── */
 
+/* Read a little-endian field of @n bytes from the resume state. */
+static int hl_state_take(const __u8 **p, const __u8 *end, void *out, __sz n)
+{
+	if ((__sz)(end - *p) < n)
+		return -1;
+	memcpy(out, *p, n);
+	*p += n;
+	return 0;
+}
+
+/* What a restored guest needs from its new host, in one host call
+ * rather than one each: GetResumeState's reply is the wall clock (u64
+ * ns), then the mount table and the resolver configuration, each a u32
+ * length and its bytes, as GetMounts and GetResolvConf would answer.
+ * -1 if the host has no GetResumeState, or the reply is malformed.
+ */
+static int hl_resume_state(void)
+{
+	__sz cap = hl_hcall_max_payload(), len = 0;
+	const __u8 *p, *end, *mounts, *resolv;
+	__u32 mounts_len, resolv_len;
+	__u64 wall_ns;
+	__u8 *buf;
+	int rc = -1;
+
+	buf = cap ? uk_malloc(uk_alloc_get_default(), cap) : NULL;
+	if (unlikely(!buf))
+		return -1;
+	if (hl_hcall_vecbytes("GetResumeState", NULL, 0, buf, cap, &len) < 0)
+		goto out;
+	p = buf;
+	end = buf + len;
+	if (hl_state_take(&p, end, &wall_ns, sizeof(wall_ns)) < 0 ||
+	    hl_state_take(&p, end, &mounts_len, sizeof(mounts_len)) < 0 ||
+	    (__sz)(end - p) < mounts_len)
+		goto out;
+	mounts = p;
+	p += mounts_len;
+	if (hl_state_take(&p, end, &resolv_len, sizeof(resolv_len)) < 0 ||
+	    (__sz)(end - p) < resolv_len)
+		goto out;
+	resolv = p;
+
+#ifdef CONFIG_LIBHOSTFS
+	hostfs_resume_list((const char *)mounts, mounts_len);
+#else /* !CONFIG_LIBHOSTFS */
+	(void)mounts;
+#endif /* !CONFIG_LIBHOSTFS */
+#ifdef CONFIG_LIBHOSTSOCK
+	hostsock_resume();
+#endif /* CONFIG_LIBHOSTSOCK */
+	/* The wall clock stopped with the snapshot; the host's did not. */
+	hyperlight_time_resync_to(wall_ns);
+	/* The snapshot carries the resolver configuration of the machine
+	 * that took it; this host may have another for the guest.
+	 */
+	hyperlight_resolv_apply_text((const char *)resolv, resolv_len);
+	rc = 0;
+out:
+	uk_free(uk_alloc_get_default(), buf);
+	return rc;
+}
+
 /* The host has just restored this guest from a snapshot.  Two things are
  * put right here, before anything else runs:
  *
@@ -792,18 +856,19 @@ static void hl_resume(void)
 		uk_pr_err("hyperlight: CSPRNG reseed after restore failed: %d\n",
 			  rc);
 #endif /* CONFIG_LIBUKRANDOM */
+	/* One host call for the mounts, the clock and the resolver; a host
+	 * without it answers each on its own.
+	 */
+	if (hl_resume_state() < 0) {
 #ifdef CONFIG_LIBHOSTFS
-	hostfs_resume();
+		hostfs_resume();
 #endif /* CONFIG_LIBHOSTFS */
 #ifdef CONFIG_LIBHOSTSOCK
-	hostsock_resume();
+		hostsock_resume();
 #endif /* CONFIG_LIBHOSTSOCK */
-	/* The wall clock stopped with the snapshot; the host's did not. */
-	hyperlight_time_resync();
-	/* The snapshot carries the resolver configuration of the machine
-	 * that took it; this host may have another for the guest.
-	 */
-	hyperlight_resolv_apply();
+		hyperlight_time_resync();
+		hyperlight_resolv_apply();
+	}
 	/* The new host has not heard these yet. */
 	if (hl_call_opened)
 		hl_emit("DriverReady");

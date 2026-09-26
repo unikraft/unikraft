@@ -86,7 +86,6 @@ void hyperlight_resolv_apply(void)
 {
 	char *buf;
 	__sz cap, len = 0;
-	int rc;
 
 	/* The content arrives on the input stack, so hl_hcall_max_payload()
 	 * bytes always hold it.  This runs twice in a guest's life, so the
@@ -98,25 +97,35 @@ void hyperlight_resolv_apply(void)
 		uk_pr_err("resolv: no memory for the host's resolv.conf\n");
 		return;
 	}
-	/* No such host function, or nothing set: the image's file stands. */
-	if (hl_hcall_string("GetResolvConf", __NULL, 0, buf, cap, &len) < 0 ||
-	    len == 0)
-		goto out;
+	/* No such host function: the image's file stands. */
+	if (hl_hcall_string("GetResolvConf", __NULL, 0, buf, cap, &len) == 0)
+		hyperlight_resolv_apply_text(buf, len);
+	uk_free(uk_alloc_get_default(), buf);
+}
 
+void hyperlight_resolv_apply_text(const char *text, __sz len)
+{
+	int rc;
+
+	/* Nothing set: the image's file stands. */
+	if (len == 0)
+		return;
 	rc = uk_syscall_do_mkdir("/etc", 0755);
 	if (rc < 0 && rc != -EEXIST) {
 		uk_pr_err("resolv: cannot create /etc: %d\n", rc);
-		goto out;
+		return;
 	}
-	rc = replace_file(RESOLV_CONF_PATH, RESOLV_CONF_TMP, buf, len);
+	rc = replace_file(RESOLV_CONF_PATH, RESOLV_CONF_TMP, text, len);
 	if (rc < 0)
 		uk_pr_err("resolv: cannot write " RESOLV_CONF_PATH ": %d\n", rc);
-out:
-	uk_free(uk_alloc_get_default(), buf);
 }
 #else /* !CONFIG_LIBVFSCORE */
 /* No filesystem to write to: a native kernel resolves nothing. */
 void hyperlight_resolv_apply(void)
+{
+}
+
+void hyperlight_resolv_apply_text(const char *text __unused, __sz len __unused)
 {
 }
 #endif /* CONFIG_LIBVFSCORE */

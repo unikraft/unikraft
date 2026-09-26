@@ -16,5 +16,7 @@
  * so pending timers keep their meaning.
  */
 void hyperlight_time_resync(void);
+/* hyperlight_time_resync() with the host's wall clock (ns) in hand. */
+void hyperlight_time_resync_to(__u64 now);
 
 #endif /* __HYPERLIGHT_X86_TIME_H__ */

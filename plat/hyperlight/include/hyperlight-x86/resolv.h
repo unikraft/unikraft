@@ -7,6 +7,8 @@
 #ifndef __HYPERLIGHT_RESOLV_H__
 #define __HYPERLIGHT_RESOLV_H__
 
+#include <uk/arch/types.h>
+
 /**
  * Fetch the host's resolver configuration (GetResolvConf) and write it
  * as the guest's /etc/resolv.conf.  A late initcall runs it at boot,
@@ -15,5 +17,9 @@
  * the image's own file alone.
  */
 void hyperlight_resolv_apply(void);
+/* hyperlight_resolv_apply() with the host's content in hand (empty:
+ * leave the image's file).
+ */
+void hyperlight_resolv_apply_text(const char *text, __sz len);
 
 #endif /* __HYPERLIGHT_RESOLV_H__ */

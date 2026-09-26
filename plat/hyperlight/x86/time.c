@@ -141,15 +141,18 @@ __nsec ukplat_wall_clock(void)
 	return wall_clock_boot_ns + ukplat_monotonic_clock();
 }
 
-void hyperlight_time_resync(void)
+void hyperlight_time_resync_to(__u64 now)
 {
-	__u64 now = hl_call_get_wall_clock_ns();
-
 	/* The monotonic clock carried on from the snapshot; the epoch it
 	 * counts from is what has to move.
 	 */
 	if (now)
 		wall_clock_boot_ns = now - ukplat_monotonic_clock();
+}
+
+void hyperlight_time_resync(void)
+{
+	hyperlight_time_resync_to(hl_call_get_wall_clock_ns());
 }
 
 void ukplat_time_init(void)
