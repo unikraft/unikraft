@@ -43,6 +43,7 @@
 #include <uk/list.h>
 #include <uk/paging.h>
 #include <uk/print.h>
+#include <uk/isr/string.h>
 
 #include <string.h>
 #include <errno.h>
@@ -513,7 +514,7 @@ static struct bfa_zone *bfa_zone_init(void *buffer, __paddr_t start, __sz len,
 	zn->blocks = (struct bfa_memblock *)(zn + 1);
 
 #ifdef CONFIG_LIBUKFALLOCBUDDY_DEBUG
-	memset(zn->blocks, 0xCD, sizeof(struct bfa_memblock) * zn->nr_blocks);
+	memset_isr(zn->blocks, 0xCD, sizeof(struct bfa_memblock) * zn->nr_blocks);
 #endif /* CONFIG_LIBUKFALLOCBUDDY_DEBUG */
 
 	zn->bitmap[0] = (bfa_zbit_word_t *)(zn->blocks + zn->nr_blocks);
@@ -522,7 +523,7 @@ static struct bfa_zone *bfa_zone_init(void *buffer, __paddr_t start, __sz len,
 	/* Clear the bitmaps */
 	do {
 		bm_words = BFA_Lx_ZBIT_WORDS(frames, lvl);
-		memset(zn->bitmap[lvl], 0, bm_words * sizeof(bfa_zbit_word_t));
+		memset_isr(zn->bitmap[lvl], 0, bm_words * sizeof(bfa_zbit_word_t));
 
 		if (++lvl == BFA_LEVELS)
 			break;
@@ -673,7 +674,7 @@ static inline void bfa_fl_del(struct buddy_framealloc *bfa,
 	uk_falloc_stats_global_memfree_decr(BFA_Lx_SIZE(mb->level));
 
 #ifdef CONFIG_LIBUKFALLOCBUDDY_DEBUG
-	memset(mb, 0xCD, sizeof(struct bfa_memblock));
+	memset_isr(mb, 0xCD, sizeof(struct bfa_memblock));
 #endif /* CONFIG_LIBUKFALLOCBUDDY_DEBUG */
 }
 
@@ -1029,7 +1030,7 @@ static int bfa_do_alloc(struct buddy_framealloc *bfa, __paddr_t paddr,
 	 * the case after bfa_fl_del()
 	 */
 	mb = bfa_paddr_to_mb(zone, paddr);
-	memset(mb, 0xCD, sizeof(struct bfa_memblock));
+	memset_isr(mb, 0xCD, sizeof(struct bfa_memblock));
 #endif /* CONFIG_LIBUKFALLOCBUDDY_DEBUG */
 
 	do {
