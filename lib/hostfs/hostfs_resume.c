@@ -189,27 +189,49 @@ static int hostfs_mkmp(const char *path)
 	return 0;
 }
 
+/* Static: the resume entry runs on a thread stack, and one call at a
+ * time.
+ */
+static char hostfs_resume_buf[HOSTFS_RESUME_LIST_MAX];
+
+void hostfs_resume_list(const char *mounts, __sz mounts_len);
+
 void hostfs_resume(void)
 {
-	/* Static: the resume entry runs on a thread stack, and one call at
-	 * a time.
-	 */
-	static char list[HOSTFS_RESUME_LIST_MAX];
-	struct hostfs_want want[HOSTFS_RESUME_MOUNTS_MAX];
-	struct hostfs_mnt *m, *tmp;
 	__sz len = 0;
-	int n, i, rc;
 
 	/* The kernel and the host ship together, so a host without
 	 * GetMounts is an external-kernel setup; say so rather than serve
 	 * the snapshot's mounts in silence.
 	 */
-	if (hl_hcall_string("GetMounts", NULL, 0, list, sizeof(list),
-			    &len) < 0) {
+	if (hl_hcall_string("GetMounts", NULL, 0, hostfs_resume_buf,
+			    sizeof(hostfs_resume_buf), &len) < 0) {
 		uk_pr_warn("hostfs: GetMounts failed; keeping the snapshot's "
 			   "mounts\n");
 		return;
 	}
+	hostfs_resume_list(hostfs_resume_buf, len);
+}
+
+/* hostfs_resume() with the host's mount table already in hand, as the
+ * GetMounts reply has it: the resume entry fetches it with the rest of
+ * what a restored guest needs from its new host, in one host call.
+ */
+void hostfs_resume_list(const char *mounts, __sz mounts_len)
+{
+	char *list = hostfs_resume_buf;
+	struct hostfs_want want[HOSTFS_RESUME_MOUNTS_MAX];
+	struct hostfs_mnt *m, *tmp;
+	int n, i, rc;
+
+	if (mounts_len >= sizeof(hostfs_resume_buf)) {
+		uk_pr_warn("hostfs: the host's mount table is too long; keeping "
+			   "the snapshot's mounts\n");
+		return;
+	}
+	if (mounts != list)
+		memcpy(list, mounts, mounts_len);
+	list[mounts_len] = '\0';
 	n = hostfs_parse_mounts(list, want, ARRAY_SIZE(want));
 
 	/* Drop what the host no longer serves, and what it serves under
