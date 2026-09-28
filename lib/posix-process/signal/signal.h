@@ -209,7 +209,12 @@ struct uk_signal_tdesc {
 struct sys_error_desc {
 	int signum;
 	__uptr auxsp;
-	__vaddr_t vaddr;
+	__vaddr_t vaddr;	/* The fault address of a memory access */
+	__vaddr_t pc;		/* The faulting instruction */
+	__vaddr_t sp;		/* The stack pointer at the fault */
+#if CONFIG_ARCH_ARM_64
+	__u64 esr;		/* What faulted, for the siginfo code */
+#endif /* CONFIG_ARCH_ARM_64 */
 };
 
 /* Allocate signal descriptor of a posix process */

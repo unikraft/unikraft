@@ -24,6 +24,19 @@ static inline void set_siginfo_kill(int signum, siginfo_t *si)
 	si->si_uid   = 0;
 }
 
+/* A signal the CPU raised: si_code says why, si_addr is the faulting
+ * address (SIGSEGV, SIGBUS) or instruction (the others), as on Linux.
+ */
+static inline void set_siginfo_fault(int signum, int code, void *addr,
+				     siginfo_t *si)
+{
+	UK_ASSERT(si);
+
+	si->si_signo = signum;
+	si->si_code  = code;
+	si->si_addr  = addr;
+}
+
 static inline void set_siginfo_sigqueue(int signum, siginfo_t *si,
 					siginfo_t *si_usr)
 {
