@@ -63,6 +63,12 @@ int sys_error_handler_except(int signum,
 	handler_desc->signum = signum;
 	handler_desc->auxsp = auxsp;
 	handler_desc->vaddr = uk_lcpu_except_err_ctx_get_fault_addr(trap_ctx);
+	handler_desc->pc = uk_lcpu_regs_get(
+		uk_lcpu_except_err_ctx_get_regs(trap_ctx), PC);
+	handler_desc->sp = curr_sp;
+#if CONFIG_ARCH_ARM_64
+	handler_desc->esr = uk_lcpu_arm64_except_err_ctx_get_esr(trap_ctx);
+#endif /* CONFIG_ARCH_ARM_64 */
 
 	/* Jump away from the exception context */
 	ukarch_ctx_init_ehtrampo(&ctx,

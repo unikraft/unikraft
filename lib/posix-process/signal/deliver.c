@@ -11,6 +11,10 @@
 #include <uk/process.h>
 #include <uk/syscall.h>
 
+#if CONFIG_LIBUKVMEM
+#include <uk/vmem.h>
+#endif /* CONFIG_LIBUKVMEM */
+
 #include "process.h"
 #include "sigset.h"
 #include "signal.h"
@@ -374,6 +378,139 @@ static void uk_signal_deliver(struct uk_syscall_exit_ctx *exit_ctx)
 
 uk_syscall_exittab_prio(uk_signal_deliver, UK_PRIO_BEFORE(UK_PRIO_LATEST));
 
+/* SEGV_ACCERR for an address that is mapped but not for this access,
+ * SEGV_MAPERR for one that is not mapped, as Linux reports them.
+ */
+static int sys_error_segv_code(__vaddr_t vaddr __maybe_unused)
+{
+#if CONFIG_LIBUKVMEM
+	struct uk_vas *vas = uk_vas_get_active();
+
+	if (vas && uk_vma_find(vas, vaddr))
+		return SEGV_ACCERR;
+#endif /* CONFIG_LIBUKVMEM */
+	return SEGV_MAPERR;
+}
+
+#if CONFIG_ARCH_ARM_64
+#ifndef FPE_FLTUNK
+#define FPE_FLTUNK 14 /* Linux's: an FP exception of unknown kind */
+#endif /* !FPE_FLTUNK */
+
+/* Alignment faults and synchronous external aborts, told apart by ESR */
+static void sys_error_siginfo_bus(const struct sys_error_desc *error,
+				  siginfo_t *si)
+{
+	__u64 ec = UK_ARCH_ARM64_ESR_EC_FROM(error->esr);
+	__u64 fsc = UK_ARCH_ARM64_ESR_ISS_ABRT_FSC_FROM(
+		UK_ARCH_ARM64_ESR_ISS_FROM(error->esr));
+
+	if (ec == UK_ARCH_ARM64_ESR_EL1_EC_SP_ALIGN)
+		/* FAR is not the address here: the stack pointer is */
+		set_siginfo_fault(SIGBUS, BUS_ADRALN, (void *)error->sp, si);
+	else if (ec == UK_ARCH_ARM64_ESR_EL1_EC_PC_ALIGN ||
+		 fsc == UK_ARCH_ARM64_ESR_ISS_ABRT_FSC_ALIGN)
+		set_siginfo_fault(SIGBUS, BUS_ADRALN, (void *)error->vaddr, si);
+	else
+		set_siginfo_fault(SIGBUS, BUS_OBJERR, (void *)error->vaddr, si);
+}
+
+/* brk, a single step, or a watchpoint */
+static void sys_error_siginfo_trap(const struct sys_error_desc *error,
+				   siginfo_t *si)
+{
+	switch (UK_ARCH_ARM64_ESR_EC_FROM(error->esr)) {
+	case UK_ARCH_ARM64_ESR_EL1_EC_STEP_EL0:
+	case UK_ARCH_ARM64_ESR_EL1_EC_STEP_EL1:
+		set_siginfo_fault(SIGTRAP, TRAP_TRACE, (void *)error->pc, si);
+		break;
+	case UK_ARCH_ARM64_ESR_EL1_EC_WATCHP_EL0:
+	case UK_ARCH_ARM64_ESR_EL1_EC_WATCHP_EL1:
+		set_siginfo_fault(SIGTRAP, TRAP_HWBKPT, (void *)error->vaddr,
+				  si);
+		break;
+	default:
+		set_siginfo_fault(SIGTRAP, TRAP_BRKPT, (void *)error->pc, si);
+		break;
+	}
+}
+
+/* arm64 integer division never traps: a SIGFPE is a trapped FP exception,
+ * whose kind the syndrome gives when its TFV bit is set (as Linux decodes
+ * it in do_fpsimd_exc()).
+ */
+static void sys_error_siginfo_fpe(const struct sys_error_desc *error,
+				  siginfo_t *si)
+{
+	__u64 iss = UK_ARCH_ARM64_ESR_ISS_FROM(error->esr);
+	int code = FPE_FLTUNK;
+
+	if (UK_ARCH_ARM64_ESR_EC_FROM(error->esr) ==
+	    UK_ARCH_ARM64_ESR_EL1_EC_FP64 && (iss & (1UL << 23))) {
+		if (iss & (1UL << 0))		/* IOF */
+			code = FPE_FLTINV;
+		else if (iss & (1UL << 1))	/* DZF */
+			code = FPE_FLTDIV;
+		else if (iss & (1UL << 2))	/* OFF */
+			code = FPE_FLTOVF;
+		else if (iss & (1UL << 3))	/* UFF */
+			code = FPE_FLTUND;
+		else if (iss & (1UL << 4))	/* IXF */
+			code = FPE_FLTRES;
+	}
+	set_siginfo_fault(SIGFPE, code, (void *)error->pc, si);
+}
+#endif /* CONFIG_ARCH_ARM_64 */
+
+/* The siginfo Linux gives a signal the CPU raised: runtimes read it to tell
+ * a fault from a kill(2) (si_code) and where it happened (si_addr), e.g., to
+ * turn a null dereference into an exception.
+ */
+static void sys_error_siginfo(const struct sys_error_desc *error,
+			      siginfo_t *si)
+{
+	switch (error->signum) {
+	case SIGSEGV:
+		set_siginfo_fault(SIGSEGV, sys_error_segv_code(error->vaddr),
+				  (void *)error->vaddr, si);
+		break;
+#if CONFIG_ARCH_X86_64
+	case SIGBUS:
+		/* #NP, #SS or #AC: which one is not known here, and CR2 holds
+		 * the last page fault's address, not theirs.
+		 */
+	case SIGTRAP:
+		/* int3 or #DB (Linux would say TRAP_TRACE for a single step) */
+		set_siginfo_fault(error->signum, SI_KERNEL, __NULL, si);
+		break;
+	case SIGILL:
+		/* #UD */
+		set_siginfo_fault(SIGILL, ILL_ILLOPN, (void *)error->pc, si);
+		break;
+	case SIGFPE:
+		/* A divide error: FP exceptions are masked unless enabled */
+		set_siginfo_fault(SIGFPE, FPE_INTDIV, (void *)error->pc, si);
+		break;
+#else /* !CONFIG_ARCH_X86_64 */
+	case SIGBUS:
+		sys_error_siginfo_bus(error, si);
+		break;
+	case SIGTRAP:
+		sys_error_siginfo_trap(error, si);
+		break;
+	case SIGILL:
+		set_siginfo_fault(SIGILL, ILL_ILLOPC, (void *)error->pc, si);
+		break;
+	case SIGFPE:
+		sys_error_siginfo_fpe(error, si);
+		break;
+#endif /* !CONFIG_ARCH_X86_64 */
+	default:
+		set_siginfo_kill(error->signum, si);
+		break;
+	}
+}
+
 /* We land here from the trap handler that executes in exception context.
  * Once we return, the trampoline will pass control back to the application.
  */
@@ -421,7 +558,7 @@ void sys_error_handler(struct ukarch_execenv *ee __unused, long arg)
 		goto err_panic;
 
 	/* Prepare siginfo */
-	set_siginfo_kill(error->signum, &sig.siginfo);
+	sys_error_siginfo(error, &sig.siginfo);
 
 	/* Execute standard delivery path */
 	do_deliver(pthread, &sig, ee);
