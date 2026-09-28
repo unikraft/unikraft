@@ -84,6 +84,15 @@ config LIBUKVMEM_STACK_GUARD_PAGES_BOTTOM
 	help
 		Number of guard pages for the bottom of the stack (low address)
 
+config LIBUKVMEM_DEVFS_MAPS
+	bool "Register /dev/maps to devfs"
+	depends on LIBVFSCORE
+	select LIBDEVFS
+	help
+		Registers /dev/maps, the active address space in the format
+		of Linux's /proc/self/maps.  glibc reads /proc/self/maps to
+		find the main thread's stack; link it to /dev/maps.
+
 config LIBUKVMEM_TEST
 	bool "Enable unit tests"
 	default n
