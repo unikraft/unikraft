@@ -21,9 +21,10 @@
 #include <uk/plat/config.h>
 #include <uk/prio.h>
 #include <uk/paging.h>
-#include <uk/psci.h>
 
 #if CONFIG_HAVE_SMP
+#include <uk/psci.h>
+
 extern void lcpu_start(void);
 
 static int plat_native_lcpu_start(__u64 idx)
