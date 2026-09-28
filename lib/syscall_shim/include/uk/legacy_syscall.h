@@ -79,5 +79,6 @@
 #define LEGACY_SYS_epoll_create /* modern: epoll_create1 */
 #define LEGACY_SYS_epoll_wait /* modern: epoll_pwait */
 #define LEGACY_SYS_eventfd /* modern: eventfd2 */
+#define LEGACY_SYS_signalfd /* modern: signalfd4 */
 
 #endif
