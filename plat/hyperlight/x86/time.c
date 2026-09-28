@@ -30,8 +30,8 @@
 #include <uk/plat/time.h>
 #include <uk/print.h>
 
-#include <hyperlight-x86/hcall.h>
-#include <hyperlight-x86/step.h>
+#include <hyperlight/hcall.h>
+#include <hyperlight/step.h>
 
 /* TSC state */
 static __u64 tsc_freq;	/* Hz */

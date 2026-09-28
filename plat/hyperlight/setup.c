@@ -31,10 +31,10 @@
 #include <uk/plat/common/sections.h>
 #include <uk/plat/common/bootinfo.h>
 
-#include <hyperlight-x86/dispatch.h>
-#include <hyperlight-x86/hcall.h>
-#include <hyperlight-x86/peb.h>
-#include <hyperlight-x86/setup.h>
+#include <hyperlight/dispatch.h>
+#include <hyperlight/hcall.h>
+#include <hyperlight/peb.h>
+#include <hyperlight/setup.h>
 
 /* Console init provided by console.c */
 void _ukplat_init_console(void);

@@ -64,8 +64,8 @@ void hyperlight_paging_reinit(void)
 #include <uk/plat/common/bootinfo.h>
 #include <uk/print.h>
 
-#include <hyperlight-x86/hcall.h>
-#include <hyperlight-x86/mem.h>
+#include <hyperlight/hcall.h>
+#include <hyperlight/mem.h>
 
 static struct uk_pagetable hyperlight_pt;
 

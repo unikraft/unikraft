@@ -12,7 +12,7 @@
 #define LCPU_SARGS_ENTRY_OFFSET		0x00
 #define LCPU_SARGS_STACKP_OFFSET	0x08
 
-/* Hyperlight scratch region metadata (from hyperlight-x86/mem.h) */
+/* Hyperlight scratch region metadata (from hyperlight/mem.h) */
 #define SCRATCH_SIZE_GVA	0xFFFFFFFFFFFFEFF8
 #define ALLOCATOR_GVA		0xFFFFFFFFFFFFEFF0
 #define HL_MAX_GPA		0x0000000FFFFFFFFF

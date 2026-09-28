@@ -4,8 +4,8 @@
  * You may not use this file except in compliance with the License.
  */
 
-#ifndef __HYPERLIGHT_X86_TIME_H__
-#define __HYPERLIGHT_X86_TIME_H__
+#ifndef __HYPERLIGHT_TIME_H__
+#define __HYPERLIGHT_TIME_H__
 
 /**
  * Re-anchor the wall clock on the host's, after a snapshot restore: the
@@ -19,4 +19,4 @@ void hyperlight_time_resync(void);
 /* hyperlight_time_resync() with the host's wall clock (ns) in hand. */
 void hyperlight_time_resync_to(__u64 now);
 
-#endif /* __HYPERLIGHT_X86_TIME_H__ */
+#endif /* __HYPERLIGHT_TIME_H__ */

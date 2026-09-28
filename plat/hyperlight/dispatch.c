@@ -35,12 +35,12 @@
 #include <uk/print.h>
 #include <uk/plat/native/except.h>
 
-#include <hyperlight-x86/dispatch.h>
-#include <hyperlight-x86/hcall.h>
-#include <hyperlight-x86/mem.h>
-#include <hyperlight-x86/outb.h>
-#include <hyperlight-x86/peb.h>
-#include <hyperlight-x86/step.h>
+#include <hyperlight/dispatch.h>
+#include <hyperlight/hcall.h>
+#include <hyperlight/mem.h>
+#include <hyperlight/outb.h>
+#include <hyperlight/peb.h>
+#include <hyperlight/step.h>
 
 /* ── PEB I/O stack pointers (cached from PEB at init) ─────────── */
 

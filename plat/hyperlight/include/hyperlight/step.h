@@ -57,8 +57,8 @@
  * guest went down without a word.
  */
 
-#ifndef __HYPERLIGHT_X86_STEP_H__
-#define __HYPERLIGHT_X86_STEP_H__
+#ifndef __HYPERLIGHT_STEP_H__
+#define __HYPERLIGHT_STEP_H__
 
 #include <sys/ioctl.h>
 #include <uk/arch/types.h>
@@ -230,4 +230,4 @@ static inline int hyperlight_step_fc_is_pump(const __u8 *fc __unused,
 }
 #endif
 
-#endif /* __HYPERLIGHT_X86_STEP_H__ */
+#endif /* __HYPERLIGHT_STEP_H__ */

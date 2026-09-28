@@ -28,8 +28,8 @@
 #include <uk/init.h>
 #include <uk/print.h>
 
-#include <hyperlight-x86/hcall.h>
-#include <hyperlight-x86/resolv.h>
+#include <hyperlight/hcall.h>
+#include <hyperlight/resolv.h>
 
 #if CONFIG_LIBVFSCORE
 /* vfscore's syscall implementations, callable from the kernel without a

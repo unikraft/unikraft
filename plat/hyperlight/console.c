@@ -35,8 +35,8 @@
  */
 
 #include <uk/console/driver.h>
-#include <hyperlight-x86/hcall.h>
-#include <hyperlight-x86/outb.h>
+#include <hyperlight/hcall.h>
+#include <hyperlight/outb.h>
 
 static __ssz hyperlight_console_out(struct uk_console *dev __unused,
 				    const char *buf, __sz len)

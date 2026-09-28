@@ -32,7 +32,7 @@
 #include <uk/event.h>
 #include <uk/lcpu.h>
 
-#include <hyperlight-x86/mem.h>
+#include <hyperlight/mem.h>
 
 #define HL_PAGE_SIZE	4096ULL
 

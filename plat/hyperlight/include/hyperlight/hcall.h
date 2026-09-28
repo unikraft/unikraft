@@ -23,7 +23,7 @@
 #define __HYPERLIGHT_HCALL_H__
 
 #include <uk/arch/types.h>
-#include <hyperlight-x86/peb.h>
+#include <hyperlight/peb.h>
 
 /**
  * Initialise the hcall subsystem with a copy of the PEB.

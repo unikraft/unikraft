@@ -18,7 +18,7 @@
 #include <vfscore/vnode.h>
 #include <vfscore/mount.h>
 
-#include <hyperlight-x86/hcall.h>
+#include <hyperlight/hcall.h>
 
 #include "hostfs.h"
 

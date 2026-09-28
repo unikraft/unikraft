@@ -24,7 +24,7 @@
 #include <vfscore/uio.h>
 #include <vfscore/file.h>
 
-#include <hyperlight-x86/hcall.h>
+#include <hyperlight/hcall.h>
 
 #include "hostfs.h"
 

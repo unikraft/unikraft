@@ -24,9 +24,9 @@
 #include <uk/prio.h>
 #include <uk/plat/common/bootinfo.h>
 
-#include <hyperlight-x86/hcall.h>
-#include <hyperlight-x86/outb.h>
-#include <hyperlight-x86/step.h>
+#include <hyperlight/hcall.h>
+#include <hyperlight/outb.h>
+#include <hyperlight/step.h>
 
 #ifdef CONFIG_LIBHOSTSOCK
 extern int hostsock_rescan_events(void);

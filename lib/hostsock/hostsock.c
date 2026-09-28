@@ -28,7 +28,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-#include <hyperlight-x86/hcall.h>
+#include <hyperlight/hcall.h>
 
 /*
  * Transfer buffers, sized from the host's PEB stacks (hl_hcall_max_payload)

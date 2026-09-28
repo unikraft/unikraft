@@ -4,8 +4,8 @@
  * You may not use this file except in compliance with the License.
  */
 
-#ifndef __HYPERLIGHT_X86_SETUP_H__
-#define __HYPERLIGHT_X86_SETUP_H__
+#ifndef __HYPERLIGHT_SETUP_H__
+#define __HYPERLIGHT_SETUP_H__
 
 #include <uk/arch/types.h>
 
@@ -27,4 +27,4 @@ struct hyperlight_entry_args {
 	__u64 max_log_level;
 };
 
-#endif /* __HYPERLIGHT_X86_SETUP_H__ */
+#endif /* __HYPERLIGHT_SETUP_H__ */

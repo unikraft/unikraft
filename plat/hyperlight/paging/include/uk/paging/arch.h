@@ -42,7 +42,7 @@ extern "C" {
 #if !__ASSEMBLY__
 
 #include <uk/assert.h>
-#include <hyperlight-x86/mem.h>
+#include <hyperlight/mem.h>
 
 #if UK_PAL_PT_LEVELS < 4
 #error "Unsupported number of page table levels"

@@ -6,7 +6,7 @@
 
 /*
  * Cooperative "step" execution model for Hyperlight guests.
- * See include/hyperlight-x86/step.h for the design.
+ * See include/hyperlight/step.h for the design.
  */
 
 #include <string.h>
@@ -31,11 +31,11 @@
 #include <uk/random.h>
 #endif /* CONFIG_LIBUKRANDOM */
 
-#include <hyperlight-x86/dispatch.h>
-#include <hyperlight-x86/hcall.h>
-#include <hyperlight-x86/resolv.h>
-#include <hyperlight-x86/step.h>
-#include <hyperlight-x86/time.h>
+#include <hyperlight/dispatch.h>
+#include <hyperlight/hcall.h>
+#include <hyperlight/resolv.h>
+#include <hyperlight/step.h>
+#include <hyperlight/time.h>
 
 /* Provided by shutdown.c: the raw port-108 halt with the dispatch entry
  * in RAX, without the shutdown machinery (no term functions, no result).

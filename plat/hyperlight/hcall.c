@@ -26,8 +26,8 @@
 #include <uk/plat/spinlock.h>
 #include <uk/print.h>
 
-#include <hyperlight-x86/hcall.h>
-#include <hyperlight-x86/outb.h>
+#include <hyperlight/hcall.h>
+#include <hyperlight/outb.h>
 
 /*
  * Cached PEB I/O stack pointers.
