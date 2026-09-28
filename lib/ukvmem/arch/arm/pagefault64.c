@@ -34,12 +34,22 @@ static int vmem_arch_pagefault(void *data)
 	vaddr = (__vaddr_t)uk_lcpu_except_err_ctx_get_fault_addr(ctx);
 	esr = uk_lcpu_arm64_except_err_ctx_get_esr(ctx);
 
-	if (esr & UK_ARCH_ARM64_ESR_ISS_ABRT_WnR_BIT)
-		faulttype = UK_VMA_FAULT_WRITE;
-	else if (esr & UK_ARCH_ARM64_ESR_ISS_ABRT_ISV_BIT)
+	/* An instruction abort is an execute fault. ISV says nothing about
+	 * the access (it marks a valid syndrome in a data abort), and WnR is
+	 * only defined for data aborts, where a cache maintenance instruction
+	 * (CM) also sets it: that one reads the page, as Linux treats it.
+	 */
+	switch (UK_ARCH_ARM64_ESR_EC_FROM(esr)) {
+	case UK_ARCH_ARM64_ESR_EL1_EC_MMU_IABRT_EL0:
+	case UK_ARCH_ARM64_ESR_EL1_EC_MMU_IABRT_EL1:
 		faulttype = UK_VMA_FAULT_EXEC;
-	else
-		faulttype = UK_VMA_FAULT_READ;
+		break;
+	default:
+		faulttype = ((esr & UK_ARCH_ARM64_ESR_ISS_ABRT_WnR_BIT) &&
+			     !(esr & UK_ARCH_ARM64_ESR_ISS_ABRT_CM_BIT)) ?
+			    UK_VMA_FAULT_WRITE : UK_VMA_FAULT_READ;
+		break;
+	}
 
 	dfsc = esr & UK_ARCH_ARM64_ESR_ISS_ABRT_FSC_MASK;
 	if (dfsc >= UK_ARCH_ARM64_ESR_ISS_ABRT_FSC_TRANS_L0 &&
