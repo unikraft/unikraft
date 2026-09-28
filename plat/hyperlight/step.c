@@ -310,6 +310,12 @@ static struct uk_thread *hl_yield_thread;
 /* Set once the yield thread has performed the boot-complete halt. */
 static int hl_boot_halted;
 
+/* The deadline the scheduler went idle with at boot, reported by the
+ * boot-complete halt: a workload that sleeps before anything else happens
+ * is waiting on it.
+ */
+static __nsec hl_boot_wakeup;
+
 /* Meaningful only while a pump is in flight. */
 static int hl_pump_active;
 static struct uk_thread *hl_pump_idle;
@@ -703,6 +709,19 @@ static int hlcall_register(struct uk_init_ctx *ictx __unused)
 devfs_initcall(hlcall_register);
 #endif /* CONFIG_LIBDEVFS */
 
+/* What a Yield reports for a monotonic deadline: the time left until it
+ * (HL_STEP_DUE_NS once it has passed), or 0 for none.
+ */
+static __u64 hl_ns_until(__nsec wakeup)
+{
+	__nsec now;
+
+	if (!wakeup)
+		return 0;
+	now = ukplat_monotonic_clock();
+	return (wakeup > now) ? (__u64)(wakeup - now) : HL_STEP_DUE_NS;
+}
+
 /* ── Yield thread ────────────────────────────────────────────────── */
 
 static __noreturn void hl_yield_thread_fn(void)
@@ -717,7 +736,7 @@ static __noreturn void hl_yield_thread_fn(void)
 	 * on this thread and reaches the pump.
 	 */
 	hl_boot_halted = 1;
-	hl_emit_yield(0);
+	hl_emit_yield(hl_ns_until(hl_boot_wakeup));
 	hyperlight_halt_to_host();
 }
 
@@ -908,6 +927,7 @@ int hyperlight_step_halt(__nsec wakeup_time)
 	 */
 	if (!hl_boot_halted && hl_yield_thread &&
 	    !uk_thread_is_runnable(hl_yield_thread)) {
+		hl_boot_wakeup = wakeup_time;
 		uk_thread_wake(hl_yield_thread);
 		return 1;
 	}
@@ -920,8 +940,7 @@ void hyperlight_step_pump(const __u8 *fc, __u64 fc_len)
 	struct uk_sched *s = uk_sched_current();
 	struct uk_thread *idle;
 	unsigned long flags;
-	__nsec wakeup, now;
-	__u64 ns;
+	__nsec wakeup;
 
 	/* The const is dropped because uk_sched_thread_switch() needs a
 	 * mutable handle; the idle thread object is legitimately mutable.
@@ -981,14 +1000,7 @@ void hyperlight_step_pump(const __u8 *fc, __u64 fc_len)
 	hl_pump_idle = NULL;
 	hl_pump_wakeup = 0;
 
-	if (wakeup) {
-		now = ukplat_monotonic_clock();
-		ns = (wakeup > now) ? (__u64)(wakeup - now) : HL_STEP_DUE_NS;
-	} else {
-		ns = 0;
-	}
-
-	hl_emit_yield(ns);
+	hl_emit_yield(hl_ns_until(wakeup));
 }
 
 /* Report the call's start or return on its own: for a path that ends the
