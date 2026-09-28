@@ -4,6 +4,7 @@
  * You may not use this file except in compliance with the License.
  */
 
+#include <uk/arch/ctx.h>
 #include <uk/arch/types.h>
 #include <uk/event.h>
 #include <uk/lcpu.h>
@@ -26,7 +27,14 @@ static int arm64_syscall_adapter(void *data)
 	/* Save system context state */
 	uk_lcpu_sysctx_store((struct uk_lcpu_sysctx *)&execenv->sysctx);
 
+	/* The exception masked IRQs, but a system call may block and
+	 * reschedule, which needs them: run it with IRQs on, as x86 does.
+	 * The vectors moved us to the thread's auxiliary stack, so another
+	 * thread's system call cannot land on this frame.
+	 */
+	uk_lcpu_enable_irq();
 	ukplat_syscall_handler((struct uk_syscall_ctx *)execenv);
+	uk_lcpu_disable_irq();
 
 	/* Restore system context state */
 	uk_lcpu_sysctx_load((struct uk_lcpu_sysctx *)&execenv->sysctx);
