@@ -68,7 +68,7 @@ static struct utsname utsname = {
 #ifdef CONFIG_ARCH_X86_64
 	.machine	= "x86_64"
 #elif CONFIG_ARCH_ARM_64
-	.machine	= "arm64"
+	.machine	= "aarch64"	/* as Linux reports it */
 #elif CONFIG_ARCH_ARM_32
 	.machine	= "arm32"
 #else
