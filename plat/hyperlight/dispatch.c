@@ -8,9 +8,10 @@
  * Guest function dispatch for Hyperlight.
  *
  * After the initial boot (evolve), the guest halts with the address
- * of hyperlight_dispatch_function in RAX.  The host can then invoke
- * guest functions by pushing a FunctionCall FlatBuffer onto the PEB
- * input stack, setting RIP to that address, and running the vCPU.
+ * of hyperlight_dispatch_function in RAX (x0 on arm64).  The host can
+ * then invoke guest functions by pushing a FunctionCall FlatBuffer onto
+ * the PEB input stack, setting RIP (PC) to that address, and running the
+ * vCPU.
  *
  * The dispatch handler pops the FunctionCall from the input stack,
  * hands it to the cooperative step pump (step.c), pushes a void result
@@ -28,7 +29,11 @@
 #include <string.h>
 #include <uk/arch/types.h>
 #include <uk/arch/limits.h>
+#if defined(__x86_64__)
 #include <uk/arch/x86_64.h>
+#elif defined(__aarch64__)
+#include <uk/plat/config.h>
+#endif
 #include <uk/alloc.h>
 #include <uk/assert.h>
 #include <uk/init.h>
@@ -306,8 +311,9 @@ static void hyperlight_dispatch_touch(void *start, __sz len, int contents,
  * Pre-fault the kernel pages exception delivery writes, after snapshot
  * restore.
  *
- * Snapshot/restore marks every writable page Copy-on-Write (PTE
- * read-only + AVL bit 9).  The first write triggers a page fault.
+ * Snapshot/restore marks every writable page Copy-on-Write (read-only
+ * in its PTE).  The first write triggers a page fault.  The rest of
+ * this comment is x86's (arm64 has no IST; see the function body).
  * Unikraft's IDT uses IST stacks for the #PF handler — but those
  * stacks are themselves CoW after restore.  The CPU can't push the
  * exception frame onto a read-only IST stack, so a CoW fault while
@@ -331,9 +337,23 @@ static void hyperlight_dispatch_touch(void *start, __sz len, int contents,
 void __attribute__((used))
 hyperlight_dispatch_prefault(void)
 {
+#if defined(__x86_64__)
 	uk_plat_native_except_state(hyperlight_dispatch_touch, NULL);
+#elif defined(__aarch64__)
+	/* On arm64 the CPU writes nothing on exception entry: the vectors
+	 * store the registers on the native PAL's exception stacks (one
+	 * each for critical, trap and IRQ), and those are all.
+	 */
+	hyperlight_dispatch_touch(
+		(void *)uk_plat_native_except_get_except_stack_base(),
+		3 * CPU_EXCEPT_STACK_SIZE, 0, NULL);
+#endif
 }
 
+/* The SYSCALL MSRs and the dispatch entry are x86's; the arm64 entry is
+ * in arm/entry64.S.
+ */
+#if defined(__x86_64__)
 /* ── SYSCALL MSR fixup ─────────────────────────────────────────── */
 
 /*
@@ -528,3 +548,4 @@ hyperlight_dispatch_function(void)
 	);
 	__builtin_unreachable();
 }
+#endif /* __x86_64__ */

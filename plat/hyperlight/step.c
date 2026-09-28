@@ -38,7 +38,8 @@
 #include <hyperlight/time.h>
 
 /* Provided by shutdown.c: the raw port-108 halt with the dispatch entry
- * in RAX, without the shutdown machinery (no term functions, no result).
+ * in RAX (x0 on arm64), without the shutdown machinery (no term
+ * functions, no result).
  */
 extern void hyperlight_halt_to_host(void) __noreturn;
 

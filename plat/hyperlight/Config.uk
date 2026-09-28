@@ -1,7 +1,7 @@
 menuconfig PLAT_HYPERLIGHT
 	bool "Hyperlight guest"
 	default n
-	depends on ARCH_X86_64
+	depends on (ARCH_X86_64 || ARCH_ARM_64)
 	select LIBUKDEBUG
 	select LIBUKBOOT
 	select LIBUKBITOPS
@@ -41,6 +41,17 @@ config HYPERLIGHT_DEBUG_PRINT
 	  Sends one byte per VM exit — slow, but works before any
 	  shared memory infrastructure is set up. Useful for early
 	  boot debugging only.
+
+config HYPERLIGHT_RANDOM
+	bool "Seed the CSPRNG from the host"
+	default y
+	depends on LIBUKRANDOM && !LIBUKRANDOM_LCPU
+	help
+	  Seed libukrandom with entropy from the host (the GetRandomBytes
+	  host function), at boot and on every reseed, including the one
+	  after a snapshot restore.  For a CPU without a random number
+	  generator LIBUKRANDOM_LCPU can use, such as arm64 cores without
+	  FEAT_RNG.
 
 config HYPERLIGHT_STEP
 	bool

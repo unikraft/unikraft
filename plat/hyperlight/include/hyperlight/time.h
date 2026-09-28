@@ -19,4 +19,14 @@ void hyperlight_time_resync(void);
 /* hyperlight_time_resync() with the host's wall clock (ns) in hand. */
 void hyperlight_time_resync_to(__u64 now);
 
+#if defined(__aarch64__)
+/**
+ * Carry the monotonic clock on from where it stood when the snapshot was
+ * taken, after a restore.  The arm64 counter is not part of the restored
+ * state (the TSC is), so a restored guest would otherwise see its clock
+ * jump, possibly backwards.  Runs before anything reads the clock.
+ */
+void hyperlight_time_restore(void);
+#endif
+
 #endif /* __HYPERLIGHT_TIME_H__ */

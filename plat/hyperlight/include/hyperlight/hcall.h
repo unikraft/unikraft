@@ -142,6 +142,15 @@ __u64 hl_call_get_initrd_size(void);
 __u64 hl_call_get_wall_clock_ns(void);
 
 /**
+ * Call GetRandomBytes() to fill @a out_buf with @a len bytes of the host's
+ * entropy.  Usable from early boot: it needs no heap.
+ *
+ * @return  0 on success, -1 if the host has no such function or could not
+ *          provide @a len bytes.
+ */
+int hl_call_get_random_bytes(__u8 *out_buf, __sz len);
+
+/**
  * Call HostPrint — send a string to the host for printing.
  *
  * This calls the "HostPrint" host function with one string parameter.

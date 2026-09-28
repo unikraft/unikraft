@@ -7,12 +7,12 @@
 /*
  * Hyperlight shutdown / power-management ops.
  *
- * Halt: writes to port 108 with the dispatch function address in EAX.
- * The host intercepts this VM exit to know the guest has finished
- * initialisation and is ready to receive function calls.
+ * Halt: writes to port 108 with the dispatch function address in EAX
+ * (x0 on arm64).  The host intercepts this VM exit to know the guest has
+ * finished initialisation and is ready to receive function calls.
  *
- * RAX holds the address of hyperlight_dispatch_function — the host
- * captures this during evolve() and uses it as the RIP for subsequent
+ * RAX (x0) holds the address of hyperlight_dispatch_function — the host
+ * captures this during evolve() and uses it as the RIP (PC) for subsequent
  * guest function calls via MultiUseSandbox::call().
  */
 
@@ -44,11 +44,22 @@ extern void hyperlight_dispatch_push_void_result(void);
  * cli + hlt after outl is a backstop — the VM exit from
  * outl already stops the vCPU.
  *
+ * On arm64 the address goes in x0 and the halt is a store to the port's
+ * slot in the I/O page (see hyperlight_out32()).  The host takes the
+ * stack pointer the call ends with as the one to start later calls on
+ * and checks its alignment: KVM reads SP_EL0 whatever the stack in use,
+ * HVF the one in use, so halt on SP_EL0 with it pointing at an aligned
+ * stack and both see the same.  The thread pointer is saved for the next
+ * entry (hl_halt_tpidr_el0, see arm/entry64.S).  There is no backstop: a
+ * WFI is an error under HVF and never wakes under KVM, which has no
+ * interrupts to send.
+ *
  * This is the bare halt: no result is pushed and no shutdown work is
  * done.  The step model's yield thread uses it to signal boot complete.
  */
 void __noreturn hyperlight_halt_to_host(void)
 {
+#if defined(__x86_64__)
 	__asm__ volatile(
 		/* Hyperlight checks RSP alignment after halt */
 		"andq $~0xf, %%rsp\n\t"
@@ -59,6 +70,25 @@ void __noreturn hyperlight_halt_to_host(void)
 		"hlt\n\t"
 		: : "r"((__u64)hyperlight_dispatch_function) : "rax", "rdx"
 	);
+#elif defined(__aarch64__)
+	extern __u64 hl_halt_tpidr_el0;	/* arm/entry64.S */
+
+	__asm__ volatile(
+		"mrs x9, tpidr_el0\n\t"
+		"str x9, [%2]\n\t"
+		"mov x9, sp\n\t"
+		"and x9, x9, #~0xf\n\t"
+		"msr sp_el0, x9\n\t"
+		"msr spsel, #0\n\t"
+		"mov x0, %0\n\t"
+		"str x0, [%1]\n\t"
+		"1: b 1b\n\t"
+		: : "r"((__u64)hyperlight_dispatch_function),
+		    "r"(HL_IO_PAGE_GVA + 8 * HYPERLIGHT_PORT_HALT),
+		    "r"(&hl_halt_tpidr_el0)
+		: "x0", "x9", "memory"
+	);
+#endif
 	__builtin_unreachable();
 }
 

@@ -9,9 +9,9 @@
  *
  * Unlike Unikraft's KVM platform (plat/kvm), we do NOT define guest-
  * side page tables here.  Hyperlight creates page tables on the host
- * side and loads them into CR3 before guest entry — the guest never
- * switches CR3.  The CoW page fault handler walks and modifies those
- * host-provided tables in place.
+ * side and loads them into the root register (CR3/TTBR0_EL1) before
+ * guest entry — the guest never switches tables.  The CoW page fault
+ * handler walks and modifies those host-provided tables in place.
  *
  * We only define bpt_unmap_mrd, which plat/common/memory.c uses to
  * decide which memory regions are usable.  It computes the upper

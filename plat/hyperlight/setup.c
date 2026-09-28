@@ -7,7 +7,8 @@
 /*
  * Platform setup for Hyperlight.
  *
- * hyperlight_entry() is the first C function called (from lcpu_start.S).
+ * hyperlight_entry() is the first C function called (x86: from
+ * lcpu_start.S; arm64: from entry64.S).
  * It initialises the console, parses the PEB to register memory, and
  * hands off to _ukplat_entry() for standard Unikraft boot.
  *
@@ -19,8 +20,15 @@
 #include <string.h>
 #include <uk/arch/limits.h>
 #include <uk/arch/types.h>
+#if defined(__x86_64__)
 #include <uk/arch/x86_64.h>
+#elif defined(__aarch64__)
+#include <uk/arch/arm64.h>
+#include <uk/plat/config.h>
+#endif
+#if defined(__x86_64__)
 #include <uk/asm/cfi.h>
+#endif
 #include <uk/boot.h>
 #include <uk/assert.h>
 #include <uk/essentials.h>
@@ -83,7 +91,9 @@ static void hyperlight_init_mem(struct ukplat_bootinfo *bi,
 
 static void __noreturn ukplat_entry2(void *arg __unused)
 {
+#if defined(__x86_64__)
 	ukarch_cfi_unwind_end();
+#endif
 	uk_boot_entry();
 	UK_BUG(); /* noreturn */
 }
@@ -94,15 +104,17 @@ static void _ukplat_entry(struct ukplat_bootinfo *bi)
 	int rc;
 
 	/*
-	 * Pre-fault the native PAL's IST exception stacks before
-	 * uk_lcpu_init() replaces the IDT.  The stacks live in BSS
-	 * (CoW); if we don't fault the pages in now, the first page
-	 * fault after lidt would try to push onto a read-only IST
-	 * stack → double fault → triple fault.
+	 * Pre-fault the native PAL's exception stacks before its
+	 * exception handling takes over.  The stacks live in BSS (CoW);
+	 * if we don't fault the pages in now, the first page fault
+	 * after would try to save its frame onto a read-only stack.
+	 * On x86 that ends in a triple fault (#PF → #DF on read-only
+	 * IST stacks); on arm64 the vectors fault on their own stores
+	 * until the stack overflows.
 	 */
 	{
 		volatile __u8 *p;
-		/* 3 IST stacks, each CPU_EXCEPT_STACK_SIZE (PAGE_SIZE << order) */
+		/* 3 exception stacks (IST on x86), each PAGE_SIZE << order */
 		__sz total = 3UL * (__PAGE_SIZE <<
 				    CONFIG_CPU_EXCEPT_STACK_SIZE_PAGE_ORDER);
 		__sz i;
@@ -114,17 +126,10 @@ static void _ukplat_entry(struct ukplat_bootinfo *bi)
 		}
 	}
 
-	/* Initialize LCPU of bootstrap processor.
-	 * This installs the native PAL's full IDT, replacing the
-	 * minimal 1-entry IDT from entry64.S.
-	 */
-	rc = uk_lcpu_init(uk_pcpuvar_current_ptr_get(uk_lcpus));
-	if (unlikely(rc))
-		UK_CRASH("Bootstrap processor init failed: %d\n", rc);
-
-	/* Switch from asm CoW handler to C event-based handler.
-	 * Must be after uk_lcpu_init() since page faults now go
-	 * through the native PAL's event system.
+	/* Ready the C CoW handler, which takes over from the early asm one
+	 * once the native PAL's vectors are installed below.  Before that:
+	 * its own writes to .bss may fault, and only the early handler, still
+	 * in place here, can serve them.
 	 */
 	{
 		extern void hyperlight_cow_init(void);
@@ -132,7 +137,28 @@ static void _ukplat_entry(struct ukplat_bootinfo *bi)
 		hyperlight_cow_init();
 	}
 
-#ifdef CONFIG_HAVE_SYSCALL
+	/* Initialize LCPU of bootstrap processor.
+	 * On x86 this installs the native PAL's full IDT, replacing the
+	 * minimal 1-entry IDT from entry64.S.
+	 */
+	rc = uk_lcpu_init(uk_pcpuvar_current_ptr_get(uk_lcpus));
+	if (unlikely(rc))
+		UK_CRASH("Bootstrap processor init failed: %d\n", rc);
+
+#if defined(__aarch64__)
+	/* On arm64 the platform owns VBAR_EL1: move from the early CoW
+	 * vectors (entry64.S) to the native PAL's, now that uk_lcpu_init()
+	 * has told them where their exception stacks are.
+	 */
+	{
+		extern char vector_table[];
+
+		UK_ARCH_ARM64_SYSREG_WRITE64(VBAR_EL1, (__u64)vector_table);
+		uk_arch_arm64_isb();
+	}
+#endif /* __aarch64__ */
+
+#if defined(__x86_64__) && defined(CONFIG_HAVE_SYSCALL)
 	/*
 	 * Program SYSCALL MSRs so ring-3 apps (e.g. via elfloader's
 	 * execve) can transition to ring-0 via the syscall instruction.
@@ -162,7 +188,7 @@ static void _ukplat_entry(struct ukplat_bootinfo *bi)
 			UK_ARCH_X86_64_RFLAGS_AC |
 			UK_ARCH_X86_64_RFLAGS_NT);
 	}
-#endif /* CONFIG_HAVE_SYSCALL */
+#endif /* __x86_64__ && CONFIG_HAVE_SYSCALL */
 
 	/* Execute early init */
 	uk_boot_early_init(bi);
@@ -216,11 +242,11 @@ static void _ukplat_entry(struct ukplat_bootinfo *bi)
 		UK_CRASH("Mem init failed: %d\n", rc);
 
 	/* Switch away from the bootstrap stack */
-	uk_arch_x86_64_jump_to((__u64)bstack, (__u64)ukplat_entry2);
+	uk_arch_jump_to((__u64)bstack, (__u64)ukplat_entry2);
 }
 
 /**
- * C entry point called from lcpu_start.S.
+ * C entry point called from lcpu_start.S (x86) or entry64.S (arm64).
  *
  * @param lcpu       Pointer to bootstrap LCPU structure
  * @param entry_args Pointer to hyperlight_entry_args in .data

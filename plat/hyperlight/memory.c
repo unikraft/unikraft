@@ -69,12 +69,18 @@ void hyperlight_paging_reinit(void)
 
 static struct uk_pagetable hyperlight_pt;
 
-static inline __paddr_t read_cr3(void)
+/* The root page table's physical address (x86: CR3; arm64: TTBR0_EL1). */
+static inline __paddr_t read_pt_root(void)
 {
 	__paddr_t val;
 
+#if defined(__x86_64__)
 	__asm__ volatile("mov %%cr3, %0" : "=r"(val));
 	return val & ~0xFFFULL;
+#elif defined(__aarch64__)
+	__asm__ volatile("mrs %0, ttbr0_el1" : "=r"(val));
+	return val & PTE_ADDR_MASK; /* drop ASID and CnP */
+#endif
 }
 
 /*
@@ -128,7 +134,7 @@ int ukplat_mem_init(void)
 {
 	struct ukplat_memregion_desc *mrd;
 	__paddr_t scratch_block;
-	__paddr_t cr3;
+	__paddr_t root;
 	__sz fa_size;
 	__u64 fa_pages;
 	int rc;
@@ -176,19 +182,19 @@ int ukplat_mem_init(void)
 	/*
 	 * Adopt the host's existing page tables.  The PML4 is in the
 	 * scratch region; pgarch_directmap_paddr_to_vaddr converts
-	 * the scratch GPA from CR3 to its GVA.
+	 * the scratch GPA of the root table to its GVA.
 	 */
-	cr3 = read_cr3();
-	hyperlight_pt.pt_pbase = cr3;
-	hyperlight_pt.pt_vbase = pgarch_directmap_paddr_to_vaddr(cr3);
+	root = read_pt_root();
+	hyperlight_pt.pt_pbase = root;
+	hyperlight_pt.pt_vbase = pgarch_directmap_paddr_to_vaddr(root);
 
-	uk_pr_info("Adopting host page tables: CR3=%lx vbase=%lx\n",
-		   (unsigned long)cr3,
+	uk_pr_info("Adopting host page tables: root=%lx vbase=%lx\n",
+		   (unsigned long)root,
 		   (unsigned long)hyperlight_pt.pt_vbase);
 
 	/*
-	 * Set as active.  Writing the same CR3 just flushes the TLB —
-	 * no page table switch.
+	 * Set as active.  Writing the same root back switches no
+	 * tables.
 	 */
 	rc = uk_paging_pt_set_active(&hyperlight_pt);
 	if (unlikely(rc))
@@ -198,7 +204,7 @@ int ukplat_mem_init(void)
 	 * If the host mapped an initrd via map_file_cow, create
 	 * first-stage page table entries for it.  The EPT already
 	 * covers these GPAs (the host set that up), but the guest's
-	 * CR3 page tables don't — they only cover the snapshot and
+	 * page tables don't — they only cover the snapshot and
 	 * scratch regions.  We identity-map the initrd so VA = GPA.
 	 *
 	 * With 4 KiB pages only: a snapshot takes the pages the guest maps,
@@ -357,28 +363,29 @@ static int hl_falloc_from_range_grow(struct uk_falloc *fa, __paddr_t *paddr,
  * function pointers and crashes.
  *
  * This function also fixes hyperlight_pt.pt_pbase / pt_vbase: after
- * restore the host sets CR3 to the relocated page tables in scratch,
- * but the snapshot copy of hyperlight_pt still holds the evolve-time
- * values.
+ * restore the host points the root register (CR3/TTBR0_EL1) at the
+ * relocated page tables in scratch, but the snapshot copy of
+ * hyperlight_pt still holds the evolve-time values.
  *
  * Called ONLY from hyperlight_dispatch_function's snapshot fixup path
- * (ZF=1 dispatch), after pre-faulting and restoring the kernel IDT.
+ * (x86: entered with ZF=1; arm64: entered at +4), after pre-faulting
+ * and restoring the kernel vectors.
  * This means every call follows a snapshot restore, so we always
  * perform the full reinit unconditionally.
  */
 void hyperlight_paging_reinit(void)
 {
 	struct uk_falloc *fa;
-	__paddr_t cr3;
+	__paddr_t root;
 	__sz fa_size, fa_struct_size;
 	__u64 bump_pos, max_avail, available;
 	__paddr_t scratch_block;
 	int rc;
 
-	/* Fix pt_pbase / pt_vbase to match the current CR3. */
-	cr3 = read_cr3();
-	hyperlight_pt.pt_pbase = cr3;
-	hyperlight_pt.pt_vbase = pgarch_directmap_paddr_to_vaddr(cr3);
+	/* Fix pt_pbase / pt_vbase to match the current root. */
+	root = read_pt_root();
+	hyperlight_pt.pt_pbase = root;
+	hyperlight_pt.pt_vbase = pgarch_directmap_paddr_to_vaddr(root);
 
 	/* Compute remaining scratch dynamically.  The host-provided
 	 * GetPagingBudget was set at evolve time and does not account

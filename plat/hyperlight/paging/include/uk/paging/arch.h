@@ -7,7 +7,7 @@
 /*
  * Hyperlight-specific paging arch layer.
  *
- * Overrides lib/ukpaging/arch/x86_64/include/uk/paging/arch.h.
+ * Overrides lib/ukpaging/arch/<arch>/include/uk/paging/arch.h.
  *
  * Hyperlight's guest memory has two regions with different
  * physical-to-virtual translations:
@@ -16,8 +16,8 @@
  *      GVA == GPA.  These pages are CoW-protected by the host.
  *
  *   2. Scratch region (page tables, I/O buffers, CoW copies):
- *      GPAs near top of 40-bit space, GVAs near top of canonical
- *      space.  Linear offset: GVA = hl_scratch_base_gva +
+ *      GPAs at the top of guest RAM, GVAs near the top of the
+ *      address space (see hyperlight/mem.h).  Linear offset: GVA = hl_scratch_base_gva +
  *                                   (GPA - hl_scratch_base_gpa).
  *
  * There is no single-offset directmap.  Instead,

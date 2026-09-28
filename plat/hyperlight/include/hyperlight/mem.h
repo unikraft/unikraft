@@ -8,7 +8,7 @@
  * Hyperlight memory layout constants.
  *
  * Values must match hyperlight-common layout.rs and
- * arch/amd64/vmem.rs.
+ * arch/{amd64,aarch64}/{layout,vmem}.rs.
  */
 
 #ifndef __HYPERLIGHT_MEM_H__
@@ -21,7 +21,12 @@
  *
  * The host stores metadata at fixed offsets below the scratch top.
  */
+#if defined(__x86_64__)
 #define HL_SCRATCH_TOP_GVA	0xFFFFFFFFFFFFEFFF
+#elif defined(__aarch64__)
+/* Lower half: Hyperlight enables only TTBR0 on arm64 */
+#define HL_SCRATCH_TOP_GVA	0x0000FFFFFFFFDFFF
+#endif
 
 /* Offsets downward from (HL_SCRATCH_TOP_GVA + 1) */
 #define HL_SCRATCH_SIZE_OFF	0x08 /* u64: total scratch size */
@@ -31,6 +36,7 @@
 #define HL_SCRATCH_SIZE_GVA	(HL_SCRATCH_TOP_GVA + 1 - HL_SCRATCH_SIZE_OFF)
 #define HL_SCRATCH_ALLOC_GVA	(HL_SCRATCH_TOP_GVA + 1 - HL_SCRATCH_ALLOC_OFF)
 
+#if defined(__x86_64__)
 /*
  * x86-64 page table entry flags.
  *
@@ -53,6 +59,31 @@
  */
 #define HL_MAX_GPA	0x0000000FFFFFFFFFULL
 #define HL_MAX_GVA	HL_SCRATCH_TOP_GVA
+
+#elif defined(__aarch64__)
+/*
+ * arm64 (VMSAv8-64, 4 KiB granule) level-3 descriptor bits.
+ *
+ * Hyperlight maps every page with AF set, so the CPU never updates a
+ * descriptor, and marks a copy-on-write page read-only (AP[2]) with the
+ * first software-reserved bit set.
+ */
+#define PTE_PRESENT	(1ULL << 0)
+#define PTE_AP_RO	(1ULL << 7)           /* AP[2]: read-only */
+
+#define PTE_ADDR_MASK	0x0000FFFFFFFFF000ULL /* bits 47:12 */
+#define PTE_AVL_COW	(1ULL << 55)          /* software CoW marker */
+
+/*
+ * The scratch region sits just below the host-call I/O page at the top
+ * of the 36-bit IPA space; its GVA alias just below the I/O page's.
+ */
+#define HL_MAX_GPA	0x0000000FFFFFBFFFULL
+#define HL_MAX_GVA	HL_SCRATCH_TOP_GVA
+
+/* Host calls are stores to this page: one 8-byte slot per port. */
+#define HL_IO_PAGE_GVA	0x0000FFFFFFFFE000ULL
+#endif
 
 #if !__ASSEMBLY__
 #include <uk/arch/types.h>

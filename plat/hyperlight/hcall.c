@@ -1481,3 +1481,45 @@ err:
 	ukplat_spin_unlock_irqrestore(&g_hcall_lock, irqf);
 	return -1;
 }
+
+/*
+ * GetRandomBytes(len) -> Vec<u8>, for the CSPRNG's seed.  Encoded into a
+ * buffer on the stack rather than the heap one the generic calls use: the
+ * random driver registers during early boot, before there is a heap.
+ */
+int hl_call_get_random_bytes(__u8 *out_buf, __sz len)
+{
+	struct hl_param p = { .type = HL_PV_HLULONG, .u64_val = len };
+	__u8 fc_buf[128];
+	__u64 fc_len;
+	const __u8 *rd, *vd;
+	__u64 rl, vl;
+	unsigned long irqf;
+
+	if (!g_hcall_ready)
+		return -1;
+
+	fc_len = fb_encode_generic(fc_buf, sizeof(fc_buf), "GetRandomBytes",
+				   HL_FCT_HOST, HL_RT_VECBYTES, &p, 1);
+	if (!fc_len)
+		return -1;
+
+	ukplat_spin_lock_irqsave(&g_hcall_lock, irqf);
+
+	if (hl_stack_push(g_output_stack, g_output_stack_size,
+			  fc_buf, fc_len) < 0)
+		goto err;
+	hyperlight_out32(HYPERLIGHT_PORT_CALL_FUNCTION, 0);
+	if (hl_stack_pop(g_input_stack, &rd, &rl) < 0)
+		goto err;
+	if (fb_decode_result_vecbytes(rd, rl, &vd, &vl) < 0 ||
+	    vl != len || !vd)
+		goto err;
+	memcpy(out_buf, vd, vl);
+
+	ukplat_spin_unlock_irqrestore(&g_hcall_lock, irqf);
+	return 0;
+err:
+	ukplat_spin_unlock_irqrestore(&g_hcall_lock, irqf);
+	return -1;
+}

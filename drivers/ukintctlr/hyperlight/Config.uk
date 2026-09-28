@@ -1,4 +1,4 @@
 config LIBUKINTCTLR_HYPERLIGHT
 	bool "Hyperlight interrupt controller"
-	depends on (HAVE_INTCTLR && ARCH_X86_64)
+	depends on (HAVE_INTCTLR && (ARCH_X86_64 || ARCH_ARM_64))
 	select LIBUKINTCTLR
