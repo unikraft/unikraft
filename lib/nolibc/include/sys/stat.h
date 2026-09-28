@@ -20,14 +20,41 @@ extern "C" {
 
 #include <nolibc-internal/shareddefs.h>
 
+#if defined(__aarch64__)
+/*
+ * Imported from Musl (arch/aarch64/bits/stat.h): the generic layout of
+ * the Linux kernel's struct stat, which arm64 uses.  Binaries write and
+ * read it through fstat() and friends, so it must match to the byte.
+ * st_nlink and st_blksize are 32 bits wide here, narrower than nolibc's
+ * (x86_64) nlink_t and blksize_t.
+ */
+struct stat {
+	dev_t st_dev;
+	ino_t st_ino;
+	mode_t st_mode;
+	unsigned int st_nlink;
+	uid_t st_uid;
+	gid_t st_gid;
+	dev_t st_rdev;
+	unsigned long __pad;
+	off_t st_size;
+	int st_blksize;
+	int __pad2;
+	blkcnt_t st_blocks;
+	struct timespec st_atim;
+	struct timespec st_mtim;
+	struct timespec st_ctim;
+	unsigned int __reserved[2];
+};
+#else /* !__aarch64__ */
 /*
  * Imported from Musl (arch/x86_64/bits/stat.h)
  *
  * Copied from kernel definition, but with padding replaced
  * by the corresponding correctly-sized userspace types.
  *
- * FIXME: This structure is defined for x86_64. On Musl, the ARM layout
- * is different.
+ * FIXME: This structure is defined for x86_64. On Musl, the 32-bit ARM
+ * layout is different.
  */
 
 struct stat {
@@ -49,6 +76,7 @@ struct stat {
 	struct timespec st_ctim;
 	long unused[3];
 };
+#endif /* !__aarch64__ */
 
 #define st_atime st_atim.tv_sec
 #define st_mtime st_mtim.tv_sec
