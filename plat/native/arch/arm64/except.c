@@ -167,10 +167,15 @@ enum uk_plat_native_arm64_except_id esr_to_exception(__u64 esr)
 		return UK_PLAT_NATIVE_ARM64_EXCEPT_ID_BUS_ERROR;
 
 	case UK_ARCH_ARM64_ESR_EL1_EC_SVE_ASIMD_FP_ACC:
-	case UK_ARCH_ARM64_ESR_EL1_EC_SVE_ACC:
 	case UK_ARCH_ARM64_ESR_EL1_EC_FP64:
 		return UK_PLAT_NATIVE_ARM64_EXCEPT_ID_MATH;
 
+	/* SVE and SME stay disabled, so their instructions are invalid here,
+	 * as on Linux for a CPU or task without them: programs probe for them
+	 * and expect SIGILL (OpenSSL on musl does, at startup).
+	 */
+	case UK_ARCH_ARM64_ESR_EL1_EC_SVE_ACC:
+	case UK_ARCH_ARM64_ESR_EL1_EC_SME_ACC:
 	case UK_ARCH_ARM64_ESR_EL1_EC_UNKNOWN:
 	case UK_ARCH_ARM64_ESR_EL1_EC_ILL:
 		return UK_PLAT_NATIVE_ARM64_EXCEPT_ID_INVALID_OP;
