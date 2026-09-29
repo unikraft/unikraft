@@ -40,6 +40,11 @@
 
 <br />
 
+> [!NOTE]
+> This repository is the Unikraft unikernel project. It is not Unikraft Cloud.
+> Unikraft Cloud is a separate platform that runs microVMs, with its own CLI and commands.
+> For Unikraft Cloud, see the [Unikraft Cloud documentation][unikraft-cloud-docs].
+
 <div align="center">
 	<img src="https://unikraft.org/assets/imgs/monkey-business.gif" width="80%" />
 </div>
@@ -81,6 +86,10 @@
 
 
 ## Quick Start
+
+If you want to deploy to Unikraft Cloud, use the [Unikraft CLI][unikraft-cloud-cli] and follow the [Unikraft Cloud documentation][unikraft-cloud-docs].
+
+If you want to build and run unikernels on your local machine, follow the steps below.
 
 Install the companion command-line client [`kraft`][kraft]:
 
@@ -221,19 +230,6 @@ You can find some common project examples below:
 Find [more examples and applications in our community catalog][unikraft-catalog]!
 
 
-## Cloud Deployment
-
-The creators of Unikraft have built [KraftCloud](https://kraft.cloud): a next generation cloud platform powered by technology intended to work in millisecond timescales.
-
-| ✅ | Millisecond Scale-to-Zero | ✅ | Millisecond Autoscale   | ✅ | Millisecond Cold Boots |
-|:-|:-|:-|:-|:-|:-|
-| ✅ | Higher Throughput         | ✅ | Much Lower Cloud Bill   | ✅ | HW-Level Isolation     |
-| ✅ | On-Prem or Cloud-Prem     | ✅ | Works with Docker & K8s | ✅ | Terraform Integration  |
-
-### [Sign-up for the beta ↗](https://console.kraft.cloud/signup)
-
-<br />
-
 ## Contributing
 
 Unikraft is open-source and licensed under `BSD-3-Clause` and the copyright of its
@@ -308,3 +304,5 @@ The Unikraft name, logo and its mascot are trademark of [Unikraft GmbH](https://
 [unikraft-kraftfile-syntax]: https://unikraft.org/docs/cli/reference/kraftfile/latest
 [github-codespaces-catalog]: https://codespaces.new/unikraft/catalog
 [kraft]: https://github.com/unikraft/kraftkit
+[unikraft-cloud-docs]: https://unikraft.com/docs
+[unikraft-cloud-cli]: https://github.com/unikraft-cloud/cli
