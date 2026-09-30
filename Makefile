@@ -874,7 +874,7 @@ clean-libs clean:
 
 endif
 
-.PHONY: print-vars print-libs print-objs print-srcs print-loc help
+.PHONY: print-vars print-libs print-objs print-srcs print-loc print-sloc-stats help
 
 # Configuration
 # ---------------------------------------------------------------------------
@@ -1081,6 +1081,15 @@ endif
 
 # Misc stuff
 # ---------------------------------------------------------------------------
+#For print-sloc-stats, default MODE is buildlog
+print-sloc-stats:
+	@$(info [SLoC stats])
+	@if [ "$(if $(MODE),$(MODE),buildlog)" = "buildlog" ]; then \
+		test -f "$(BUILD_DIR)/build.log" || \
+		{ echo "ERROR: build.log not found, run 'make' with 'V=1 2>&1 | tee $(BUILD_DIR)/build.log' first"; exit 1; }; \
+	fi
+	@$(call measure_sloc_stats,$(if$(MODE),$(MODE),buildlog))
+
 print-loc: images
 	@$(info [LoC stats])
 	@$(foreach I,$(UK_DEBUG_IMAGES) $(UK_DEBUG_IMAGES-y),\
@@ -1250,6 +1259,7 @@ endif
 	@echo '  print-srcs             - print source file names enabled for build'
 	@echo '  print-vars             - prints all the variables currently defined in Makefile'
 	@echo '  print-loc              - print Lines-of-Code statistics for built unikernel image(s)'
+	@echo '  print-sloc-stats       - print Source-Lines-of-Code statistics from build.log (MODE=buildlog|dryrun|preprocess|count|all)'
 	@echo ''
 
 endif #umask
