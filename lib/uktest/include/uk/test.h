@@ -126,6 +126,13 @@
  *    menuconfig housing all test suite options under the name `LIBNAME_TEST`.
  *    This menuconfig option must invoke all the suites if `LIBUKTEST_ALL` is
  *    set to true.
+ * 4. Some assertions for known failures may be temporarily and purposefully
+ *    omitted from the failure count such that the internal test suite can pass.
+ *    This intermediate assertion level UK_FIXME_{ASSERTF,EXPECT,etc...}
+ *    can thus downgrade known failing test assertions. However, changes from a
+ *    general assertion to a FIXME assertion must come with an associated GitHub
+ *    issue that is addressed as a comment preamble such that discussion and
+ *    tracking can be done for the specific assertion.
  *
  *
  * ## Registering tests
@@ -169,6 +176,8 @@
 #define UK_TEST_ASSERT_NOT_RUN	0
 #define UK_TEST_ASSERT_SUCCESS	1
 #define UK_TEST_ASSERT_FAIL	2
+#define UK_TEST_ASSERT_OMITTED_SUCCESS	3
+#define UK_TEST_ASSERT_OMITTED_FAIL	4
 
 
 #define UKT_PADDING		"............................................"\
@@ -182,6 +191,9 @@
 #define UKT_CLR_FAILED		UK_ANSI_MOD_BOLD			\
 				UK_ANSI_MOD_COLORFG(UK_ANSI_COLOR_WHITE)\
 				UK_ANSI_MOD_COLORBG(UK_ANSI_COLOR_RED)
+#define UKT_CLR_OMITTED		UK_ANSI_MOD_BOLD			\
+				UK_ANSI_MOD_COLORFG(UK_ANSI_COLOR_WHITE)\
+				UK_ANSI_MOD_COLORBG(UK_ANSI_COLOR_BLACK)
 #define UKT_CLR_FILE		UK_ANSI_MOD_COLORFG(UK_ANSI_COLOR_CYAN)
 #define UKT_CLR_LINE		UK_ANSI_MOD_COLORFG(UK_ANSI_COLOR_MAGENTA)
 #define LVLC_TESTNAME		UK_ANSI_MOD_COLORFG(UK_ANSI_COLOR_CYAN)
@@ -190,6 +202,7 @@
 #define UKT_CLR_RESET		"]"
 #define UKT_CLR_PASSED		"["
 #define UKT_CLR_FAILED		"["
+#define UKT_CLR_OMITTED		"["
 #define UKT_CLR_FILE
 #define UKT_CLR_LINE
 #define LVLC_TESTNAME
@@ -197,6 +210,9 @@
 
 #define UKT_PASSED		UKT_CLR_PASSED " PASSED " UKT_CLR_RESET
 #define UKT_FAILED		UKT_CLR_FAILED " FAILED " UKT_CLR_RESET
+#define UKT_OMITTED		UKT_CLR_OMITTED " OMITTED " UKT_CLR_RESET
+#define UKT_OMITTED_PASSED	    UKT_CLR_OMITTED " OMITTED/PASSED " UKT_CLR_RESET
+#define UKT_OMITTED_FAILED		UKT_CLR_OMITTED " OMITTED/FAILED " UKT_CLR_RESET
 
 /* Custom print method. */
 #define uk_test_printf(fmt, ...)					\
@@ -668,6 +684,49 @@ _uk_test_do_assert(struct uk_testcase *esac, unsigned short line, int cond,
 	}
 }
 
+static void __maybe_unused
+_uk_fixme_do_assert(struct uk_testcase *esac, unsigned short line, int cond,
+		   const char *fmt, ...)
+{
+	struct uk_assert *assert;
+#ifdef CONFIG_LIBUKTEST_LOG_TESTS
+	va_list ap;
+	int pad_len;
+	char msg[UKT_COLWIDTH];
+
+	/* Save formatted message to buffer. */
+	va_start(ap, fmt);
+	vsnprintf(msg, sizeof(msg), fmt, ap);
+	va_end(ap);
+
+	/* Output the result. */
+	pad_len = UKT_COLWIDTH - strlen(msg);
+	UK_ASSERT(pad_len >= 0);
+
+#ifndef CONFIG_LIBUKTEST_STRICT_MODE
+	uk_test_printf("%s %*.*s %s\n",
+				msg,
+				pad_len, pad_len,
+				UKT_PADDING,
+				UKT_OMITTED);
+#else
+    uk_test_printf("%s %*.*s %s\n",
+				msg,
+				pad_len, pad_len,
+				UKT_PADDING,
+				cond ? UKT_OMITTED_PASSED : UKT_OMITTED_FAILED);
+#endif
+#endif
+	assert = _uk_test_find_assert(esac, line);
+
+	UK_ASSERT(assert);
+
+	if (cond)
+		assert->status = UK_TEST_ASSERT_OMITTED_SUCCESS;
+	else
+		assert->status = UK_TEST_ASSERT_OMITTED_FAIL;
+}
+
 
 /**
  * Assert a boolean condition with formatted string.
@@ -683,6 +742,11 @@ _uk_test_do_assert(struct uk_testcase *esac, unsigned short line, int cond,
 		_uk_test_do_assert(esac, __LINE__, cond, fmt, ##__VA_ARGS__);\
 	} while (0)
 
+#define UK_FIXME_ASSERTF(cond, fmt, ...)					\
+	do {								\
+		_UK_TEST_ASSERTTAB_ENTRY(UK_TEST_ASSERT_NOT_RUN);	\
+		_uk_fixme_do_assert(esac, __LINE__, cond, fmt, ##__VA_ARGS__);\
+	} while (0)
 
 /**
  * Expect a condition to be true.
@@ -697,8 +761,16 @@ _uk_test_do_assert(struct uk_testcase *esac, unsigned short line, int cond,
 		STRINGIFY(cond)						\
 	)
 
+#define UK_FIXME_EXPECT(cond)						\
+	UK_FIXME_ASSERTF(						\
+		(cond),							\
+		"expected `%s` to be true",				\
+		STRINGIFY(cond)						\
+	)
+
 #define UK_TEST_ASSERT(cond) UK_TEST_EXPECT(cond)
 
+#define UK_FIXME_ASSERT(cond) UK_FIXME_EXPECT(cond)
 
 /**
  * Helper macro to compare expression a with expression b of same type.
@@ -731,6 +803,21 @@ _uk_test_do_assert(struct uk_testcase *esac, unsigned short line, int cond,
 	} while (0)
 
 
+#define _UK_FIXME_EXPECT_A_COND_B(a, cond, b, desc, type, fmt)		\
+	do {								\
+		type a_v = (type)(a);					\
+		type b_v = (type)(b);					\
+		int _cond = (a_v cond b_v);				\
+		UK_FIXME_ASSERTF(					\
+			_cond,						\
+			"expected `%s` to " desc			\
+			" " fmt " %s was " fmt,				\
+			STRINGIFY(a), b_v,				\
+			_cond ? "and" : "but", a_v			\
+		);							\
+	} while (0)
+
+
 /**
  * Expect an expression to be NULL.
  *
@@ -739,6 +826,9 @@ _uk_test_do_assert(struct uk_testcase *esac, unsigned short line, int cond,
  */
 #define UK_TEST_EXPECT_NULL(exp)					\
 	_UK_TEST_EXPECT_A_COND_B(exp, ==, NULL, "be", void *, "%p")
+
+#define UK_FIXME_EXPECT_NULL(exp)					\
+	_UK_FIXME_EXPECT_A_COND_B(exp, ==, NULL, "be", void *, "%p")
 
 
 /**
@@ -750,6 +840,9 @@ _uk_test_do_assert(struct uk_testcase *esac, unsigned short line, int cond,
 #define UK_TEST_EXPECT_NOT_NULL(exp)					\
 	_UK_TEST_EXPECT_A_COND_B(exp, !=, NULL, "not be", void *, "%p")
 
+#define UK_FIXME_EXPECT_NOT_NULL(exp)					\
+	_UK_FIXME_EXPECT_A_COND_B(exp, !=, NULL, "not be", void *, "%p")
+
 
 /**
  * Expect an expression to evaluate to zero.
@@ -760,6 +853,9 @@ _uk_test_do_assert(struct uk_testcase *esac, unsigned short line, int cond,
 #define UK_TEST_EXPECT_ZERO(exp)					\
 	_UK_TEST_EXPECT_A_COND_B(exp, ==, 0, "be", long, "%ld")
 
+#define UK_FIXME_EXPECT_ZERO(exp)					\
+	_UK_FIXME_EXPECT_A_COND_B(exp, ==, 0, "be", long, "%ld")
+
 
 /**
  * Expect an expression to not evaluate to zero.
@@ -769,6 +865,9 @@ _uk_test_do_assert(struct uk_testcase *esac, unsigned short line, int cond,
  */
 #define UK_TEST_EXPECT_NOT_ZERO(exp)					\
 	_UK_TEST_EXPECT_A_COND_B(exp, !=, 0, "not be", long, "%ld")
+
+#define UK_FIXME_EXPECT_NOT_ZERO(exp)					\
+	_UK_FIXME_EXPECT_A_COND_B(exp, !=, 0, "not be", long, "%ld")
 
 
 /**
@@ -781,6 +880,9 @@ _uk_test_do_assert(struct uk_testcase *esac, unsigned short line, int cond,
  */
 #define UK_TEST_EXPECT_PTR_EQ(a, b)					\
 	_UK_TEST_EXPECT_A_COND_B(a, ==, b, "be", void *, "%p")
+
+#define UK_FIXME_EXPECT_PTR_EQ(a, b)					\
+	_UK_FIXME_EXPECT_A_COND_B(a, ==, b, "be", void *, "%p")
 
 
 /**
@@ -803,6 +905,18 @@ _uk_test_do_assert(struct uk_testcase *esac, unsigned short line, int cond,
 		);							\
 	} while (0)
 
+#define UK_FIXME_EXPECT_BYTES_EQ(a, b, size)				\
+	do {								\
+		void *a_p = (void *)(a);				\
+		void *b_p = (void *)(b);				\
+		UK_FIXME_ASSERTF(					\
+			memcmp(a_p, b_p, size) == 0,			\
+			"expected `%s` at %p "				\
+			"to equal `%s` at %p",				\
+			STRINGIFY(a), b_p, STRINGIFY(b), a_p		\
+		);							\
+	} while (0)
+
 
 /**
  * Expect two long integers to be equal to each other.
@@ -814,6 +928,9 @@ _uk_test_do_assert(struct uk_testcase *esac, unsigned short line, int cond,
  */
 #define UK_TEST_EXPECT_SNUM_EQ(a, b)					\
 	_UK_TEST_EXPECT_A_COND_B(a, ==, b, "be", long, "%ld")
+
+#define UK_FIXME_EXPECT_SNUM_EQ(a, b)					\
+	_UK_FIXME_EXPECT_A_COND_B(a, ==, b, "be", long, "%ld")
 
 
 /**
@@ -827,6 +944,9 @@ _uk_test_do_assert(struct uk_testcase *esac, unsigned short line, int cond,
 #define UK_TEST_EXPECT_SNUM_NQ(a, b)					\
 	_UK_TEST_EXPECT_A_COND_B(a, !=, b, "not be", long, "%ld")
 
+#define UK_FIXME_EXPECT_SNUM_NQ(a, b)					\
+	_UK_FIXME_EXPECT_A_COND_B(a, !=, b, "not be", long, "%ld")
+
 
 /**
  * Expect the left-hand long integer to be greater than the right.
@@ -838,6 +958,9 @@ _uk_test_do_assert(struct uk_testcase *esac, unsigned short line, int cond,
  */
 #define UK_TEST_EXPECT_SNUM_GT(a, b)					\
 	_UK_TEST_EXPECT_A_COND_B(a, >, b, "be greater than", long, "%ld")
+
+#define UK_FIXME_EXPECT_SNUM_GT(a, b)					\
+	_UK_FIXME_EXPECT_A_COND_B(a, >, b, "be greater than", long, "%ld")
 
 
 /**
@@ -852,6 +975,10 @@ _uk_test_do_assert(struct uk_testcase *esac, unsigned short line, int cond,
 	_UK_TEST_EXPECT_A_COND_B(a, >=, b, "be greater than or equal to",\
 				 long, "%ld")
 
+#define UK_FIXME_EXPECT_SNUM_GE(a, b)					\
+	_UK_FIXME_EXPECT_A_COND_B(a, >=, b, "be greater than or equal to",\
+				 long, "%ld")
+
 
 /**
  * Expect the left-hand long integer to be less than the right.
@@ -862,6 +989,9 @@ _uk_test_do_assert(struct uk_testcase *esac, unsigned short line, int cond,
  *   The right-hand operand.
  */
 #define UK_TEST_EXPECT_SNUM_LT(a, b)					\
+	_UK_TEST_EXPECT_A_COND_B(a, <, b, "be less than", long, "%ld")
+
+#define UK_FIXME_EXPECT_SNUM_LT(a, b)					\
 	_UK_TEST_EXPECT_A_COND_B(a, <, b, "be less than", long, "%ld")
 
 
@@ -875,6 +1005,10 @@ _uk_test_do_assert(struct uk_testcase *esac, unsigned short line, int cond,
  */
 #define UK_TEST_EXPECT_SNUM_LE(a, b)					\
 	_UK_TEST_EXPECT_A_COND_B(a, <=, b, "be less than or equal to",	\
+				 long, "%ld")
+
+#define UK_FIXME_EXPECT_SNUM_LE(a, b)					\
+	_UK_FIXME_EXPECT_A_COND_B(a, <=, b, "be less than or equal to",	\
 				 long, "%ld")
 
 
