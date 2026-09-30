@@ -74,4 +74,33 @@ config XEN_PV_BUILD_P2M
 		Create and initialize physical to machine (p2m) table on a PV
 		xen host
 
+config XEN_STATIC_SHM
+	bool "Xen static shared memory"
+	default n
+	depends on PLAT_XEN_ARM64
+	help
+		Enable Xen static shared memory regions.
+		When enabled, shared memory regions declared in the device tree
+		(compatible = "xen,shared-memory-v1") are mapped at boot time
+		and accessible via the uk_shm_map() API.
+
+config XEN_SHM_MAX_ENTRIES
+	int "Maximum number of shared memory entries"
+	default 32
+	depends on XEN_STATIC_SHM
+	help
+		Maximum number of Xen static shared memory regions that
+		can be registered.
+
+config XEN_SHM_REGION_SIZE_MB
+	int "Shared memory region size in MB (multiple of 2)"
+	default 64
+	range 2 1024
+	depends on XEN_STATIC_SHM
+	help
+		Size of the virtual address space reserved for Xen static
+		shared memory mappings, in megabytes. Must be a multiple of 2.
+		This determines the number of L3 page tables pre-allocated
+		in BSS (size_MB / 2).
+
 endif

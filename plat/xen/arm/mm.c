@@ -100,6 +100,92 @@ static void build_pagetable(unsigned long start_pfn, unsigned long max_pfn)
 	} while (vaddr != end_vaddr);
 }
 
+static void alloc_init_pte(lpae_t *pmd, unsigned long vaddr, unsigned long vend,
+			   paddr_t phys, __u64 attr,
+			   struct pgtable_pool *pool)
+{
+	lpae_t *pte;
+	int l3_idx;
+	unsigned long next_va;
+	unsigned long pte_pa;
+
+	l3_idx = (vaddr - pool->base_va) >> L2_SHIFT;
+
+	if (!*pmd) {
+		pte_pa = (unsigned long)to_phys(&pool->l3_tables[l3_idx][0]);
+		set_pgt_entry(pmd, (pte_pa & (~ATTR_MASK_L)) | L2_TABLE);
+	}
+
+	do {
+		next_va = pte_addr_end(vaddr, vend);
+
+		l3_idx = (vaddr - pool->base_va) >> L2_SHIFT;
+		pte = &pool->l3_tables[l3_idx][l3_pgt_idx(vaddr)];
+
+		set_pgt_entry(pte, (phys & (~ATTR_MASK_L)) | attr | L3_PAGE);
+
+		phys += (next_va - vaddr);
+		vaddr = next_va;
+	} while (vaddr < vend);
+}
+
+static void alloc_init_pmd(lpae_t *pgd, unsigned long vaddr,
+			   unsigned long vend, paddr_t phys, __u64 attr,
+			   struct pgtable_pool *pool)
+{
+	lpae_t *pmd;
+	unsigned long next_va;
+	unsigned long l2_pa;
+
+	if (!(*pgd)) {
+		l2_pa = (unsigned long)to_phys(pool->l2_table);
+		set_pgt_entry(pgd, (l2_pa & ~ATTR_MASK_L) | L1_TABLE);
+	}
+
+	pmd = &pool->l2_table[l2_pgt_idx(vaddr)];
+
+	do {
+		next_va = pmd_addr_end(vaddr, vend);
+
+		/* Always use L3 page tables to allow
+		 * page-granularity permission control.
+		 */
+		alloc_init_pte(pmd, vaddr, next_va, phys,
+			       attr, pool);
+
+		phys += (next_va - vaddr);
+		vaddr = next_va;
+		pmd++;
+	} while (vaddr < vend);
+}
+
+unsigned long create_mapping(paddr_t start_paddr, paddr_t end_paddr,
+			     __u64 attr, struct pgtable_pool *pool)
+{
+	unsigned long start_vaddr, end_vaddr;
+	lpae_t *pgd;
+
+	if (pool->next_va >= pool->top_va) {
+		uk_pr_err("[%s] no VA space available\n", __func__);
+		return 0;
+	}
+
+	start_vaddr = pool->next_va;
+	end_vaddr = start_vaddr + (end_paddr - start_paddr);
+	if (end_vaddr > pool->top_va) {
+		uk_pr_err("[%s] mapping exceeds available VA space\n",
+			  __func__);
+		return 0;
+	}
+
+	pool->next_va = end_vaddr;
+
+	pgd = &boot_l1_pgtable[l1_pgt_idx(start_vaddr)];
+	alloc_init_pmd(pgd, start_vaddr, end_vaddr, start_paddr, attr, pool);
+
+	return start_vaddr;
+}
+
 void arch_mm_prepare(unsigned long *start_pfn_p, unsigned long *max_pfn_p)
 {
 	int memory;
