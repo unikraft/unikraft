@@ -169,11 +169,18 @@ static inline void __uk_trace_save_arg(char **pbuff,
 #define __UK_TRACE_ARG_TYPES(n, ...)					\
 	{ UK_FOREACH(__UK_TRACE_GET_TYPE_FOREACH, __VA_ARGS__) }
 
+#if defined(__arm__) || defined(__aarch64__)
+#define __UK_TRACEPOINTS_SECTION \
+	__attribute((__section__(".uk_tracepoints_list,\"\",%note//")))
+#else
+#define __UK_TRACEPOINTS_SECTION \
+	__attribute((__section__(".uk_tracepoints_list,\"\",@note#")))
+#endif
+
 #define __UK_TRACE_REG(NR, regname, trace_name, fmt, ...)	\
 	UK_CTASSERT(sizeof(#trace_name) < 255);			\
 	UK_CTASSERT(sizeof(fmt) < 255);				\
-	__attribute((__section__(				\
-		".uk_tracepoints_list,\"\",@note#")))		\
+	__UK_TRACEPOINTS_SECTION				\
 	static struct {						\
 		uint32_t magic;					\
 		uint32_t size;					\
