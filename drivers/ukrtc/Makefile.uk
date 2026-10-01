@@ -7,3 +7,4 @@
 UK_DRIV_RTC_BASE := $(UK_DRIV_BASE)/ukrtc
 
 $(eval $(call import_lib,$(UK_DRIV_RTC_BASE)/pl031))
+$(eval $(call import_lib,$(UK_DRIV_RTC_BASE)/goldfish))

@@ -28,7 +28,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 #include <libfdt.h>
-#include <uk/arch/util.h>
+#include <uk/arch.h>
 #include <uk/assert.h>
 #include <uk/config.h>
 #include <uk/init.h>
@@ -111,13 +111,14 @@ __isr static __u32 ns16550_reg_read(__u64 base, __u32 reg)
 
 	switch (ns16550_reg_width) {
 	case 1:
-		ret = uk_arch_arm64_ioreg_read8((__u8 *)NS16550_REG(base, reg)) & 0xff;
+		ret = uk_arch_ioreg_read8((__u8 *)NS16550_REG(base, reg)) & 0xff;
 		break;
 	case 2:
-		ret = uk_arch_arm64_ioreg_read16((__u16 *)NS16550_REG(base, reg)) & 0xffff;
+		ret = uk_arch_ioreg_read16((__u16 *)NS16550_REG(base, reg)) &
+		      0xffff;
 		break;
 	case 4:
-		ret = uk_arch_arm64_ioreg_read32((__u32 *)NS16550_REG(base, reg));
+		ret = uk_arch_ioreg_read32((__u32 *)NS16550_REG(base, reg));
 		break;
 	default:
 		UK_CRASH("Invalid register width: %d\n", ns16550_reg_width);
@@ -129,16 +130,15 @@ __isr static void ns16550_reg_write(__u64 base, __u32 reg, __u32 value)
 {
 	switch (ns16550_reg_width) {
 	case 1:
-		uk_arch_arm64_ioreg_write8((__u8 *)NS16550_REG(base, reg),
-					   (__u8)(value & 0xff));
+		uk_arch_ioreg_write8((__u8 *)NS16550_REG(base, reg),
+				     (__u8)(value & 0xff));
 		break;
 	case 2:
-		uk_arch_arm64_ioreg_write16((__u16 *)NS16550_REG(base, reg),
-					    (__u16)(value & 0xffff));
+		uk_arch_ioreg_write16((__u16 *)NS16550_REG(base, reg),
+				      (__u16)(value & 0xffff));
 		break;
 	case 4:
-		uk_arch_arm64_ioreg_write32((__u32 *)NS16550_REG(base, reg),
-					    value);
+		uk_arch_ioreg_write32((__u32 *)NS16550_REG(base, reg), value);
 		break;
 	default:
 		UK_CRASH("Invalid register width: %d\n", ns16550_reg_width);

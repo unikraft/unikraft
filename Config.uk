@@ -17,6 +17,7 @@ config UK_ARCH
 	default "x86_64" if ARCH_X86_64
 	default "arm64"  if ARCH_ARM_64
 	default "arm"	if ARCH_ARM_32
+	default "riscv64" if ARCH_RISCV_64
 	default "$(UK_ARCH)"
 
 config HOST_ARCH

@@ -56,7 +56,7 @@ def main():
     )
     opt = parser.parse_args()
 
-    if (opt.arch != "x86_64") and (opt.arch != "arm64"):
+    if (opt.arch != 'x86_64') and (opt.arch != 'arm64') and (opt.arch != 'riscv64'):
         raise Exception("Unsupported architecture: {}".format(opt.arch))
 
     endianness = "big" if opt.big else "little"

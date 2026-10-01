@@ -1,0 +1,4 @@
+config LIBUKRTC_GOLDFISH
+	bool "RISC-V RTC (GOLDFISH)"
+	depends on ARCH_RISCV_64
+	select LIBUKBUS_PLATFORM

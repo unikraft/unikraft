@@ -53,7 +53,12 @@ struct uk_lcpu *uk_lcpu_get_current(void)
 
 __isr __u64 uk_lcpu_get_current_idx_in_except(void)
 {
-	return (uk_arch_read_sp() - uk_pal_except_get_except_stack_base()) /
+	__uptr except_stack_base = uk_pal_except_get_except_stack_base();
+
+	if (unlikely(!except_stack_base))
+		return uk_pcpuvar_current_get(uk_pcpuvar_cpu_idx);
+
+	return (uk_arch_read_sp() - except_stack_base) /
 		(CPU_EXCEPT_STACK_SIZE * 3);
 }
 
