@@ -81,6 +81,9 @@ extern "C" {
 /* Arbitrary descriptor layouts. */
 #define VIRTIO_F_ANY_LAYOUT       27
 
+/* Support for additional data from drivers for device notification. */
+#define VIRTIO_F_NOTIFICATION_DATA	38
+
 /**
  * Virtqueue descriptors: 16 bytes.
  * These can chain together via "next".

@@ -1,1 +1,5 @@
 _pci_register_driver
+arch_pci_find_cap
+arch_pci_find_next_cap
+pci_map_bar
+pci_unmap_bar
