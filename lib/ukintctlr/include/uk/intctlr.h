@@ -104,7 +104,7 @@ int uk_intctlr_init(struct uk_alloc *alloc);
  * Register an interrupt handler
  *
  * @param irq     Interrupt to register handler for
- * @param handler Handler function
+ * @param handler Callback function
  * @param arg     Caller data to be passed to the handler
  */
 int uk_intctlr_irq_register(unsigned int irq,
@@ -115,10 +115,21 @@ int uk_intctlr_irq_register(unsigned int irq,
  * Unregister a previously registered interrupt handler
  *
  * @param irq     Interrupt to register handler for
- * @param handler Handler function
+ * @param handler Callback function
  */
 int uk_intctlr_irq_unregister(unsigned int irq,
 			      uk_intctlr_irq_handler_func_t handler);
+
+/**
+ * Unregister one interrupt handler matching both function and argument
+ *
+ * @param irq     Interrupt to unregister handler from
+ * @param handler Callback function
+ * @param arg     Caller data used when registering the handler
+ */
+int uk_intctlr_irq_unregister_arg(unsigned int irq,
+				  uk_intctlr_irq_handler_func_t handler,
+				  void *arg);
 
 /**
  *  Mask an interrupt
