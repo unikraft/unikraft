@@ -7,7 +7,7 @@
 #ifndef __UK_PLAT_XEN_PAGE_H__
 #define __UK_PLAT_XEN_PAGE_H__
 
-/* Xen shares fundamental page definitions with native platform */
+#include <uk/config.h>
 #include <uk/plat/native/page.h>
 
 #ifdef __cplusplus

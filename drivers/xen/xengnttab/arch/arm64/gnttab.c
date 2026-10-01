@@ -31,10 +31,9 @@
 #include <libfdt.h>
 #include <xen/grant_table.h>
 #include <common/hypervisor.h>
+#include <common/fixmap.h>
 #include <xen-arm/os.h>
 #include <xen-arm/mm.h>
-
-extern lpae_t fixmap_pgtable[512];
 
 /* Get Xen's suggested physical page assignments for the grant table. */
 static paddr_t get_gnttab_base(void)
@@ -68,10 +67,7 @@ static paddr_t map_gnttab(paddr_t phys)
 {
 	uk_pr_debug("%s, phys = 0x%lx\n", __func__, phys);
 
-	set_pgt_entry(&fixmap_pgtable[l2_pgt_idx(FIX_GNT_START)],
-		      ((phys & L2_MASK) | BLOCK_DEF_ATTR | L2_BLOCK));
-
-	return (paddr_t)(FIX_GNT_START + (phys & L2_OFFSET));
+	return (paddr_t)uk_plat_xen_fixmap_set(UK_PLAT_XEN_FIXMAP_GNT, phys);
 }
 
 grant_entry_v1_t *gnttab_arch_init(int nr_grant_frames)

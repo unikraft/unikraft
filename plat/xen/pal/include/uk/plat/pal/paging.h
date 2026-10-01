@@ -7,6 +7,29 @@
 #ifndef __UK_PLAT_PAL_PAGING_H__
 #define __UK_PLAT_PAL_PAGING_H__
 
-/* Xen platform does not currently support paging, do not define anything */
+#include <uk/config.h>
+#include <uk/plat/xen/paging.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+#if !__ASSEMBLY__
+
+#if CONFIG_HAVE_PAGING
+
+static inline
+int uk_pal_paging_init(void)
+{
+	return uk_plat_xen_paging_init();
+}
+
+#endif /* CONFIG_HAVE_PAGING */
+
+#endif /* !__ASSEMBLY__ */
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* __UK_PLAT_PAL_PAGING_H__ */

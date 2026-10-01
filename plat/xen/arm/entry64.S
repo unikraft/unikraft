@@ -52,10 +52,10 @@ ELFNOTE(Xen, XEN_ELFNOTE_XEN_VERSION, .asciz "xen-3.0")
 
 lr      .req    x30             // link register
 
-#define MAIR(attr, mt)  ((attr) << ((mt) * 8))
 #define TCR_FLAGS       (TCR_IRGN_WBWA | TCR_ORGN_WBWA | TCR_SHARED)
 #define PT_PT           0x3
-#define PT_MEM          0x711
+/* Block, AF, inner-shareable, AttrIndx = NORMAL_WB */
+#define PT_MEM          (0x701 | (NORMAL_WB << 2))
 /* Number of virtual address bits for 4KB page */
 #define VA_BITS         39
 
@@ -311,23 +311,8 @@ ENTRY(_libxenplat_setup_cpu)
 
 	/*
 	 * Setup memory attribute type tables
-	 *
-	 * Memory regioin attributes for LPAE:
-	 *
-	 *   n = AttrIndx[2:0]
-	 *                           MAIR
-	 *   DEVICE_nGnRnE           00000000 (0x00)
-	 *   DEVICE_nGnRE            00000100 (0x04)
-	 *   DEVICE_GRE              00001100 (0x0c)
-	 *   NORMAL_NC               01000100 (0x44)
-	 *   NORMAL_WB               11111111 (0xff)
-	 *   NORMAL_WT               10111011 (0xbb)
 	 */
-	ldr     x0, =(MAIR(MAIR_DEVICE_nGnRnE, MT_DEVICE_nGnRnE) | \
-	             MAIR(MAIR_DEVICE_nGnRE, MT_DEVICE_nGnRE) | \
-	             MAIR(MAIR_DEVICE_GRE, MT_DEVICE_GRE) | \
-	             MAIR(MAIR_NORMAL_NC, MT_NORMAL_NC) | \
-	             MAIR(MAIR_NORMAL_WB, MT_NORMAL))
+	ldr     x0, =MAIR_INIT_ATTR
 	msr     mair_el1, x0
 
 	/*
