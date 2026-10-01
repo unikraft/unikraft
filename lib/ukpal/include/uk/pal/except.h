@@ -117,7 +117,7 @@ __isr void uk_pal_except_irq_ctx_set_regs(
 	struct uk_pal_except_irq_ctx *ctx,
 	struct uk_pal_regs *regs);
 
-__isr __u64 uk_pal_except_irq_ctx_get_irq(
+__isr __u32 uk_pal_except_irq_ctx_get_irq(
 	const struct uk_pal_except_irq_ctx *ctx);
 
 __isr void uk_pal_except_irq_ctx_set_irq(

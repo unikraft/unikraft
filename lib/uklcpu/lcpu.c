@@ -123,6 +123,7 @@ void uk_lcpu_halt_irq(void)
 	if (unlikely(!pm_ops || !pm_ops->halt_irq)) {
 		uk_pal_enable_irq();
 		uk_arch_spinwait();
+		uk_pal_disable_irq();
 	} else {
 		pm_ops->halt_irq();
 	}
