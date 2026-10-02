@@ -82,7 +82,8 @@ static uk_spinlock futex_list_lock = UK_SPINLOCK_INITIALIZER();
  * Get the futex value atomically and compare it with the expected value. Add
  * the thread to the wait list and then block it if the value is equal to the
  * expected one. If the futex was not removed from the list when the thread was
- * unblocked, then it means that it timed out.
+ * unblocked, then it means that it timed out.  The entry is looked up by
+ * itself rather than by uaddr: a requeue may have moved it to another futex.
  *
  * @param uaddr		The futex userspace address
  * @param val		The expected value
@@ -139,7 +140,7 @@ static int futex_wait(uint32_t *uaddr, uint32_t val, const __nsec *timeout)
 	uk_list_for_each_safe(itr, tmp, &futex_list) {
 		f_tmp = uk_list_entry(itr, struct uk_futex, list_node);
 
-		if (f_tmp->uaddr == uaddr && f_tmp->thread == current) {
+		if (f_tmp == &f) {
 			/* Remove the thread from the futex list */
 			uk_list_del(&f_tmp->list_node);
 			uk_spin_unlock(&futex_list_lock);
