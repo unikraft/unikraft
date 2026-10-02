@@ -19,7 +19,7 @@ KVM_LDFLAGS-y += -Wl,-m,aarch64elf
 KVM_LDLIBS-y += -lgcc
 else
 KVM_LDFLAGS-y += -Wl,--entry=_libkvmplat_entry
-KVM_LDFLAGS-y += -Wl,-m,aarch64elf
+KVM_LDFLAGS-y += -Wl,-m,aarch64linux
 KVM_LDLIBS-y += -lgcc
 endif
 endif
