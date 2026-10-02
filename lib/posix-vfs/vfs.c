@@ -1526,6 +1526,56 @@ void vfs_rename_unlock(const struct uk_file *sdir, const struct uk_file *ddir)
 	vfs_wunlock(d1);
 }
 
+/**
+ * INTERNAL. Check whether `name` under directory `dir` is the point of an
+ * active mount. Replacing such an entry would detach the mounted filesystem
+ * from the directory tree while the mount table still references it,
+ * leaving it unreachable through any path.
+ *
+ * The caller must hold `dir`'s write lock, as for any other operation
+ * mutating its contents.
+ *
+ * @param dir Directory to look `name` up in
+ * @param name Entry name to check
+ * @param len Length of `name`
+ *
+ * @return
+ *  == 0: `name` is not an active mount point
+ *   < 0: Negative errno; -EBUSY if `name` is an active mount point
+ */
+static
+int vfs_rename_check_mountpoint(const struct uk_file *dir, const char *name,
+				size_t len)
+{
+	union uk_fs_lookup_out lout;
+	size_t prog;
+	int r;
+
+	r = uk_fs_lookupat(dir, name, len,
+			   UKFS_LOOKUP_NO_MNTAUX | UKFS_LOOKUP_NO_SYMAUX,
+			   &lout, &prog);
+	switch (r) {
+	case UKFS_STOP_MNT:
+		uk_file_release(lout.target);
+		return -EBUSY;
+	case UKFS_SUCCESS:
+	case UKFS_STOP_NOD:
+	case UKFS_STOP_SYM:
+	case UKFS_STOP_FILE:
+		/* Not a mount point; drop the reference lookup acquired */
+		uk_file_release(lout.target);
+		break;
+	default:
+		/* -ENOENT, -EIO, UKFS_STOP_SPEC, UKFS_STOP_END, or any other
+		 * outcome is not our concern; the rename below performs its
+		 * own validation and reports errors as appropriate. None of
+		 * these targets can be mount points.
+		 */
+		break;
+	}
+	return 0;
+}
+
 int uk_sys_renameat(const struct uk_file *olddir, const char *oldpath,
 		    const struct uk_file *newdir, const char *newpath,
 		    int flags)
@@ -1576,6 +1626,11 @@ int uk_sys_renameat(const struct uk_file *olddir, const char *oldpath,
 		goto out_unlock;
 
 	ret = vfs_check_perms(ddir, W_OK);
+	if (unlikely(ret))
+		goto out_unlock;
+
+	ret = vfs_rename_check_mountpoint(ddir, &newpath[np.pos],
+					  np.len - np.pos);
 	if (unlikely(ret))
 		goto out_unlock;
 

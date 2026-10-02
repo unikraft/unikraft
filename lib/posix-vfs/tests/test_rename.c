@@ -356,4 +356,29 @@ UK_TESTCASE(posix_vfs_rename_testsuite, posix_vfs_test_rename_exdev_bind)
 	UK_TEST_EXPECT_ZERO(uk_sys_umount(RN_ROOT "/bind/dst", 0));
 }
 
+UK_TESTCASE(posix_vfs_rename_testsuite, posix_vfs_test_rename_onto_mountpoint)
+{
+	if (unlikely(rn_skip))
+		return;
+
+	UK_TEST_EXPECT_ZERO(rn_mkdir(RN_ROOT "/mp"));
+	UK_TEST_EXPECT_ZERO(rn_mount(RN_ROOT "/mp/mnt", 0));
+	UK_TEST_EXPECT_ZERO(rn_mkfile(RN_ROOT "/mp/mnt/inside"));
+	UK_TEST_EXPECT_ZERO(rn_mkdir(RN_ROOT "/mp/other"));
+
+	/* Replacing an active mount point must not detach the mount */
+	UK_TEST_EXPECT_SNUM_EQ(uk_sys_rename(RN_ROOT "/mp/other",
+					     RN_ROOT "/mp/mnt"),
+			       -EBUSY);
+	UK_TEST_EXPECT(rn_exists(RN_ROOT "/mp/mnt/inside"));
+	UK_TEST_EXPECT(rn_exists(RN_ROOT "/mp/other"));
+
+	/* Moving the mount point itself to a new name is unaffected */
+	UK_TEST_EXPECT_ZERO(uk_sys_rename(RN_ROOT "/mp/mnt",
+					  RN_ROOT "/mp/moved"));
+	UK_TEST_EXPECT(rn_exists(RN_ROOT "/mp/moved/inside"));
+
+	UK_TEST_EXPECT_ZERO(uk_sys_umount(RN_ROOT "/mp/moved", 0));
+}
+
 uk_testsuite_register(posix_vfs_rename_testsuite, rn_suite_init);
