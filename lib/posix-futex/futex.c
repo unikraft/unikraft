@@ -228,41 +228,50 @@ static int futex_cmp_requeue(uint32_t *uaddr, uint32_t val, uint32_t val2,
 	unsigned long irqf;
 	struct uk_list_head *itr, *tmp;
 	struct uk_futex *f;
-	int woken_uaddr1;
-	uint32_t waiters_uaddr2 = 0;
+	uint32_t woken = 0, requeued = 0;
 
 	if (!((uint32_t)val3 == uk_load_n(uaddr)))
 		return -EAGAIN;
 
-	/* Wake up val waiters on uaddr */
-	woken_uaddr1 = futex_wake(uaddr, val);
-
-	if (!val2)
-		return woken_uaddr1;
-
 	irqf = uk_lcpu_save_irqf();
 	uk_spin_lock(&futex_list_lock);
 
-	/* Requeue val2 waiters on uaddr2 */
+	/* Wake the first val waiters on uaddr and requeue the next val2 to
+	 * uaddr2, in one walk: val is a count here, so 0 wakes none (where
+	 * FUTEX_WAKE wakes at least one).
+	 */
 	uk_list_for_each_safe(itr, tmp, &futex_list) {
 		f = uk_list_entry(itr, struct uk_futex, list_node);
 
-		if (f->uaddr == uaddr) {
-			/* Requeue thread to uaddr2 */
-			uk_list_del(&f->list_node);
-			f->uaddr = uaddr2;
-			uk_list_add_tail(&f->list_node, &futex_list);
+		if (f->uaddr != uaddr)
+			continue;
 
-			/* Requeue at most val2 threads */
-			if (++waiters_uaddr2 >= val2)
-				break;
+		if (woken < val) {
+			/* Remove the thread from the futex list */
+			uk_list_del(&f->list_node);
+
+			/* TODO: Replace with uk_thread_wakeup when the new
+			 * scheduler API is ready
+			 */
+			uk_thread_wake(f->thread);
+			woken++;
+			continue;
 		}
+
+		if (requeued >= val2)
+			break;
+
+		/* Requeue thread to uaddr2 */
+		uk_list_del(&f->list_node);
+		f->uaddr = uaddr2;
+		uk_list_add_tail(&f->list_node, &futex_list);
+		requeued++;
 	}
 
 	uk_spin_unlock(&futex_list_lock);
 	uk_lcpu_restore_irqf(irqf);
 
-	return woken_uaddr1 + waiters_uaddr2;
+	return (int) (woken + requeued);
 }
 
 /**
