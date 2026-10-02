@@ -261,10 +261,15 @@ static int futex_cmp_requeue(uint32_t *uaddr, uint32_t val, uint32_t val2,
 		if (requeued >= val2)
 			break;
 
-		/* Requeue thread to uaddr2 */
-		uk_list_del(&f->list_node);
-		f->uaddr = uaddr2;
-		uk_list_add_tail(&f->list_node, &futex_list);
+		/* Requeue thread to uaddr2.  Onto the same futex it stays
+		 * where it is: moved to the tail, the walk would find it
+		 * again, and again.
+		 */
+		if (uaddr2 != uaddr) {
+			uk_list_del(&f->list_node);
+			f->uaddr = uaddr2;
+			uk_list_add_tail(&f->list_node, &futex_list);
+		}
 		requeued++;
 	}
 
