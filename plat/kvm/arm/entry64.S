@@ -48,6 +48,8 @@ lcpu_bootstack:
 
 .text
 ENTRY(_libkvmplat_entry)
+	/* Disable interrupts */
+	msr	daifset, #2
 
 #ifdef CONFIG_KVM_BOOT_PROTO_LXBOOT
 	mov x25, x0 /* preserve dtb addr */
