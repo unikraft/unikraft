@@ -42,16 +42,12 @@
 extern "C" {
 #endif
 
-typedef void (*uk_ctor_func_t)();
+typedef void (*uk_ctor_func_t)(void);
 
 /*
  * Function pointer arrays of constructors; provided by
  * the platform's linker script
  */
-extern const uk_ctor_func_t __preinit_array_start[];
-extern const uk_ctor_func_t __preinit_array_end;
-extern const uk_ctor_func_t __init_array_start[];
-extern const uk_ctor_func_t __init_array_end;
 extern const uk_ctor_func_t uk_ctortab_start[];
 extern const uk_ctor_func_t uk_ctortab_end;
 
