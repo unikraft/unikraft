@@ -170,6 +170,8 @@
 	{								\
 		*(.data)						\
 		*(.data.*)						\
+		*(.sdata)						\
+		*(.sdata.*)						\
 	} UK_SEGMENT_DATA						\
 	_edata = .;							\
 									\
@@ -185,6 +187,8 @@
 	{								\
 		*(.bss)							\
 		*(.bss.*)						\
+		*(.sbss)						\
+		*(.sbss.*)						\
 		*(COMMON)						\
 		. = ALIGN(__PAGE_SIZE);					\
 	}
