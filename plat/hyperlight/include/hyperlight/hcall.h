@@ -8,57 +8,70 @@
  * Hyperlight host-call (hcall) API.
  *
  * Allows the guest to call functions registered on the host side.
- * Communication uses the PEB's shared I/O stacks with Hyperlight's
+ * Communication uses the G2H virtqueue (transport.h) with Hyperlight's
  * FlatBuffer-based protocol:
  *
- *   1. Guest encodes a FunctionCall FlatBuffer and pushes it onto
- *      the PEB output stack.
- *   2. Guest writes to port 101 (CallFunction) → VM exit.
- *   3. Host reads the output stack, dispatches the call, and writes
- *      the result (FunctionCallResult FlatBuffer) to the input stack.
- *   4. Guest resumes and pops the result from the input stack.
+ *   1. Guest encodes a FunctionCall FlatBuffer, followed by the bytes of
+ *      any VecBytes parameter, into the request buffer.
+ *   2. Guest publishes the request with a writable reply buffer in one
+ *      chain and writes to port 109 (VirtqNotify) → VM exit.
+ *   3. Host reads the request, dispatches the call, and writes the
+ *      result (FunctionCallResult FlatBuffer, then any VecBytes bytes)
+ *      to the reply buffer.
+ *   4. Guest resumes and decodes the reply.
  */
 
 #ifndef __HYPERLIGHT_HCALL_H__
 #define __HYPERLIGHT_HCALL_H__
 
 #include <uk/arch/types.h>
-#include <hyperlight/peb.h>
 
 /**
- * Initialise the hcall subsystem with a copy of the PEB.
+ * Initialise the hcall subsystem: attach to the virtqueue transport the
+ * host published in scratch.
  *
- * Must be called before any hl_call_host_* function.  The PEB's
- * input_stack and output_stack pointers are cached internally.
+ * Must be called before any hl_call_host_* function.
  */
-void hl_hcall_init(const struct hyperlight_peb *peb);
+void hl_hcall_init(void);
 
 /**
- * Check whether the hcall subsystem has been initialised.
+ * Check whether host calls can be made: the hcall subsystem has been
+ * initialised, and the transport has not been marked lost (see
+ * hl_transport_ready()).
+ * Asked before each call, not cached: the console falls back to
+ * DebugPrint when it turns false.
  */
 int hl_hcall_ready(void);
 
 /**
  * Largest payload one host call can carry, in either direction: a string
  * or vecbytes parameter on the way out, a string or vecbytes result on the
- * way back.  Derived from the PEB I/O stack sizes the host chose, less a
+ * way back.  Derived from the G2H pool size the host chose, less a
  * reserve for the FlatBuffer framing and the other parameters, so a
- * transfer of this size always fits and a buffer of this size never
- * truncates a result.  Valid once hl_hcall_init() has run; 0 before.
+ * transfer of this size always fits.  A result can be up to the reserve
+ * larger: hluk caps its data transfers at this same figure (fs_*,
+ * net_recvfrom, HostCall), so a buffer of this size holds them; a
+ * larger result of any other (the environment, the mount table) is
+ * refused by hl_hcall_string() and hl_hcall_vecbytes().  Valid once
+ * hl_hcall_init() has run; 0 before.
  */
 __u64 hl_hcall_max_payload(void);
 
 /**
- * Low-level PEB I/O stack push/pop.
- *
- * Shared by the hcall subsystem (guest→host calls) and the dispatch
- * subsystem (host→guest calls).  Both operate on the same PEB I/O
- * stacks using the same blob-stack layout.
+ * Whether @a len bytes at @a s are well-formed UTF-8: no overlong forms,
+ * no surrogates, nothing past U+10FFFF.  A string parameter must be: the
+ * host decodes it as a string, and refuses the whole message, and the
+ * guest function call in flight, on one that is not.  The hl_hcall_*
+ * calls check theirs and fail.
  */
-int hl_stack_push(volatile __u8 *stack, __u64 stack_size,
-		  const __u8 *data, __u64 data_len);
-int hl_stack_pop(volatile __u8 *stack,
-		 const __u8 **out_data, __u64 *out_len);
+int hl_utf8_valid(const __u8 *s, __u64 len);
+
+/**
+ * Queue the result of guest function call @a cid (see
+ * hl_transport_respond()), under the lock host calls take, so it cannot
+ * meet one half made.
+ */
+int hl_hcall_respond(__u32 cid, const __u8 *payload, __u64 len);
 
 /**
  * Call GetExnStackTop() to query the scratch exception stack top GVA.
@@ -87,7 +100,8 @@ int hl_call_get_cmdline(char *out_buf, __sz buf_sz);
  * NUL, and returns the length not counting that terminator -- with
  * snprintf() semantics: a return value of @a buf_sz or more means the
  * data did not fit and nothing was stored.  A buffer of
- * hl_hcall_max_payload() bytes always suffices.
+ * hl_hcall_max_payload() bytes holds what the host is documented to
+ * send (under that many bytes, separators included).
  *
  * @param out_buf   Buffer to receive the NUL-separated entries
  * @param buf_sz    Size of out_buf
@@ -151,31 +165,30 @@ __u64 hl_call_get_wall_clock_ns(void);
 int hl_call_get_random_bytes(__u8 *out_buf, __sz len);
 
 /**
- * Call HostPrint — send a string to the host for printing.
+ * Call HostWrite -- send standard output to the host, as bytes.
  *
- * This calls the "HostPrint" host function with one string parameter.
  * Used by the console driver as an alternative to DebugPrint (port 103).
- * DebugPrint does one VM exit per byte; HostPrint does one VM exit for
- * each piece of at most 4 KiB, cut at a whole UTF-8 character.
+ * DebugPrint does one VM exit per byte; HostWrite does one VM exit per
+ * hl_hcall_max_payload() bytes.  Bytes, not a string: a program's output
+ * need not be UTF-8, and a write can end inside a character.
  *
- * @param msg   String to print (not necessarily NUL-terminated)
- * @param len   Length of the string
- * @return      Bytes sent (all of them, unless a call failed part way),
- *              or if none were, HL_HOST_PRINT_REFUSED when the host
- *              answered with an error (such as not having the function)
- *              and -1 when the call did not reach it
+ * @param buf   Bytes to write
+ * @param len   How many
+ * @return      How many bytes, from the start, the host took: all of
+ *              them, unless a call failed part way or the host wrote
+ *              fewer than it was given; or if none, HL_HCALL_REFUSED
+ *              when the host answered with an error (such as not having
+ *              the function) and -1 otherwise.
  */
-__ssz hl_call_host_print(const char *msg, __sz len);
-
-#define HL_HOST_PRINT_REFUSED	(-2)
+__ssz hl_call_host_write(const char *buf, __sz len);
 
 /**
- * Call HostPrintErr — HostPrint for the guest's standard error.
+ * Call HostWriteErr -- HostWrite for the guest's standard error.
  *
- * The same as hl_call_host_print(), through the "HostPrintErr" host
+ * The same as hl_call_host_write(), through the "HostWriteErr" host
  * function, so the host can keep standard error apart.
  */
-__ssz hl_call_host_print_err(const char *msg, __sz len);
+__ssz hl_call_host_write_err(const char *buf, __sz len);
 
 /*
  * FlatBuffer ReturnType constants (from function_types.fbs).
@@ -222,13 +235,17 @@ __ssz hl_call_host_print_err(const char *msg, __sz len);
 #define HL_PV_HLDOUBLE	6
 #define HL_PV_HLSTRING	7
 #define HL_PV_HLBOOL	8
+/* A Vec<u8> parameter, as callers name it in struct hl_param.  On the
+ * wire it is an hlexternalbytes: tag 9 is reserved since Hyperlight 0.18.
+ */
 #define HL_PV_HLVECBYTES 9
+#define HL_PV_HLEXTERNALBYTES 10
 
 /*
  * Additional ReturnType / ReturnValue constants not in original set.
  */
 #define HL_RT_VECBYTES		9	/* ReturnType for Vec<u8> */
-#define HL_RV_HLSIZEPREFIXED	10	/* ReturnValue discriminant for Vec<u8> */
+#define HL_RV_HLEXTERNALBYTES	11	/* ReturnValue discriminant for Vec<u8> */
 
 /*
  * FlatBuffer FunctionCallResultType discriminants.
@@ -259,6 +276,10 @@ struct hl_param {
 	};
 };
 
+/* hl_hcall_* failures besides -1, the call did not reach the host. */
+#define HL_HCALL_REFUSED	(-2)	/* it answered with an error */
+#define HL_HCALL_BAD_RESULT	(-3)	/* it ran it; the result is unusable */
+
 /**
  * Call a host function returning i32.
  *
@@ -266,7 +287,11 @@ struct hl_param {
  * @param params     Array of typed parameters
  * @param nparams    Number of parameters (0..HL_MAX_PARAMS)
  * @param out        Output: the i32 return value
- * @return           0 on success, -1 on error
+ * @return           0 on success; HL_HCALL_REFUSED if the host answered
+ *                   with an error (such as not having the function),
+ *                   HL_HCALL_BAD_RESULT if it ran the call but the
+ *                   result does not decode, or does not fit, -1 if the
+ *                   call did not reach it.  The same for every hl_hcall_*.
  */
 int hl_hcall_int(const char *func_name,
 		 const struct hl_param *params, int nparams,
@@ -284,8 +309,10 @@ int hl_hcall_ulong(const char *func_name,
  *
  * @param out_buf    Buffer to receive the string (NUL-terminated)
  * @param buf_sz     Size of out_buf
- * @param out_len    Output: length of string (excluding NUL), or NULL
- * @return           0 on success, -1 on error
+ * @param out_len    Output: length of string (excluding NUL), or NULL;
+ *                   also set, with HL_HCALL_BAD_RESULT, when it does not
+ *                   fit
+ * @return           as hl_hcall_int()
  */
 int hl_hcall_string(const char *func_name,
 		    const struct hl_param *params, int nparams,
@@ -297,7 +324,8 @@ int hl_hcall_string(const char *func_name,
  * @param out_buf    Buffer to receive the bytes
  * @param buf_sz     Size of out_buf
  * @param out_len    Output: number of bytes written
- * @return           0 on success, -1 on error
+ * @return           as hl_hcall_int(); HL_HCALL_BAD_RESULT if the result
+ *                   is larger than @a buf_sz
  */
 int hl_hcall_vecbytes(const char *func_name,
 		      const struct hl_param *params, int nparams,

@@ -80,7 +80,7 @@ extern "C" {
 /**
  * Store the largest call a read() can return, as a __u64, at the
  * argument.  A driver sizes its buffers with it, so the limit is set
- * once, by the host (the PEB input stack size), and nobody else
+ * once, by the host (the H2G buffers it publishes), and nobody else
  * hard-codes it.
  */
 #define HLCALL_IOC_MAXLEN _IOR('H', 1, __u64)
@@ -103,9 +103,12 @@ struct hlcall_env {
  * cannot see.  The kernel answers from its own copy while the call in
  * flight carries the environment version it fetched under, so only a
  * changed environment costs a host call.  Fails with ENOBUFS if the
- * entries do not fit @cap;
- * HLCALL_IOC_MAXLEN bytes always do, the entries arrive on the same PEB
- * stack as a call.
+ * entries do not fit @cap, which HLCALL_IOC_MAXLEN bytes always do as
+ * long as the host sizes H2G to hold any host call reply (hluk does).
+ * Fails with EIO if the kernel cannot have them: the host has no
+ * GetEnvVars or the host call failed, there is no memory for the
+ * kernel's copy, or they take hl_hcall_max_payload() bytes or more (see
+ * hyperlight_step_env()).
  */
 #define HLCALL_IOC_GETENV _IOWR('H', 2, struct hlcall_env)
 
@@ -135,8 +138,9 @@ struct hlcall_hostcall {
  * the name is not UTF-8 (the host takes it as a string); ENOMEM if the
  * kernel's buffers for host calls could not be allocated; EIO if the host
  * has no HostCall or could not deliver it; ENOBUFS, with @out_len the
- * reply's size, if it does not fit @out_cap.  A call-sized buffer
- * (HLCALL_IOC_MAXLEN) always holds it.
+ * reply's size, if it does not fit @out_cap.  HLCALL_IOC_MAXLEN bytes
+ * always hold it, as long as the host sizes H2G to hold any host call
+ * reply (hluk does), as for HLCALL_IOC_GETENV.
  */
 #define HLCALL_IOC_HOSTCALL _IOWR('H', 3, struct hlcall_hostcall)
 
@@ -149,8 +153,8 @@ struct hlcall_hostcall {
  * dispatch handler can push the void result and halt.
  *
  * @param fc      The FunctionCall FlatBuffer that entered the guest
- *                (a stable copy; the PEB input stack is reused by host
- *                calls made while the scheduler runs).
+ *                (a stable copy; the H2G buffers it came in are reposted
+ *                at once).
  * @param fc_len  Length of @fc.
  */
 void hyperlight_step_pump(const __u8 *fc, __u64 fc_len);
@@ -173,12 +177,6 @@ void hyperlight_step_pump(const __u8 *fc, __u64 fc_len);
 int hyperlight_step_halt(__nsec wakeup_time);
 
 /**
- * Whether a pump is currently driving the scheduler, i.e. the VM entered
- * through the `step` model and any halt should first push a result.
- */
-int hyperlight_step_active(void);
-
-/**
  * True if the size-prefixed FunctionCall @fc is the pump's own `step`
  * entry point rather than a named application call.
  */
@@ -186,7 +184,10 @@ int hyperlight_step_fc_is_pump(const __u8 *fc, __u64 fc_len);
 
 /**
  * The host's environment for @version, fetched only when it changed (see
- * step.c).  1 if fetched, 0 if the kernel's copy stood, -1 on failure.
+ * step.c).  1 if fetched, 0 if the kernel's copy stood, -1 on failure:
+ * no GetEnvVars on the host or the host call failed, no memory for the
+ * copy, or hl_hcall_max_payload() bytes or more (under the nonzero
+ * version that failed so, -1 again with no host call).
  */
 int hyperlight_step_env(__u64 version, const char **buf, __sz *len);
 
@@ -209,11 +210,6 @@ static inline void hyperlight_step_flush(void)
 }
 
 static inline int hyperlight_step_halt(__nsec wakeup_time __unused)
-{
-	return 0;
-}
-
-static inline int hyperlight_step_active(void)
 {
 	return 0;
 }

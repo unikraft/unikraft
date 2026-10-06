@@ -31,7 +31,7 @@
 #include <hyperlight/hcall.h>
 
 /*
- * Transfer buffers, sized from the host's PEB stacks (hl_hcall_max_payload)
+ * Transfer buffers, sized from the host's G2H pool (hl_hcall_max_payload)
  * when the first socket is created: the host decides how much one call
  * carries, the guest never guesses.  Heap, not stack -- a payload does not
  * fit a thread stack -- and shared: the single vCPU and the hcall spinlock

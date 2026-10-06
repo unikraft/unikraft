@@ -23,7 +23,7 @@
 static int hyperlight_random_bytes(__u8 *buf, __sz size)
 {
 	/* hluk serves at most 4 KiB per call; 256-byte calls stay well inside
-	 * the I/O stacks, and a seed is only 32 bytes.
+	 * one transport buffer, and a seed is only 32 bytes.
 	 */
 	while (size) {
 		__sz n = size < 256 ? size : 256;

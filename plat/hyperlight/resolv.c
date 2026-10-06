@@ -87,9 +87,10 @@ void hyperlight_resolv_apply(void)
 	char *buf;
 	__sz cap, len = 0;
 
-	/* The content arrives on the input stack, so hl_hcall_max_payload()
-	 * bytes always hold it.  This runs twice in a guest's life, so the
-	 * buffer is not kept.
+	/* The content arrives in a host call reply: hl_hcall_max_payload()
+	 * bytes hold any resolver configuration under that size, and a
+	 * larger one is refused, which leaves the image's file.  This runs
+	 * twice in a guest's life, so the buffer is not kept.
 	 */
 	cap = hl_hcall_max_payload();
 	buf = cap ? uk_malloc(uk_alloc_get_default(), cap) : __NULL;

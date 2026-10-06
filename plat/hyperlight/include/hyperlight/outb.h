@@ -22,10 +22,9 @@
 /*
  * OutBAction ports — handled by the sandbox-level outb dispatcher.
  */
-#define HYPERLIGHT_PORT_LOG		99  /* structured log message */
-#define HYPERLIGHT_PORT_CALL_FUNCTION	101 /* invoke a host function */
 #define HYPERLIGHT_PORT_ABORT		102 /* abort with error code */
 #define HYPERLIGHT_PORT_DEBUG_PRINT	103 /* single-byte debug output */
+#define HYPERLIGHT_PORT_VIRTQ_NOTIFY	109 /* new virtqueue work */
 
 /*
  * VmAction ports — intercepted at the hypervisor level.

@@ -32,9 +32,18 @@
 #define HL_SCRATCH_SIZE_OFF	0x08 /* u64: total scratch size */
 #define HL_SCRATCH_ALLOC_OFF	0x10 /* u64: bump allocator pointer */
 
+/* Virtqueue transport geometry (u64 each), published by the host */
+#define HL_SCRATCH_ARENA_GPA_OFF	0x38 /* GPA of the transport arena */
+#define HL_SCRATCH_G2H_QUEUE_SIZE_OFF	0x40 /* G2H descriptors */
+#define HL_SCRATCH_G2H_POOL_PAGES_OFF	0x48 /* G2H pool pages */
+#define HL_SCRATCH_H2G_QUEUE_SIZE_OFF	0x58 /* H2G descriptors */
+#define HL_SCRATCH_H2G_POOL_PAGES_OFF	0x60 /* H2G pool pages */
+#define HL_SCRATCH_H2G_BUFFER_SIZE_OFF	0x68 /* H2G receive buffer size */
+
 /* Computed addresses */
 #define HL_SCRATCH_SIZE_GVA	(HL_SCRATCH_TOP_GVA + 1 - HL_SCRATCH_SIZE_OFF)
 #define HL_SCRATCH_ALLOC_GVA	(HL_SCRATCH_TOP_GVA + 1 - HL_SCRATCH_ALLOC_OFF)
+#define HL_SCRATCH_META_GVA(off)	(HL_SCRATCH_TOP_GVA + 1 - (off))
 
 #if defined(__x86_64__)
 /*

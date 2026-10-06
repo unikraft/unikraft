@@ -13,7 +13,7 @@
  *
  * RAX (x0) holds the address of hyperlight_dispatch_function — the host
  * captures this during evolve() and uses it as the RIP (PC) for subsequent
- * guest function calls via MultiUseSandbox::call().
+ * guest function calls via Sandbox::call().
  */
 
 #include <uk/boot/earlytab.h>
@@ -22,20 +22,18 @@
 #include <uk/lcpu/pm.h>
 #include <uk/pm.h>
 #include <uk/prio.h>
+#include <uk/print.h>
 #include <uk/plat/common/bootinfo.h>
 
+#include <hyperlight/dispatch.h>
 #include <hyperlight/hcall.h>
 #include <hyperlight/outb.h>
 #include <hyperlight/step.h>
+#include <hyperlight/transport.h>
 
 #ifdef CONFIG_LIBHOSTSOCK
 extern int hostsock_rescan_events(void);
 #endif
-
-/* Provided by dispatch.c */
-extern void hyperlight_dispatch_function(void)
-	__attribute__((noreturn));
-extern void hyperlight_dispatch_push_void_result(void);
 
 /*
  * Halt via port 108.  The host intercepts this VM exit.
@@ -55,9 +53,9 @@ extern void hyperlight_dispatch_push_void_result(void);
  * interrupts to send.
  *
  * This is the bare halt: no result is pushed and no shutdown work is
- * done.  The step model's yield thread uses it to signal boot complete.
+ * done.  hyperlight_halt_boot_done() ends boot with it.
  */
-void __noreturn hyperlight_halt_to_host(void)
+static void __noreturn hyperlight_halt_to_host(void)
 {
 #if defined(__x86_64__)
 	__asm__ volatile(
@@ -68,7 +66,11 @@ void __noreturn hyperlight_halt_to_host(void)
 		"outl %%eax, %%dx\n\t"
 		"cli\n\t"
 		"hlt\n\t"
-		: : "r"((__u64)hyperlight_dispatch_function) : "rax", "rdx"
+		/* "memory": what the guest stored before the halt is in the
+		 * snapshot the host may take next (hl_booted, say).
+		 */
+		: : "r"((__u64)hyperlight_dispatch_function)
+		: "rax", "rdx", "memory"
 	);
 #elif defined(__aarch64__)
 	extern __u64 hl_halt_tpidr_el0;	/* arm/entry64.S */
@@ -90,6 +92,37 @@ void __noreturn hyperlight_halt_to_host(void)
 	);
 #endif
 	__builtin_unreachable();
+}
+
+/* Set just before the boot halt; later entries are calls or snapshot
+ * checkpoints.
+ */
+static int hl_booted;
+
+int hyperlight_booted(void)
+{
+	return hl_booted;
+}
+
+/*
+ * The halt that ends initialisation.  Hyperlight takes the guest as it
+ * leaves this entry for the boot snapshot, and requires the transport in
+ * checkpoint form, reported complete through the mailbox, as after a
+ * SnapshotCheckpoint message.  Nothing may use G2H after this.
+ */
+void __noreturn hyperlight_halt_boot_done(void)
+{
+	/* Interrupts off from here to the halt: a handler that logged
+	 * would post to G2H between the reset and the snapshot.
+	 */
+	uk_lcpu_disable_irq();
+	/* The host refuses the boot on a mailbox left pending; this says
+	 * why, through DebugPrint: a failed checkpoint leaves G2H unusable.
+	 */
+	if (hl_transport_checkpoint() < 0)
+		uk_pr_err("transport: cannot ready the rings for the boot snapshot\n");
+	hl_booted = 1;
+	hyperlight_halt_to_host();
 }
 
 /* ── Exit status ─────────────────────────────────────────────────── */
@@ -137,17 +170,18 @@ static void hyperlight_report_exit(void)
 static int hyperlight_shutdown(void)
 {
 	/*
-	 * Under a step pump this halt lands in the middle of the host's
-	 * `step` call (the workload's main thread exited and ukboot is
-	 * shutting the system down): complete that call with a void result
-	 * too, so the host reads a clean exit rather than a truncated step.
-	 * The report goes first; it is a host call and must not sit on top
-	 * of the result.
+	 * A halt in the middle of a guest function call (the workload's
+	 * main thread exited and ukboot is shutting the system down, under
+	 * the step pump or not) completes that call with a void result too,
+	 * so the host reads a clean exit rather than a truncated call; a
+	 * halt before boot has ended (a program that exits during it) is
+	 * the end of boot.  The report goes first: it is a host call, and
+	 * none can follow the result.
 	 */
 	hyperlight_report_exit();
-	if (hyperlight_step_active())
-		hyperlight_dispatch_push_void_result();
-
+	if (!hyperlight_booted())
+		hyperlight_halt_boot_done();
+	hyperlight_dispatch_push_void_result();
 	hyperlight_halt_to_host();
 }
 

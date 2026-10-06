@@ -9,13 +9,15 @@
  *
  * After the initial boot (evolve), the guest halts with the address
  * of hyperlight_dispatch_function in RAX (x0 on arm64).  The host can
- * then invoke guest functions by pushing a FunctionCall FlatBuffer onto
- * the PEB input stack, setting RIP (PC) to that address, and running the
- * vCPU.
+ * then invoke guest functions by writing a FunctionCall FlatBuffer into
+ * the H2G virtqueue (transport.h), setting RIP (PC) to that address, and
+ * running the vCPU.
  *
- * The dispatch handler pops the FunctionCall from the input stack,
- * hands it to the cooperative step pump (step.c), pushes a void result
- * onto the output stack, and halts via port 108.
+ * The dispatch handler takes the FunctionCall off H2G, hands it to the
+ * cooperative step pump (step.c), queues a void result on G2H, and
+ * halts via port 108.  The host also enters here to have the transport
+ * put in its canonical state before a snapshot; that message gets no
+ * result.
  *
  * The pump is the sole consumer of guest function calls: it
  * runs the scheduler until it would go idle and hands the vCPU back with
@@ -44,16 +46,11 @@
 #include <hyperlight/hcall.h>
 #include <hyperlight/mem.h>
 #include <hyperlight/outb.h>
-#include <hyperlight/peb.h>
 #include <hyperlight/step.h>
+#include <hyperlight/transport.h>
 
-/* ── PEB I/O stack pointers (cached from PEB at init) ─────────── */
-
-static volatile __u8 *g_input_stack;
-static __u64 g_input_stack_size;
-static volatile __u8 *g_output_stack;
-static __u64 g_output_stack_size;
-static int g_dispatch_ready;
+/* Correlation ID of the guest function call in flight, 0 if none. */
+static __u32 g_call_cid;
 
 /*
  * Scratch exception stack top GVA — queried from the host at init
@@ -64,21 +61,6 @@ __u64 g_exn_stack_top;
 
 /* ── Host-provided environment variables ─────────────────────────── */
 
-/*
- * Bring the host-provided environment into the process: GetEnvVars
- * returns KEY=VALUE entries separated by NUL, and each is setenv()ed
- * over whatever was there.  The buffer is sized from the PEB on first
- * use -- the entries arrive on the input stack, so hl_hcall_max_payload()
- * bytes always hold them -- and kept, since this runs often.
- *
- * Runs as a late initcall, after posix-environ and before the ELF
- * loader's main(), so the loaded program starts with the variables; and
- * again ahead of every named call (hyperlight_dispatch_inner), since the
- * initcall does not re-run after a snapshot restore and that is how the
- * variables the new host set get in.  A loaded program has a libc
- * environ of its own that this cannot reach; drivers refresh it through
- * the HLCALL_IOC_GETENV ioctl (step.c).
- */
 /* setenv() each KEY=VALUE entry of @buf (@len bytes, NUL-separated). */
 static void hyperlight_dispatch_setenv(char *buf, __sz len)
 {
@@ -109,8 +91,32 @@ static void hyperlight_dispatch_apply_host_env_version(__u64 version)
 }
 #endif /* CONFIG_HYPERLIGHT_STEP */
 
+/*
+ * Bring the host-provided environment into the process: GetEnvVars
+ * returns KEY=VALUE entries separated by NUL, and each is setenv()ed
+ * over whatever was there.  A step kernel fetches into the step model's
+ * copy (hyperlight_step_env()), which named calls reuse; any other keeps
+ * a buffer of its own, sized on first use to what one host call carries
+ * (an environment of hl_hcall_max_payload() bytes or more is not
+ * applied).
+ *
+ * Runs as a late initcall, after posix-environ and before the ELF
+ * loader's main(), so the loaded program starts with the variables; and
+ * again ahead of every named call (hyperlight_dispatch_inner), since the
+ * initcall does not re-run after a snapshot restore and that is how the
+ * variables the new host set get in.  A loaded program has a libc
+ * environ of its own that this cannot reach; drivers refresh it through
+ * the HLCALL_IOC_GETENV ioctl (step.c).
+ */
 static void hyperlight_dispatch_apply_host_env(void)
 {
+#if CONFIG_HYPERLIGHT_STEP
+	/* Version 0 always fetches. */
+	hyperlight_dispatch_apply_host_env_version(0);
+#else /* !CONFIG_HYPERLIGHT_STEP */
+	/* Not throttled: a kernel without the step model serves no call, and
+	 * already warns on each (hyperlight_dispatch_inner()).
+	 */
 	static char *buf;
 	static __sz cap;
 	int len;
@@ -133,6 +139,7 @@ static void hyperlight_dispatch_apply_host_env(void)
 		return;
 	}
 	hyperlight_dispatch_setenv(buf, len);
+#endif /* !CONFIG_HYPERLIGHT_STEP */
 }
 
 static int hyperlight_dispatch_env_init(struct uk_init_ctx *ictx __unused)
@@ -144,7 +151,8 @@ uk_late_initcall(hyperlight_dispatch_env_init, 0x0);
 
 /*
  * Void FunctionCallResult — pre-encoded FlatBuffer.
- * Matches hyperlight-common 0.16.0.
+ * Encoded by hyperlight-common 0.16.0; the FunctionCallResult schema,
+ * and hlvoid's ReturnValue tag (9), are unchanged in 0.18.0.
  */
 static const __u8 HL_VOID_RESULT[] = {
 	0x2c, 0x00, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00,
@@ -155,12 +163,36 @@ static const __u8 HL_VOID_RESULT[] = {
 	0x04, 0x00, 0x04, 0x00, 0x04, 0x00, 0x00, 0x00,
 };
 
+/*
+ * GuestError FunctionCallResult (ErrorCode::GuestError, "the kernel could
+ * not receive the call") — pre-encoded FlatBuffer, by hyperlight-common
+ * 0.18.0, which encodes HL_VOID_RESULT above byte for byte.  The answer
+ * to a call the guest could not take off H2G: too large for the call
+ * buffer, no call buffer at all, or a message malformed or cut short
+ * (see hl_transport_recv()); or one too short to be a FunctionCall.
+ */
+static const __u8 HL_REFUSED_RESULT[] = {
+	0x64, 0x00, 0x00, 0x00, 0x10, 0x00, 0x00, 0x00,
+	0x00, 0x00, 0x00, 0x00, 0x08, 0x00, 0x0c, 0x00,
+	0x07, 0x00, 0x08, 0x00, 0x08, 0x00, 0x00, 0x00,
+	0x00, 0x00, 0x00, 0x02, 0x0c, 0x00, 0x00, 0x00,
+	0x08, 0x00, 0x14, 0x00, 0x08, 0x00, 0x04, 0x00,
+	0x08, 0x00, 0x00, 0x00, 0x10, 0x00, 0x00, 0x00,
+	0x0f, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+	0x00, 0x00, 0x00, 0x00, 0x25, 0x00, 0x00, 0x00,
+	0x74, 0x68, 0x65, 0x20, 0x6b, 0x65, 0x72, 0x6e,
+	0x65, 0x6c, 0x20, 0x63, 0x6f, 0x75, 0x6c, 0x64,
+	0x20, 0x6e, 0x6f, 0x74, 0x20, 0x72, 0x65, 0x63,
+	0x65, 0x69, 0x76, 0x65, 0x20, 0x74, 0x68, 0x65,
+	0x20, 0x63, 0x61, 0x6c, 0x6c, 0x00, 0x00, 0x00,
+};
+
 /* ── Call size ─────────────────────────────────────────────────── */
 
 /*
- * A FunctionCall arrives on the PEB input stack, so it can never be
- * larger than that stack.  Its size is chosen by the host when it
- * creates the sandbox and read from the PEB at init: it is the one
+ * A FunctionCall arrives in the H2G receive buffers, so it can never be
+ * larger than all of them together.  Their size is chosen by the host
+ * when it creates the sandbox and published in scratch: it is the one
  * limit on a call, and nothing in the guest guesses it separately.
  * The dispatch copy below is sized from it, and so must be any other
  * guest-side buffer that has to hold a whole call (the step queue, and
@@ -168,87 +200,125 @@ static const __u8 HL_VOID_RESULT[] = {
  */
 __u64 hyperlight_dispatch_max_call(void)
 {
-	return g_input_stack_size;
+	return hl_transport_max_recv();
 }
 
 /* ── Public init ──────────────────────────────────────────────── */
 
-void hyperlight_dispatch_init(const struct hyperlight_peb *peb)
+void hyperlight_dispatch_init(void)
 {
-	g_input_stack = (volatile __u8 *)peb->input_stack.ptr;
-	g_input_stack_size = peb->input_stack.size;
-	g_output_stack = (volatile __u8 *)peb->output_stack.ptr;
-	g_output_stack_size = peb->output_stack.size;
-
 	g_exn_stack_top = hl_call_get_exn_stack_top();
 	if (!g_exn_stack_top)
 		UK_CRASH("GetExnStackTop host function failed\n");
-
-	g_dispatch_ready = 1;
 }
 
 /* ── Dispatch inner ─────────────────────────────────────────────── */
 
-/* Push the pre-encoded void FunctionCallResult onto the output stack.
- * Also used by the shutdown path when a step pump is in flight, so the
- * host's in-progress `step` call completes normally when the guest
- * process exits.
+/* Answer the call in flight, if any, with @res, once. */
+static void hyperlight_dispatch_push_result(const __u8 *res, __sz len)
+{
+	if (!g_call_cid)
+		return;
+	if (hl_hcall_respond(g_call_cid, res, len) < 0)
+		uk_pr_err("dispatch: cannot send the result of call %u\n",
+			  g_call_cid);
+	g_call_cid = 0;
+}
+
+/* Answer the call in flight with the pre-encoded void
+ * FunctionCallResult.  Also used by the shutdown path, so the host's
+ * call in flight (`step` under the pump) completes normally when the
+ * guest process exits.
  */
 void hyperlight_dispatch_push_void_result(void)
 {
-	hl_stack_push(g_output_stack, g_output_stack_size,
-		      HL_VOID_RESULT, sizeof(HL_VOID_RESULT));
+	hyperlight_dispatch_push_result(HL_VOID_RESULT,
+					sizeof(HL_VOID_RESULT));
 }
+
+/* Answer the call in flight with an error: it never ran. */
+static void hyperlight_dispatch_push_refused_result(void)
+{
+	hyperlight_dispatch_push_result(HL_REFUSED_RESULT,
+					sizeof(HL_REFUSED_RESULT));
+}
+
+/*
+ * Buffer for the FunctionCall FlatBuffer.
+ *
+ * The message is copied out of the H2G buffers, which go straight back
+ * to the host.  Allocated at boot, at the largest call H2G can carry
+ * (see hyperlight_dispatch_max_call), rather than on the first entry:
+ * that may be a snapshot checkpoint, during which the host refuses the
+ * console output a failure would make.  The dispatch entry runs on the
+ * exception stack, which is too small to hold a call.  NULL if there was
+ * no memory: every call is then refused.
+ */
+static __u8 *fc_buf;
+
+static int hyperlight_dispatch_buf_init(struct uk_init_ctx *ictx __unused)
+{
+	fc_buf = uk_malloc(uk_alloc_get_default(),
+			   hyperlight_dispatch_max_call());
+	if (unlikely(!fc_buf))
+		uk_pr_err("dispatch: no memory for a %lu-byte call buffer\n",
+			  (unsigned long)hyperlight_dispatch_max_call());
+	return 0;
+}
+uk_late_initcall(hyperlight_dispatch_buf_init, 0x0);
 
 void __attribute__((used))
 hyperlight_dispatch_inner(void)
 {
-	/*
-	 * Buffer for the FunctionCall FlatBuffer.
-	 *
-	 * The pop returns a pointer into the input stack.  Any subsequent
-	 * host function call (including uk_pr_err via HostPrintErr) pushes a
-	 * response onto the SAME input stack at the same offset, clobbering
-	 * the data.  We must copy it out before doing anything that might
-	 * trigger a host call.
-	 *
-	 * Heap-allocated on the first entry, at the size of the input stack
-	 * (see hyperlight_dispatch_max_call): the allocator is up by then,
-	 * dispatch is single-threaded (one vCPU), and the dispatch entry
-	 * runs on the exception stack, which is too small to hold a call.
+	__s64 fc_len;
+	__u8 kind;
+	__u32 cid;
+
+	/* Taken off H2G even without a buffer to copy it to, so the next
+	 * entry finds its own message; answered whenever its ID is known,
+	 * so the host is not left waiting for a result.
 	 */
-	static __u8 *fc_buf;
-	const __u8 *fc_raw;
-	__u64 fc_len;
+	fc_len = hl_transport_recv(fc_buf,
+				   fc_buf ? hyperlight_dispatch_max_call() : 0,
+				   &kind, &cid);
+	if (kind == HL_MSG_REQUEST)
+		g_call_cid = cid;
 
-	if (!g_dispatch_ready) {
-		uk_pr_err("dispatch: not initialised\n");
-		goto push_result;
+	if (kind == HL_MSG_SNAPSHOT_CHECKPOINT) {
+		/* It carries nothing to copy, so it runs whatever recv said.
+		 * The host refuses a host call during a checkpoint; a failure
+		 * marks the transport lost, so its report goes out through
+		 * DebugPrint, which the host takes, and the mailbox left
+		 * pending fails the snapshot.
+		 */
+		if (hl_transport_checkpoint() < 0)
+			uk_pr_err("dispatch: snapshot checkpoint failed\n");
+		return;
 	}
-
-	/* Pop the FunctionCall from the input stack.
-	 * Copy immediately — the pointer is invalidated by any host call.
-	 */
-	if (hl_stack_pop(g_input_stack, &fc_raw, &fc_len) < 0) {
-		uk_pr_err("dispatch: no function call on input stack\n");
-		goto push_result;
+	if (unlikely(fc_len < 0)) {
+		/* Reported once its header was read.  Kind 0 means none was
+		 * (a completion shorter than a header, or no H2G message for
+		 * this entry): nothing to report, and nothing says the entry
+		 * allows the host call a report makes.
+		 */
+		if (kind)
+			uk_pr_err("dispatch: no call to run (message kind %u, cid %u)\n",
+				  kind, cid);
+		hyperlight_dispatch_push_refused_result();
+		return;
 	}
-
-	if (!fc_buf) {
-		fc_buf = uk_malloc(uk_alloc_get_default(), g_input_stack_size);
-		if (unlikely(!fc_buf)) {
-			uk_pr_err("dispatch: no memory for a %lu-byte call buffer\n",
-				  (unsigned long)g_input_stack_size);
-			goto push_result;
-		}
+	if (unlikely(kind != HL_MSG_REQUEST || !cid)) {
+		/* Not a call: there is no correlation ID to answer. */
+		uk_pr_err("dispatch: unexpected message kind %u\n", kind);
+		return;
 	}
-	if (unlikely(fc_len > g_input_stack_size)) {
-		uk_pr_err("dispatch: FunctionCall larger than the input stack (%lu bytes)\n",
-			  (unsigned long)fc_len);
-		goto push_result;
+	if (unlikely(fc_len < HL_FC_MIN_LEN)) {
+		/* Too short for a FunctionCall's size prefix and root. */
+		uk_pr_err("dispatch: call %u is malformed (%ld bytes)\n",
+			  cid, (long)fc_len);
+		hyperlight_dispatch_push_refused_result();
+		return;
 	}
-
-	memcpy(fc_buf, (const void *)fc_raw, fc_len);
 
 	/*
 	 * Bring the environment up to date ahead of a named call: after a
@@ -277,7 +347,6 @@ hyperlight_dispatch_inner(void)
 		   (unsigned long)fc_len);
 #endif /* !CONFIG_HYPERLIGHT_STEP */
 
-push_result:
 	hyperlight_dispatch_push_void_result();
 }
 
@@ -438,7 +507,7 @@ hyperlight_dispatch_function(void)
 		 * On the normal dispatch path (ZF=0) the TLB is valid,
 		 * so this read of the BSS variable is correct.  On the
 		 * snapshot/restore path (ZF=1) the vCPU may be reused
-		 * with a STALE TLB (in-place MultiUseSandbox::restore
+		 * with a STALE TLB (in-place Sandbox::restore
 		 * relocates the page tables into fresh scratch but does
 		 * not flush our TLB), so this read can return a stale
 		 * value — we re-load it below after flushing the TLB.

@@ -31,17 +31,13 @@
 #include <uk/random.h>
 #endif /* CONFIG_LIBUKRANDOM */
 
+#include <hyperlight/console.h>
 #include <hyperlight/dispatch.h>
 #include <hyperlight/hcall.h>
 #include <hyperlight/resolv.h>
 #include <hyperlight/step.h>
 #include <hyperlight/time.h>
-
-/* Provided by shutdown.c: the raw port-108 halt with the dispatch entry
- * in RAX (x0 on arm64), without the shutdown machinery (no term
- * functions, no result).
- */
-extern void hyperlight_halt_to_host(void) __noreturn;
+#include <hyperlight/transport.h>
 
 #ifdef CONFIG_LIBHOSTFS
 /* Make the hostfs mounts match the host's after a snapshot restore.
@@ -191,14 +187,14 @@ static int fc_name_is(const __u8 *b, __u64 len, const char *name)
 	__u64 root, vt, p, nlen;
 	__u16 vsize, off;
 
-	if (!b || len < 8)
+	if (!b || len < HL_FC_MIN_LEN)
 		return 0;
 	root = 4 + fb_u32(b, 4);
 	if (root + 4 > len)
 		return 0;
 	/* vtable is at root - soffset; function_name is vtable slot 4. */
 	vt = root - (__s32)fb_u32(b, root);
-	if (vt + 6 > len)
+	if (vt > len || len - vt < 6)	/* vt may have wrapped */
 		return 0;
 	vsize = fb_u16(b, vt);
 	if (vsize < 6)
@@ -230,7 +226,7 @@ static __u64 fb_field_at(const __u8 *b, __u64 len, __u64 tbl, __u16 vtoff)
 	if (tbl + 4 > len)
 		return 0;
 	vt = tbl - (__s32)fb_u32(b, tbl);
-	if (vt + 4 > len)
+	if (vt > len || len - vt < 4)	/* vt may have wrapped */
 		return 0;
 	vsize = fb_u16(b, vt);
 	if (vtoff + 2 > vsize || vt + vtoff + 2 > len)
@@ -259,7 +255,7 @@ static __u64 fc_env_version(const __u8 *b, __u64 len)
 	__u64 root, params, count, elem, value, field, v = 0;
 	__u64 tf;
 
-	if (!b || len < 8)
+	if (!b || len < HL_FC_MIN_LEN)
 		return 0;
 	root = 4 + fb_u32(b, 4);
 	/* FunctionCall.parameters, then its last Parameter. */
@@ -308,9 +304,6 @@ int hyperlight_step_fc_is_resume(const __u8 *fc, __u64 fc_len)
  */
 static struct uk_thread *hl_yield_thread;
 
-/* Set once the yield thread has performed the boot-complete halt. */
-static int hl_boot_halted;
-
 /* The deadline the scheduler went idle with at boot, reported by the
  * boot-complete halt: a workload that sleeps before anything else happens
  * is waiting on it.
@@ -324,7 +317,7 @@ static __nsec hl_pump_wakeup;
 
 /* ── Named-call queue (/dev/hlcall) ──────────────────────────────── */
 
-/* Sized from the PEB input stack (hyperlight_dispatch_max_call) at init:
+/* Sized from the H2G buffers (hyperlight_dispatch_max_call) at init:
  * the host decides how large a call can be, the guest never guesses.
  */
 static __u8 *hl_call_buf;
@@ -332,9 +325,6 @@ static __u64 hl_call_cap;
 static __u64 hl_call_len;              /* 0 = nothing queued */
 static struct uk_thread *hl_call_reader; /* thread blocked in read() */
 static int hl_call_opened;             /* a driver has opened the device */
-static __u64 hl_result_cap;            /* hl_hcall_max_payload(): what CallDone carries */
-static __u8 *hl_reply_buf;             /* a HostCall reply, hl_call_cap bytes */
-static __u8 *hl_args_buf;              /* a HostCall's name and args, hl_hcall_max_payload() */
 
 /* The host's environment as the kernel last fetched it, and its version:
  * HLCALL_IOC_GETENV answers from here, with no host call, while the call
@@ -346,20 +336,46 @@ static char *hl_env_cache;
 static __u64 hl_env_cache_len;
 static __u64 hl_env_cache_version;
 
+/* The environment the kernel last could not take, by the version the
+ * call carried and the size the host reported: reported once, not on
+ * each named call that runs this, since the console is the workload's
+ * output.  Under a nonzero version it is not fetched again either until
+ * the host bumps the version, as it does for a new host (after a
+ * restore) or a changed environment; a host that sends no version gets
+ * a fetch every time, and a report when the size changes.
+ */
+static __u64 hl_env_failed_version;
+static int hl_env_failed_len = -1;
+
+/* An allocation failure is the kernel's own, not the environment's:
+ * reported once, and the allocation retried every time.
+ */
+static int hl_env_nomem_reported;
+
 /* The host's environment for @version, fetched with GetEnvVars only when
  * the version is not the one the copy was fetched under (0: always).
  * Returns 1 if it was fetched, 0 if the copy stood, -1 if it cannot be
- * had; *buf is NUL-terminated, *len without the final NUL.
+ * had (no GetEnvVars on the host or the host call failed, no memory for
+ * the copy, or hl_hcall_max_payload() bytes or more; under the nonzero
+ * version that did not fit, -1 again with no host call);
+ * *buf is NUL-terminated, *len without the final NUL.
  */
 int hyperlight_step_env(__u64 version, const char **buf, __sz *len)
 {
 	__u64 cap = hl_hcall_max_payload();
 	int n;
 
+	if (version && version == hl_env_failed_version)
+		return -1;
 	if (!hl_env_cache) {
 		hl_env_cache = cap ? uk_malloc(uk_alloc_get_default(), cap) : NULL;
-		if (unlikely(!hl_env_cache))
+		if (unlikely(!hl_env_cache)) {
+			if (!hl_env_nomem_reported) {
+				hl_env_nomem_reported = 1;
+				uk_pr_err("step: no memory for the host environment\n");
+			}
 			return -1;
+		}
 	}
 	if (version && version == hl_env_cache_version) {
 		*buf = hl_env_cache;
@@ -367,10 +383,24 @@ int hyperlight_step_env(__u64 version, const char **buf, __sz *len)
 		return 0;
 	}
 	n = hl_call_get_env_vars(hl_env_cache, cap);
-	if (n < 0 || (__u64)n >= cap) {
+	if (n < 0) {
+		/* No GetEnvVars on this host, or the call failed: no report,
+		 * as a host may well serve no environment.
+		 */
 		hl_env_cache_version = 0;
 		return -1;
 	}
+	if ((__u64)n >= cap) {
+		if (version != hl_env_failed_version || n != hl_env_failed_len)
+			uk_pr_err("step: host environment (%d bytes) does not fit\n",
+				  n);
+		hl_env_failed_version = version;
+		hl_env_failed_len = n;
+		hl_env_cache_version = 0;
+		return -1;
+	}
+	hl_env_failed_version = 0;
+	hl_env_failed_len = -1;
 	hl_env_cache[n] = '\0';
 	hl_env_cache_len = n;
 	hl_env_cache_version = version;
@@ -416,6 +446,16 @@ static void hl_route_call(const __u8 *fc, __u64 fc_len)
 static int hl_call_in_flight;
 
 #if CONFIG_LIBDEVFS
+/* The device's buffers, sized when it is first opened. */
+/* What CallDone carries: hl_hcall_max_payload(). */
+static __u64 hl_result_cap;
+/* A HostCall reply, hl_reply_cap bytes. */
+static __u8 *hl_reply_buf;
+/* What a reply holds: hl_transport_payload_cap(). */
+static __u64 hl_reply_cap;
+/* A HostCall's name and args, hl_hcall_max_payload() bytes. */
+static __u8 *hl_args_buf;
+
 static int hlcall_open(struct device *dev __unused, int mode __unused)
 {
 	/* The buffers for results and host call replies are allocated when
@@ -433,11 +473,12 @@ static int hlcall_open(struct device *dev __unused, int mode __unused)
 			hl_result_cap = 0;
 		}
 	}
-	if (!hl_reply_buf && hl_call_cap) {
-		hl_reply_buf = uk_malloc(uk_alloc_get_default(), hl_call_cap);
+	if (!hl_reply_buf && hl_transport_payload_cap()) {
+		hl_reply_cap = hl_transport_payload_cap();
+		hl_reply_buf = uk_malloc(uk_alloc_get_default(), hl_reply_cap);
 		if (unlikely(!hl_reply_buf))
 			uk_pr_err("hyperlight: no memory for a %llu-byte host call reply\n",
-				  (unsigned long long)hl_call_cap);
+				  (unsigned long long)hl_reply_cap);
 	}
 	if (!hl_args_buf && hl_hcall_max_payload()) {
 		hl_args_buf = uk_malloc(uk_alloc_get_default(),
@@ -545,43 +586,6 @@ static int hlcall_write(struct device *dev __unused, struct uio *uio,
 	return 0;
 }
 
-/* Whether @len bytes at @s are well-formed UTF-8: no overlong forms, no
- * surrogates, nothing past U+10FFFF.  HostCall's name is a string on the
- * host, whose decoding fails the whole entry on one that is not.
- */
-static int hl_utf8_valid(const __u8 *s, __u64 len)
-{
-	const __u8 *end = s + len;
-
-	while (s < end) {
-		__u8 c = *s++;
-		__u32 cp, min;
-		int n;
-
-		if (c < 0x80)
-			continue;
-		if ((c & 0xe0) == 0xc0) {
-			n = 1; cp = c & 0x1f; min = 0x80;
-		} else if ((c & 0xf0) == 0xe0) {
-			n = 2; cp = c & 0x0f; min = 0x800;
-		} else if ((c & 0xf8) == 0xf0) {
-			n = 3; cp = c & 0x07; min = 0x10000;
-		} else {
-			return 0;
-		}
-		if (end - s < n)
-			return 0;
-		while (n--) {
-			if ((*s & 0xc0) != 0x80)
-				return 0;
-			cp = (cp << 6) | (*s++ & 0x3f);
-		}
-		if (cp < min || cp > 0x10ffff || (cp >= 0xd800 && cp <= 0xdfff))
-			return 0;
-	}
-	return 1;
-}
-
 /* HLCALL_IOC_HOSTCALL: HostCall(name, args) on the host, the reply into
  * the driver's buffer.  See step.h.
  */
@@ -612,13 +616,14 @@ static int hl_host_call(struct hlcall_hostcall *arg)
 	if (unlikely(!hl_reply_buf || !hl_args_buf))
 		return ENOMEM;
 	/* The name and args are copied in first, as the reply is copied out
-	 * last: the host call reads its parameters holding a spinlock with
-	 * interrupts off, where a fault on the driver's memory could not be
-	 * served.  The vnode lock around this ioctl keeps both buffers to
+	 * last: the name is checked on the copy, so a name that is not UTF-8
+	 * fails with EILSEQ (hl_hcall_vecbytes() would refuse it too, but
+	 * as EIO), and the reply arrives whole before the driver's buffer,
+	 * which may be too small for it (ENOBUFS, with its length), is
+	 * written.  The vnode lock around this ioctl keeps both buffers to
 	 * one host call at a time.
 	 */
 	memcpy(hl_args_buf, hc.name, hc.name_len);
-	/* Checked on the copy, which the driver cannot change under us. */
 	if (!hl_utf8_valid(hl_args_buf, hc.name_len))
 		return EILSEQ;
 	if (hc.args_len)
@@ -629,12 +634,11 @@ static int hl_host_call(struct hlcall_hostcall *arg)
 	p[1].type = HL_PV_HLVECBYTES;
 	p[1].vec.ptr = hl_args_buf + hc.name_len;
 	p[1].vec.len = (__u32)hc.args_len;
-	/* Into a kernel buffer as large as the input stack, so the reply
-	 * arrives whole, and only then into the driver's: writing there
-	 * may fault, and must not happen while the host call holds its lock
-	 * and the input stack it is reading from.
+	/* Into a kernel buffer as large as any reply (a G2H reply half), so
+	 * the reply arrives whole, and only then into the driver's, which
+	 * may be too small for it (ENOBUFS, with its length, below).
 	 */
-	if (hl_hcall_vecbytes("HostCall", p, 2, hl_reply_buf, hl_call_cap,
+	if (hl_hcall_vecbytes("HostCall", p, 2, hl_reply_buf, hl_reply_cap,
 			      &len) < 0)
 		return EIO;
 	arg->out_len = len;
@@ -736,9 +740,8 @@ static __noreturn void hl_yield_thread_fn(void)
 	 * Every later entry comes back through hyperlight_dispatch_function
 	 * on this thread and reaches the pump.
 	 */
-	hl_boot_halted = 1;
 	hl_emit_yield(hl_ns_until(hl_boot_wakeup));
-	hyperlight_halt_to_host();
+	hyperlight_halt_boot_done();
 }
 
 static int hl_yield_thread_create(struct uk_init_ctx *ictx __unused)
@@ -844,8 +847,12 @@ out:
 	return rc;
 }
 
-/* The host has just restored this guest from a snapshot.  Two things are
- * put right here, before anything else runs:
+/* The host has just restored this guest from a snapshot.  These are put
+ * right here, before anything else runs:
+ *
+ *   the console asks the new host afresh for HostWrite and HostWriteErr,
+ *   which the snapshot's may have lacked (hyperlight_console_resume()),
+ *   first, so the reports of what follows take the right way out;
  *
  *   the CSPRNG is reseeded: its state lives in guest memory, so without
  *   this every clone of one snapshot would draw the same "random" bytes
@@ -870,8 +877,12 @@ out:
 static void hl_resume(void)
 {
 #if CONFIG_LIBUKRANDOM
-	int rc = uk_random_reseed();
+	int rc;
+#endif /* CONFIG_LIBUKRANDOM */
 
+	hyperlight_console_resume();
+#if CONFIG_LIBUKRANDOM
+	rc = uk_random_reseed();
 	if (unlikely(rc))
 		uk_pr_err("hyperlight: CSPRNG reseed after restore failed: %d\n",
 			  rc);
@@ -894,11 +905,6 @@ static void hl_resume(void)
 		hl_emit("DriverReady");
 	if (hl_call_in_flight)
 		hl_emit("CallStarted");
-}
-
-int hyperlight_step_active(void)
-{
-	return hl_pump_active;
 }
 
 int hyperlight_step_fc_is_pump(const __u8 *fc, __u64 fc_len)
@@ -926,7 +932,7 @@ int hyperlight_step_halt(__nsec wakeup_time)
 	 * (uk_thread_is_blocked() is not used: upstream's macro is
 	 * mis-parenthesised and always false.)
 	 */
-	if (!hl_boot_halted && hl_yield_thread &&
+	if (!hyperlight_booted() && hl_yield_thread &&
 	    !uk_thread_is_runnable(hl_yield_thread)) {
 		hl_boot_wakeup = wakeup_time;
 		uk_thread_wake(hl_yield_thread);

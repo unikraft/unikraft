@@ -62,8 +62,7 @@ static char hyperlight_cmdline[4096] = "unikraft-hyperlight";
  * Register PEB memory regions in bootinfo.
  *
  * The PEB's guest_heap region is registered as FREE memory so that
- * Unikraft's allocator can use it.  The input/output stacks are for
- * the FlatBuffer-based host-call protocol and are not general memory.
+ * Unikraft's allocator can use it.
  */
 static void hyperlight_init_mem(struct ukplat_bootinfo *bi,
 				struct hyperlight_peb *peb)
@@ -272,14 +271,13 @@ void hyperlight_entry(struct uk_lcpu *lcpu __unused,
 	/* Register PEB memory regions */
 	hyperlight_init_mem(bi, g_peb);
 
-	/* Initialise the host-call subsystem so we can query the host */
-	hl_hcall_init(g_peb);
+	/* Attach to the virtqueue transport so we can query the host */
+	hl_hcall_init();
 
-	/* Initialise the dispatch subsystem with a copy of the PEB.
-	 * The dispatch handler reads/writes the PEB I/O stacks when
-	 * the host calls guest functions after evolve().
+	/* Initialise the dispatch subsystem, which serves the guest
+	 * function calls the host makes after evolve().
 	 */
-	hyperlight_dispatch_init(g_peb);
+	hyperlight_dispatch_init();
 
 	/* Try to get the command line from the host via hcall.
 	 * If the host doesn't register GetCmdLine, the default

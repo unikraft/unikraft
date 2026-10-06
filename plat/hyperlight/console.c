@@ -11,36 +11,52 @@
  *
  *   1. DebugPrint (port 103) — one VM exit per byte.  Available from
  *      the very first instruction; used during early boot before the
- *      hcall subsystem is initialised, and for whatever HostPrint does
+ *      hcall subsystem is initialised, and for whatever HostWrite does
  *      not send.
  *
- *   2. HostPrint (host function call) — one VM exit per 4 KiB of the
- *      buffer.  Uses the FlatBuffer-based hcall protocol over the PEB's
- *      shared I/O stacks.  Requires hl_hcall_init() to have been called.
- *      Standard error and kernel messages go through HostPrintErr, the
- *      same call under another name, so the host keeps them apart.  A
- *      host that refuses HostPrintErr is taken to lack it: from then on
- *      standard error goes through HostPrint, as before it existed.
+ *   2. HostWrite (host function call) — one VM exit per host call's
+ *      worth of the buffer.  Uses the FlatBuffer-based hcall protocol
+ *      over the G2H virtqueue.  Requires hl_hcall_init() to have been
+ *      called.  Standard error and kernel messages go through
+ *      HostWriteErr, the same call under another name, so the host keeps
+ *      them apart.  A host that refuses HostWriteErr is taken to lack it:
+ *      from then on standard error goes through HostWrite; one that
+ *      refuses HostWrite, likewise, gets standard output, and with it
+ *      standard error, through DebugPrint.  A snapshot restore asks the
+ *      new host afresh (hyperlight_console_resume()).
  *
- * Input uses the ReadStdin host function — the host maintains a
- * byte buffer that the caller populates via GuestConfig::write_stdin().
- * The console_in callback drains from that buffer; when it's empty
- * the read returns 0 (EOF).
+ * Input uses the ReadStdin host function, which hands over the host
+ * process's stdin, as bytes, a chunk at a time.  The console_in callback
+ * drains each chunk; when the host has no more, the read returns 0 (EOF).
  *
- * TODO: Route uk_pr_* output through port 99 (Log / OutBAction::Log)
- * instead of HostPrintErr.  Port 99 delivers a GuestLogData FlatBuffer
- * to the host's tracing framework, keeping kernel warnings out of the
- * program's standard error.  This requires
+ * TODO: Route uk_pr_* output through G2H Log messages instead of
+ * HostWriteErr.  A Log message delivers a GuestLogData FlatBuffer to the
+ * host's tracing framework, keeping kernel warnings out of the program's
+ * standard error.  This requires
  * encoding GuestLogData FlatBuffers (level, source_file, line, source,
  * message) in the kernel — a different schema from hcall FlatBuffers.
  */
 
 #include <uk/console/driver.h>
+#include <hyperlight/console.h>
 #include <hyperlight/hcall.h>
 #include <hyperlight/outb.h>
 
+/* Set once the host refuses HostWrite or HostWriteErr: it lacks it.  A
+ * host whose function fails looks the same.  Guest memory, so a snapshot
+ * keeps them: hyperlight_console_resume() clears them for the next host.
+ */
+static __bool no_host_write;
+static __bool no_host_write_err;
+
+void hyperlight_console_resume(void)
+{
+	no_host_write = __false;
+	no_host_write_err = __false;
+}
+
 /*
- * HostPrint once the hcall subsystem is up; what it did not send, and all
+ * HostWrite once the hcall subsystem is up; what it did not send, and all
  * of it before, goes out through DebugPrint, which needs nothing.
  */
 static __ssz hyperlight_console_out(struct uk_console *dev __unused,
@@ -48,8 +64,10 @@ static __ssz hyperlight_console_out(struct uk_console *dev __unused,
 {
 	__ssz sent = 0;
 
-	if (hl_hcall_ready()) {
-		sent = hl_call_host_print(buf, len);
+	if (hl_hcall_ready() && !no_host_write) {
+		sent = hl_call_host_write(buf, len);
+		if (sent == HL_HCALL_REFUSED)
+			no_host_write = __true;
 		if (sent < 0)
 			sent = 0;
 	}
@@ -59,13 +77,8 @@ static __ssz hyperlight_console_out(struct uk_console *dev __unused,
 	return len;
 }
 
-/* Set once the host refuses HostPrintErr: it lacks it.  A host whose
- * HostPrintErr fails looks the same, and gets stderr on HostPrint from then.
- */
-static __bool no_host_print_err;
-
 /*
- * Standard error, kept apart from standard output by HostPrintErr; what
+ * Standard error, kept apart from standard output by HostWriteErr; what
  * that does not send goes the way of standard output.
  */
 static __ssz hyperlight_console_err(struct uk_console *dev,
@@ -73,10 +86,10 @@ static __ssz hyperlight_console_err(struct uk_console *dev,
 {
 	__ssz sent = 0;
 
-	if (hl_hcall_ready() && !no_host_print_err) {
-		sent = hl_call_host_print_err(buf, len);
-		if (sent == HL_HOST_PRINT_REFUSED)
-			no_host_print_err = __true;
+	if (hl_hcall_ready() && !no_host_write_err) {
+		sent = hl_call_host_write_err(buf, len);
+		if (sent == HL_HCALL_REFUSED)
+			no_host_write_err = __true;
 		if (sent < 0)
 			sent = 0;
 	}
@@ -88,9 +101,8 @@ static __ssz hyperlight_console_err(struct uk_console *dev,
 /*
  * Console input via the ReadStdin host function.
  *
- * The host maintains a stdin buffer that the caller populates via
- * GuestConfig::write_stdin().  Each call here drains up to @len
- * bytes from that buffer.
+ * The host hands over its process's stdin a chunk at a time.  Each call
+ * here drains up to @len bytes of it.
  *
  * When the buffer is fully drained, we inject an EOT (Ctrl-D, 0x04)
  * byte.  The serial TTY driver recognises EOT as the end of input, so
