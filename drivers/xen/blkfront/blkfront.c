@@ -38,7 +38,7 @@
 #include <uk/alloc.h>
 #include <uk/essentials.h>
 #include <uk/arch/limits.h>
-#include <uk/page.h>
+#include <uk/paging.h>
 #include <uk/blkdev_driver.h>
 #if defined(__i386__) || defined(__x86_64__)
 #include <xen-x86/mm.h>
@@ -224,7 +224,7 @@ static void blkfront_request_map_grefs(struct blkif_request *ring_req,
 
 	blkfront_req = (struct blkfront_request *)ring_req->id;
 	req = blkfront_req->req;
-	start_sector = round_pgdown((uintptr_t)req->aio_buf);
+	start_sector = UK_PAGING_PAGE_ALIGN_DOWN((uintptr_t)req->aio_buf);
 	nb_segments = blkfront_req->nb_segments;
 
 	for (gref_index = 0; gref_index < nb_segments; ++gref_index) {
@@ -272,8 +272,8 @@ static void blkif_request_init(struct blkif_request *ring_req,
 	 * of the pages the buffer is allocated, in order to calculate the
 	 * number of pages the request has.
 	 **/
-	start_sector = round_pgdown(start_data);
-	end_sector = round_pgup(end_data);
+	start_sector = UK_PAGING_PAGE_ALIGN_DOWN(start_data);
+	end_sector = UK_PAGING_PAGE_ALIGN_UP(end_data);
 	nb_segments = (end_sector - start_sector) / UK_PAGING_PAGE_SIZE;
 	UK_ASSERT(nb_segments <= BLKIF_MAX_SEGMENTS_PER_REQUEST);
 
