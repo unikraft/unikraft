@@ -24,4 +24,9 @@ config LIBPOSIX_FDIO_VMA_COPY
 
 endchoice
 
+	config LIBPOSIX_FDIO_TEST
+	bool "Enable tests"
+	default n
+	select LIBUKTEST
+
 endif
