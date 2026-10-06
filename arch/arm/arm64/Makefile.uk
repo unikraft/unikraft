@@ -9,10 +9,12 @@ else
 ARCHFLAGS     += -D__ARM_64__ -mgeneral-regs-only
 endif
 ARCHFLAGS-$(call gcc_version_ge,9,4) += -mno-outline-atomics
+ARCHFLAGS-$(call clang_version_ge,12,0) += -mno-outline-atomics
 
 # Disable FPU for trap/exception/interrupt handlers
 ISR_ARCHFLAGS += -D__ARM_64__ -mgeneral-regs-only
 ISR_ARCHFLAGS-$(call gcc_version_ge,9,4) += -mno-outline-atomics
+ISR_ARCHFLAGS-$(call clang_version_ge,12,0) += -mno-outline-atomics
 
 ARCHFLAGS-$(call have_clang)     += --target=aarch64-none-elf
 ISR_ARCHFLAGS-$(call have_clang) += --target=aarch64-none-elf
@@ -34,6 +36,12 @@ CXXINCLUDES += -I$(CONFIG_UK_BASE)/arch/arm64/include
 # Define these in the order of arch revision, to allow march
 # to be overwritten to the highest version required by the
 # selected extensions.
+ifeq ($(CONFIG_ARM64_FEAT_LSE),y)
+# GCC-6+ / Clang-3.9+, no version check needed
+ARCH_REV := armv8-a
+ARCH_OPT := $(ARCH_OPT)+lse
+endif
+
 ifeq ($(CONFIG_ARM64_FEAT_PAUTH),y)
 # Min GCC >= 9 to avoid dealing with deprecated
 # msign-return-address here and in macros
