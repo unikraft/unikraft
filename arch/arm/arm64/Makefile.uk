@@ -9,10 +9,12 @@ else
 ARCHFLAGS     += -D__ARM_64__ -mgeneral-regs-only
 endif
 ARCHFLAGS-$(call gcc_version_ge,9,4) += -mno-outline-atomics
+ARCHFLAGS-$(call clang_version_ge,12,0) += -mno-outline-atomics
 
 # Disable FPU for trap/exception/interrupt handlers
 ISR_ARCHFLAGS += -D__ARM_64__ -mgeneral-regs-only
 ISR_ARCHFLAGS-$(call gcc_version_ge,9,4) += -mno-outline-atomics
+ISR_ARCHFLAGS-$(call clang_version_ge,12,0) += -mno-outline-atomics
 
 ARCHFLAGS-$(call have_clang)     += --target=aarch64-none-elf
 ISR_ARCHFLAGS-$(call have_clang) += --target=aarch64-none-elf
