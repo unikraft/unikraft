@@ -31,18 +31,39 @@
 /* ── Helpers ──────────────────────────────────────────────────────── */
 
 /*
+ * Whether @name can go to the host: it takes paths as strings, UTF-8,
+ * and a host call with any other refuses the whole message.  EILSEQ
+ * otherwise, as for a name a filesystem cannot encode.
+ */
+static int host_name_ok(const char *name)
+{
+	return hl_utf8_valid((const __u8 *)name, strlen(name)) ? 0 : EILSEQ;
+}
+
+/*
  * Build the host-relative path for a child of a directory node.
  * Result is written into `out` (at most `sz` bytes including NUL).
+ * Every node's path is built here, whole, from names checked here, so a
+ * path that reaches the host is UTF-8 and the one asked for.  Returns 0,
+ * EILSEQ, or ENAMETOOLONG for a path that does not fit @sz.
  */
-static void build_path(char *out, size_t sz,
-		       const struct hostfs_node *dir, const char *name)
+static int build_path(char *out, size_t sz,
+		      const struct hostfs_node *dir, const char *name)
 {
+	int err = host_name_ok(name);
+	size_t len;
+
+	if (err)
+		return err;
 	if (dir->hf_path[0] == '\0') {
 		/* Root directory — child is just "name". */
-		strlcpy(out, name, sz);
+		len = strlcpy(out, name, sz);
 	} else {
-		snprintf(out, sz, "%s/%s", dir->hf_path, name);
+		int n = snprintf(out, sz, "%s/%s", dir->hf_path, name);
+
+		len = n < 0 ? sz : (size_t)n;
 	}
+	return len < sz ? 0 : ENAMETOOLONG;
 }
 
 /*
@@ -111,7 +132,9 @@ hostfs_lookup(struct vnode *dvp, const char *name, struct vnode **vpp)
 	if (hostfs_stale(dnp))
 		return ESTALE;
 
-	build_path(path, sizeof(path), dnp, name);
+	err = build_path(path, sizeof(path), dnp, name);
+	if (err)
+		return err;
 
 	err = host_stat(dnp->hf_mount_idx, path, &size, &mode,
 			&is_dir, &is_file);
@@ -164,11 +187,14 @@ hostfs_create(struct vnode *dvp, const char *name, mode_t mode __unused)
 {
 	struct hostfs_node *dnp = dvp->v_data;
 	char path[1024];
+	int err;
 
 	if (hostfs_stale(dnp))
 		return ESTALE;
 
-	build_path(path, sizeof(path), dnp, name);
+	err = build_path(path, sizeof(path), dnp, name);
+	if (err)
+		return err;
 
 	/*
 	 * Create by writing zero bytes at offset 0.  The host's
@@ -505,13 +531,16 @@ hostfs_mkdir(struct vnode *dvp, const char *name, mode_t mode __unused)
 {
 	struct hostfs_node *dnp = dvp->v_data;
 	char path[1024];
+	int err;
 	struct hl_param p[2];
 	__s32 ret;
 
 	if (hostfs_stale(dnp))
 		return ESTALE;
 
-	build_path(path, sizeof(path), dnp, name);
+	err = build_path(path, sizeof(path), dnp, name);
+	if (err)
+		return err;
 
 	p[0].type = HL_PV_HLINT;
 	p[0].i32_val = dnp->hf_mount_idx;
@@ -568,11 +597,14 @@ hostfs_rename(struct vnode *dvp, struct vnode *vp, const char *sname __unused,
 	struct hostfs_node *np = vp->v_data;
 	struct hostfs_node *tdnp = tdvp->v_data;
 	char new_path[1024];
+	int err;
 
 	if (hostfs_stale(dnp))
 		return ESTALE;
 
-	build_path(new_path, sizeof(new_path), tdnp, tname);
+	err = build_path(new_path, sizeof(new_path), tdnp, tname);
+	if (err)
+		return err;
 
 	struct hl_param p[3];
 	__s32 ret;
@@ -606,11 +638,14 @@ hostfs_link(struct vnode *tdvp, struct vnode *svp, const char *name)
 	struct hostfs_node *snp = svp->v_data;
 	struct hostfs_node *tdnp = tdvp->v_data;
 	char dst_path[1024];
+	int err;
 
 	if (hostfs_stale(snp))
 		return ESTALE;
 
-	build_path(dst_path, sizeof(dst_path), tdnp, name);
+	err = build_path(dst_path, sizeof(dst_path), tdnp, name);
+	if (err)
+		return err;
 
 	struct hl_param p[3];
 	__s32 ret;
@@ -637,11 +672,18 @@ hostfs_symlink(struct vnode *dvp, const char *name, const char *oldpath)
 {
 	struct hostfs_node *dnp = dvp->v_data;
 	char link_path[1024];
+	int err;
 
 	if (hostfs_stale(dnp))
 		return ESTALE;
 
-	build_path(link_path, sizeof(link_path), dnp, name);
+	err = build_path(link_path, sizeof(link_path), dnp, name);
+	if (err)
+		return err;
+
+	err = host_name_ok(oldpath);
+	if (err)
+		return err;
 
 	struct hl_param p[3];
 	__s32 ret;
