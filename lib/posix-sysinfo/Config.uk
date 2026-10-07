@@ -1,4 +1,10 @@
-config LIBPOSIX_SYSINFO
+menuconfig LIBPOSIX_SYSINFO
 	bool "posix-sysinfo: Information about system parameters"
 	select LIBNOLIBC if !HAVE_LIBC
 	default n
+
+if LIBPOSIX_SYSINFO
+config LIBPOSIX_SYSINFO_TEST
+	bool "Enable unit tests"
+	select LIBUKTEST
+endif
