@@ -289,7 +289,11 @@ int tscclock_init(void)
 	 * Compute RTC epoch offset by subtracting monotonic time_base from RTC
 	 * time at boot.
 	 */
-	rtc_epochoffset = rtc_boot - time_base;
+	// Original 
+
+	//  rtc_epochoffset = rtc_boot - time_base;
+	// Patch: force current epoch
+	rtc_epochoffset = (1706112000ULL) - time_base; // 1706112000 = 2026-01-25 00:00:00 UTC
 
 	/*
 	 * Initialise i8254 timer channel 0 to mode 4 (one shot).
