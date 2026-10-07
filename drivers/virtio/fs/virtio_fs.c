@@ -271,6 +271,7 @@ __ssz virtiofs_do_request_vec(struct virtqueue *vq, __u16 vqlen,
 	struct virtiofs_thread_cookie cookie = { .thread = current };
 	struct uk_sglist sg;
 	struct uk_sglist sg_out;
+	struct uk_sglist_seg *sgsegs = NULL;
 	__u16 nseg;
 	__u16 in_segs;
 	__u16 out_segs;
@@ -278,6 +279,7 @@ __ssz virtiofs_do_request_vec(struct virtqueue *vq, __u16 vqlen,
 	__sz ivec = 0;
 	__sz pos = 0;
 	__sz rem;
+	__ssz ret = 0;
 	int r;
 
 	for (__sz i = 0; i < num_iovec; i++) {
@@ -289,8 +291,13 @@ __ssz virtiofs_do_request_vec(struct virtqueue *vq, __u16 vqlen,
 		}
 	}
 	nseg = (__u16)maxsegs;
-	/* We must declare this here, as its size is runtime-computed */
-	struct uk_sglist_seg sgsegs[nseg];
+
+	if (unlikely(nseg == 0))
+		return -EINVAL;
+
+	sgsegs = uk_malloc(virtiofs_alloc, (__sz)nseg * sizeof(*sgsegs));
+	if (unlikely(!sgsegs))
+		return -ENOMEM;
 
 	/* Prepare input iovs/segments */
 	uk_sglist_init(&sg, nseg, sgsegs);
@@ -306,15 +313,19 @@ __ssz virtiofs_do_request_vec(struct virtqueue *vq, __u16 vqlen,
 		UK_ASSERT(rem);
 
 		r = virtiofs_prep_sglist(&sg, &iovecs[ivec].iov[pos], rem);
-		if (unlikely(r))
-			return r;
+		if (unlikely(r)) {
+			ret = r;          /* keep real error */
+			goto out;
+		}
 
 		pos += rem;
 		in_iovcnt -= rem;
 	}
+
 	in_segs = sg.sg_nseg;
 	/* Prepare output iovs/segments */
 	uk_sglist_init(&sg_out, nseg - in_segs, &sgsegs[in_segs]);
+
 	while (out_iovcnt) {
 		UK_ASSERT(ivec < num_iovec);
 		while (pos >= iovecs[ivec].iovcnt) {
@@ -327,27 +338,37 @@ __ssz virtiofs_do_request_vec(struct virtqueue *vq, __u16 vqlen,
 		UK_ASSERT(rem);
 
 		r = virtiofs_prep_sglist(&sg_out, &iovecs[ivec].iov[pos], rem);
-		if (unlikely(r))
-			return r;
+		if (unlikely(r)) {
+			ret = r;
+			goto out;
+		}
 
 		pos += rem;
 		out_iovcnt -= rem;
 	}
+
 	out_segs = sg_out.sg_nseg;
 
 	sg.sg_nseg += out_segs;
 
 	/* Enqueue request */
 	r = virtqueue_buffer_enqueue(vq, &cookie, &sg, in_segs, out_segs);
-	if (unlikely(r < 0))
-		return r;
+	if (unlikely(r < 0)) {
+		ret = r;
+		goto out;
+	}
 	/* Notify the host & block until awoken by request completion */
 	uk_thread_block_until(current, 0);
 	virtqueue_host_notify(vq);
 	uk_sched_yield();
 
 	/* Awoken, request complete; cookie has length of reply from device */
-	return cookie.rlen;
+	ret = cookie.rlen;
+
+out:
+	if (sgsegs)
+		uk_free(virtiofs_alloc, sgsegs);
+	return ret;
 }
 
 /**
@@ -364,38 +385,58 @@ __ssz virtiofs_do_request(struct virtqueue *vq, __u16 vqlen,
 	const __u16 nseg = virtiofs_maxsegs(iov, iovlen, vqlen);
 	struct uk_sglist sg;
 	struct uk_sglist sg_out;
-	struct uk_sglist_seg sgsegs[nseg];
+	struct uk_sglist_seg *sgsegs = NULL;
 	__u16 in_segs;
 	__u16 out_segs;
+	__ssz ret = 0;
 	int r;
+
+	if (unlikely(nseg == 0))
+		return -EINVAL;
+
+	sgsegs = uk_malloc(virtiofs_alloc, (__sz)nseg * sizeof(*sgsegs));
+	if (unlikely(!sgsegs))
+		return -ENOMEM;
 
 	/* Prepare input iovs/segments */
 	uk_sglist_init(&sg, nseg, sgsegs);
 	r = virtiofs_prep_sglist(&sg, iov, in_iovlen);
-	if (unlikely(r))
-		return r;
+	if (unlikely(r)) {
+		ret = r;
+		goto out;
+	}
 	in_segs = sg.sg_nseg;
 
 	/* Prepare output iovs/segments */
 	uk_sglist_init(&sg_out, nseg - in_segs, &sgsegs[in_segs]);
 	r = virtiofs_prep_sglist(&sg_out, &iov[in_iovlen], out_iovlen);
-	if (unlikely(r))
-		return r;
+	if (unlikely(r)) {
+		ret = r;
+		goto out;
+	}
 	out_segs = sg_out.sg_nseg;
 
 	sg.sg_nseg += out_segs;
 
 	/* Enqueue request */
 	r = virtqueue_buffer_enqueue(vq, &cookie, &sg, in_segs, out_segs);
-	if (unlikely(r < 0))
-		return r;
+	if (unlikely(r < 0)) {
+		ret = r;
+		goto out;
+	}
+
 	/* Notify the host & block until awoken by request completion */
 	uk_thread_block_until(current, 0);
 	virtqueue_host_notify(vq);
 	uk_sched_yield();
 
 	/* Awoken, request complete; cookie has length of reply from device */
-	return cookie.rlen;
+	ret = cookie.rlen;
+
+out:
+	if (sgsegs)
+		uk_free(virtiofs_alloc, sgsegs);
+	return ret;
 }
 
 /* Minimal stub for a fuse header, enough to check length & opcode */
