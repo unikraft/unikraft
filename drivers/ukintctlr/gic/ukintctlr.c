@@ -76,15 +76,18 @@ static int enumerate_cpus(void)
 			continue;
 		}
 
-		uk_pcpuvar_lval(idx, uk_pcpuvar_cpu_id) = cpu_id;
-		uk_pcpuvar_lval(idx, uk_pcpuvar_cpu_idx) = idx;
-		idx++;
-
-		/* Ignore cores that exceed max configured value */
-		if (unlikely(idx == CONFIG_UKPLAT_CPU_MAXCOUNT)) {
+		/* Ignore cores that exceed max configured value. Check
+		 * before writing: the per-CPU variables only have
+		 * CONFIG_UKPLAT_CPU_MAXCOUNT slots.
+		 */
+		if (unlikely(idx >= CONFIG_UKPLAT_CPU_MAXCOUNT)) {
 			uk_pr_warn("Maximum number of cores exceeded.\n");
 			return 0;
 		}
+
+		uk_pcpuvar_lval(idx, uk_pcpuvar_cpu_id) = cpu_id;
+		uk_pcpuvar_lval(idx, uk_pcpuvar_cpu_idx) = idx;
+		idx++;
 	}
 	UK_ASSERT(bsp_found);
 
@@ -213,15 +216,18 @@ static int enumerate_cpus(void)
 			continue;
 		}
 
-		uk_pcpuvar_lval(idx, uk_pcpuvar_cpu_id) = cpu_id;
-		uk_pcpuvar_lval(idx, uk_pcpuvar_cpu_idx) = idx;
-		idx++;
-
-		if (unlikely(idx == CONFIG_UKPLAT_CPU_MAXCOUNT)) {
+		/* Check before writing: the per-CPU variables only have
+		 * CONFIG_UKPLAT_CPU_MAXCOUNT slots.
+		 */
+		if (unlikely(idx >= CONFIG_UKPLAT_CPU_MAXCOUNT)) {
 			/* Handle gracefully */
 			uk_pr_warn("Maximum number of cores exceeded.\n");
 			return 0;
 		}
+
+		uk_pcpuvar_lval(idx, uk_pcpuvar_cpu_id) = cpu_id;
+		uk_pcpuvar_lval(idx, uk_pcpuvar_cpu_idx) = idx;
+		idx++;
 	}
 	UK_ASSERT(bsp_found);
 
