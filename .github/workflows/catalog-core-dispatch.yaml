@@ -1,0 +1,37 @@
+# SPDX-License-Identifier: BSD-3-Clause
+
+name: cc-dispatch-unikraft
+
+on:
+  pull_request_target:
+    branches: [staging]
+    types: [opened, synchronize, reopened]
+
+jobs:
+  notify-catalog-core:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate App Token for Catalog Core
+        uses: actions/create-github-app-token@v1
+        id: generate_token
+        with:
+          app-id: ${{ vars.APP_ID }}
+          private-key: ${{ secrets.PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: catalog-core
+
+      - name: Repository Dispatch
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ steps.generate_token.outputs.token }}
+          script: |
+            await github.rest.repos.createDispatchEvent({
+              owner: '${{ github.repository_owner }}',
+              repo: 'catalog-core',
+              event_type: 'unikraft_open_pr',
+              client_payload: {
+                pr_number: '${{ github.event.pull_request.number }}',
+                pr_repo: '${{ github.repository }}',
+                pr_sha: '${{ github.event.pull_request.head.sha }}'
+              }
+            });
