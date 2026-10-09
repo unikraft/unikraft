@@ -1025,11 +1025,7 @@ static int virtio_netdev_probe(struct uk_netdev *n)
 	if (VIRTIO_FEATURE_HAS(host_features, VIRTIO_NET_F_STATUS))
 		VIRTIO_FEATURE_SET(drv_features, VIRTIO_NET_F_STATUS);
 
-	/**
-	 * Gratuitous ARP
-	 * NOTE: We tell that we will do gratuitous ARPs ourselves.
-	 */
-	VIRTIO_FEATURE_SET(drv_features, VIRTIO_NET_F_GUEST_ANNOUNCE);
+	/* GUEST_ANNOUNCE requires CTRL_VQ and ANNOUNCE_ACK support. */
 
 	/**
 	 * Partial checksumming
@@ -1041,7 +1037,10 @@ static int virtio_netdev_probe(struct uk_netdev *n)
 			    n);
 	} else {
 		VIRTIO_FEATURE_SET(drv_features, VIRTIO_NET_F_CSUM);
-		VIRTIO_FEATURE_SET(drv_features, VIRTIO_NET_F_GUEST_CSUM);
+		if (VIRTIO_FEATURE_HAS(host_features,
+				       VIRTIO_NET_F_GUEST_CSUM))
+			VIRTIO_FEATURE_SET(drv_features,
+					   VIRTIO_NET_F_GUEST_CSUM);
 	}
 
 	/* VirtIO modern */
@@ -1101,6 +1100,7 @@ static int virtio_netdev_feature_negotiate(struct uk_netdev *n,
 {
 	struct virtio_net_device *vndev;
 	__u64 host_features;
+	__u32 mtu_offset;
 	int rc;
 
 	UK_ASSERT(n);
@@ -1148,15 +1148,21 @@ static int virtio_netdev_feature_negotiate(struct uk_netdev *n,
 	 * different virtio devices.
 	 * Currently, unaligned read is supported in the underlying function.
 	 */
-	virtio_config_get(vndev->vdev,
-			  __offsetof(struct virtio_net_config, mac),
-			  &vndev->hw_addr.addr_bytes[0],
-			  UK_NETDEV_HWADDR_LEN, 1);
+	rc = virtio_config_get(vndev->vdev,
+			       __offsetof(struct virtio_net_config, mac),
+			       &vndev->hw_addr.addr_bytes[0],
+			       UK_NETDEV_HWADDR_LEN, 1);
+	if (unlikely(rc))
+		goto err_negotiate_feature;
 
 	if (VIRTIO_FEATURE_HAS(vndev->vdev->features, VIRTIO_NET_F_MTU)) {
-		virtio_config_get(vndev->vdev,
-				  __offsetof(struct virtio_net_config, mac),
-				  &vndev->mtu, sizeof(vndev->mtu), 1);
+		mtu_offset = __offsetof(struct virtio_net_config, mtu);
+		rc = virtio_config_get(vndev->vdev,
+				       mtu_offset,
+				       &vndev->mtu, sizeof(vndev->mtu),
+				       sizeof(vndev->mtu));
+		if (unlikely(rc))
+			goto err_negotiate_feature;
 		vndev->max_mtu = vndev->mtu;
 	} else {
 		/**
@@ -1168,10 +1174,12 @@ static int virtio_netdev_feature_negotiate(struct uk_netdev *n,
 		vndev->max_mtu = vndev->mtu = UK_ETH_PAYLOAD_MAXLEN;
 	}
 
-	virtio_dev_status_update(vndev->vdev,
-				 (VIRTIO_CONFIG_STATUS_ACK |
-				  VIRTIO_CONFIG_STATUS_DRIVER |
-				  VIRTIO_CONFIG_STATUS_FEATURES_OK));
+	rc = virtio_dev_status_update(vndev->vdev,
+				      VIRTIO_CONFIG_STATUS_ACK |
+				      VIRTIO_CONFIG_STATUS_DRIVER |
+				      VIRTIO_CONFIG_STATUS_FEATURES_OK);
+	if (unlikely(rc))
+		goto err_negotiate_feature;
 
 	return 0;
 
@@ -1186,8 +1194,8 @@ static int virtio_netdev_rxtx_alloc(struct virtio_net_device *vndev,
 	int rc = 0;
 	int i = 0;
 	int vq_avail = 0;
-	int total_vqs = conf->nb_rx_queues + conf->nb_tx_queues;
-	__u16 qdesc_size[total_vqs];
+	int total_vqs;
+	__u16 qdesc_size[2];
 
 	if (conf->nb_rx_queues != 1 || conf->nb_tx_queues != 1) {
 		uk_pr_err("Queue combination not supported: %"__PRIu16"/%"__PRIu16" rx/tx\n",
@@ -1195,6 +1203,7 @@ static int virtio_netdev_rxtx_alloc(struct virtio_net_device *vndev,
 
 		return -ENOTSUP;
 	}
+	total_vqs = conf->nb_rx_queues + conf->nb_tx_queues;
 
 	/**
 	 * TODO:
@@ -1228,7 +1237,7 @@ static int virtio_netdev_rxtx_alloc(struct virtio_net_device *vndev,
 	 * ...
 	 * Virtqueue-ctrlq
 	 */
-	for (i = 0; i < vndev->max_vqueue_pairs; i++) {
+	for (i = 0; i < conf->nb_rx_queues; i++) {
 		/**
 		 * Initialize the received queue with the information received
 		 * from the device.
@@ -1255,10 +1264,14 @@ exit:
 	return rc;
 
 err_free_txrx:
-	if (!vndev->rxqs)
+	if (vndev->rxqs) {
 		uk_free(a, vndev->rxqs);
-	if (!vndev->txqs)
+		vndev->rxqs = NULL;
+	}
+	if (vndev->txqs) {
 		uk_free(a, vndev->txqs);
+		vndev->txqs = NULL;
+	}
 	goto exit;
 }
 

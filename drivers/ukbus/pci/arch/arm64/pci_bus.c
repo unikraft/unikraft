@@ -54,6 +54,9 @@
 #include <uk/errptr.h>
 #include <uk/print.h>
 #include <uk/bus/pci.h>
+#if CONFIG_LIBUKPAGING
+#include <uk/bus/platform.h>
+#endif /* CONFIG_LIBUKPAGING */
 #include <libfdt_env.h>
 #include <uk/intctlr/gic.h>
 
@@ -61,6 +64,57 @@
 
 #define DEVFN(dev, fn)   ((dev << PCI_FN_BIT_NBR) | fn)
 #define SIZE_PER_PCI_DEV 0x20	/* legacy pci device size, no msi */
+
+__u8 pci_config_read8(struct pci_device *dev, int where)
+{
+	__u8 val = 0;
+
+	pci_generic_config_read(dev->addr.bus,
+				DEVFN(dev->addr.devid, dev->addr.function),
+				where, sizeof(val), &val);
+	return val;
+}
+
+__u16 pci_config_read16(struct pci_device *dev, int where)
+{
+	__u16 val = 0;
+
+	pci_generic_config_read(dev->addr.bus,
+				DEVFN(dev->addr.devid, dev->addr.function),
+				where, sizeof(val), &val);
+	return val;
+}
+
+__u32 pci_config_read32(struct pci_device *dev, int where)
+{
+	__u32 val = 0;
+
+	pci_generic_config_read(dev->addr.bus,
+				DEVFN(dev->addr.devid, dev->addr.function),
+				where, sizeof(val), &val);
+	return val;
+}
+
+void pci_config_write8(struct pci_device *dev, int where, __u8 val)
+{
+	pci_generic_config_write(dev->addr.bus,
+				 DEVFN(dev->addr.devid, dev->addr.function),
+				 where, sizeof(val), val);
+}
+
+void pci_config_write16(struct pci_device *dev, int where, __u16 val)
+{
+	pci_generic_config_write(dev->addr.bus,
+				 DEVFN(dev->addr.devid, dev->addr.function),
+				 where, sizeof(val), val);
+}
+
+void pci_config_write32(struct pci_device *dev, int where, __u32 val)
+{
+	pci_generic_config_write(dev->addr.bus,
+				 DEVFN(dev->addr.devid, dev->addr.function),
+				 where, sizeof(val), val);
+}
 
 static int arch_pci_driver_add_device(struct pci_driver *drv,
 					struct pci_address *addr,
@@ -70,6 +124,8 @@ static int arch_pci_driver_add_device(struct pci_driver *drv,
 					struct uk_alloc *pha)
 {
 	struct pci_device *dev;
+	__u64 pbase;
+	__vaddr_t vbase;
 	int ret;
 
 	UK_ASSERT(drv != NULL);
@@ -91,17 +147,26 @@ static int arch_pci_driver_add_device(struct pci_driver *drv,
 	memcpy(&dev->addr, addr,  sizeof(dev->addr));
 	dev->drv = drv;
 
+	pbase = base;
+	vbase = (__vaddr_t)pbase;
 #if CONFIG_LIBUKPAGING
 	/* TODO Properly query the BAR size */
-	base = uk_bus_pf_devmap(base, __PAGE_SIZE);
-	if (unlikely(PTRISERR(base))) {
-		uk_pr_err("Could not map device (%d)\n", PTR2ERR(base));
-		return PTR2ERR(base);
+	vbase = uk_bus_pf_devmap(pbase, __PAGE_SIZE);
+	if (unlikely(PTRISERR(vbase))) {
+		ret = PTR2ERR(vbase);
+		uk_pr_err("Could not map device (%d)\n", ret);
+		uk_free(pha, dev);
+		return ret;
 	}
 #endif /* CONFIG_LIBUKPAGING */
 
-	dev->base = base;
+	dev->base = vbase;
 	dev->irq = irq;
+	dev->bar[0].type = PCI_BAR_MEM;
+	dev->bar[0].index = 0;
+	dev->bar[0].pbase = pbase;
+	dev->bar[0].vbase = vbase;
+	dev->bar[0].size = __PAGE_SIZE;
 	uk_pr_info("pci dev base(0x%lx) irq(%ld)\n", dev->base, dev->irq);
 
 	if (drv->add_dev) {

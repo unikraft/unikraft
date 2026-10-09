@@ -492,9 +492,12 @@ static int vtcons_port_rxq_recv_done(struct virtqueue *vq, void *priv)
 {
 	struct vtcons_port *port = (struct vtcons_port *)priv;
 
-	UK_ASSERT(vq && priv);
+	UK_ASSERT(vq);
 
 	virtqueue_intr_disable(vq);
+	/* Reused queues can have completions before ADD finishes. */
+	if (!port || !port->is_registered)
+		return 1;
 
 	uk_console_async_in_handle(&port->con_drv);
 
@@ -611,6 +614,9 @@ static void vtcons_handle_console_port(struct vtcons_dev *dev,
 
 	if (port->is_registered)
 		uk_console_unregister(&port->con_drv.cons);
+	port->is_registered = 0;
+	if (port->rxq.vq)
+		virtqueue_intr_disable(port->rxq.vq);
 
 	if (VIRTIO_FEATURE_HAS(dev->vdev->features,
 			       VIRTIO_CONSOLE_F_EMERG_WRITE))
@@ -635,6 +641,46 @@ static void vtcons_handle_console_port(struct vtcons_dev *dev,
 
 	port->is_console = 1;
 	port->is_registered = 1;
+	if (port->rxq.vq && virtqueue_intr_enable(port->rxq.vq))
+		vtcons_port_rxq_recv_done(port->rxq.vq, port);
+}
+
+/* Completed cookies belong to the driver; pending cookies stay in the ring
+ * across PORT_REMOVE/ADD because modern PCI cannot disable a single queue.
+ */
+static void vtcons_port_drain(struct vtcons_port *port)
+{
+	struct vtcons_rxbuf *rxbuf;
+	char *txbuf;
+	__u32 dummy;
+	int rc;
+
+	/* Drain and free any outstanding RX buffers for the port. */
+	if (port->rxq.vq) {
+		for (;;) {
+			rc = virtqueue_buffer_dequeue(port->rxq.vq,
+						      (void **)&rxbuf, &dummy);
+			if (rc < 0)
+				break;
+			UK_ASSERT(rxbuf);
+			uk_free(vtcons_a, rxbuf);
+		}
+	}
+
+	/* Reclaim any outstanding TX buffers. */
+	if (port->txq.vq) {
+		for (;;) {
+			rc = virtqueue_buffer_dequeue(port->txq.vq,
+						      (void **)&txbuf, __NULL);
+			if (rc < 0)
+				break;
+			UK_ASSERT(txbuf);
+			uk_free(vtcons_a, txbuf);
+		}
+	}
+
+	uk_free(vtcons_a, port->cached_rxbuf);
+	port->cached_rxbuf = NULL;
 }
 
 /*
@@ -678,7 +724,9 @@ static void vtcons_handle_device_add(struct vtcons_dev *dev,
 		ops = &vtcons_ops;
 
 	if (ctlbuf->id == 0) {
-		/* Port 0 data queues are already set up at probe time. */
+		/* Port 0 rings survive removal as well as ordinary re-adds. */
+		vtcons_port_drain(port);
+		vtcons_port_rxq_fillup(port, port->rxq.nb_desc, 1);
 		rc = vtcons_send_ctl(dev, 0, VIRTIO_CONSOLE_PORT_READY, 1);
 		if (unlikely(rc))
 			uk_pr_warn_isr("port %u: failed to send PORT_READY: %d\n",
@@ -707,6 +755,8 @@ static void vtcons_handle_device_add(struct vtcons_dev *dev,
 				      UK_CONSOLE_CLASS_NONE);
 		uk_console_register(&port->con_drv.cons);
 		port->is_registered = 1;
+		if (virtqueue_intr_enable(port->rxq.vq))
+			vtcons_port_rxq_recv_done(port->rxq.vq, port);
 		return;
 	}
 
@@ -755,15 +805,20 @@ static void vtcons_handle_device_add(struct vtcons_dev *dev,
 			      ctlbuf->id, (int)PTR2ERR(vq));
 		vtcons_send_ctl(dev, ctlbuf->id,
 				VIRTIO_CONSOLE_PORT_READY, 0);
+		virtio_vqueue_release(dev->vdev, port->rxq.vq, vtcons_a);
+		port->rxq.vq = NULL;
 		return;
 	}
 	port->txq.vq = vq;
+
+	/* Discard completions from the previous incarnation of this port. */
+	vtcons_port_drain(port);
 
 	/* TX is purely poll/lazy — no interrupt needed. */
 	virtqueue_intr_disable(port->txq.vq);
 
 	filled = vtcons_port_rxq_fillup(port, port->rxq.nb_desc, 0);
-	if (unlikely(!filled)) {
+	if (unlikely(!filled && !virtqueue_is_full(port->rxq.vq))) {
 		uk_pr_err_isr("port %u: failed to post any RX buffers\n",
 			      ctlbuf->id);
 		rc = vtcons_send_ctl(dev, ctlbuf->id,
@@ -773,11 +828,12 @@ static void vtcons_handle_device_add(struct vtcons_dev *dev,
 				       ctlbuf->id, rc);
 		virtio_vqueue_release(dev->vdev, port->rxq.vq, vtcons_a);
 		virtio_vqueue_release(dev->vdev, port->txq.vq, vtcons_a);
+		port->rxq.vq = NULL;
+		port->txq.vq = NULL;
 		return;
 	}
 
 	virtqueue_host_notify(port->rxq.vq);
-	virtqueue_intr_enable(port->rxq.vq);
 
 	rc = vtcons_send_ctl(dev, ctlbuf->id, VIRTIO_CONSOLE_PORT_READY, 1);
 	if (unlikely(rc))
@@ -803,6 +859,8 @@ static void vtcons_handle_device_add(struct vtcons_dev *dev,
 			      UK_CONSOLE_CLASS_NONE);
 	uk_console_register(&port->con_drv.cons);
 	port->is_registered = 1;
+	if (virtqueue_intr_enable(port->rxq.vq))
+		vtcons_port_rxq_recv_done(port->rxq.vq, port);
 
 #if CONFIG_LIBUKFS_DEVFS
 	if (port->dev->devfs_ready)
@@ -818,11 +876,7 @@ static void vtcons_handle_device_remove(struct vtcons_dev *dev,
 					struct virtio_console_control *ctlbuf,
 					__u32 rxlen __maybe_unused)
 {
-	struct vtcons_rxbuf *rxbuf;
 	struct vtcons_port *port;
-	char *txbuf;
-	__u32 dummy;
-	int rc;
 
 	if (ctlbuf->id >= dev->max_nr_ports)
 		return;
@@ -831,30 +885,11 @@ static void vtcons_handle_device_remove(struct vtcons_dev *dev,
 
 	if (port->is_registered)
 		uk_console_unregister(&port->con_drv.cons);
+	port->is_registered = 0;
+	if (port->rxq.vq)
+		virtqueue_intr_disable(port->rxq.vq);
 
-	/* Drain and free any outstanding RX buffers for the port. */
-	if (port->rxq.vq) {
-		for (;;) {
-			rc = virtqueue_buffer_dequeue(port->rxq.vq,
-						      (void **)&rxbuf, &dummy);
-			if (rc < 0)
-				break;
-			UK_ASSERT(rxbuf);
-			uk_free(vtcons_a, rxbuf);
-		}
-	}
-
-	/* Reclaim any outstanding TX buffers. */
-	if (port->txq.vq) {
-		for (;;) {
-			rc = virtqueue_buffer_dequeue(port->txq.vq,
-						      (void **)&txbuf, __NULL);
-			if (rc < 0)
-				break;
-			UK_ASSERT(txbuf);
-			uk_free(vtcons_a, txbuf);
-		}
-	}
+	vtcons_port_drain(port);
 
 	if (ctlbuf->id != 0) {
 		/* Release the per-port virtqueues. */
@@ -873,7 +908,18 @@ static void vtcons_handle_device_remove(struct vtcons_dev *dev,
 		vtcons_devfs_rmnode(port);
 #endif /* CONFIG_LIBUKFS_DEVFS */
 
-	memset(port, 0, sizeof(*port));
+	if (ctlbuf->id == 0) {
+		struct vtcons_rxq rxq = port->rxq;
+		struct vtcons_txq txq = port->txq;
+
+		memset(port, 0, sizeof(*port));
+		port->rxq = rxq;
+		port->txq = txq;
+	} else {
+		memset(port, 0, sizeof(*port));
+	}
+	port->id = ctlbuf->id;
+	port->dev = dev;
 }
 
 /*

@@ -1,1 +1,12 @@
 _pci_register_driver
+pci_config_read8
+pci_config_read16
+pci_config_read32
+pci_config_write8
+pci_config_write16
+pci_config_write32
+pci_device_probe_bar
+pci_device_probe_bars
+pci_device_map_bar
+pci_device_enable
+pci_device_intx
