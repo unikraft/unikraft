@@ -10,7 +10,7 @@
 #include <uk/lcpu.h>
 
 void clone_setup_child_ctx(struct ukarch_execenv *pexecenv,
-			   struct uk_thread *child, __uptr sp)
+			   struct uk_thread *child, __uptr sp, __uptr tlsp)
 {
 	struct ukarch_execenv *cexecenv;
 	struct ukarch_auxspcb *auxspcb;
@@ -51,10 +51,10 @@ void clone_setup_child_ctx(struct ukarch_execenv *pexecenv,
 	uk_lcpu_sysctx_set(cexecenv->sysctx, GSBASE, gsbase);
 
 	/* Use parent's fsbase if clone did not have SETTLS */
-	if (!child->tlsp)
+	if (!tlsp)
 		fsbase = uk_lcpu_sysctx_get(pexecenv->sysctx, FSBASE);
 	else
-		fsbase = child->tlsp;
+		fsbase = tlsp;
 
 	uk_lcpu_sysctx_set(cexecenv->sysctx, FSBASE, fsbase);
 

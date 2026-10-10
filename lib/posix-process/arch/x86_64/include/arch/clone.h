@@ -13,7 +13,8 @@
 
 #if !__ASSEMBLY__
 
+/* @tlsp: the child's userland TLS pointer, or 0 for the parent's */
 void clone_setup_child_ctx(struct ukarch_execenv *pexecenv,
-			   struct uk_thread *child, __uptr sp);
+			   struct uk_thread *child, __uptr sp, __uptr tlsp);
 
 #endif /* !__ASSEMBLY__ */
