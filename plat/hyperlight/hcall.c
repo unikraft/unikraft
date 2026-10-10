@@ -868,30 +868,51 @@ __u64 hl_call_get_initrd_size(void)
 	return size;
 }
 
-int hl_call_host_print(const char *msg, __sz len)
+/* The most of a message one HostPrint call carries */
+#define HL_HOST_PRINT_CHUNK 4096
+
+/*
+ * How much of @len bytes of output the next call sends: at most
+ * HL_HOST_PRINT_CHUNK, cut before a UTF-8 sequence rather than inside one,
+ * so each piece reaches the host as whole characters.  Bytes that are not
+ * UTF-8 are cut at the limit.
+ */
+static __sz host_print_cut(const char *msg, __sz len)
+{
+	__sz cut = HL_HOST_PRINT_CHUNK;
+
+	if (len <= cut)
+		return len;
+	/* A continuation byte (10xxxxxx) at the cut belongs to a sequence
+	 * that starts before it: cut at that sequence's lead byte instead,
+	 * at most three bytes back.
+	 */
+	for (__sz back = 0; back <= 3; back++) {
+		if (((__u8)msg[cut - back] & 0xC0) != 0x80)
+			return cut - back;
+	}
+	return cut;
+}
+
+/* One call of the host function @fn with at most HL_HOST_PRINT_CHUNK bytes */
+static int host_print_one(const char *fn, __sz fn_len,
+			  const char *msg, __sz len)
 {
 	/*
 	 * Stack-allocate a buffer large enough for the FlatBuffer.
 	 * Fixed overhead is 80 + 4 (name) + 4 (msg) = 88 bytes,
 	 * plus the two strings aligned to 4 bytes.
-	 * "HostPrint" is 9 chars → 12 aligned. Cap message at ~4K.
 	 */
-	__u8 fc_buf[4096 + 128];
+	__u8 fc_buf[HL_HOST_PRINT_CHUNK + 128];
 	__u64 fc_len;
 	const __u8 *result_data;
 	__u64 result_len;
 	unsigned long irqf;
 
-	if (!g_hcall_ready)
-		return -1;
-
-	if (len > 4096)
-		len = 4096;
-
 	/* Encode outside the lock — no shared state touched */
 	fc_len = fb_encode_function_call_1str(
 		fc_buf, sizeof(fc_buf),
-		"HostPrint", 9,
+		fn, fn_len,
 		msg, len,
 		HL_FCT_HOST, HL_RT_INT);
 	if (fc_len == 0)
@@ -912,6 +933,38 @@ int hl_call_host_print(const char *msg, __sz len)
 
 	ukplat_spin_unlock_irqrestore(&g_hcall_lock, irqf);
 	return 0;
+}
+
+/*
+ * Send all @len bytes through the host function @fn, a call per
+ * HL_HOST_PRINT_CHUNK.  Returns the bytes sent, or -1 if none were.
+ */
+static __ssz host_print(const char *fn, __sz fn_len,
+			const char *msg, __sz len)
+{
+	__sz sent = 0;
+	__sz n;
+
+	if (!g_hcall_ready)
+		return -1;
+
+	while (sent < len) {
+		n = host_print_cut(msg + sent, len - sent);
+		if (host_print_one(fn, fn_len, msg + sent, n) < 0)
+			return sent ? (__ssz)sent : -1;
+		sent += n;
+	}
+	return (__ssz)sent;
+}
+
+__ssz hl_call_host_print(const char *msg, __sz len)
+{
+	return host_print("HostPrint", 9, msg, len);
+}
+
+__ssz hl_call_host_print_err(const char *msg, __sz len)
+{
+	return host_print("HostPrintErr", 12, msg, len);
 }
 
 __u64 hl_call_get_exn_stack_top(void)

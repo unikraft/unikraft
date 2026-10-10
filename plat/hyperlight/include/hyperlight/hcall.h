@@ -156,13 +156,22 @@ int hl_call_get_random_bytes(__u8 *out_buf, __sz len);
  * This calls the "HostPrint" host function with one string parameter.
  * Used by the console driver as an alternative to DebugPrint (port 103).
  * DebugPrint does one VM exit per byte; HostPrint does one VM exit for
- * the entire string.
+ * each 4 KiB of the string, the most one call carries.
  *
  * @param msg   String to print (not necessarily NUL-terminated)
  * @param len   Length of the string
- * @return      0 on success, -1 on error
+ * @return      Bytes sent (all of them, unless a call failed part way),
+ *              or -1 if none were
  */
-int hl_call_host_print(const char *msg, __sz len);
+__ssz hl_call_host_print(const char *msg, __sz len);
+
+/**
+ * Call HostPrintErr — HostPrint for the guest's standard error.
+ *
+ * The same as hl_call_host_print(), through the "HostPrintErr" host
+ * function, so the host can keep standard error apart.
+ */
+__ssz hl_call_host_print_err(const char *msg, __sz len);
 
 /*
  * FlatBuffer ReturnType constants (from function_types.fbs).

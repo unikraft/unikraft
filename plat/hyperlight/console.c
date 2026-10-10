@@ -14,9 +14,11 @@
  *      hcall subsystem is initialised.  Also the fallback if HostPrint
  *      fails.
  *
- *   2. HostPrint (host function call) — one VM exit per buffer.  Uses
- *      the FlatBuffer-based hcall protocol over the PEB's shared I/O
- *      stacks.  Requires hl_hcall_init() to have been called.
+ *   2. HostPrint (host function call) — one VM exit per 4 KiB of the
+ *      buffer.  Uses the FlatBuffer-based hcall protocol over the PEB's
+ *      shared I/O stacks.  Requires hl_hcall_init() to have been called.
+ *      Standard error and kernel messages go through HostPrintErr, the
+ *      same call under another name, so the host keeps them apart.
  *
  * The console transparently picks HostPrint when the hcall subsystem
  * is ready, falling back to DebugPrint otherwise.
@@ -38,19 +40,39 @@
 #include <hyperlight/hcall.h>
 #include <hyperlight/outb.h>
 
-static __ssz hyperlight_console_out(struct uk_console *dev __unused,
-				    const char *buf, __sz len)
+/*
+ * Send @buf through @host_print (HostPrint or HostPrintErr) when the hcall
+ * subsystem is up; what it could not send goes out through DebugPrint.
+ */
+static __ssz hyperlight_console_write(__ssz (*host_print)(const char *, __sz),
+				      const char *buf, __sz len)
 {
-	/* Try HostPrint first — one VM exit for the entire buffer */
+	__ssz sent = 0;
+
+	/* Try the host function first — one VM exit per 4 KiB */
 	if (hl_hcall_ready()) {
-		if (hl_call_host_print(buf, len) == 0)
-			return len;
+		sent = host_print(buf, len);
+		if (sent < 0)
+			sent = 0;
 	}
 
 	/* Fallback: DebugPrint, one byte at a time */
-	for (__sz i = 0; i < len; i++)
+	for (__sz i = (__sz)sent; i < len; i++)
 		hyperlight_debug_putc(buf[i]);
 	return len;
+}
+
+static __ssz hyperlight_console_out(struct uk_console *dev __unused,
+				    const char *buf, __sz len)
+{
+	return hyperlight_console_write(hl_call_host_print, buf, len);
+}
+
+/* Standard error, kept apart from standard output by HostPrintErr */
+static __ssz hyperlight_console_err(struct uk_console *dev __unused,
+				    const char *buf, __sz len)
+{
+	return hyperlight_console_write(hl_call_host_print_err, buf, len);
 }
 
 /*
@@ -86,6 +108,7 @@ static __ssz hyperlight_console_in(struct uk_console *dev __unused,
 static struct uk_console_ops hyperlight_console_ops = {
 	.out = hyperlight_console_out,
 	.in = hyperlight_console_in,
+	.err = hyperlight_console_err,
 };
 
 static struct uk_console hyperlight_console;
