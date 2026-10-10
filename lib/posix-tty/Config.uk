@@ -30,6 +30,28 @@ config LIBPOSIX_TTY_SERIAL_EOF_FINAL
 	  arrives: a program that polls stdin after the end then waits for
 	  input that never comes.
 
+config LIBPOSIX_TTY_SERIAL_STDERR
+	bool "Separate standard error on the serial console"
+	depends on LIBPOSIX_TTY_SERIAL
+	default y if PLAT_HYPERLIGHT
+	help
+	  Open stderr (fd 2) as a serial file of its own, written with
+	  uk_console_err(), instead of as a duplicate of stdout.  A console
+	  driver with an err operation then receives standard error apart
+	  from standard output; one without it prints both alike.
+
+config LIBPOSIX_TTY_SERIAL_ONLCR
+	bool "Translate newline to CR-LF on serial output"
+	depends on LIBPOSIX_TTY_SERIAL
+	default n if PLAT_HYPERLIGHT
+	default y
+	help
+	  Write each newline written to the serial console as CR-LF, for
+	  consoles that need a carriage return to start the next line.
+	  Turn it off where the console hands a program's output to a host
+	  that keeps its bytes, such as one capturing the output: the host
+	  then sees the newlines the program wrote.
+
 config LIBPOSIX_TTY_STDIO
 	bool "Open standard I/O files at boot (fd 0, 1, 2)"
 	select LIBPOSIX_FDTAB

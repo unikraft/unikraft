@@ -15,6 +15,11 @@
 
 extern const struct uk_file uk_file_serial;
 
+#if CONFIG_LIBPOSIX_TTY_SERIAL_STDERR
+/* Standard error, written to the console's error stream (uk_console_err) */
+extern const struct uk_file uk_file_serial_err;
+#endif /* CONFIG_LIBPOSIX_TTY_SERIAL_STDERR */
+
 #endif /* CONFIG_LIBPOSIX_TTY_SERIAL */
 
 #endif /* __UK_POSIX_SERIALFILE_H__ */

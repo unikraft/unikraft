@@ -64,16 +64,21 @@ static struct termios serial_termios = {
 	},
 };
 
-/* TODO: Some consoles require both a newline and a carriage return to
- * go to the start of the next line. This kind of behavior should be in
- * a single place in posix-tty. We keep this workaround until we have feature
- * in posix-tty that handles newline characters correctly.
- */
-static inline __ssz _console_out(const char *buf, __sz len)
+typedef __ssz (*console_write_func)(const char *buf, __sz len);
+
+static inline __ssz _console_write(console_write_func cout,
+				   const char *buf, __sz len)
 {
+#if CONFIG_LIBPOSIX_TTY_SERIAL_ONLCR
+	/* TODO: Some consoles require both a newline and a carriage return to
+	 * go to the start of the next line. This kind of behavior should be in
+	 * a single place in posix-tty. We keep this workaround until we have
+	 * feature in posix-tty that handles newline characters correctly.
+	 */
 	const char *next_nl = NULL;
 	__sz l = len;
 	__sz off = 0;
+#endif /* CONFIG_LIBPOSIX_TTY_SERIAL_ONLCR */
 	__ssz rc = 0;
 
 	if (unlikely(!len))
@@ -81,24 +86,34 @@ static inline __ssz _console_out(const char *buf, __sz len)
 	if (unlikely(!buf))
 		return -EINVAL;
 
+#if CONFIG_LIBPOSIX_TTY_SERIAL_ONLCR
 	while (l > 0) {
 		next_nl = memchr(buf, '\n', l);
 		if (next_nl) {
 			off = next_nl - buf;
-			if ((rc = uk_console_out(buf, off)) < 0)
+			if ((rc = cout(buf, off)) < 0)
 				return rc;
-			if ((rc = uk_console_out("\r\n", 2)) < 0)
+			if ((rc = cout("\r\n", 2)) < 0)
 				return rc;
 			buf = next_nl + 1;
 			l -= off + 1;
 		} else {
-			if ((rc = uk_console_out(buf, l)) < 0)
+			if ((rc = cout(buf, l)) < 0)
 				return rc;
 			break;
 		}
 	}
+#else /* !CONFIG_LIBPOSIX_TTY_SERIAL_ONLCR */
+	if ((rc = cout(buf, len)) < 0)
+		return rc;
+#endif /* !CONFIG_LIBPOSIX_TTY_SERIAL_ONLCR */
 
 	return len;
+}
+
+static inline __ssz _console_out(const char *buf, __sz len)
+{
+	return _console_write(uk_console_out, buf, len);
 }
 
 #if CONFIG_LIBPOSIX_TTY_SERIAL_EOF_FINAL
@@ -207,7 +222,12 @@ static ssize_t serial_write(const struct uk_file *f __maybe_unused,
 		if (unlikely(!buf && len))
 			return  -EFAULT;
 
-		bytes_written = _console_out(buf, len);
+#if CONFIG_LIBPOSIX_TTY_SERIAL_STDERR
+		if (f == &uk_file_serial_err)
+			bytes_written = _console_write(uk_console_err, buf, len);
+		else
+#endif /* CONFIG_LIBPOSIX_TTY_SERIAL_STDERR */
+			bytes_written = _console_out(buf, len);
 		if (unlikely(bytes_written < 0))
 			return bytes_written;
 
@@ -339,3 +359,21 @@ const struct uk_file uk_file_serial = {
 	.state = &serial_state,
 	._release = uk_file_static_release
 };
+
+#if CONFIG_LIBPOSIX_TTY_SERIAL_STDERR
+static uk_file_refcnt serial_err_ref =
+	UK_FILE_REFCNT_INITIALIZER(serial_err_ref);
+
+static struct uk_file_state serial_err_state =
+	UK_FILE_STATE_EVENTS_INITIALIZER(serial_err_state, UKFD_POLLOUT);
+
+/* Standard error: the serial console's output, on its error stream */
+const struct uk_file uk_file_serial_err = {
+	.vol = SERIAL_VOLID,
+	.node = NULL,
+	.ops = &serial_ops,
+	.refcnt = &serial_err_ref,
+	.state = &serial_err_state,
+	._release = uk_file_static_release
+};
+#endif /* CONFIG_LIBPOSIX_TTY_SERIAL_STDERR */
