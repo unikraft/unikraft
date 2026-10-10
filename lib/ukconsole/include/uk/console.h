@@ -56,6 +56,23 @@ __u16 uk_console_count(void);
 __ssz uk_console_out(const char *buf, __sz len);
 
 /**
+ * Write bytes to the STDERR default console(s).
+ *
+ * Write bytes to all STDOUT devices, through a device's `err`
+ * operation when it has one and through `out` otherwise, so a device
+ * that can tell standard error from standard output keeps them apart.
+ *
+ * @param buf
+ *   Source of bytes to write
+ * @param len
+ *   Number of bytes to write starting at buf
+ * @return
+ *   - (>=0): Number of bytes written
+ *   - (<0): Error
+ */
+__ssz uk_console_err(const char *buf, __sz len);
+
+/**
  * Read bytes from the STDIN console device(s).
  *
  * Read bytes from all devices that have the UK_CONSOLE_FLAG_STDIN

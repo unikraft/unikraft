@@ -58,6 +58,29 @@ __ssz uk_console_out(const char *buf, __sz len)
 	return len;
 }
 
+__ssz uk_console_err(const char *buf, __sz len)
+{
+	struct uk_console *dev = __NULL;
+
+	if (unlikely(!len))
+		return 0;
+
+	if (unlikely(!buf))
+		return -EINVAL;
+
+	/* Output to all STDOUT devices, on their error stream if they have one */
+	uk_list_for_each_entry(dev, &uk_console_device_list, _list) {
+		if (!(dev->flags & UK_CONSOLE_FLAG_STDOUT))
+			continue;
+		if (dev->ops->err)
+			dev->ops->err(dev, buf, len);
+		else if (dev->ops->out)
+			uk_console_out_direct(dev, buf, len);
+	}
+
+	return len;
+}
+
 __ssz uk_console_in(char *buf, __sz len)
 {
 	struct uk_console *dev = __NULL;
