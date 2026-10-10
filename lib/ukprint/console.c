@@ -82,6 +82,9 @@ struct vprint_console {
  * go to the start of the next line. This kind of behavior should be in
  * a single place in posix-tty. We keep this workaround until we have feature
  * in posix-tty that handles newline characters correctly.
+ *
+ * Kernel messages are diagnostics: they go to the consoles' error stream,
+ * kept apart from a program's standard output where a console can.
  */
 static __ssz console_out(const char *buf, __sz len)
 {
@@ -99,14 +102,14 @@ static __ssz console_out(const char *buf, __sz len)
 		next_nl = memchr(buf, '\n', l);
 		if (next_nl) {
 			off = next_nl - buf;
-			if ((rc = uk_console_out(buf, off)) < 0)
+			if ((rc = uk_console_err(buf, off)) < 0)
 				return rc;
-			if ((rc = uk_console_out("\r\n", 2)) < 0)
+			if ((rc = uk_console_err("\r\n", 2)) < 0)
 				return rc;
 			buf = next_nl + 1;
 			l -= off + 1;
 		} else {
-			if ((rc = uk_console_out(buf, l)) < 0)
+			if ((rc = uk_console_err(buf, l)) < 0)
 				return rc;
 			break;
 		}
