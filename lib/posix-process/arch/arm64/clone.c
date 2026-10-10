@@ -10,12 +10,11 @@
 #include <uk/lcpu.h>
 
 void clone_setup_child_ctx(struct ukarch_execenv *pexecenv,
-			   struct uk_thread *child, __uptr sp)
+			   struct uk_thread *child, __uptr sp, __uptr tlsp)
 {
 	struct ukarch_execenv *cexecenv;
 	struct ukarch_auxspcb *auxspcb;
 	__uptr auxsp_pos;
-	__u64 tlsp;
 
 	UK_ASSERT(pexecenv);
 	UK_ASSERT(child);
@@ -49,10 +48,8 @@ void clone_setup_child_ctx(struct ukarch_execenv *pexecenv,
 	uk_lcpu_regs_set(cexecenv->regs, SP, sp);
 
 	/* Use parent's userland TPIDR_EL0 if clone did not have SETTLS */
-	if (!child->tlsp)
+	if (!tlsp)
 		tlsp = uk_lcpu_sysctx_get(pexecenv->sysctx, TLSP);
-	else
-		tlsp = child->tlsp;
 
 	uk_lcpu_sysctx_set(cexecenv->sysctx, TLSP, tlsp);
 

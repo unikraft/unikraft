@@ -392,7 +392,13 @@ int uk_clone(struct clone_args *cl_args, size_t cl_args_len,
 		    t, t->name ? child->name : "<unnamed>",
 		    child, child->name ? child->name : "<unnamed>", ret);
 
-	clone_setup_child_ctx(execenv, child, (__uptr)stack);
+	/* The child's userland TLS is child->tlsp, or the parent's when that
+	 * is 0 -- except for a vfork child, whose tlsp is its Unikraft TLS,
+	 * for the scheduler: in userland it runs on the parent's TLS, as it
+	 * runs on the parent's stack.
+	 */
+	clone_setup_child_ctx(execenv, child, (__uptr)stack,
+			      (flags & CLONE_VFORK) ? 0 : child->tlsp);
 
 	uk_thread_set_runnable(child);
 
