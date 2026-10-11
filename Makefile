@@ -299,6 +299,11 @@ XARGS := xargs
 CONFIG_SHELL := $(SHELL)
 export SHELL CONFIG_SHELL Q KBUILD_VERBOSE
 
+# Kconfig tools are needed before a .config exists, so select them outside
+# the configured-build section below.
+YACC := bison
+LEX  := flex
+
 ################################################################################
 # Create minimal necessary folder structure
 ################################################################################
@@ -674,8 +679,6 @@ GREP		:= grep
 READLINK	:= readlink
 DIRNAME		:= dirname
 endif
-YACC		:= bison
-LEX     	:= flex
 PATCH		:= patch
 GZIP		:= gzip
 TAR		:= tar
