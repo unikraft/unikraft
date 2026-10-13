@@ -75,7 +75,7 @@ if LIBSYSCALL_SHIM
 			config LIBSYSCALL_SHIM_STRACE_ANSI_COLOR
 			bool "Use ANSI-colored syntax highlighting"
 			default n
-			default y if LIBUKDEBUG_ANSI_COLOR
+			default y if LIBUKPRINT_ANSI_COLOR
 
 			config LIBSYSCALL_SHIM_STRACE_PRINT_TYPE
 			bool "Print type name"
