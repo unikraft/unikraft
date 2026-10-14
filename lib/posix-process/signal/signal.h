@@ -303,6 +303,12 @@ int pprocess_signal_thread_do(int tid, int signum, siginfo_t *siginfo);
  */
 void pthread_signal_pause(struct posix_thread *pthread);
 
+/* Signal @parent that a child exits, with @signum, the child's exit
+ * signal: as kill() would (dropped if ignored and blocked by no thread,
+ * init spared, a signal that ends @parent ends it)
+ */
+int pprocess_signal_notify_parent(struct posix_process *parent, int signum);
+
 /* Signal a process */
 int pprocess_signal_send(struct posix_process *proc, int signum,
 			 siginfo_t *siginfo);
