@@ -4,6 +4,8 @@
  * You may not use this file except in compliance with the License.
  */
 
+#include <string.h>
+
 #include <uk/process.h>
 #include <uk/refcount.h>
 #include <uk/semaphore.h>
@@ -418,6 +420,51 @@ int pprocess_signal_thread_do(int tid, int signum, siginfo_t *siginfo)
 
 	return 0;
 }
+
+#if CONFIG_LIBPOSIX_PROCESS_EXECVE
+/* execve(2): a handler is code of the image being replaced.  Caught
+ * signals go back to their default, ignored ones stay ignored, and the
+ * alternate stack, the old image's memory too, goes.  Without this a
+ * program inherited the handlers its parent set before vfork() and
+ * exec(): a signal it did not catch ran its parent's code instead.
+ */
+static int pprocess_signal_execve(void *data)
+{
+	struct posix_process_execve_event_data *event_data = data;
+	struct posix_process *pproc;
+	struct uk_sigaction *shared;
+	int signum;
+	int rc;
+
+	pproc = pid2pprocess(event_data->pid);
+	UK_ASSERT(pproc);
+
+	/* A table shared with other processes (CLONE_SIGHAND) stays theirs */
+	shared = pproc->signal->sigaction;
+	if (uk_refcount_read(&shared->refcnt) > 1) {
+		rc = pprocess_signal_sigaction_new(pproc->_a, pproc->signal);
+		if (unlikely(rc)) {
+			/* It cleared the pointer: the shared table is still ours */
+			pproc->signal->sigaction = shared;
+			return rc;
+		}
+		memcpy(pproc->signal->sigaction->ks, shared->ks,
+		       sizeof(shared->ks));
+		pprocess_signal_sigaction_release(shared);
+	}
+
+	pprocess_signal_foreach(signum) {
+		if (KERN_SIGACTION(pproc, signum)->ks_handler != SIG_IGN)
+			pprocess_signal_sigaction_clear(
+				KERN_SIGACTION(pproc, signum));
+	}
+	pproc->signal->altstack = (stack_t){ .ss_flags = SS_DISABLE };
+
+	return UK_EVENT_HANDLED_CONT;
+}
+
+POSIX_PROCESS_EXECVE_HANDLER(pprocess_signal_execve);
+#endif /* CONFIG_LIBPOSIX_PROCESS_EXECVE */
 
 int pprocess_signal_pdesc_alloc(struct posix_process *process)
 {
