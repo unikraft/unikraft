@@ -281,13 +281,48 @@ static void pprocess_signal_end(struct posix_process *pproc, int signum)
 	pprocess_signal_interrupt(pproc);
 }
 
+/* As Linux spares a namespace's init the signals it has no handler for
+ * (SIGNAL_UNKILLABLE): its death would end the guest.  Spared when another
+ * process sends them, or init signals a group it is in (kill(0)); not when
+ * init aims one at itself, which is how abort() ends it.  Only one whose
+ * default action ends a process is spared: init may wait for the others,
+ * as ukboot's reads SIGCHLD from a signalfd.  One a thread of init blocks
+ * is init's to take (ukboot's takes SIGTERM for a request to shut down):
+ * sent to init it is delivered, as on Linux; sent to a group, unlike
+ * Linux, it is spared, as a command's kill(0) must not end the guest.
+ */
+static bool pprocess_signal_spares_init(struct posix_process *pproc,
+					int signum, bool group)
+{
+	struct posix_thread *thread, *threadn;
+
+	if (pproc->pid != UK_PID_INIT ||
+	    (!group && pproc == uk_pprocess_current()) ||
+	    KERN_SIGACTION(pproc, signum)->ks_handler != SIG_DFL ||
+	    !(signum == SIGKILL || signum >= SIGRTMIN ||
+	      UK_BIT(signum) & (SIGACT_TERM_MASK | SIGACT_CORE_MASK)))
+		return false;
+
+	if (!group) {
+		uk_pprocess_foreach_pthread(pproc, thread, threadn) {
+			if (IS_MASKED(thread, signum))
+				return false;
+		}
+	}
+	return true;
+}
+
 /* Send @signum to @pproc, unless it ignores it; @pproc is permitted */
 static int pprocess_signal_process_one(struct posix_process *pproc,
-				       int signum, siginfo_t *siginfo)
+				       int signum, siginfo_t *siginfo,
+				       bool group)
 {
 	int rc;
 
 	if (pprocess_signal_should_drop(pproc, signum))
+		return 0;
+
+	if (pprocess_signal_spares_init(pproc, signum, group))
 		return 0;
 
 	rc = pprocess_signal_send(pproc, signum, siginfo);
@@ -346,7 +381,7 @@ int pprocess_signal_process_do(pid_t pid, int signum, siginfo_t *siginfo)
 			 * succeeds if any member took it.
 			 */
 			rc = pprocess_signal_process_one(pproc, signum,
-							 siginfo);
+							 siginfo, true);
 			if (unlikely(rc))
 				err = rc;
 			else
@@ -369,7 +404,7 @@ int pprocess_signal_process_do(pid_t pid, int signum, siginfo_t *siginfo)
 	if (!signum)
 		return 0;
 
-	return pprocess_signal_process_one(pproc, signum, siginfo);
+	return pprocess_signal_process_one(pproc, signum, siginfo, false);
 }
 
 int pprocess_signal_thread_do(int tid, int signum, siginfo_t *siginfo)
@@ -379,12 +414,19 @@ int pprocess_signal_thread_do(int tid, int signum, siginfo_t *siginfo)
 	struct uk_signal *sig;
 	int rc;
 
+	/* A number from userland, used as an index below */
+	if (unlikely(signum != 0 && !IS_VALID(signum)))
+		return -EINVAL;
+
 	pthread = tid2pthread(tid);
 	if (unlikely(!pthread))
 		return -EINVAL;
 
 	pproc = tid2pprocess(tid);
 	UK_ASSERT(pproc);
+
+	if (signum && pprocess_signal_spares_init(pproc, signum, false))
+		return 0;
 
 	sig = uk_signal_alloc(pthread->_a);
 	if (unlikely(!sig)) {
