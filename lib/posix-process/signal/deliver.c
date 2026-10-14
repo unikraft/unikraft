@@ -604,6 +604,14 @@ void sys_error_handler(struct ukarch_execenv *ee __unused, long arg)
 		UK_BUG(); /* noreturn */
 	}
 
+	/* Out of memory (see pprocess_signal_pf_handler) */
+	if (error->signum == SIGKILL) {
+		uk_pr_err("Out of memory: killed process %d (pc 0x%lx, no page for 0x%lx)\n",
+			  pproc->pid, error->pc, error->vaddr);
+		uk_sigact_term(SIGKILL);
+		UK_BUG(); /* noreturn */
+	}
+
 	/* If the application masks or ignores this signal, panic.
 	 * A general-purpose OS would terminate the application.
 	 * Being a unikernel, we treat this as a non-recoverable

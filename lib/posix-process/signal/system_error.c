@@ -4,6 +4,8 @@
  * You may not use this file except in compliance with the License.
  */
 
+#include <errno.h>
+
 #include <uk/arch/ctx.h>
 #include <uk/essentials.h>
 #include <uk/event.h>
@@ -93,6 +95,12 @@ int sys_error_handler_except(int signum,
 
 static int pprocess_signal_pf_handler(void *arg)
 {
+	/* A fault that found no memory to back the page: the program did
+	 * nothing wrong, the guest ran out. Kill it as Linux's OOM killer
+	 * would, rather than blame it with a SIGSEGV.
+	 */
+	if (uk_lcpu_except_err_ctx_get_handler_err(arg) == -ENOMEM)
+		return sys_error_handler_except(SIGKILL, arg);
 	return sys_error_handler_except(SIGSEGV, arg);
 }
 
