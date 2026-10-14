@@ -28,6 +28,9 @@
  *
  * Setting pthread to NULL signifies that the signal
  * targets the process.
+ *
+ * Returns 1, not taking @sig, for a standard signal already pending
+ * there: the caller frees it.
  */
 static int pprocess_signal_enqueue(struct posix_process *pproc,
 				   struct posix_thread *pthread,
@@ -49,18 +52,22 @@ static int pprocess_signal_enqueue(struct posix_process *pproc,
 	if (pthread) {
 		/* Standard signals can be queued once */
 		if (signum < SIGRTMIN && IS_PENDING(pthread->signal->sigqueue, signum))
-			return 0;
+			return 1;
 
 		uk_pr_debug("Queueing signal %d for tid %d (pid %d)\n",
 			    signum, pthread->tid, pproc->pid);
 
 		uk_list_add_tail(&sig->list_head,
 				 &pthread->signal->sigqueue.list_head[signum]);
-		SET_PENDING(pproc->signal->sigqueue, signum);
+		/* The thread's, as the dequeue clears it: marked on the
+		 * process, it would stay set and make a later kill() of the
+		 * process count as pending already, and be dropped
+		 */
+		SET_PENDING(pthread->signal->sigqueue, signum);
 	} else {
 		/* Standard signals can be queued once */
 		if (signum < SIGRTMIN && IS_PENDING(pproc->signal->sigqueue, signum))
-			return 0;
+			return 1;
 
 		uk_pr_debug("Queueing signal %d for pid %d\n",
 			    signum, pproc->pid);
@@ -233,6 +240,11 @@ int pprocess_signal_send(struct posix_process *proc, int signum,
 		set_siginfo_kill(signum, &sig->siginfo);
 
 	rc = pprocess_signal_enqueue(proc, NULL, sig);
+	if (rc == 1) {
+		/* Already pending: the one queued stands for both */
+		uk_signal_free(proc->_a, sig);
+		return 0;
+	}
 	if (unlikely(rc)) {
 		/* issue a warning as this may be temporary */
 		uk_pr_warn("Could not queue signal\n");
@@ -478,6 +490,12 @@ int pprocess_signal_thread_do(int tid, int signum, siginfo_t *siginfo)
 	if (pprocess_signal_spares_init(pproc, signum, false))
 		return 0;
 
+	/* Ignored, as for a process: queued, it would stay pending (nothing
+	 * delivers it) and swallow the copies sent once it is handled
+	 */
+	if (pprocess_signal_should_drop(pproc, signum))
+		return 0;
+
 	sig = uk_signal_alloc(pthread->_a);
 	if (unlikely(!sig)) {
 		uk_pr_err("Could not allocate signal\n");
@@ -490,7 +508,13 @@ int pprocess_signal_thread_do(int tid, int signum, siginfo_t *siginfo)
 		set_siginfo_kill(signum, &sig->siginfo);
 
 	rc = pprocess_signal_enqueue(pproc, pthread, sig);
-	if (unlikely(rc)) {
+	if (rc == 1) {
+		/* Already pending: the one queued stands for both.  What
+		 * follows still holds for it: a handler reset to the default
+		 * since the first may make this one end the process.
+		 */
+		uk_signal_free(pthread->_a, sig);
+	} else if (unlikely(rc)) {
 		/* issue a warning as this may be temporary */
 		uk_pr_warn("Could not queue signal\n");
 		uk_signal_free(pthread->_a, sig);
