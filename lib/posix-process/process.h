@@ -171,6 +171,9 @@ void pprocess_exit_pthread(struct posix_thread *pthread,
  *                     POSIX_PROCESS_STATE_KILLED if terminated by signal.
  * @param exit_status  The exit status of the terminating process.
  */
+/* Wake every thread of @pprocess waiting in wait(), to look again */
+void pprocess_wake_waiters(struct posix_process *pprocess);
+
 void pprocess_exit(struct posix_process *process,
 		   enum posix_process_state state,
 		   int exit_status);
