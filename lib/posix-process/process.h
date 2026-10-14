@@ -71,6 +71,8 @@ struct posix_process {
 #endif /* CONFIG_LIBPOSIX_PROCESS_SIGNAL */
 	struct uk_semaphore wait_semaphore;
 	struct uk_semaphore exit_semaphore;
+	/* Woken when a vfork child gives a thread its stack back */
+	struct uk_waitq vfork_waitq;
 	enum posix_process_state state;
 	__u64 exit_signal;
 	int exit_status;
@@ -171,6 +173,11 @@ void pprocess_exit_pthread(struct posix_thread *pthread,
  *                     POSIX_PROCESS_STATE_KILLED if terminated by signal.
  * @param exit_status  The exit status of the terminating process.
  */
+/* Wait until no thread of the caller's process lends its stack to a
+ * vfork child
+ */
+void pprocess_wait_vfork(struct posix_process *pprocess);
+
 /* Wake every thread of @pprocess waiting in wait(), to look again */
 void pprocess_wake_waiters(struct posix_process *pprocess);
 
