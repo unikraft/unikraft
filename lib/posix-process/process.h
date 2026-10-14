@@ -74,6 +74,7 @@ struct posix_process {
 	enum posix_process_state state;
 	__u64 exit_signal;
 	int exit_status;
+	int term_signal; /* the signal ending it, while it ends; 0 before */
 #if CONFIG_LIBPOSIX_PROCESS_BRK
 	struct {
 		struct uk_mutex mtx;
