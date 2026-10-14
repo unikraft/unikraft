@@ -11,6 +11,7 @@
 #include <uk/plat/config.h>
 #include <uk/process.h>
 #include <uk/syscall.h>
+#include <uk/sched.h>
 #include <uk/thread.h>
 
 #include "process.h"
@@ -55,7 +56,7 @@ static void __noreturn execve_ctx_switch(long arg0, long arg1)
 		uk_pr_debug("Waking up parent (tid %d)\n", pthread_parent->tid);
 		uk_thread_wake(tid2ukthread(pthread_parent->tid));
 		pthread_parent->state = POSIX_THREAD_RUNNING;
-	} else {
+	} else if (stack_old) {
 		uk_free(this_thread->_mem.stack_a, stack_old);
 	}
 
@@ -88,6 +89,7 @@ UK_SYSCALL_R_E_DEFINE(int, execve, const char *, pathname,
 	struct posix_process_execve_event_data event_data;
 	struct uk_binfmt_loader_args loader_args;
 	struct ukarch_execenv *execenv_new;
+	struct uk_alloc *stack_a;
 	struct uk_thread *this_thread;
 	struct ukarch_ctx ctx_old;
 	void *stack_old;
@@ -120,8 +122,7 @@ UK_SYSCALL_R_E_DEFINE(int, execve, const char *, pathname,
 
 	/* Allocate a new stack. Even if we don't come from vfork we
 	 * can't operate on the current thread's stack without either
-	 * corrupting it or wasting space. Use the threads's
-	 * stack allocator for the new stack.
+	 * corrupting it or wasting space.
 	 */
 #if CONFIG_LIBPOSIX_PROCESS_EXECVE_STACK_SIZE_PAGES
 	const __sz exec_stack_size =
@@ -129,7 +130,13 @@ UK_SYSCALL_R_E_DEFINE(int, execve, const char *, pathname,
 #else
 	const __sz exec_stack_size = STACK_SIZE;
 #endif
-	stack_new = uk_malloc(this_thread->_mem.stack_a, exec_stack_size);
+	/* A thread made by clone() got its stack from its caller and has
+	 * no stack allocator: the new stack comes from the scheduler's.
+	 */
+	stack_a = this_thread->_mem.stack_a;
+	if (!stack_a)
+		stack_a = uk_sched_current()->a_stack;
+	stack_new = uk_malloc(stack_a, exec_stack_size);
 	if (unlikely(!stack_new)) {
 		uk_pr_err("Could not allocate stack\n");
 		return -ENOMEM;
@@ -194,10 +201,17 @@ UK_SYSCALL_R_E_DEFINE(int, execve, const char *, pathname,
 	 * a context-switch trampoline that we execute on the new stack.
 	 */
 	stack_old = this_thread->_mem.stack;
-	uk_pr_debug("%s: Old stack at %p - %p\n", loader_args.progname,
-		    stack_old, (void *)((uintptr_t)stack_old + STACK_SIZE));
+	/* The trampoline frees the old stack (except from init) with the
+	 * thread's allocator: a thread without one did not allocate it
+	 */
+	if (!this_thread->_mem.stack_a)
+		stack_old = NULL;
+	if (stack_old)
+		uk_pr_debug("%s: Old stack at %p\n",
+			    loader_args.progname, stack_old);
 
 	this_thread->_mem.stack = stack_new;
+	this_thread->_mem.stack_a = stack_a;
 	this_thread->ctx = loader_args.ctx;
 
 	ukarch_ctx_init_entry2(&loader_args.ctx,
@@ -209,7 +223,7 @@ UK_SYSCALL_R_E_DEFINE(int, execve, const char *, pathname,
 	UK_BUG(); /* noreturn */
 
 err_free_stack_new:
-	uk_free(this_thread->_mem.stack_a, stack_new);
+	uk_free(stack_a, stack_new);
 
 	return rc;
 }
