@@ -4,6 +4,17 @@ menuconfig LIBUKCONSOLE
 	select LIBUKBITOPS
 
 if LIBUKCONSOLE
+config LIBUKCONSOLE_ONLCR
+	bool "Translate newline to CR-LF on console output"
+	default n if PLAT_HYPERLIGHT
+	default y
+	help
+	  Write each newline written to the console as CR-LF, for consoles
+	  that need a carriage return to start the next line.  Turn it off
+	  where the console hands output to a host that keeps its bytes,
+	  such as one capturing a program's output: the host then sees the
+	  newlines as written.
+
 config LIBUKCONSOLE_TEST
 	bool "Enable unit tests"
 	select LIBUKTEST

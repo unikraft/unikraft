@@ -56,9 +56,10 @@ __u16 uk_console_count(void);
 __ssz uk_console_out(const char *buf, __sz len);
 
 /**
- * Write bytes to the STDERR default console(s).
+ * Write standard-error bytes to the STDOUT default console(s).
  *
- * Write bytes to all STDOUT devices, through a device's `err`
+ * There is no STDERR console flag: write bytes to all devices with
+ * UK_CONSOLE_FLAG_STDOUT set, through a device's `err`
  * operation when it has one and through `out` otherwise, so a device
  * that can tell standard error from standard output keeps them apart.
  *
@@ -71,6 +72,34 @@ __ssz uk_console_out(const char *buf, __sz len);
  *   - (<0): Error
  */
 __ssz uk_console_err(const char *buf, __sz len);
+
+/**
+ * uk_console_out(), writing each newline as CR-LF if
+ * CONFIG_LIBUKCONSOLE_ONLCR is set and as written otherwise.
+ *
+ * @param buf
+ *   Source of bytes to write
+ * @param len
+ *   Number of bytes to write starting at buf
+ * @return
+ *   - (>=0): Number of bytes written
+ *   - (<0): Error
+ */
+__ssz uk_console_out_onlcr(const char *buf, __sz len);
+
+/**
+ * uk_console_err(), writing each newline as CR-LF if
+ * CONFIG_LIBUKCONSOLE_ONLCR is set and as written otherwise.
+ *
+ * @param buf
+ *   Source of bytes to write
+ * @param len
+ *   Number of bytes to write starting at buf
+ * @return
+ *   - (>=0): Number of bytes written
+ *   - (<0): Error
+ */
+__ssz uk_console_err_onlcr(const char *buf, __sz len);
 
 /**
  * Read bytes from the STDIN console device(s).
@@ -101,6 +130,20 @@ __ssz uk_console_in(char *buf, __sz len);
   *   - (<0): Error
   */
 __ssz uk_console_out_direct(struct uk_console *dev, const char *buf, __sz len);
+
+/**
+ * Write standard-error bytes to the given console device: through its
+ * `err` operation, or through `out` when it has none.
+ *
+ * @param buf
+ *   Source of bytes to write
+ * @param len
+ *   Number of bytes to write starting at buf
+ * @return
+ *   - (>=0): Number of bytes written
+ *   - (<0): Error
+ */
+__ssz uk_console_err_direct(struct uk_console *dev, const char *buf, __sz len);
 
 /**
  * Read bytes from the given console device.

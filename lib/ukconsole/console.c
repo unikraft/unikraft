@@ -10,6 +10,9 @@
 #include <uk/console.h>
 #include <uk/console/driver.h>
 #include <errno.h>
+#if CONFIG_LIBUKCONSOLE_ONLCR
+#include <string.h>
+#endif /* CONFIG_LIBUKCONSOLE_ONLCR */
 
 #if CONFIG_LIBUKDEBUG_PRINTK
 #include <uk/print.h>
@@ -39,7 +42,8 @@ __u16 uk_console_count(void)
 	return uk_console_device_count;
 }
 
-__ssz uk_console_out(const char *buf, __sz len)
+/* There is no STDERR flag: standard error goes to the STDOUT devices */
+static __ssz console_write(const char *buf, __sz len, __bool err)
 {
 	struct uk_console *dev = __NULL;
 
@@ -49,36 +53,76 @@ __ssz uk_console_out(const char *buf, __sz len)
 	if (unlikely(!buf))
 		return -EINVAL;
 
-	/* Output to all STDOUT devices */
 	uk_list_for_each_entry(dev, &uk_console_device_list, _list) {
-		if ((dev->flags & UK_CONSOLE_FLAG_STDOUT) && dev->ops->out)
+		if (!(dev->flags & UK_CONSOLE_FLAG_STDOUT))
+			continue;
+		if (err)
+			uk_console_err_direct(dev, buf, len);
+		else
 			uk_console_out_direct(dev, buf, len);
 	}
 
 	return len;
 }
 
+__ssz uk_console_out(const char *buf, __sz len)
+{
+	return console_write(buf, len, __false);
+}
+
 __ssz uk_console_err(const char *buf, __sz len)
 {
-	struct uk_console *dev = __NULL;
+	return console_write(buf, len, __true);
+}
+
+/* One place for the CR-LF serial consoles need and byte-keeping hosts do not */
+static __ssz console_write_onlcr(__ssz (*write)(const char *, __sz),
+				 const char *buf, __sz len)
+{
+#if CONFIG_LIBUKCONSOLE_ONLCR
+	const char *next_nl;
+	__sz l = len;
+	__sz off;
+#endif /* CONFIG_LIBUKCONSOLE_ONLCR */
+	__ssz rc;
 
 	if (unlikely(!len))
 		return 0;
-
 	if (unlikely(!buf))
 		return -EINVAL;
 
-	/* Output to all STDOUT devices, on their error stream if they have one */
-	uk_list_for_each_entry(dev, &uk_console_device_list, _list) {
-		if (!(dev->flags & UK_CONSOLE_FLAG_STDOUT))
-			continue;
-		if (dev->ops->err)
-			dev->ops->err(dev, buf, len);
-		else if (dev->ops->out)
-			uk_console_out_direct(dev, buf, len);
+#if CONFIG_LIBUKCONSOLE_ONLCR
+	while (l > 0) {
+		next_nl = memchr(buf, '\n', l);
+		if (!next_nl) {
+			if ((rc = write(buf, l)) < 0)
+				return rc;
+			break;
+		}
+		off = next_nl - buf;
+		if ((rc = write(buf, off)) < 0)
+			return rc;
+		if ((rc = write("\r\n", 2)) < 0)
+			return rc;
+		buf = next_nl + 1;
+		l -= off + 1;
 	}
+#else /* !CONFIG_LIBUKCONSOLE_ONLCR */
+	if ((rc = write(buf, len)) < 0)
+		return rc;
+#endif /* !CONFIG_LIBUKCONSOLE_ONLCR */
 
 	return len;
+}
+
+__ssz uk_console_out_onlcr(const char *buf, __sz len)
+{
+	return console_write_onlcr(uk_console_out, buf, len);
+}
+
+__ssz uk_console_err_onlcr(const char *buf, __sz len)
+{
+	return console_write_onlcr(uk_console_err, buf, len);
 }
 
 __ssz uk_console_in(char *buf, __sz len)
@@ -133,6 +177,20 @@ __ssz uk_console_out_direct(struct uk_console *dev, const char *buf, __sz len)
 		return -EIO;
 
 	return dev->ops->out(dev, buf, len);
+}
+
+__ssz uk_console_err_direct(struct uk_console *dev, const char *buf, __sz len)
+{
+	UK_ASSERT(dev && dev->ops);
+
+	if (unlikely(!len))
+		return 0;
+
+	if (unlikely(!buf))
+		return -EINVAL;
+
+	return dev->ops->err ? dev->ops->err(dev, buf, len)
+			     : uk_console_out_direct(dev, buf, len);
 }
 
 __ssz uk_console_in_direct(struct uk_console *dev, char *buf, __sz len)
