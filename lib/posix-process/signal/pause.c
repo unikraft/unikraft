@@ -22,8 +22,7 @@ UK_SYSCALL_R_DEFINE(int, pause)
 	/* Return as soon as a signal is queued. The signal will
 	 * be delivered at syscall exit.
 	 */
-	pthread->state = POSIX_THREAD_BLOCKED_SIGNAL;
-	uk_semaphore_down(&pthread->signal->deliver_semaphore);
+	pthread_signal_pause(pthread);
 
 	return -EINTR;
 }
