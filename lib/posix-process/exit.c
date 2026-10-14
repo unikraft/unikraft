@@ -20,9 +20,11 @@
 
 #include "process.h"
 
-#define PTHREAD_WAITING_FOR_PID(_pt, _pid)				\
+#define PTHREAD_WAITING_FOR(_pt, _pproc)				\
 	((_pt)->state == POSIX_THREAD_BLOCKED_WAIT &&			\
-	 ((_pt)->wait_pid == (_pid) || (_pt)->wait_pid == -1))
+	 ((_pt)->wait_pid == (_pproc)->pid ||				\
+	  ((_pt)->wait_pid == -1 &&					\
+	   (!(_pt)->wait_pgid || (_pt)->wait_pgid == (_pproc)->pgid))))
 
 #if CONFIG_LIBPOSIX_PROCESS_SIGNAL
 #define PTHREAD_BLOCKING_ON_SIGNAL(_pt)					\
@@ -214,13 +216,13 @@ void pprocess_exit(struct posix_process *pprocess,
 
 	uk_semaphore_up(&pprocess->exit_semaphore);
 
-	/* Unblock wait. Match on the exiting process's pid, not the
-	 * caller's: the caller's pthread is gone by now (getpid() fails),
-	 * and with kill(2) the caller is not the exiting process at all.
+	/* Unblock wait. Match on the exiting process, not the caller: the
+	 * caller's pthread is gone by now (getpid() fails), and with kill(2)
+	 * the caller is not the exiting process at all.
 	 */
 	if (parent_process && !nowait) {
 		uk_pprocess_foreach_pthread(parent_process, pt, ptn) {
-			if (PTHREAD_WAITING_FOR_PID(pt, pprocess->pid) ||
+			if (PTHREAD_WAITING_FOR(pt, pprocess) ||
 			    PTHREAD_BLOCKING_ON_SIGNAL(pt)) {
 				uk_semaphore_up(&parent_process->wait_semaphore);
 				break;
