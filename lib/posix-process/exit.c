@@ -109,6 +109,31 @@ void pprocess_wake_waiters(struct posix_process *pprocess)
 		uk_semaphore_up(&pprocess->wait_semaphore);
 }
 
+/* Wait until no thread of @pprocess, the caller's, lends its stack to a
+ * vfork child: the child runs on it until it execs or exits, which gives
+ * it back.  Ending such a thread first would free the stack, and the
+ * thread the child wakes, from under the child.
+ */
+static __bool pprocess_lends_to_vfork(struct posix_process *pprocess)
+{
+	struct posix_thread *pt, *ptn;
+
+	uk_pprocess_foreach_pthread(pprocess, pt, ptn) {
+		if (pt->state == POSIX_THREAD_BLOCKED_VFORK)
+			return true;
+	}
+	return false;
+}
+
+void pprocess_wait_vfork(struct posix_process *pprocess)
+{
+	/* Blocked, not yielding: the guest goes idle, so what the child
+	 * waits for (the host, another thread) can come.
+	 */
+	uk_waitq_wait_event(&pprocess->vfork_waitq,
+			    !pprocess_lends_to_vfork(pprocess));
+}
+
 /* Exit AND release pthread.
  * Notice: Unlike pprocesses, pthreads are released upon exit.
  */
@@ -150,6 +175,7 @@ void pprocess_exit_pthread(struct posix_thread *pthread,
 	    parent_pthread->state == POSIX_THREAD_BLOCKED_VFORK) {
 		uk_thread_wake(parent_pthread->thread);
 		parent_pthread->state = POSIX_THREAD_RUNNING;
+		uk_waitq_wake_up(&parent_pthread->process->vfork_waitq);
 	}
 
 	/* Release pthread and terminate the underlying uk_thread
@@ -180,6 +206,15 @@ void pprocess_exit(struct posix_process *pprocess,
 
 	UK_ASSERT(pprocess);
 	UK_ASSERT(pprocess->state == POSIX_PROCESS_RUNNING);
+
+	/* The shutdown path ends processes from a thread that is none's */
+	if (uk_pthread_current() &&
+	    uk_pthread_current()->process == pprocess) {
+		pprocess_wait_vfork(pprocess);
+		/* Another of its threads may have ended it meanwhile */
+		if (pprocess->state != POSIX_PROCESS_RUNNING)
+			uk_sched_thread_exit();
+	}
 
 	uk_pr_debug("pid %d: exit process\n", pprocess->pid);
 

@@ -56,6 +56,7 @@ static void __noreturn execve_ctx_switch(long arg0, long arg1)
 		uk_pr_debug("Waking up parent (tid %d)\n", pthread_parent->tid);
 		uk_thread_wake(tid2ukthread(pthread_parent->tid));
 		pthread_parent->state = POSIX_THREAD_RUNNING;
+		uk_waitq_wake_up(&pthread_parent->process->vfork_waitq);
 	} else if (stack_old) {
 		uk_free(this_thread->_mem.stack_a, stack_old);
 	}
@@ -105,6 +106,13 @@ UK_SYSCALL_R_E_DEFINE(int, execve, const char *, pathname,
 
 	this_thread = uk_thread_current();
 	UK_ASSERT(this_thread);
+
+	/* The other threads end with the old image (pprocess_cleanup()), and
+	 * not one may be lending its stack to a running vfork child.  Wait
+	 * for that here, before anything of the image is replaced: the wait
+	 * lets them run.
+	 */
+	pprocess_wait_vfork(uk_pprocess_current());
 
 	loader_args.argv = (const char **)argv;
 	loader_args.envp = (const char **)envp;
