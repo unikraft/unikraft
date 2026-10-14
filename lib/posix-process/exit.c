@@ -252,6 +252,11 @@ void pprocess_exit(struct posix_process *pprocess,
 			pprocess_wake_waiters(parent_process);
 	} else if (nowait) { /* release now */
 		pprocess_release(pprocess);
+		/* Gone from its parent's children: a wait() of the parent's
+		 * may now have none left (ECHILD)
+		 */
+		if (parent_process)
+			pprocess_wake_waiters(parent_process);
 	}
 }
 

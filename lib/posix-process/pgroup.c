@@ -18,6 +18,24 @@
 
 #include "process.h"
 
+/* @p leaves its group: wake its parent's threads waiting for a child of
+ * that group, which may have no child left in it (ECHILD).
+ */
+static void pgroup_leave(struct posix_process *p)
+{
+	struct posix_thread *pt, *ptn;
+
+	if (!p->parent)
+		return;
+	uk_pprocess_foreach_pthread(p->parent, pt, ptn) {
+		if (pt->state == POSIX_THREAD_BLOCKED_WAIT &&
+		    pt->wait_pid == -1 && pt->wait_pgid == p->pgid) {
+			pprocess_wake_waiters(p->parent);
+			return;
+		}
+	}
+}
+
 /* Whether a process of @sid has @pgid as its group */
 static bool pgroup_exists(pid_t pgid, pid_t sid)
 {
@@ -43,6 +61,7 @@ UK_SYSCALL_R_DEFINE(pid_t, setsid)
 			return -EPERM;
 	}
 
+	pgroup_leave(this);
 	this->sid = this->pid;
 	this->pgid = this->pid;
 	return this->sid;
@@ -83,6 +102,8 @@ UK_SYSCALL_R_DEFINE(int, setpgid, pid_t, pid, pid_t, pgid)
 	if (pgid != p->pid && !pgroup_exists(pgid, this->sid))
 		return -EPERM;
 
+	if (p->pgid != pgid)
+		pgroup_leave(p);
 	p->pgid = pgid;
 	return 0;
 }
