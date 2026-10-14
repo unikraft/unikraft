@@ -397,6 +397,36 @@ static int pprocess_signal_process_one(struct posix_process *pproc,
 	return 0;
 }
 
+int pprocess_signal_notify_parent(struct posix_process *parent, int signum)
+{
+	struct posix_thread *thread, *threadn;
+	int rc;
+
+	/* Ignored, it is dropped, as kill() drops it, unless a thread
+	 * blocks it: then, as on Linux, it stays pending for that thread to
+	 * take with sigtimedwait()
+	 */
+	if (pprocess_signal_should_drop(parent, signum)) {
+		uk_pprocess_foreach_pthread(parent, thread, threadn) {
+			if (IS_MASKED(thread, signum))
+				goto send;
+		}
+		return 0;
+	}
+
+send:
+	if (pprocess_signal_spares_init(parent, signum, false))
+		return 0;
+
+	rc = pprocess_signal_send(parent, signum, NULL);
+	if (unlikely(rc))
+		return rc;
+
+	if (pprocess_signal_is_fatal(parent, signum))
+		pprocess_signal_end(parent, signum);
+	return 0;
+}
+
 int pprocess_signal_process_do(pid_t pid, int signum, siginfo_t *siginfo)
 {
 	struct posix_process *this_process = uk_pprocess_current();

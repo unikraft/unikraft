@@ -54,6 +54,11 @@ static void pprocess_reparent_children(struct posix_process *pprocess)
 		uk_list_del(&pchild->child_list_entry);
 		if (pprocess_init && pprocess != pprocess_init) {
 			pchild->parent = pprocess_init;
+			/* Its exit is for init to hear of as SIGCHLD, whatever
+			 * signal it was to send its parent, as on Linux: init
+			 * has no handler for most signals and would die of one
+			 */
+			pchild->exit_signal = SIGCHLD;
 			uk_list_add(&pchild->child_list_entry,
 				    &pprocess_init->children);
 			uk_pr_debug("Process PID %d re-assigned to PID %d\n",
@@ -68,24 +73,51 @@ static void pprocess_reparent_children(struct posix_process *pprocess)
 }
 
 #if CONFIG_LIBPOSIX_PROCESS_SIGNAL
-static inline int signal_exit(struct posix_process *pprocess)
+/* Signal @parent that @child exits, with the child's exit signal (the one
+ * its clone() named), not the parent's own.  Returns 1 when the parent
+ * discards its children's status (SIGCHLD ignored, or SA_NOCLDWAIT).
+ */
+static inline int signal_exit(struct posix_process *parent,
+			      struct posix_process *child)
 {
 	struct kern_sigaction *ks;
 	__u64 exit_signal;
+	int discard = 0;
+	int rc;
 
-	UK_ASSERT(pprocess);
-	UK_ASSERT(pprocess->signal);
+	UK_ASSERT(parent);
+	UK_ASSERT(parent->signal);
+	UK_ASSERT(child);
 
-	if (pprocess->exit_signal)
-		exit_signal = pprocess->exit_signal;
-	else
-		exit_signal = SIGCHLD;
+	exit_signal = child->exit_signal ? child->exit_signal : SIGCHLD;
 
-	ks = KERN_SIGACTION(pprocess, exit_signal);
-	if (ks->ks_handler == SIG_IGN || ks->ks_flags & SA_NOCLDWAIT)
-		return 1;
+	if (exit_signal == SIGCHLD) {
+		ks = KERN_SIGACTION(parent, SIGCHLD);
+		if (ks->ks_handler == SIG_IGN)
+			return 1;
+		/* Reaped at once, but a handler still hears of it */
+		if (ks->ks_flags & SA_NOCLDWAIT)
+			discard = 1;
+	}
 
-	return pprocess_signal_send(pprocess, exit_signal, NULL);
+	/* clone() takes any number for the exit signal: one that is not a
+	 * signal sends nothing, as on Linux; nor do SIGSTOP and SIGCONT,
+	 * which kill() ignores too (stop and resume are not supported)
+	 */
+	if (!IS_VALID(exit_signal) ||
+	    exit_signal == SIGSTOP || exit_signal == SIGCONT)
+		return discard;
+
+	/* As kill() sends it: dropped if ignored, init spared, the parent
+	 * ended by a signal that ends it.  One the parent cannot take (a
+	 * full queue of realtime signals, no memory) is lost, as on Linux:
+	 * the child stays to be waited for, which is what the parent needs.
+	 */
+	rc = pprocess_signal_notify_parent(parent, (int)exit_signal);
+	if (unlikely(rc < 0))
+		uk_pr_warn("pid %d: could not signal parent %d of its exit (%d)\n",
+			   child->pid, parent->pid, rc);
+	return discard;
 }
 #endif /* CONFIG_LIBPOSIX_PROCESS_SIGNAL */
 
@@ -228,7 +260,7 @@ void pprocess_exit(struct posix_process *pprocess,
 	 * current).
 	 */
 	if (parent_process) {
-		ret = signal_exit(parent_process);
+		ret = signal_exit(parent_process, pprocess);
 		if (ret > 0) {
 			/* From exit(2): "If the parent has set SA_NOCLDWAIT, or
 			 * has set the SIGCHLD handler to SIG_IGN, the status is
@@ -236,8 +268,6 @@ void pprocess_exit(struct posix_process *pprocess,
 			 */
 			uk_pr_info("Parent ignores SIGHLD, terminating\n");
 			nowait = true;
-		} else if (unlikely(ret < 0)) { /* no choice here but crash */
-			UK_CRASH("Could not signal parent (%d)\n", ret);
 		}
 	}
 #endif /* CONFIG_LIBPOSIX_PROCESS_SIGNAL */
