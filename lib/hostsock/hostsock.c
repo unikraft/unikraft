@@ -514,6 +514,12 @@ hostsock_listen(posix_sock *sock, int backlog)
 		return err;
 	hs->backlog = backlog;
 	hs->state = HS_LISTENING;
+	/* The state published when the socket was made is that of an
+	 * unconnected socket, which the host reports hung up -- ready both
+	 * ways. A listener is ready only with a connection pending: left
+	 * stale, select() calls it readable and accept() blocks.
+	 */
+	hostsock_ready(sock, POLLIN | POLLOUT);
 	return 0;
 }
 
@@ -559,6 +565,10 @@ hostsock_accept4(posix_sock *sock,
 
 	__s32 new_fd = rd_i32(buf, 0);
 
+	/* Taking a connection can leave none pending: ask again, or the
+	 * listener stays readable and the next accept() blocks for good.
+	 */
+	hostsock_ready(sock, POLLIN);
 	if (new_fd < 0)
 		return ERR2PTR(new_fd);
 
@@ -765,6 +775,18 @@ hostsock_recvfrom(posix_sock *sock, void *restrict buf, size_t len,
 
 	__s32 nbytes = rd_i32(g_recv_buf, 0);
 
+	/* What was read may have been all there was: say so, or the socket
+	 * stays readable and a recv() select() vouched for blocks.  A stream
+	 * that gave less than was asked had no more, so no host call is
+	 * needed to know it (data that arrives after is the idle rescan's
+	 * to publish).  Otherwise -- a full read, a datagram, end of file,
+	 * an error -- ask the host; g_recv_buf is not touched by the check.
+	 */
+	if ((hs_of(sock)->type & 0xff) == SOCK_STREAM && nbytes > 0 &&
+	    nbytes < p[1].i32_val)
+		hostsock_publish_events(sock, 0, POLLIN);
+	else
+		hostsock_ready(sock, POLLIN);
 	if (nbytes < 0)
 		return nbytes;
 
