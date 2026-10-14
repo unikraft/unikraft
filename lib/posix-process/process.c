@@ -296,6 +296,7 @@ struct posix_process *pprocess_create(struct uk_alloc *a,
 
 	uk_semaphore_init(&pprocess->wait_semaphore, 0);
 	uk_semaphore_init(&pprocess->exit_semaphore, 0);
+	uk_waitq_init(&pprocess->vfork_waitq);
 
 	/* Check if we have a pthread structure already for this thread
 	 * or if we need to allocate one
