@@ -64,58 +64,6 @@ static struct termios serial_termios = {
 	},
 };
 
-typedef __ssz (*console_write_func)(const char *buf, __sz len);
-
-static inline __ssz _console_write(console_write_func cout,
-				   const char *buf, __sz len)
-{
-#if CONFIG_LIBPOSIX_TTY_SERIAL_ONLCR
-	/* TODO: Some consoles require both a newline and a carriage return to
-	 * go to the start of the next line. This kind of behavior should be in
-	 * a single place in posix-tty. We keep this workaround until we have
-	 * feature in posix-tty that handles newline characters correctly.
-	 */
-	const char *next_nl = NULL;
-	__sz l = len;
-	__sz off = 0;
-#endif /* CONFIG_LIBPOSIX_TTY_SERIAL_ONLCR */
-	__ssz rc = 0;
-
-	if (unlikely(!len))
-		return 0;
-	if (unlikely(!buf))
-		return -EINVAL;
-
-#if CONFIG_LIBPOSIX_TTY_SERIAL_ONLCR
-	while (l > 0) {
-		next_nl = memchr(buf, '\n', l);
-		if (next_nl) {
-			off = next_nl - buf;
-			if ((rc = cout(buf, off)) < 0)
-				return rc;
-			if ((rc = cout("\r\n", 2)) < 0)
-				return rc;
-			buf = next_nl + 1;
-			l -= off + 1;
-		} else {
-			if ((rc = cout(buf, l)) < 0)
-				return rc;
-			break;
-		}
-	}
-#else /* !CONFIG_LIBPOSIX_TTY_SERIAL_ONLCR */
-	if ((rc = cout(buf, len)) < 0)
-		return rc;
-#endif /* !CONFIG_LIBPOSIX_TTY_SERIAL_ONLCR */
-
-	return len;
-}
-
-static inline __ssz _console_out(const char *buf, __sz len)
-{
-	return _console_write(uk_console_out, buf, len);
-}
-
 #if CONFIG_LIBPOSIX_TTY_SERIAL_EOF_FINAL
 /* The console reached the end of its input, for good. */
 static int serial_eof;
@@ -179,7 +127,7 @@ static ssize_t serial_read(const struct uk_file *f,
 			uk_file_event_clear(f, UKFD_POLLIN);
 #endif /* !CONFIG_LIBPOSIX_TTY_SERIAL_EOF_FINAL */
 			if (bytes_read > 1 && (serial_termios.c_lflag & ECHO))
-				_console_out(buf, bytes_read - 1);
+				uk_console_out_onlcr(buf, bytes_read - 1);
 			break;
 		}
 
@@ -187,7 +135,7 @@ static ssize_t serial_read(const struct uk_file *f,
 		 * program turned ECHO off to do its own -- otherwise every
 		 * character would appear twice. */
 		if (serial_termios.c_lflag & ECHO)
-			_console_out(buf, bytes_read);
+			uk_console_out_onlcr(buf, bytes_read);
 
 		if (*last == '\n')
 			break;
@@ -204,9 +152,10 @@ static ssize_t serial_read(const struct uk_file *f,
 		return -EAGAIN;
 }
 
-static ssize_t serial_write(const struct uk_file *f __maybe_unused,
-			    const struct iovec *iov, size_t iovcnt,
-			    size_t off, long flags __unused)
+static ssize_t serial_write_with(__ssz (*write)(const char *, __sz),
+				 const struct uk_file *f __maybe_unused,
+				 const struct iovec *iov, size_t iovcnt,
+				 size_t off)
 {
 	ssize_t total = 0;
 
@@ -217,17 +166,12 @@ static ssize_t serial_write(const struct uk_file *f __maybe_unused,
 	for (size_t i = 0; i < iovcnt; i++) {
 		char *buf = iov[i].iov_base;
 		size_t len = iov[i].iov_len;
-		int bytes_written;
+		ssize_t bytes_written;
 
 		if (unlikely(!buf && len))
 			return  -EFAULT;
 
-#if CONFIG_LIBPOSIX_TTY_SERIAL_STDERR
-		if (f == &uk_file_serial_err)
-			bytes_written = _console_write(uk_console_err, buf, len);
-		else
-#endif /* CONFIG_LIBPOSIX_TTY_SERIAL_STDERR */
-			bytes_written = _console_out(buf, len);
+		bytes_written = write(buf, len);
 		if (unlikely(bytes_written < 0))
 			return bytes_written;
 
@@ -235,6 +179,13 @@ static ssize_t serial_write(const struct uk_file *f __maybe_unused,
 	}
 
 	return total;
+}
+
+static ssize_t serial_write(const struct uk_file *f,
+			    const struct iovec *iov, size_t iovcnt,
+			    size_t off, long flags __unused)
+{
+	return serial_write_with(uk_console_out_onlcr, f, iov, iovcnt, off);
 }
 
 static int serial_ctl(const struct uk_file *f __maybe_unused,
@@ -361,19 +312,46 @@ const struct uk_file uk_file_serial = {
 };
 
 #if CONFIG_LIBPOSIX_TTY_SERIAL_STDERR
+static ssize_t serial_err_write(const struct uk_file *f,
+				const struct iovec *iov, size_t iovcnt,
+				size_t off, long flags __unused)
+{
+	return serial_write_with(uk_console_err_onlcr, f, iov, iovcnt, off);
+}
+
+/* A file of its own, so programs comparing fd 1 and fd 2 tell them apart */
+static int serial_err_getstat(const struct uk_file *f,
+			      unsigned int mask, struct uk_statx *arg)
+{
+	int r = serial_getstat(f, mask, arg);
+
+	if (!r)
+		arg->stx_ino = 2;
+	return r;
+}
+
+static const struct uk_file_ops serial_err_ops = {
+	/* Reading /dev/stderr reads the console's input, as it did as stdout */
+	.read = serial_read,
+	.write = serial_err_write,
+	.mem = uk_file_nop_mem,
+	.getstat = serial_err_getstat,
+	.setstat = uk_file_nop_setstat,
+	.ctl = serial_ctl,
+};
+
 static uk_file_refcnt serial_err_ref =
 	UK_FILE_REFCNT_INITIALIZER(serial_err_ref);
 
-static struct uk_file_state serial_err_state =
-	UK_FILE_STATE_EVENTS_INITIALIZER(serial_err_state, UKFD_POLLOUT);
-
-/* Standard error: the serial console's output, on its error stream */
+/* Standard error: its own identity, so fd 1 and fd 2 differ, but the
+ * console's poll state, since reading it reads the console's input
+ */
 const struct uk_file uk_file_serial_err = {
 	.vol = SERIAL_VOLID,
 	.node = NULL,
-	.ops = &serial_ops,
+	.ops = &serial_err_ops,
 	.refcnt = &serial_err_ref,
-	.state = &serial_err_state,
+	.state = &serial_state,
 	._release = uk_file_static_release
 };
 #endif /* CONFIG_LIBPOSIX_TTY_SERIAL_STDERR */

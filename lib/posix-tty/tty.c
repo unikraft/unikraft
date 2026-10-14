@@ -81,11 +81,6 @@ static int init_posix_tty_devfs(const struct uk_file *in,
 #define STDERR_FNAME_SERIAL "stderr:serial"
 #define STDERR_FNAME_LEN_SERIAL (sizeof(STDERR_FNAME_SERIAL) - 1)
 
-/* Standard error as a file of its own, or as a duplicate of stdout */
-#if CONFIG_LIBPOSIX_TTY_STDOUT_SERIAL && CONFIG_LIBPOSIX_TTY_SERIAL_STDERR
-#define STDERR_SEPARATE 1
-#endif
-
 static int init_posix_tty(struct uk_init_ctx *ictx __unused)
 {
 	const struct uk_file *in;
@@ -139,14 +134,15 @@ static int init_posix_tty(struct uk_init_ctx *ictx __unused)
 		return (r < 0) ? r : -EBADF;
 	}
 
-#if STDERR_SEPARATE
+/* A file of its own lets a console with an err operation keep stderr apart */
+#if CONFIG_LIBPOSIX_TTY_SERIAL_STDERR
 	err = &uk_file_serial_err;
 	r = uk_fdtab_open_named(err, O_WRONLY | UKFD_O_NOSEEK,
 				STDERR_FNAME_SERIAL, STDERR_FNAME_LEN_SERIAL);
-#else /* !STDERR_SEPARATE */
+#else /* !CONFIG_LIBPOSIX_TTY_SERIAL_STDERR */
 	err = out;
 	r = uk_sys_dup2(1, 2);
-#endif /* !STDERR_SEPARATE */
+#endif /* !CONFIG_LIBPOSIX_TTY_SERIAL_STDERR */
 	if (unlikely(r != 2)) {
 		uk_pr_err("Failed to allocate fd for stderr: %d\n", r);
 		return (r < 0) ? r : -EBADF;
