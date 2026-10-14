@@ -119,7 +119,10 @@ static void _clone_child_gc(struct uk_thread *t)
  *       the TLS effectively as TCB.
  *       In case no TLS is handed over (CLONE_SETTLS is not set), uk_clone will
  *       still allocate an Unikraft TLS but sets the TLS architecture pointer
- *       to zero.
+ *       to zero -- except for a vfork child, which returns to userland on
+ *       the TLS CLONE_SETTLS passed, or else on its parent's TLS, or on its
+ *       own Unikraft TLS when the parent was running on its own (a native
+ *       caller).
  */
 int uk_clone(struct clone_args *cl_args, size_t cl_args_len,
 	     struct ukarch_execenv *execenv)
@@ -137,6 +140,7 @@ int uk_clone(struct clone_args *cl_args, size_t cl_args_len,
 	__u64 stack;
 	__u64 flags;
 	__u64 tls;
+	__uptr utlsp;
 	int ret;
 
 	t = uk_thread_current();
@@ -229,9 +233,9 @@ int uk_clone(struct clone_args *cl_args, size_t cl_args_len,
 	/* CLONE_VM requires that the child operates on the same memory
 	 * space as the parent.
 	 *
-	 * Assign the parent's stack. We assign the user TLS to the
-	 * parent's in clone_setup_child_ctx(). We copy the registers
-	 * later below.
+	 * Assign the parent's stack. Which userland TLS the child gets is
+	 * decided below, before clone_setup_child_ctx(). We copy the
+	 * registers later below.
 	 */
 	if (flags & CLONE_VM) {
 		if (!stack && !stack_size) {
@@ -338,9 +342,30 @@ int uk_clone(struct clone_args *cl_args, size_t cl_args_len,
 			child->tlsp = 0;
 	}
 
-	uk_pr_debug("Child is going to wake up with TLS pointer set to: %p (%s TLS)\n",
-		    (void *) child->tlsp,
-		    (child->tlsp != child->uktlsp) ? "custom" : "Unikraft");
+	/* The child's userland TLS is child->tlsp, or the parent's when that
+	 * is 0 -- except for a vfork child, whose tlsp is its Unikraft TLS,
+	 * for the scheduler: in userland it runs on the TLS that CLONE_SETTLS
+	 * passed, or else on the parent's, as it runs on the parent's stack.
+	 * A parent whose saved TLS is its own Unikraft TLS (a native caller:
+	 * native system calls keep it) must not lend it, or the child finds
+	 * the parent as current: that child keeps its own.  Without
+	 * CONFIG_LIBSYSCALL_SHIM_HANDLER_ULTLS, a thread made with
+	 * CLONE_SETTLS has the passed TLS as its Unikraft TLS (above), so
+	 * the test holds for it too.
+	 */
+	if (!(flags & CLONE_VFORK))
+		utlsp = child->tlsp;
+	else if (flags & CLONE_SETTLS)
+		utlsp = (__uptr)tls;
+	else if (uk_lcpu_sysctx_get(execenv->sysctx, TLSP) == t->uktlsp)
+		utlsp = child->uktlsp;
+	else
+		utlsp = 0;
+
+	uk_pr_debug("Child is going to return to userland with TLS pointer: %p (%s TLS)\n",
+		    (void *)utlsp,
+		    !utlsp ? "parent's"
+			   : (utlsp != child->uktlsp) ? "custom" : "Unikraft");
 
 	pprocess = uk_pprocess_current();
 	UK_ASSERT(pprocess);
@@ -392,13 +417,7 @@ int uk_clone(struct clone_args *cl_args, size_t cl_args_len,
 		    t, t->name ? child->name : "<unnamed>",
 		    child, child->name ? child->name : "<unnamed>", ret);
 
-	/* The child's userland TLS is child->tlsp, or the parent's when that
-	 * is 0 -- except for a vfork child, whose tlsp is its Unikraft TLS,
-	 * for the scheduler: in userland it runs on the parent's TLS, as it
-	 * runs on the parent's stack.
-	 */
-	clone_setup_child_ctx(execenv, child, (__uptr)stack,
-			      (flags & CLONE_VFORK) ? 0 : child->tlsp);
+	clone_setup_child_ctx(execenv, child, (__uptr)stack, utlsp);
 
 	uk_thread_set_runnable(child);
 
