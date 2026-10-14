@@ -56,26 +56,47 @@ __uk_tls struct posix_thread *pthread_self = NULL;
 /**
  * Helpers to find and reserve a `pid_t`
  */
+/* Whether @id names a process group or a session that still has members */
+static bool tid_names_group(unsigned long id)
+{
+	struct posix_process *p;
+
+	uk_pprocess_foreach(p) {
+		if ((unsigned long)p->pgid == id || (unsigned long)p->sid == id)
+			return true;
+	}
+	return false;
+}
+
 static inline pid_t find_free_tid(void)
 {
 	static pid_t prev = 0;
-	unsigned long found;
+	unsigned long found = prev;
+	unsigned long tries;
 
-	/* search starting from last position */
-	found = uk_find_next_zero_bit(tid_map, TIDMAP_SIZE, prev + 1);
-	if (found == TIDMAP_SIZE) {
-		/* search again starting from the beginning */
-		found = uk_find_first_zero_bit(tid_map, TIDMAP_SIZE);
-	}
-	if (found == TIDMAP_SIZE) {
-		/* no free PID */
-		uk_pr_err("Could not allocate TID: Out of TIDs (configured max: %d)\n",
-			  CONFIG_LIBPOSIX_PROCESS_MAX_PID);
-		return -1;
+	for (tries = 0; tries < TIDMAP_SIZE; tries++) {
+		/* search starting from last position */
+		found = uk_find_next_zero_bit(tid_map, TIDMAP_SIZE, found + 1);
+		if (found == TIDMAP_SIZE) {
+			/* search again starting from the beginning */
+			found = uk_find_first_zero_bit(tid_map, TIDMAP_SIZE);
+		}
+		if (found == TIDMAP_SIZE)
+			break;
+		/* As Linux, keep a pid that still names a group or session
+		 * out of use: given out, it would join a stranger's group
+		 * (kill(-pgid)) and refuse its owner setsid()
+		 */
+		if (!tid_names_group(found)) {
+			prev = found;
+			return found;
+		}
 	}
 
-	prev = found;
-	return found;
+	/* no free PID */
+	uk_pr_err("Could not allocate TID: Out of TIDs (configured max: %d)\n",
+		  CONFIG_LIBPOSIX_PROCESS_MAX_PID);
+	return -1;
 }
 
 static pid_t find_and_reserve_tid(void)
@@ -329,6 +350,13 @@ struct posix_process *pprocess_create(struct uk_alloc *a,
 	if (parent_pprocess) {
 		uk_list_add_tail(&pprocess->child_list_entry,
 				 &parent_pprocess->children);
+		/* fork(2): the child is in its parent's group and session */
+		pprocess->pgid = parent_pprocess->pgid;
+		pprocess->sid = parent_pprocess->sid;
+	} else {
+		/* The first process leads its own group and session */
+		pprocess->pgid = pprocess->pid;
+		pprocess->sid = pprocess->pid;
 	}
 	pid_process[pprocess->pid] = pprocess;
 

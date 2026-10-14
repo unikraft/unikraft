@@ -212,9 +212,23 @@ int pprocess_signal_send(struct posix_process *proc, int signum,
 	return 0;
 }
 
+/* Send @signum to @pproc, unless it ignores it; @pproc is permitted */
+static int pprocess_signal_process_one(struct posix_process *pproc,
+				       int signum, siginfo_t *siginfo)
+{
+	if (pprocess_signal_should_drop(pproc, signum))
+		return 0;
+
+	return pprocess_signal_send(pproc, signum, siginfo);
+}
+
 int pprocess_signal_process_do(pid_t pid, int signum, siginfo_t *siginfo)
 {
+	struct posix_process *this_process = uk_pprocess_current();
 	struct posix_process *pproc = NULL;
+	bool found = false, sent = false;
+	pid_t pgid = 0;
+	int err = 0;
 	int rc;
 
 	if (unlikely(signum != 0 && !IS_VALID(signum)))
@@ -229,28 +243,41 @@ int pprocess_signal_process_do(pid_t pid, int signum, siginfo_t *siginfo)
 	 *             of the calling process.
 	 * pid < -1 -> Send the signal to every process in the process group
 	 *             with ID equal to -pid.
+	 * pid == -1 -> Send the signal to every process for which the
+	 *              calling process has permissions to signal, except
+	 *              init and the caller, as Linux does.
 	 */
-	if (!pid || pid < -1) {
-		uk_pr_warn("pgroups not supported, delivering to every process\n");
-		pid = -1;
-	}
+	if (!pid)
+		pgid = this_process->pgid;
+	else if (pid < -1)
+		pgid = -pid;
 
-	/* pid == -1 -> Send the signal to every process for which the
-	 *              calling process has permissions to signal.
-	 */
-	if (pid == -1) {
+	if (pgid || pid == -1) {
 		uk_pprocess_foreach(pproc) {
+			if (pgid ? pproc->pgid != pgid
+				 : (pproc->pid == UK_PID_INIT ||
+				    pproc == this_process))
+				continue;
 			if (!signal_check_perm(pproc))
 				continue;
-
-			if (pprocess_signal_should_drop(pproc, signum))
+			found = true;
+			/* As on Linux, a zombie counts but takes nothing */
+			if (!signum || pproc->state != POSIX_PROCESS_RUNNING)
 				continue;
-
-			rc = pprocess_signal_send(pproc, signum, siginfo);
+			/* One that refuses (a full queue of realtime signals)
+			 * spares none of the rest, as on Linux: the send
+			 * succeeds if any member took it.
+			 */
+			rc = pprocess_signal_process_one(pproc, signum,
+							 siginfo);
 			if (unlikely(rc))
-				return rc;
+				err = rc;
+			else
+				sent = true;
 		}
-		return 0;
+		if (!found)
+			return -ESRCH;
+		return (sent || !err) ? 0 : err;
 	}
 
 	/* Default: Send to process with pid */
@@ -265,11 +292,7 @@ int pprocess_signal_process_do(pid_t pid, int signum, siginfo_t *siginfo)
 	if (!signum)
 		return 0;
 
-	/* If this signal is currently ignored, don't even try */
-	if (pprocess_signal_should_drop(pproc, signum))
-		return 0;
-
-	return pprocess_signal_send(pproc, signum, siginfo);
+	return pprocess_signal_process_one(pproc, signum, siginfo);
 }
 
 int pprocess_signal_thread_do(int tid, int signum, siginfo_t *siginfo)

@@ -59,6 +59,8 @@ enum posix_process_state {
 
 struct posix_process {
 	pid_t pid;
+	pid_t pgid; /* process group */
+	pid_t sid;  /* session */
 	struct posix_process *parent;
 	struct uk_list_head children; /* child processes */
 	struct uk_list_head child_list_entry;
@@ -95,6 +97,8 @@ struct posix_thread {
 	struct uk_signal_tdesc *signal;
 #endif /* CONFIG_LIBPOSIX_PROCESS_SIGNAL */
 	pid_t wait_pid;
+	/* With wait_pid == -1: the process group waited on, 0 for any */
+	pid_t wait_pgid;
 
 	/* TODO: Mutex */
 };
