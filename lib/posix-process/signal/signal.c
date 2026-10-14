@@ -174,6 +174,7 @@ int pprocess_signal_sigaction_new(struct uk_alloc *alloc, struct uk_signal_pdesc
 int pprocess_signal_send(struct posix_process *proc, int signum,
 			 siginfo_t *siginfo)
 {
+	struct posix_thread *thread, *threadn;
 	struct uk_signal *sig;
 	int rc;
 
@@ -200,13 +201,20 @@ int pprocess_signal_send(struct posix_process *proc, int signum,
 	pprocess_signal_files_notify(proc, signum);
 #endif /* CONFIG_LIBPOSIX_PROCESS_SIGNALFD */
 
+	/* Wake up any threads that may be paused, in sigsuspend() or pause(),
+	 * whoever sent the signal: a SIGCHLD from an exiting child included.
+	 */
+	uk_pprocess_foreach_pthread(proc, thread, threadn) {
+		if (thread->state == POSIX_THREAD_BLOCKED_SIGNAL)
+			uk_semaphore_up(&thread->signal->deliver_semaphore);
+	}
+
 	return 0;
 }
 
 int pprocess_signal_process_do(pid_t pid, int signum, siginfo_t *siginfo)
 {
 	struct posix_process *pproc = NULL;
-	struct posix_thread *thread, *threadn;
 	int rc;
 
 	if (unlikely(signum != 0 && !IS_VALID(signum)))
@@ -261,17 +269,7 @@ int pprocess_signal_process_do(pid_t pid, int signum, siginfo_t *siginfo)
 	if (pprocess_signal_should_drop(pproc, signum))
 		return 0;
 
-	rc = pprocess_signal_send(pproc, signum, siginfo);
-	if (unlikely(rc))
-		return rc;
-
-	/* Wake up any threads that may be paused */
-	uk_pprocess_foreach_pthread(pproc, thread, threadn) {
-		if (thread->state == POSIX_THREAD_BLOCKED_SIGNAL)
-			uk_semaphore_up(&thread->signal->deliver_semaphore);
-	}
-
-	return 0;
+	return pprocess_signal_send(pproc, signum, siginfo);
 }
 
 int pprocess_signal_thread_do(int tid, int signum, siginfo_t *siginfo)
