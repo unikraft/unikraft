@@ -317,11 +317,12 @@ int uk_clone(struct clone_args *cl_args, size_t cl_args_len,
 		 */
 		child->tlsp = child->uktlsp;
 
-		/* Since we didn't specify a stack to
-		 * uk_thread_create_container2() above,
-		 * we need to assign the stack manually.
+		/* The child runs on the parent's stack, which is not its to
+		 * free: it owns no stack until execve allocates one.  A child
+		 * that exits without a successful execve would otherwise free
+		 * the parent's stack.
 		 */
-		child->_mem.stack = (void *)stack;
+		child->_mem.stack = NULL;
 
 		/* Also inherit the parent's stack allocator */
 		child->_mem.stack_a = t->_mem.stack_a;
