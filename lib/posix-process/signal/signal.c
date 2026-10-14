@@ -36,6 +36,7 @@ static int pprocess_signal_enqueue(struct posix_process *pproc,
 				   struct posix_thread *pthread,
 				   struct uk_signal *sig)
 {
+	struct uk_signal_queue *sigqueue;
 	int signum;
 
 	UK_ASSERT(sig);
@@ -44,16 +45,26 @@ static int pprocess_signal_enqueue(struct posix_process *pproc,
 	if (pthread)
 		UK_ASSERT(pthread->process == pproc);
 
-	if (unlikely(pproc->signal->queued_count >= pproc->signal->queued_max))
-		return -EAGAIN;
-
 	signum = sig->siginfo.si_signo;
 
-	if (pthread) {
-		/* Standard signals can be queued once */
-		if (signum < SIGRTMIN && IS_PENDING(pthread->signal->sigqueue, signum))
-			return 1;
+	/* Standard signals can be queued once: a copy of one pending is
+	 * folded into it, even with the queue full
+	 */
+	sigqueue = pthread ? &pthread->signal->sigqueue
+			   : &pproc->signal->sigqueue;
+	if (signum < SIGRTMIN && IS_PENDING(*sigqueue, signum))
+		return 1;
 
+	/* The limit is on realtime signals, as on Linux: a standard one
+	 * takes one place at most, and is never refused for want of room.
+	 * A process that filled its queue (with realtime signals it blocks,
+	 * say) still takes SIGKILL, SIGTERM and SIGCHLD.
+	 */
+	if (unlikely(signum >= SIGRTMIN &&
+		     pproc->signal->queued_count >= pproc->signal->queued_max))
+		return -EAGAIN;
+
+	if (pthread) {
 		uk_pr_debug("Queueing signal %d for tid %d (pid %d)\n",
 			    signum, pthread->tid, pproc->pid);
 
@@ -65,10 +76,6 @@ static int pprocess_signal_enqueue(struct posix_process *pproc,
 		 */
 		SET_PENDING(pthread->signal->sigqueue, signum);
 	} else {
-		/* Standard signals can be queued once */
-		if (signum < SIGRTMIN && IS_PENDING(pproc->signal->sigqueue, signum))
-			return 1;
-
 		uk_pr_debug("Queueing signal %d for pid %d\n",
 			    signum, pproc->pid);
 
