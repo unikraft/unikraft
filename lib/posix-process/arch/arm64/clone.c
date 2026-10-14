@@ -47,7 +47,7 @@ void clone_setup_child_ctx(struct ukarch_execenv *pexecenv,
 	/* Use new stack pointer */
 	uk_lcpu_regs_set(cexecenv->regs, SP, sp);
 
-	/* Use parent's userland TPIDR_EL0 if clone did not have SETTLS */
+	/* tlsp 0: uk_clone chose the parent's TLS (see there) */
 	if (!tlsp)
 		tlsp = uk_lcpu_sysctx_get(pexecenv->sysctx, TLSP);
 

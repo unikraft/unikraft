@@ -14,7 +14,7 @@ void clone_setup_child_ctx(struct ukarch_execenv *pexecenv,
 {
 	struct ukarch_execenv *cexecenv;
 	struct ukarch_auxspcb *auxspcb;
-	__u64 gsbase, fsbase;
+	__u64 gsbase;
 	__uptr auxsp_pos;
 
 	UK_ASSERT(pexecenv);
@@ -50,13 +50,11 @@ void clone_setup_child_ctx(struct ukarch_execenv *pexecenv,
 	gsbase = uk_lcpu_sysctx_get(pexecenv->sysctx, GSBASE);
 	uk_lcpu_sysctx_set(cexecenv->sysctx, GSBASE, gsbase);
 
-	/* Use parent's fsbase if clone did not have SETTLS */
+	/* tlsp 0: uk_clone chose the parent's TLS (see there) */
 	if (!tlsp)
-		fsbase = uk_lcpu_sysctx_get(pexecenv->sysctx, FSBASE);
-	else
-		fsbase = tlsp;
+		tlsp = uk_lcpu_sysctx_get(pexecenv->sysctx, FSBASE);
 
-	uk_lcpu_sysctx_set(cexecenv->sysctx, FSBASE, fsbase);
+	uk_lcpu_sysctx_set(cexecenv->sysctx, FSBASE, tlsp);
 
 	ukarch_ctx_init_entry1(&child->ctx,
 			       auxsp_pos,
