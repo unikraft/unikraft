@@ -199,6 +199,11 @@ struct uk_signal_pdesc {
  */
 struct uk_signal_tdesc {
 	uk_sigset_t mask;
+	/* The mask sigsuspend() replaced, put back once the signals it
+	 * waited for are delivered (see uk_signal_deliver())
+	 */
+	uk_sigset_t sigsuspend_saved;
+	__bool sigsuspend_restore;
 	uk_sigset_t sigwait_set;
 	struct uk_signal_queue sigqueue;
 	struct uk_semaphore deliver_semaphore;

@@ -378,11 +378,28 @@ static int deliver_pending_thread(struct posix_thread *thread,
 	return handled;
 }
 
+/* Take the mask sigsuspend() replaced, if it is to come back on this way
+ * out: into @saved, and the request is spent, so the system calls a
+ * handler makes do not put it back from within the handler (which would
+ * then return to the suspend mask, kept for good).
+ */
+static __bool pthread_signal_sigsuspend_take(struct posix_thread *pthread,
+					     uk_sigset_t *saved)
+{
+	if (!pthread || !pthread->signal->sigsuspend_restore)
+		return false;
+	*saved = pthread->signal->sigsuspend_saved;
+	pthread->signal->sigsuspend_restore = false;
+	return true;
+}
+
 static void uk_signal_deliver(struct uk_syscall_exit_ctx *exit_ctx)
 {
 	struct ukarch_execenv *execenv;
 	struct posix_thread *pthread;
 	struct posix_process *pproc;
+	uk_sigset_t sigsuspend_saved;
+	__bool sigsuspend_restore;
 
 	UK_ASSERT(exit_ctx);
 
@@ -392,8 +409,15 @@ static void uk_signal_deliver(struct uk_syscall_exit_ctx *exit_ctx)
 	 *        by kernel context and pass execenv to syscalls in native
 	 *        mode.
 	 */
-	if (!execenv)
+	if (!execenv) {
+		/* Nothing is delivered here: a sigsuspend() of the caller's
+		 * gets its mask back at once
+		 */
+		pthread = uk_pthread_current();
+		if (pthread_signal_sigsuspend_take(pthread, &sigsuspend_saved))
+			pthread->signal->mask = sigsuspend_saved;
 		return;
+	}
 
 	/* Out of the call it was interrupted in: the request is spent.  Not
 	 * before: a call the kernel makes from within it has no execenv, and
@@ -427,11 +451,18 @@ static void uk_signal_deliver(struct uk_syscall_exit_ctx *exit_ctx)
 	UK_ASSERT(!IS_PENDING(pproc->signal->sigqueue, SIGSTOP));
 	UK_ASSERT(!IS_PENDING(pproc->signal->sigqueue, SIGCONT));
 
-	/* Deliver all pending signals of this process & thread */
+	/* Deliver all pending signals of this process & thread, under the
+	 * mask sigsuspend() set, if this is its way out; then put back the
+	 * one it replaced.
+	 */
+	sigsuspend_restore = pthread_signal_sigsuspend_take(pthread,
+							    &sigsuspend_saved);
 	deliver_pending_proc(pproc, execenv);
 	if (pthread->state == POSIX_THREAD_RUNNING ||
 	    pthread->state == POSIX_THREAD_BLOCKED_SIGNAL)
 		deliver_pending_thread(pthread, execenv);
+	if (sigsuspend_restore)
+		pthread->signal->mask = sigsuspend_saved;
 }
 
 uk_syscall_exittab_prio(uk_signal_deliver, UK_PRIO_BEFORE(UK_PRIO_LATEST));

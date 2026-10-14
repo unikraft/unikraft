@@ -625,6 +625,7 @@ int pprocess_signal_tdesc_init(struct posix_thread *thread)
 	td = thread->signal;
 
 	uk_sigemptyset(&td->mask);
+	td->sigsuspend_restore = false;
 	uk_sigemptyset(&td->sigqueue.pending);
 
 	pprocess_signal_foreach(signum)

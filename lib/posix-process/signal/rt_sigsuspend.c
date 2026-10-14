@@ -39,8 +39,13 @@ UK_LLSYSCALL_R_DEFINE(int, rt_sigsuspend,
 	/* Wait for signal */
 	pthread_signal_pause(pthread);
 
-	/* Restore mask */
-	pthread->signal->mask = saved_mask;
+	/* The signal that woke us is delivered on the way out, under the
+	 * suspend mask, which unblocks it: the old mask comes back after
+	 * that, as on Linux.  Put back here, it would block the signal
+	 * again, and it would stay queued with its handler never run.
+	 */
+	pthread->signal->sigsuspend_saved = saved_mask;
+	pthread->signal->sigsuspend_restore = true;
 
 	return -EINTR;
 }
