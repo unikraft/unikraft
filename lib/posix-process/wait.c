@@ -173,6 +173,16 @@ static int pprocess_wait(pid_t pid, pid_t pgid, siginfo_t *si, int opt)
 			ret = -EINTR;
 			break;
 		}
+
+		/* The last child may be gone (reaped by another thread), or
+		 * the group's last child may have left it (setpgid(2))
+		 */
+		if (pid == -1 &&
+		    (uk_list_empty(&this_process->children) ||
+		     (pgid && !pprocess_has_child_in(this_process, pgid)))) {
+			ret = -ECHILD;
+			break;
+		}
 	}
 
 out:
