@@ -68,44 +68,37 @@
 #include <uk/essentials.h>
 #include <uk/lcpu.h>
 
+/* How much of @buf[0..@len) to send so its end does not cut a UTF-8
+ * sequence: the host takes the text as a string, and a broken one aborts
+ * the guest call.
+ */
+static __sz utf8_whole(const char *buf, __sz len)
+{
+	__sz i = len;
+	unsigned char lead;
+	__sz n;
+
+	/* A sequence is at most 4 bytes: its lead is at most 3 back */
+	while (i > 0 && len - i < 3 &&
+	       ((unsigned char)buf[i - 1] & 0xC0) == 0x80)
+		i--;
+	if (i == 0)
+		return len;
+	lead = (unsigned char)buf[i - 1];
+	if (lead < 0xC0)
+		return len;
+	n = (lead >= 0xF0) ? 4 : (lead >= 0xE0) ? 3 : 2;
+	return (len - (i - 1) < n) ? i - 1 : len;
+}
+
 #if CONFIG_LIBUKCONSOLE
 #include <uk/console.h>
 
-/* TODO: Some consoles require both a newline and a carriage return to
- * go to the start of the next line. This kind of behavior should be in
- * a single place in posix-tty. We keep this workaround until we have feature
- * in posix-tty that handles newline characters correctly.
- */
-static inline __ssz _console_out(const char *buf, __sz len)
+/* nolibc's FILE stderr has no fd for posix-tty to configure: split it here */
+static inline __ssz _console_out(FILE *fp, const char *buf, __sz len)
 {
-	const char *next_nl = NULL;
-	__sz l = len;
-	__sz off = 0;
-	__ssz rc = 0;
-
-	if (unlikely(!len))
-		return 0;
-	if (unlikely(!buf))
-		return -EINVAL;
-
-	while (l > 0) {
-		next_nl = memchr(buf, '\n', l);
-		if (next_nl) {
-			off = next_nl - buf;
-			if ((rc = uk_console_out(buf, off)) < 0)
-				return rc;
-			if ((rc = uk_console_out("\r\n", 2)) < 0)
-				return rc;
-			buf = next_nl + 1;
-			l -= off + 1;
-		} else {
-			if ((rc = uk_console_out(buf, l)) < 0)
-				return rc;
-			break;
-		}
-	}
-
-	return len;
+	return (fp == stderr) ? uk_console_err_onlcr(buf, len)
+			      : uk_console_out_onlcr(buf, len);
 }
 #endif /* CONFIG_LIBUKCONSOLE */
 
@@ -483,13 +476,16 @@ int vfprintf(FILE *fp __maybe_unused, const char *fmt __maybe_unused,
 	ret = vsnprintf(buf, sizeof(buf), fmt, ap);
 	if (ret < 0)
 		return ret;
+	/* vsnprintf returns the length it wanted, not what fits in buf */
+	if ((size_t)ret >= sizeof(buf))
+		ret = utf8_whole(buf, sizeof(buf) - 1);
 
 	/* we do not support device handling for now, we
 	 * just send the buffer content to the kernel console
 	 */
 	if (fp == stdout || fp == stderr)
 #if CONFIG_LIBUKCONSOLE
-		ret = _console_out(buf, ret);
+		ret = _console_out(fp, buf, ret);
 #else /* !CONFIG_LIBUKCONSOLE */
 		ret = strlen(buf);
 #endif /* !CONFIG_LIBUKCONSOLE */
@@ -541,7 +537,7 @@ int fputc(int _c __maybe_unused, FILE *fp __maybe_unused)
 	unsigned char c = _c;
 
 	if (fp == stdout || fp == stderr)
-		ret = _console_out((char *)&c, 1);
+		ret = _console_out(fp, (char *)&c, 1);
 
 	if (ret == 1)
 		return _c;
@@ -568,7 +564,7 @@ fputs_internal(const char *restrict s __maybe_unused,
 	len = strlen(s);
 
 	if (stream == stdout || stream == stderr)
-		ret = _console_out(s, len);
+		ret = _console_out(stream, s, len);
 	else
 		return EOF;
 
