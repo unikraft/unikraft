@@ -181,6 +181,7 @@ UK_LLSYSCALL_R_DEFINE(int, open, const char*, pathname, int, flags,
 int open(const char *pathname, int flags, ...)
 {
 	mode_t mode = 0;
+	int fd;
 
 	if (flags & O_CREAT) {
 		va_list ap;
@@ -190,7 +191,13 @@ int open(const char *pathname, int flags, ...)
 		va_end(ap);
 	}
 
-	return uk_syscall_do_open((long)pathname, flags, mode);
+	/* The raw call returns -errno; this is the libc function */
+	fd = uk_syscall_do_open((long)pathname, flags, mode);
+	if (fd < 0) {
+		errno = -fd;
+		return -1;
+	}
+	return fd;
 }
 
 #ifdef open64
@@ -1971,7 +1978,15 @@ out_error:
 
 int euidaccess(const char *pathname, int mode)
 {
-	return uk_syscall_do_access((long) pathname, (long) mode);
+	int ret;
+
+	/* The raw call returns -errno; this is the libc function */
+	ret = uk_syscall_do_access((long) pathname, (long) mode);
+	if (ret < 0) {
+		errno = -ret;
+		return -1;
+	}
+	return ret;
 }
 
 __weak_alias(euidaccess,eaccess);
