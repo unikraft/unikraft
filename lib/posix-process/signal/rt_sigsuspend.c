@@ -37,8 +37,7 @@ UK_LLSYSCALL_R_DEFINE(int, rt_sigsuspend,
 	pthread->signal->mask = suspend_mask;
 
 	/* Wait for signal */
-	pthread->state = POSIX_THREAD_BLOCKED_SIGNAL;
-	uk_semaphore_down(&pthread->signal->deliver_semaphore);
+	pthread_signal_pause(pthread);
 
 	/* Restore mask */
 	pthread->signal->mask = saved_mask;
