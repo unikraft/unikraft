@@ -469,7 +469,13 @@ int pprocess_signal_thread_do(int tid, int signum, siginfo_t *siginfo)
 	pproc = tid2pprocess(tid);
 	UK_ASSERT(pproc);
 
-	if (signum && pprocess_signal_spares_init(pproc, signum, false))
+	/* Signal 0 asks whether the thread exists: nothing is queued (it
+	 * has no queue)
+	 */
+	if (!signum)
+		return 0;
+
+	if (pprocess_signal_spares_init(pproc, signum, false))
 		return 0;
 
 	sig = uk_signal_alloc(pthread->_a);
