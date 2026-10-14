@@ -67,6 +67,14 @@ __u64 hl_hcall_max_payload(void);
 int hl_utf8_valid(const __u8 *s, __u64 len);
 
 /**
+ * Decode the well-formed UTF-8 character (as hl_utf8_valid() takes it)
+ * at the start of the @a len bytes at @a s into @a cp.
+ *
+ * @return its length in bytes, 0 if the bytes do not start one.
+ */
+__u64 hl_utf8_decode(const __u8 *s, __u64 len, __u32 *cp);
+
+/**
  * Queue the result of guest function call @a cid (see
  * hl_transport_respond()), under the lock host calls take, so it cannot
  * meet one half made.
@@ -168,7 +176,7 @@ int hl_call_get_random_bytes(__u8 *out_buf, __sz len);
  * Call HostWrite -- send standard output to the host, as bytes.
  *
  * Used by the console driver as an alternative to DebugPrint (port 103).
- * DebugPrint does one VM exit per byte; HostWrite does one VM exit per
+ * DebugPrint does one VM exit per character; HostWrite does one VM exit per
  * hl_hcall_max_payload() bytes.  Bytes, not a string: a program's output
  * need not be UTF-8, and a write can end inside a character.
  *

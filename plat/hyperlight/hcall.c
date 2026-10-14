@@ -114,36 +114,48 @@ static void hl_touch_params(const struct hl_param *params, int nparams)
 	}
 }
 
+__u64 hl_utf8_decode(const __u8 *s, __u64 len, __u32 *cp)
+{
+	__u32 c, min;
+	__u64 n, i;
+
+	if (!len)
+		return 0;
+	c = s[0];
+	if (c < 0x80) {
+		*cp = c;
+		return 1;
+	}
+	if ((c & 0xe0) == 0xc0) {
+		n = 2; c &= 0x1f; min = 0x80;
+	} else if ((c & 0xf0) == 0xe0) {
+		n = 3; c &= 0x0f; min = 0x800;
+	} else if ((c & 0xf8) == 0xf0) {
+		n = 4; c &= 0x07; min = 0x10000;
+	} else {
+		return 0;
+	}
+	if (len < n)
+		return 0;
+	for (i = 1; i < n; i++) {
+		if ((s[i] & 0xc0) != 0x80)
+			return 0;
+		c = (c << 6) | (s[i] & 0x3f);
+	}
+	if (c < min || c > 0x10ffff || (c >= 0xd800 && c <= 0xdfff))
+		return 0;
+	*cp = c;
+	return n;
+}
+
 int hl_utf8_valid(const __u8 *s, __u64 len)
 {
-	const __u8 *end = s + len;
+	__u64 n;
+	__u32 cp;
 
-	while (s < end) {
-		__u8 c = *s++;
-		__u32 cp, min;
-		int n;
-
-		if (c < 0x80)
-			continue;
-		if ((c & 0xe0) == 0xc0) {
-			n = 1; cp = c & 0x1f; min = 0x80;
-		} else if ((c & 0xf0) == 0xe0) {
-			n = 2; cp = c & 0x0f; min = 0x800;
-		} else if ((c & 0xf8) == 0xf0) {
-			n = 3; cp = c & 0x07; min = 0x10000;
-		} else {
+	for (; len; s += n, len -= n)
+		if (!(n = hl_utf8_decode(s, len, &cp)))
 			return 0;
-		}
-		if (end - s < n)
-			return 0;
-		while (n--) {
-			if ((*s & 0xc0) != 0x80)
-				return 0;
-			cp = (cp << 6) | (*s++ & 0x3f);
-		}
-		if (cp < min || cp > 0x10ffff || (cp >= 0xd800 && cp <= 0xdfff))
-			return 0;
-	}
 	return 1;
 }
 

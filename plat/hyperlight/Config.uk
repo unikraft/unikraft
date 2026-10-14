@@ -38,7 +38,7 @@ config HYPERLIGHT_DEBUG_PRINT
 	default n
 	help
 	  Enable debug print output via Hyperlight DebugPrint port (103).
-	  Sends one byte per VM exit — slow, but works before any
+	  Sends one character per VM exit — slow, but works before any
 	  shared memory infrastructure is set up. Useful for early
 	  boot debugging only.
 

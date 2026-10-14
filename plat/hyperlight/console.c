@@ -9,7 +9,7 @@
  *
  * Two output paths:
  *
- *   1. DebugPrint (port 103) — one VM exit per byte.  Available from
+ *   1. DebugPrint (port 103) — one VM exit per character.  Available from
  *      the very first instruction; used during early boot before the
  *      hcall subsystem is initialised, and for whatever HostWrite does
  *      not send.
@@ -72,8 +72,22 @@ static __ssz hyperlight_console_out(struct uk_console *dev __unused,
 			sent = 0;
 	}
 
-	for (__sz i = (__sz)sent; i < len; i++)
-		hyperlight_debug_putc(buf[i]);
+	/* Fallback, for what it did not take: DebugPrint, a character at a
+	 * time.  The host prints each word as a code point, so UTF-8 is
+	 * decoded first; a byte that does not start a character here (cut
+	 * by the write, or not UTF-8) goes as itself, read as Latin-1.
+	 */
+	for (__sz i = (__sz)sent; i < len;) {
+		__u32 cp;
+		__sz n = hl_utf8_decode((const __u8 *)buf + i, len - i, &cp);
+
+		if (!n) {
+			cp = (__u8)buf[i];
+			n = 1;
+		}
+		hyperlight_debug_putc(cp);
+		i += n;
+	}
 	return len;
 }
 

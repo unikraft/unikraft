@@ -23,7 +23,7 @@
  * OutBAction ports — handled by the sandbox-level outb dispatcher.
  */
 #define HYPERLIGHT_PORT_ABORT		102 /* abort with error code */
-#define HYPERLIGHT_PORT_DEBUG_PRINT	103 /* single-byte debug output */
+#define HYPERLIGHT_PORT_DEBUG_PRINT	103 /* debug output, one code point */
 #define HYPERLIGHT_PORT_VIRTQ_NOTIFY	109 /* new virtqueue work */
 
 /*
@@ -65,14 +65,15 @@ static inline void hyperlight_out32(__u16 port, __u32 val)
 }
 
 /*
- * Send a single byte via DebugPrint (port 103).
- * One VM exit per byte — slow, but requires no shared memory setup.
- * Output appears on the host's stderr.
+ * Send a single character via DebugPrint (port 103).
+ * One VM exit per character — slow, but requires no shared memory setup.
+ * Output appears on the host's stderr.  The host reads the word as a
+ * Unicode code point and refuses one that is not, so a byte is widened
+ * without sign extension; console.c decodes UTF-8 before it gets here.
  */
-static inline void hyperlight_debug_putc(char c)
+static inline void hyperlight_debug_putc(__u32 cp)
 {
-	/* Unsigned: a sign-extended byte >= 0x80 is no character to the host */
-	hyperlight_out32(HYPERLIGHT_PORT_DEBUG_PRINT, (__u32)(__u8)c);
+	hyperlight_out32(HYPERLIGHT_PORT_DEBUG_PRINT, cp);
 }
 
 /*
