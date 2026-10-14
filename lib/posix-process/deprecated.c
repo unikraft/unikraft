@@ -166,6 +166,8 @@ int pclose(FILE *stream __unused)
 	return -1;
 }
 
+#if !CONFIG_LIBPOSIX_PROCESS_MULTITHREADING
+/* With multithreading, pgroup.c keeps real groups and sessions */
 UK_SYSCALL_R_DEFINE(pid_t, setsid)
 {
 	/* We have a single "session" with a single "process" */
@@ -207,8 +209,11 @@ UK_SYSCALL_R_DEFINE(pid_t, getpgrp)
 {
 	return UNIKRAFT_PGID;
 }
+#endif /* !CONFIG_LIBPOSIX_PROCESS_MULTITHREADING */
 
 #if UK_LIBC_SYSCALLS
+int setpgid(pid_t pid, pid_t pgid);
+
 int setpgrp(void)
 {
 	return setpgid(0, 0);
