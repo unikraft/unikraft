@@ -89,6 +89,26 @@ static inline int signal_exit(struct posix_process *pprocess)
 }
 #endif /* CONFIG_LIBPOSIX_PROCESS_SIGNAL */
 
+/* The threads of @pprocess in wait() share one semaphore: up it once for
+ * each, so each looks again.  One up could go to a thread waiting for
+ * another child, which sleeps again, while the one it was for sleeps on.
+ */
+void pprocess_wake_waiters(struct posix_process *pprocess)
+{
+	struct posix_thread *pt, *ptn;
+	int waiters = 0;
+
+	uk_pprocess_foreach_pthread(pprocess, pt, ptn) {
+		if (pt->state == POSIX_THREAD_BLOCKED_WAIT)
+			waiters++;
+	}
+	/* A thread paused for a signal looks too (see pprocess_exit()) */
+	if (!waiters)
+		waiters = 1;
+	while (waiters--)
+		uk_semaphore_up(&pprocess->wait_semaphore);
+}
+
 /* Exit AND release pthread.
  * Notice: Unlike pprocesses, pthreads are released upon exit.
  */
@@ -221,13 +241,15 @@ void pprocess_exit(struct posix_process *pprocess,
 	 * the caller is not the exiting process at all.
 	 */
 	if (parent_process && !nowait) {
+		__bool wake = false;
+
 		uk_pprocess_foreach_pthread(parent_process, pt, ptn) {
 			if (PTHREAD_WAITING_FOR(pt, pprocess) ||
-			    PTHREAD_BLOCKING_ON_SIGNAL(pt)) {
-				uk_semaphore_up(&parent_process->wait_semaphore);
-				break;
-			}
+			    PTHREAD_BLOCKING_ON_SIGNAL(pt))
+				wake = true;
 		}
+		if (wake)
+			pprocess_wake_waiters(parent_process);
 	} else if (nowait) { /* release now */
 		pprocess_release(pprocess);
 	}
