@@ -139,8 +139,17 @@ static int pprocess_wait(pid_t pid, pid_t pgid, siginfo_t *si, int opt)
 		 * the state change happened to a different child, so we
 		 * loop back to the semaphore.
 		 */
-		if (pid > 0)
+		if (pid > 0) {
+			/* Again each time: another thread of this process
+			 * may have reaped (and freed) it while this one slept
+			 */
+			child = pid2pprocess(pid);
+			if (!child || child->parent != this_process) {
+				ret = -ECHILD;
+				break;
+			}
 			waitable = pprocess_state_changed(child, opt);
+		}
 		else /* any */
 			waitable = pprocess_child_state_changed(pgid, opt);
 
