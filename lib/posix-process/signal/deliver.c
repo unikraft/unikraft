@@ -575,8 +575,8 @@ err_panic:
 		int ignored = IS_IGNORED(pproc, error->signum);
 		unsigned long handler = (unsigned long)
 			KERN_SIGACTION(pproc, error->signum)->ks_handler;
-		UK_CRASH("Cannot deliver signal %d for pf at 0x%lx: tid %d, masked %d, ignored %d, handler 0x%lx\n",
-			 error->signum, error->vaddr, pthread->tid, masked,
-			 ignored, handler);
+		UK_CRASH("Cannot deliver signal %d for pf at 0x%lx: tid %d, pc 0x%lx, sp 0x%lx, masked %d, ignored %d, handler 0x%lx\n",
+			 error->signum, error->vaddr, pthread->tid,
+			 error->pc, error->sp, masked, ignored, handler);
 	}
 }
