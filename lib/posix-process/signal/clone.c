@@ -130,8 +130,11 @@ int uk_posix_clone_sighand(void *arg)
 		if (unlikely(rc))
 			goto fail_malloc;
 
-		memcpy(cp->signal->sigaction, pp->signal->sigaction,
-		       sizeof(*cp->signal->sigaction));
+		/* The handlers only: the table's allocator and reference
+		 * count are the new table's own.
+		 */
+		memcpy(cp->signal->sigaction->ks, pp->signal->sigaction->ks,
+		       sizeof(cp->signal->sigaction->ks));
 	}
 
 	/* The child process has no pending signals */
