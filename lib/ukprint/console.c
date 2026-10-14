@@ -21,7 +21,6 @@
 
 #if CONFIG_LIBUKCONSOLE
 #include <uk/console.h>
-#include <errno.h>
 #endif /* CONFIG_LIBUKCONSOLE */
 
 #include "print.h"
@@ -77,58 +76,43 @@ struct vprint_console {
 	int prevlvl;
 };
 
-#if CONFIG_LIBUKCONSOLE
-/* TODO: Some consoles require both a newline and a carriage return to
- * go to the start of the next line. This kind of behavior should be in
- * a single place in posix-tty. We keep this workaround until we have feature
- * in posix-tty that handles newline characters correctly.
- *
- * Kernel messages are diagnostics: they go to the consoles' error stream,
- * kept apart from a program's standard output where a console can.
- */
-static __ssz console_out(const char *buf, __sz len)
-{
-	const char *next_nl = __NULL;
-	__sz l = len;
-	__sz off = 0;
-	__ssz rc = 0;
-
-	if (unlikely(!len))
-		return 0;
-	if (unlikely(!buf))
-		return -EINVAL;
-
-	while (l > 0) {
-		next_nl = memchr(buf, '\n', l);
-		if (next_nl) {
-			off = next_nl - buf;
-			if ((rc = uk_console_err(buf, off)) < 0)
-				return rc;
-			if ((rc = uk_console_err("\r\n", 2)) < 0)
-				return rc;
-			buf = next_nl + 1;
-			l -= off + 1;
-		} else {
-			if ((rc = uk_console_err(buf, l)) < 0)
-				return rc;
-			break;
-		}
-	}
-
-	return len;
-}
-#endif /* CONFIG_LIBUKCONSOLE */
-
 /* Console state for kernel output */
 static struct vprint_console kconsole  = {
 #if CONFIG_LIBUKCONSOLE
-	.cout = console_out,
+	/* Kernel messages are diagnostics: they go to the consoles' error
+	 * stream, kept apart from a program's standard output where a
+	 * console can.
+	 */
+	.cout = uk_console_err_onlcr,
 #else /* !CONFIG_LIBUKCONSOLE */
 	.cout = __NULL,
 #endif /* !CONFIG_LIBUKCONSOLE */
 	.newline = 1,
 	.prevlvl = INT_MIN
 };
+
+/* How much of @buf[0..@len) to send so its end does not cut a UTF-8
+ * sequence: the host takes the text as a string, and a broken one aborts
+ * the guest call.
+ */
+static __sz utf8_whole(const char *buf, __sz len)
+{
+	__sz i = len;
+	unsigned char lead;
+	__sz n;
+
+	/* A sequence is at most 4 bytes: its lead is at most 3 back */
+	while (i > 0 && len - i < 3 &&
+	       ((unsigned char)buf[i - 1] & 0xC0) == 0x80)
+		i--;
+	if (i == 0)
+		return len;
+	lead = (unsigned char)buf[i - 1];
+	if (lead < 0xC0)
+		return len;
+	n = (lead >= 0xF0) ? 4 : (lead >= 0xE0) ? 3 : 2;
+	return (len - (i - 1) < n) ? i - 1 : len;
+}
 
 static inline void vprint_cout(struct vprint_console *cons,
 			       const char *buf, __sz len)
@@ -163,8 +147,13 @@ static void print_thread(struct vprint_console *cons)
 
 	if (t) {
 		if (t->name) {
+			/* A long name is cut, at a whole character, so the
+			 * tag still closes before the message
+			 */
+			len = strnlen(t->name, BUFLEN / 2);
+			len = utf8_whole(t->name, len);
 			len = uk_snprintf(buf, BUFLEN, LVLC_RESET LVLC_THREAD
-					  "<%s> ", t->name);
+					  "<%.*s> ", len, t->name);
 		} else {
 			len = uk_snprintf(buf, BUFLEN, LVLC_RESET LVLC_THREAD
 					  "<%p> ", (void *)t);
@@ -244,6 +233,15 @@ void uk_print_console_write(struct uk_print_msg *msg)
 	}
 
 	len = uk_vsnprintf(lbuf, BUFLEN, msg->fmt, msg->ap);
+	/* uk_vsnprintf returns the length it wanted, not what fits in lbuf.
+	 * A cut message ends at a whole character, and its line ends, or
+	 * the next message joins it; a raw piece's caller ends its own.
+	 */
+	if (len >= BUFLEN) {
+		len = utf8_whole(lbuf, raw ? BUFLEN - 1 : BUFLEN - 2);
+		if (!raw && (!len || lbuf[len - 1] != '\n'))
+			lbuf[len++] = '\n';
+	}
 	lptr = lbuf;
 	while (len > 0) {
 		if (cons->newline && !raw) {
@@ -295,17 +293,17 @@ void uk_print_console_write(struct uk_print_msg *msg)
 		switch (lvl) {
 		case UK_PRINT_KLVL_CRIT:
 			vprint_cout(cons, LVLC_RESET LVLC_CRIT_MSG,
-				    sizeof(LVLC_RESET LVLC_CRIT_MSG));
+				    sizeof(LVLC_RESET LVLC_CRIT_MSG) - 1);
 			break;
 		case UK_PRINT_KLVL_ERR:
 			vprint_cout(cons, LVLC_RESET LVLC_ERROR_MSG,
-				    sizeof(LVLC_RESET LVLC_ERROR_MSG));
+				    sizeof(LVLC_RESET LVLC_ERROR_MSG) - 1);
 			break;
 		default:
-			vprint_cout(cons, LVLC_RESET, sizeof(LVLC_RESET));
+			vprint_cout(cons, LVLC_RESET, sizeof(LVLC_RESET) - 1);
 		}
 		vprint_cout(cons, (char *)lptr, llen);
-		vprint_cout(cons, LVLC_RESET, sizeof(LVLC_RESET));
+		vprint_cout(cons, LVLC_RESET, sizeof(LVLC_RESET) - 1);
 
 		len -= llen;
 		lptr = nlptr + 1;

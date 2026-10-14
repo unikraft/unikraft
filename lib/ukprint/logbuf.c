@@ -157,7 +157,8 @@ void uk_print_dmesg(void)
 	}
 
 	uk_logbuf_foreach(lb, lm)
-		uk_console_err(lm->msg.msg, lm->msg.len);
+		/* msg.len counts the NUL the message is stored with */
+		uk_console_err_onlcr(lm->msg.msg, lm->msg.len - 1);
 
 	uk_spin_unlock(&lb->lock);
 #endif /* CONFIG_LIBUKCONSOLE */
