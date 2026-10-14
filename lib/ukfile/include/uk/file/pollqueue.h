@@ -370,7 +370,11 @@ uk_pollevent uk_pollq_poll_until(struct uk_pollq *q, uk_pollevent req,
 		return ev;
 	if ((ev = _uk_pollq_lock(q, req, f)))
 		return ev;
-	while (_uk_pollq_wait(q, req, deadline)) {
+	/* Asked to end its waits: no events, as at a deadline; the caller
+	 * tells the two apart by the flag (uk_thread_is_interrupted())
+	 */
+	while (!uk_thread_is_interrupted(uk_thread_current()) &&
+	       _uk_pollq_wait(q, req, deadline)) {
 		if ((ev = _uk_pollq_poll_locked(q, req, f)))
 			break;
 	}

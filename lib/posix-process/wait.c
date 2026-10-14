@@ -158,6 +158,12 @@ static int pprocess_wait(pid_t pid, pid_t pgid, siginfo_t *si, int opt)
 
 		/* Wait for a state change on one of our children */
 		uk_semaphore_down(&this_thread->process->wait_semaphore);
+
+		/* Asked to end its waits (a signal ends the process) */
+		if (uk_thread_is_interrupted(uk_thread_current())) {
+			ret = -EINTR;
+			break;
+		}
 	}
 
 out:

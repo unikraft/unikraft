@@ -212,14 +212,89 @@ int pprocess_signal_send(struct posix_process *proc, int signum,
 	return 0;
 }
 
+/* Whether @signum, once delivered, ends @pproc: SIGKILL, or a signal whose
+ * default action is to terminate, left at its default and not blocked by
+ * every thread.
+ */
+static bool pprocess_signal_is_fatal(struct posix_process *pproc, int signum)
+{
+	struct posix_thread *thread, *threadn;
+
+	if (signum == SIGKILL)
+		return true;
+	if (KERN_SIGACTION(pproc, signum)->ks_handler != SIG_DFL)
+		return false;
+	if (signum < SIGRTMIN &&
+	    !(UK_BIT(signum) & (SIGACT_TERM_MASK | SIGACT_CORE_MASK)))
+		return false;
+	uk_pprocess_foreach_pthread(pproc, thread, threadn) {
+		if (!IS_MASKED(thread, signum))
+			return true;
+	}
+	return false;
+}
+
+/* Make the threads of @pproc, which a signal ends, leave the system
+ * calls they are blocked in.  The signal is taken on the way out of a
+ * call, and a thread blocked with no deadline -- in a read from a pipe, an
+ * accept(), a poll(), a wait() -- may never leave its own: the killed
+ * process would live on.  Interrupted, each wait returns EINTR and its
+ * call unwinds as it would on its own, releasing what it holds (the file
+ * a read() holds open, say); ending the threads where they wait would
+ * leak that.
+ */
+void pprocess_signal_interrupt(struct posix_process *pproc)
+{
+	struct posix_thread *thread, *threadn;
+	struct uk_thread *t;
+
+	uk_pprocess_foreach_pthread(pproc, thread, threadn) {
+		t = thread->thread;
+		if (!t || t == uk_thread_current() || uk_thread_is_exited(t))
+			continue;
+		/* A vfork parent's stack is the running child's until the
+		 * child execs or exits, which wakes the parent.
+		 */
+		if (thread->state == POSIX_THREAD_BLOCKED_VFORK)
+			continue;
+		uk_thread_set_interrupted(t);
+		if (thread->state == POSIX_THREAD_BLOCKED_WAIT)
+			uk_semaphore_up(&pproc->wait_semaphore);
+		else if (!uk_thread_is_runnable(t))
+			uk_thread_wake(t);
+	}
+}
+
+/* @signum ends @pproc: decided now, as Linux does when it sends a fatal
+ * signal, not when a thread takes it.  A handler installed in between
+ * does not save the process, and no thread goes back to the program with
+ * the EINTR it was interrupted with (see uk_signal_deliver()), a thread
+ * that blocks the signal included.
+ */
+static void pprocess_signal_end(struct posix_process *pproc, int signum)
+{
+	if (pproc->term_signal)
+		return;
+	pproc->term_signal = signum;
+	pprocess_signal_interrupt(pproc);
+}
+
 /* Send @signum to @pproc, unless it ignores it; @pproc is permitted */
 static int pprocess_signal_process_one(struct posix_process *pproc,
 				       int signum, siginfo_t *siginfo)
 {
+	int rc;
+
 	if (pprocess_signal_should_drop(pproc, signum))
 		return 0;
 
-	return pprocess_signal_send(pproc, signum, siginfo);
+	rc = pprocess_signal_send(pproc, signum, siginfo);
+	if (unlikely(rc))
+		return rc;
+
+	if (pprocess_signal_is_fatal(pproc, signum))
+		pprocess_signal_end(pproc, signum);
+	return 0;
 }
 
 int pprocess_signal_process_do(pid_t pid, int signum, siginfo_t *siginfo)
@@ -330,6 +405,12 @@ int pprocess_signal_thread_do(int tid, int signum, siginfo_t *siginfo)
 
 	if (pthread->state == POSIX_THREAD_BLOCKED_SIGNAL)
 		uk_semaphore_up(&pthread->signal->deliver_semaphore);
+	/* To a thread or not, a signal that ends the process ends it now;
+	 * sent to a thread, only if that thread takes it.
+	 */
+	if (pprocess_signal_is_fatal(pproc, signum) &&
+	    (signum == SIGKILL || !IS_MASKED(pthread, signum)))
+		pprocess_signal_end(pproc, signum);
 
 #if CONFIG_LIBPOSIX_PROCESS_SIGNALFD
 	pthread_signal_files_notify(pproc, pthread, signum);

@@ -47,14 +47,60 @@ void pprocess_signal_jmp_handler(struct pprocess_signal_handler_ctx *h,
 
 static void uk_sigact_term(int __unused sig)
 {
+	struct posix_thread *thread, *threadn;
 	struct posix_process *pprocess;
+	__bool unwinding;
 
 	pprocess = uk_pprocess_current();
 	UK_ASSERT(pprocess);
 
+	/* This thread is out of its call (it may come from a fault, not a
+	 * syscall exit, where the request is cleared): left set, a sibling
+	 * here would wait for it as one still unwinding, and it for them.
+	 */
+	uk_thread_clear_interrupted(uk_thread_current());
+
+	/* The process ends of the first such signal a thread takes.  A
+	 * signal other than SIGKILL is dequeued by that thread, so the rest
+	 * find it here on their way out (see uk_signal_deliver()) rather
+	 * than going back to the program.
+	 */
+	if (!pprocess->term_signal) {
+		pprocess->term_signal = sig;
+		/* Not decided when sent (an out-of-memory fault, a signal
+		 * left pending): the others are to leave their calls too
+		 */
+		pprocess_signal_interrupt(pprocess);
+	}
+
+	/* Let the threads interrupted for this signal (see
+	 * pprocess_signal_interrupt()) that can run leave their system calls
+	 * first: ended where they wait, they would keep what their calls
+	 * hold.  Each clears its flag on the way out and comes here too.
+	 * Threads blocked where an interrupt does not reach are ended where
+	 * they are, as before.
+	 */
+	do {
+		unwinding = false;
+		uk_pprocess_foreach_pthread(pprocess, thread, threadn) {
+			struct uk_thread *t = thread->thread;
+
+			if (t && t != uk_thread_current() &&
+			    uk_thread_is_interrupted(t) &&
+			    uk_thread_is_runnable(t))
+				unwinding = true;
+		}
+		if (unwinding)
+			uk_sched_yield();
+	} while (unwinding && pprocess->state == POSIX_PROCESS_RUNNING);
+
+	/* Another thread ended the process while this one waited */
+	if (pprocess->state != POSIX_PROCESS_RUNNING)
+		uk_sched_thread_exit();
+
 	uk_pr_info("pid: %d terminated by signal\n", pprocess->pid);
 
-	pprocess_exit(pprocess, POSIX_PROCESS_KILLED, sig);
+	pprocess_exit(pprocess, POSIX_PROCESS_KILLED, pprocess->term_signal);
 	uk_sched_thread_exit(); /* noreturn */
 }
 
@@ -349,6 +395,12 @@ static void uk_signal_deliver(struct uk_syscall_exit_ctx *exit_ctx)
 	if (!execenv)
 		return;
 
+	/* Out of the call it was interrupted in: the request is spent.  Not
+	 * before: a call the kernel makes from within it has no execenv, and
+	 * must leave the request to the call it is part of.
+	 */
+	uk_thread_clear_interrupted(uk_thread_current());
+
 	pthread = uk_pthread_current();
 	UK_ASSERT(pthread);
 
@@ -362,6 +414,12 @@ static void uk_signal_deliver(struct uk_syscall_exit_ctx *exit_ctx)
 		/* We assume that we always call this function
 		 * on the running process.
 		 */
+		UK_BUG();
+	}
+
+	/* Its process is ending: so does this thread, not back to the program */
+	if (pproc->term_signal) {
+		uk_sigact_term(pproc->term_signal);
 		UK_BUG();
 	}
 

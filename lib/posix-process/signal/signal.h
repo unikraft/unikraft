@@ -285,6 +285,11 @@ struct uk_signal *pprocess_signal_next_pending_t(struct posix_thread *pthread);
 /* Signal a process (abstraction for kill / sigqueueinfo) */
 int pprocess_signal_process_do(pid_t pid, int signum, siginfo_t *siginfo);
 
+/* Make the other threads of @pproc, which a signal ends, leave the system
+ * calls they are blocked in (UK_THREADF_INTERRUPT)
+ */
+void pprocess_signal_interrupt(struct posix_process *pproc);
+
 /* Signal a thread (abstraction for kill / sigqueueinfo) */
 int pprocess_signal_thread_do(int tid, int signum, siginfo_t *siginfo);
 

@@ -121,7 +121,20 @@ const struct vfs_mtab_entry *vfs_parent_mount(const struct uk_file *f)
 			if (!prog) {
 				UK_ASSERT(lout.target == d);
 				uk_file_release(lout.target);
-				uk_file_poll(d, UKFD_POLLIN);
+				/* No unwinding here: mount() has grafted its
+				 * mount already and needs the answer.  Wait
+				 * with an interrupt (UK_THREADF_INTERRUPT) set
+				 * aside, or the poll would not wait at all.
+				 */
+				{
+					struct uk_thread *t = uk_thread_current();
+					int intr = uk_thread_is_interrupted(t);
+
+					uk_thread_clear_interrupted(t);
+					uk_file_poll(d, UKFD_POLLIN);
+					if (intr)
+						uk_thread_set_interrupted(t);
+				}
 				continue;
 			}
 			UK_ASSERT(prog == 2);
@@ -632,6 +645,12 @@ const struct uk_file *_vfs_lookupat(const struct uk_file *atroot,
 				UK_ASSERT(lout.target == d);
 				uk_file_release(lout.target);
 				uk_file_poll(d, UKFD_POLLIN);
+				/* Its process ends: the call unwinds */
+				if (uk_thread_is_interrupted(
+					    uk_thread_current())) {
+					ret = ERR2PTR(-EINTR);
+					goto out;
+				}
 			} else {
 				/* Progress made, continue */
 				uk_file_release(d);

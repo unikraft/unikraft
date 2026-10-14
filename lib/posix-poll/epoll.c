@@ -647,7 +647,9 @@ int uk_sys_epoll_pwait2(const struct uk_file *epf, struct epoll_event *events,
 			return nout;
 		/* If nout == 0 loop back around */
 	}
-	/* Timeout */
+	/* Asked to end its waits (a signal ends the process), else timeout */
+	if (uk_thread_is_interrupted(uk_thread_current()))
+		return -EINTR;
 	return 0;
 }
 
