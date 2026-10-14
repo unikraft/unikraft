@@ -293,6 +293,11 @@ void pprocess_signal_interrupt(struct posix_process *pproc);
 /* Signal a thread (abstraction for kill / sigqueueinfo) */
 int pprocess_signal_thread_do(int tid, int signum, siginfo_t *siginfo);
 
+/* pause() and sigsuspend(): sleep until a signal @pthread takes is
+ * queued, unless one already is
+ */
+void pthread_signal_pause(struct posix_thread *pthread);
+
 /* Signal a process */
 int pprocess_signal_send(struct posix_process *proc, int signum,
 			 siginfo_t *siginfo);

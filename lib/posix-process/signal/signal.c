@@ -173,6 +173,47 @@ int pprocess_signal_sigaction_new(struct uk_alloc *alloc, struct uk_signal_pdesc
 	return 0;
 }
 
+/* Whether @signum, sent to @pproc, ends a pause() or sigsuspend() that
+ * @thread is in: only a signal the thread will take does.  One ignored,
+ * such as a SIGCHLD at its default action, or one the thread blocks stays
+ * queued and leaves it asleep, as on Linux.
+ */
+static bool pthread_signal_wakes(struct posix_process *pproc,
+				 struct posix_thread *thread, int signum)
+{
+	return thread->state == POSIX_THREAD_BLOCKED_SIGNAL &&
+	       !IS_IGNORED(pproc, signum) && !IS_MASKED(thread, signum);
+}
+
+/* Whether a signal @pthread will take is already queued for it */
+static bool pthread_signal_takes_queued(struct posix_thread *pthread)
+{
+	struct posix_process *pproc = pthread->process;
+	int signum;
+
+	pprocess_signal_foreach(signum) {
+		if (IS_MASKED(pthread, signum) || IS_IGNORED(pproc, signum))
+			continue;
+		if (!uk_list_empty(&pthread->signal->sigqueue.list_head[signum]) ||
+		    !uk_list_empty(&pproc->signal->sigqueue.list_head[signum]))
+			return true;
+	}
+	return false;
+}
+
+void pthread_signal_pause(struct posix_thread *pthread)
+{
+	/* A wake-up left from a signal taken before this call is spent: a
+	 * stale one would end this pause at once.
+	 */
+	uk_semaphore_init(&pthread->signal->deliver_semaphore, 0);
+	pthread->state = POSIX_THREAD_BLOCKED_SIGNAL;
+	if (!pthread_signal_takes_queued(pthread) &&
+	    !uk_thread_is_interrupted(uk_thread_current()))
+		uk_semaphore_down(&pthread->signal->deliver_semaphore);
+	pthread->state = POSIX_THREAD_RUNNING;
+}
+
 int pprocess_signal_send(struct posix_process *proc, int signum,
 			 siginfo_t *siginfo)
 {
@@ -207,7 +248,7 @@ int pprocess_signal_send(struct posix_process *proc, int signum,
 	 * whoever sent the signal: a SIGCHLD from an exiting child included.
 	 */
 	uk_pprocess_foreach_pthread(proc, thread, threadn) {
-		if (thread->state == POSIX_THREAD_BLOCKED_SIGNAL)
+		if (pthread_signal_wakes(proc, thread, signum))
 			uk_semaphore_up(&thread->signal->deliver_semaphore);
 	}
 
@@ -262,6 +303,9 @@ void pprocess_signal_interrupt(struct posix_process *pproc)
 		uk_thread_set_interrupted(t);
 		if (thread->state == POSIX_THREAD_BLOCKED_WAIT)
 			uk_semaphore_up(&pproc->wait_semaphore);
+		/* Paused, possibly with the fatal signal blocked */
+		else if (thread->state == POSIX_THREAD_BLOCKED_SIGNAL)
+			uk_semaphore_up(&thread->signal->deliver_semaphore);
 		else if (!uk_thread_is_runnable(t))
 			uk_thread_wake(t);
 	}
@@ -447,7 +491,7 @@ int pprocess_signal_thread_do(int tid, int signum, siginfo_t *siginfo)
 		return rc;
 	}
 
-	if (pthread->state == POSIX_THREAD_BLOCKED_SIGNAL)
+	if (pthread_signal_wakes(pproc, pthread, signum))
 		uk_semaphore_up(&pthread->signal->deliver_semaphore);
 	/* To a thread or not, a signal that ends the process ends it now;
 	 * sent to a thread, only if that thread takes it.
