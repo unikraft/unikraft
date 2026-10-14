@@ -207,7 +207,7 @@ hyperlight_dispatch_inner(void)
 	 * Buffer for the FunctionCall FlatBuffer.
 	 *
 	 * The pop returns a pointer into the input stack.  Any subsequent
-	 * host function call (including uk_pr_err via HostPrint) pushes a
+	 * host function call (including uk_pr_err via HostPrintErr) pushes a
 	 * response onto the SAME input stack at the same offset, clobbering
 	 * the data.  We must copy it out before doing anything that might
 	 * trigger a host call.

@@ -868,8 +868,12 @@ __u64 hl_call_get_initrd_size(void)
 	return size;
 }
 
-/* The most of a message one HostPrint call carries */
+/* The most of a message one HostPrint call carries: small enough for
+ * the call's encoding to live on the stack (fc_buf in host_print_one)
+ */
 #define HL_HOST_PRINT_CHUNK 4096
+/* The longest print host function name, NUL included, fc_buf leaves room for */
+#define HL_HOST_PRINT_NAME_MAX 32
 
 /*
  * How much of @len bytes of output the next call sends: at most
@@ -894,20 +898,25 @@ static __sz host_print_cut(const char *msg, __sz len)
 	return cut;
 }
 
-/* One call of the host function @fn with at most HL_HOST_PRINT_CHUNK bytes */
+/*
+ * One call of the host function @fn with at most HL_HOST_PRINT_CHUNK bytes.
+ * Returns 0 once the host ran it, whatever it returned;
+ * HL_HOST_PRINT_REFUSED if it answered with an error, such as a host
+ * without @fn; -1 if the call never reached it.
+ */
 static int host_print_one(const char *fn, __sz fn_len,
 			  const char *msg, __sz len)
 {
-	/*
-	 * Stack-allocate a buffer large enough for the FlatBuffer.
-	 * Fixed overhead is 80 + 4 (name) + 4 (msg) = 88 bytes,
-	 * plus the two strings aligned to 4 bytes.
+	/* Besides the message and the name, the encoding takes under 96
+	 * bytes: 88 fixed (80, and 4 for each string's length), and the
+	 * padding of the two strings.
 	 */
-	__u8 fc_buf[HL_HOST_PRINT_CHUNK + 128];
+	__u8 fc_buf[HL_HOST_PRINT_CHUNK + 96 + HL_HOST_PRINT_NAME_MAX];
 	__u64 fc_len;
 	const __u8 *result_data;
 	__u64 result_len;
 	unsigned long irqf;
+	int rc;
 
 	/* Encode outside the lock — no shared state touched */
 	fc_len = fb_encode_function_call_1str(
@@ -928,43 +937,62 @@ static int host_print_one(const char *fn, __sz fn_len,
 
 	hyperlight_out32(HYPERLIGHT_PORT_CALL_FUNCTION, 0);
 
-	/* Pop and discard the return value (i32 result code) */
-	hl_stack_pop(g_input_stack, &result_data, &result_len);
+	/* The host ran: a result it lost still counts as sent, not resent */
+	rc = 0;
+	if (hl_stack_pop(g_input_stack, &result_data, &result_len) == 0 &&
+	    result_len >= 8 &&
+	    fb_u8_default(result_data, 4 + fb_u32(result_data, 4),
+			  VT_FCR_RESULT_TYPE, 0) == HL_FCRT_GUEST_ERROR)
+		rc = HL_HOST_PRINT_REFUSED;
 
 	ukplat_spin_unlock_irqrestore(&g_hcall_lock, irqf);
-	return 0;
+	return rc;
 }
 
 /*
  * Send all @len bytes through the host function @fn, a call per
- * HL_HOST_PRINT_CHUNK.  Returns the bytes sent, or -1 if none were.
+ * HL_HOST_PRINT_CHUNK.  Returns the bytes sent, or if none were, the
+ * first call's failure (HL_HOST_PRINT_REFUSED or -1).
  */
 static __ssz host_print(const char *fn, __sz fn_len,
 			const char *msg, __sz len)
 {
 	__sz sent = 0;
 	__sz n;
+	int rc;
 
 	if (!g_hcall_ready)
 		return -1;
 
 	while (sent < len) {
 		n = host_print_cut(msg + sent, len - sent);
-		if (host_print_one(fn, fn_len, msg + sent, n) < 0)
-			return sent ? (__ssz)sent : -1;
+		rc = host_print_one(fn, fn_len, msg + sent, n);
+		if (rc < 0)
+			return sent ? (__ssz)sent : rc;
 		sent += n;
 	}
 	return (__ssz)sent;
 }
 
+/* @fn must be a string literal ("" fn "" refuses anything else), short
+ * enough that a full chunk still fits fc_buf in host_print_one
+ */
+#define HOST_PRINT(fn, msg, len)					\
+	({								\
+		_Static_assert(						\
+			sizeof("" fn "") <= HL_HOST_PRINT_NAME_MAX,	\
+			"host function name too long for fc_buf");	\
+		host_print(fn, sizeof("" fn "") - 1, msg, len);		\
+	})
+
 __ssz hl_call_host_print(const char *msg, __sz len)
 {
-	return host_print("HostPrint", 9, msg, len);
+	return HOST_PRINT("HostPrint", msg, len);
 }
 
 __ssz hl_call_host_print_err(const char *msg, __sz len)
 {
-	return host_print("HostPrintErr", 12, msg, len);
+	return HOST_PRINT("HostPrintErr", msg, len);
 }
 
 __u64 hl_call_get_exn_stack_top(void)

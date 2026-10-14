@@ -72,7 +72,8 @@ static inline void hyperlight_out32(__u16 port, __u32 val)
  */
 static inline void hyperlight_debug_putc(char c)
 {
-	hyperlight_out32(HYPERLIGHT_PORT_DEBUG_PRINT, (__u32)c);
+	/* Unsigned: a sign-extended byte >= 0x80 is no character to the host */
+	hyperlight_out32(HYPERLIGHT_PORT_DEBUG_PRINT, (__u32)(__u8)c);
 }
 
 /*

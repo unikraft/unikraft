@@ -11,17 +11,16 @@
  *
  *   1. DebugPrint (port 103) — one VM exit per byte.  Available from
  *      the very first instruction; used during early boot before the
- *      hcall subsystem is initialised.  Also the fallback if HostPrint
- *      fails.
+ *      hcall subsystem is initialised, and for whatever HostPrint does
+ *      not send.
  *
  *   2. HostPrint (host function call) — one VM exit per 4 KiB of the
  *      buffer.  Uses the FlatBuffer-based hcall protocol over the PEB's
  *      shared I/O stacks.  Requires hl_hcall_init() to have been called.
  *      Standard error and kernel messages go through HostPrintErr, the
- *      same call under another name, so the host keeps them apart.
- *
- * The console transparently picks HostPrint when the hcall subsystem
- * is ready, falling back to DebugPrint otherwise.
+ *      same call under another name, so the host keeps them apart.  A
+ *      host that refuses HostPrintErr is taken to lack it: from then on
+ *      standard error goes through HostPrint, as before it existed.
  *
  * Input uses the ReadStdin host function — the host maintains a
  * byte buffer that the caller populates via GuestConfig::write_stdin().
@@ -29,9 +28,9 @@
  * the read returns 0 (EOF).
  *
  * TODO: Route uk_pr_* output through port 99 (Log / OutBAction::Log)
- * instead of HostPrint (port 101).  Port 99 delivers a GuestLogData
- * FlatBuffer to the host's tracing framework, keeping kernel warnings
- * out of the HostPrint capture path (drain_output).  This requires
+ * instead of HostPrintErr.  Port 99 delivers a GuestLogData FlatBuffer
+ * to the host's tracing framework, keeping kernel warnings out of the
+ * program's standard error.  This requires
  * encoding GuestLogData FlatBuffers (level, source_file, line, source,
  * message) in the kernel — a different schema from hcall FlatBuffers.
  */
@@ -41,38 +40,49 @@
 #include <hyperlight/outb.h>
 
 /*
- * Send @buf through @host_print (HostPrint or HostPrintErr) when the hcall
- * subsystem is up; what it could not send goes out through DebugPrint.
+ * HostPrint once the hcall subsystem is up; what it did not send, and all
+ * of it before, goes out through DebugPrint, which needs nothing.
  */
-static __ssz hyperlight_console_write(__ssz (*host_print)(const char *, __sz),
-				      const char *buf, __sz len)
+static __ssz hyperlight_console_out(struct uk_console *dev __unused,
+				    const char *buf, __sz len)
 {
 	__ssz sent = 0;
 
-	/* Try the host function first — one VM exit per 4 KiB */
 	if (hl_hcall_ready()) {
-		sent = host_print(buf, len);
+		sent = hl_call_host_print(buf, len);
 		if (sent < 0)
 			sent = 0;
 	}
 
-	/* Fallback: DebugPrint, one byte at a time */
 	for (__sz i = (__sz)sent; i < len; i++)
 		hyperlight_debug_putc(buf[i]);
 	return len;
 }
 
-static __ssz hyperlight_console_out(struct uk_console *dev __unused,
-				    const char *buf, __sz len)
-{
-	return hyperlight_console_write(hl_call_host_print, buf, len);
-}
+/* Set once the host refuses HostPrintErr: it lacks it.  A host whose
+ * HostPrintErr fails looks the same, and gets stderr on HostPrint from then.
+ */
+static __bool no_host_print_err;
 
-/* Standard error, kept apart from standard output by HostPrintErr */
-static __ssz hyperlight_console_err(struct uk_console *dev __unused,
+/*
+ * Standard error, kept apart from standard output by HostPrintErr; what
+ * that does not send goes the way of standard output.
+ */
+static __ssz hyperlight_console_err(struct uk_console *dev,
 				    const char *buf, __sz len)
 {
-	return hyperlight_console_write(hl_call_host_print_err, buf, len);
+	__ssz sent = 0;
+
+	if (hl_hcall_ready() && !no_host_print_err) {
+		sent = hl_call_host_print_err(buf, len);
+		if (sent == HL_HOST_PRINT_REFUSED)
+			no_host_print_err = __true;
+		if (sent < 0)
+			sent = 0;
+	}
+	if ((__sz)sent < len)
+		hyperlight_console_out(dev, buf + sent, len - sent);
+	return len;
 }
 
 /*
