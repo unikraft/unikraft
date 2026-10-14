@@ -574,8 +574,11 @@ UK_THREAD_INIT_PRIO(0, posix_thread_fini, UK_PRIO_EARLIEST);
 
 struct posix_process *pid2pprocess(pid_t pid)
 {
-	UK_ASSERT((__sz)pid < ARRAY_SIZE(pid_process));
-
+	/* Callers pass pids from userland (kill(2), wait4(2)): one that no
+	 * process could have is not a bug, just no process.
+	 */
+	if ((__sz)pid >= ARRAY_SIZE(pid_process) || pid < 0)
+		return NULL;
 	return pid_process[pid];
 }
 
