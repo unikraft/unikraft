@@ -450,6 +450,10 @@ int uk_clone(struct clone_args *cl_args, size_t cl_args_len,
 	 */
 	if (flags & CLONE_VFORK) {
 		pthread = tid2pthread(ukthread2tid(t));
+		/* Only this child's execve() or exit gives the stack back:
+		 * not those of another thread or child this thread made
+		 */
+		pthread->vfork_child = tid2pthread(child_tid);
 		uk_thread_block(t);
 		pthread->state = POSIX_THREAD_BLOCKED_VFORK;
 		uk_sched_yield();

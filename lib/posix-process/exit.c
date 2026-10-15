@@ -146,12 +146,31 @@ void pprocess_wake_waiters(struct posix_process *pprocess)
  * it back.  Ending such a thread first would free the stack, and the
  * thread the child wakes, from under the child.
  */
+/* Whether @self is @lender's vfork child, or one down a chain of them:
+ * a vfork child that shares its process (CLONE_THREAD) gives the stack
+ * back with its own execve or exit, so it cannot wait for its lenders.
+ */
+static __bool pthread_lends_to(struct posix_thread *lender,
+			       struct posix_thread *self)
+{
+	struct posix_thread *q;
+
+	for (q = lender; q && q->state == POSIX_THREAD_BLOCKED_VFORK;
+	     q = q->vfork_child) {
+		if (q->vfork_child == self)
+			return true;
+	}
+	return false;
+}
+
 static __bool pprocess_lends_to_vfork(struct posix_process *pprocess)
 {
+	struct posix_thread *self = uk_pthread_current();
 	struct posix_thread *pt, *ptn;
 
 	uk_pprocess_foreach_pthread(pprocess, pt, ptn) {
-		if (pt->state == POSIX_THREAD_BLOCKED_VFORK)
+		if (pt->state == POSIX_THREAD_BLOCKED_VFORK &&
+		    !pthread_lends_to(pt, self))
 			return true;
 	}
 	return false;
@@ -202,9 +221,11 @@ void pprocess_exit_pthread(struct posix_thread *pthread,
 	event_data.tid = pthread->tid;
 	pprocess_raise_ptexit_event(&event_data);
 
-	/* Wake up parent if it was blocking on vfork */
+	/* Wake up parent if it was blocking on vfork for this child */
 	if (parent_pthread &&
-	    parent_pthread->state == POSIX_THREAD_BLOCKED_VFORK) {
+	    parent_pthread->state == POSIX_THREAD_BLOCKED_VFORK &&
+	    parent_pthread->vfork_child == pthread) {
+		parent_pthread->vfork_child = NULL;
 		uk_thread_wake(parent_pthread->thread);
 		parent_pthread->state = POSIX_THREAD_RUNNING;
 		uk_waitq_wake_up(&parent_pthread->process->vfork_waitq);

@@ -52,7 +52,9 @@ static void __noreturn execve_ctx_switch(long arg0, long arg1)
 	/* If we're coming from VFORK it's time to wake up the parent.
 	 * Otherwise, free the old stack.
 	 */
-	if (pthread_parent->state == POSIX_THREAD_BLOCKED_VFORK) {
+	if (pthread_parent->state == POSIX_THREAD_BLOCKED_VFORK &&
+	    pthread_parent->vfork_child == pthread) {
+		pthread_parent->vfork_child = NULL;
 		uk_pr_debug("Waking up parent (tid %d)\n", pthread_parent->tid);
 		uk_thread_wake(tid2ukthread(pthread_parent->tid));
 		pthread_parent->state = POSIX_THREAD_RUNNING;
