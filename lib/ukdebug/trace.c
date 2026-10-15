@@ -52,13 +52,8 @@ char *uk_trace_buffer_writep = uk_trace_buffer;
  *
  *     $ readelf -p .uk_trace_keyvals <your_image.gdb>
  */
-#if defined(__arm__) || defined(__aarch64__)
 #define __UK_TRACE_KEYVALS_SECTION                                             \
-	__attribute((__section__(".uk_trace_keyvals,\"\",%note//")))
-#else
-#define __UK_TRACE_KEYVALS_SECTION                                             \
-	__attribute((__section__(".uk_trace_keyvals,\"\",@note#")))
-#endif
+	__attribute((__section__(".uk_trace_keyvals")))
 
 #define TRACE_DEFINE_KEY(key, val)                                             \
 	__UK_TRACE_KEYVALS_SECTION                                             \
