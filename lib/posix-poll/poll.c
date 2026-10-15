@@ -11,6 +11,8 @@
 #include <uk/timeutil.h>
 #include <uk/syscall.h>
 
+#include "signal_wait.h"
+
 /* For performance we copy between epoll and poll events with no conversion. */
 /* This assumes them to be equal, which we ensure with these asserts */
 UK_CTASSERT(EPOLLIN == POLLIN);
@@ -42,7 +44,8 @@ int uk_sys_ppoll(struct pollfd *fds, nfds_t nfds,
 	int ret;
 	int monitored;
 
-	if (unlikely(!fds))
+	/* With no fds, there is no array to read: NULL is fine, as on Linux */
+	if (unlikely(!fds && nfds))
 		return -EFAULT;
 	if (timeout && uk_time_spec_to_nsec(timeout) < 0)
 		return -EINVAL;
@@ -133,11 +136,30 @@ UK_SYSCALL_R_DEFINE(int, ppoll, struct pollfd *, fds, nfds_t, nfds,
 		    const struct timespec *, timeout,
 		    const sigset_t *, sigmask, size_t, sigsetsize)
 {
+	/* Only this wait takes the mask: uk_sys_ppoll() has none (ENOSYS) */
+	if (!timeout && posix_poll_watches_nothing(fds, nfds)) {
+		int ret = posix_poll_signal_wait(sigmask, sigsetsize);
+
+		if (ret != -ENOTSUP) {
+			if (ret == -EINTR)
+				posix_poll_clear_revents(fds, nfds);
+			return ret;
+		}
+	}
 	return uk_sys_ppoll(fds, nfds, timeout, sigmask, sigsetsize);
 }
 
 UK_SYSCALL_R_DEFINE(int, poll, struct pollfd *, fds, nfds_t, nfds, int, timeout)
 {
+	if (timeout < 0 && posix_poll_watches_nothing(fds, nfds)) {
+		int ret = posix_poll_signal_wait(NULL, 0);
+
+		if (ret != -ENOTSUP) {
+			if (ret == -EINTR)
+				posix_poll_clear_revents(fds, nfds);
+			return ret;
+		}
+	}
 	return uk_sys_ppoll(
 		fds, nfds,
 		(timeout < 0) ? NULL : &uk_time_spec_from_msec(timeout),
