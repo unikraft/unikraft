@@ -213,6 +213,14 @@ void pprocess_release_pthread(struct posix_thread *pthread)
 	/* remove from process' thread list */
 	uk_list_del_init(&pthread->thread_list_entry);
 
+	/* The threads it created outlive it: their parent is gone, not
+	 * this memory once freed (execve() and exit read their parent)
+	 */
+	for (pid_t tid = 1; tid < TIDMAP_SIZE; tid++) {
+		if (tid_thread[tid] && tid_thread[tid]->parent == pthread)
+			tid_thread[tid]->parent = NULL;
+	}
+
 	/* release TID */
 	release_tid(pthread->tid);
 	tid_thread[pthread->tid] = NULL;
