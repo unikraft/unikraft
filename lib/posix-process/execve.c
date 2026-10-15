@@ -40,12 +40,13 @@ static void __noreturn execve_ctx_switch(long arg0, long arg1)
 
 	pthread_parent = pthread->parent;
 
-	/* If there is no parent, then must be calling execve()
-	 * from init without having called vfork().
+	/* No parent: init's first execve() (whose stack is the boot's, not
+	 * to free), or a thread whose creator is gone and so lends it none
 	 */
 	if (!pthread_parent) {
 		UK_ASSERT(pthread->process);
-		UK_ASSERT(pthread->process->pid == UK_PID_INIT);
+		if (pthread->process->pid != UK_PID_INIT && stack_old)
+			uk_free(this_thread->_mem.stack_a, stack_old);
 		goto switch_ctx;
 	}
 
