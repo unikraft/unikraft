@@ -10,6 +10,8 @@
 #include <uk/timeutil.h>
 #include <uk/syscall.h>
 
+#include "signal_wait.h"
+
 /* HACK: Because we need to support both vfscore and uk_file, we need to defer
  * to epoll(), which can handle both. Once vfscore shim is no longer needed, we
  * can switch to a more efficient bespoke implementation.
@@ -166,6 +168,15 @@ UK_SYSCALL_R_DEFINE(int, pselect6, int, nfds,
 		    struct timespec *restrict, timeout,
 		    const struct uk_ksigset *, sigset)
 {
+	/* Only this wait takes the mask: uk_sys_pselect() has none (ENOSYS) */
+	if (!timeout &&
+	    posix_select_watches_nothing(nfds, readfds, writefds, exceptfds)) {
+		int ret = posix_poll_signal_wait(sigset ? sigset->ss : NULL,
+						 sigset ? sigset->ss_len : 0);
+
+		if (ret != -ENOTSUP)
+			return ret;
+	}
 	return uk_sys_pselect(nfds, readfds, writefds, exceptfds,
 			      timeout, sigset);
 }
@@ -184,6 +195,13 @@ UK_SYSCALL_R_DEFINE(int, select, int, nfds,
 		*timeout = uk_time_val_from_spec(&ts);
 		return r;
 	} else {
+		if (posix_select_watches_nothing(nfds, readfds, writefds,
+						 exceptfds)) {
+			int ret = posix_poll_signal_wait(NULL, 0);
+
+			if (ret != -ENOTSUP)
+				return ret;
+		}
 		return uk_sys_pselect(nfds, readfds, writefds, exceptfds, NULL,
 				      NULL);
 	}
