@@ -92,6 +92,8 @@ struct posix_thread {
 	pid_t tid;
 	struct posix_process *process;
 	struct posix_thread *parent;
+	/* The child this thread lends its stack to while BLOCKED_VFORK */
+	struct posix_thread *vfork_child;
 	struct uk_list_head thread_list_entry;
 	struct uk_thread *thread;
 	struct uk_alloc *_a;
