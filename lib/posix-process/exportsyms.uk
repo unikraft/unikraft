@@ -46,7 +46,9 @@ sbrk
 clone
 vfork
 kill
+uk_sys_pause
 pause
+uk_sys_rt_sigsuspend
 sigaddset
 sigaltstack
 sigdelset
