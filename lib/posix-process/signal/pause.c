@@ -6,18 +6,20 @@
 
 #include <stddef.h>
 #include <sys/types.h>
+#include <uk/process.h>
 #include <uk/syscall.h>
 
 #include "process.h"
 #include "signal.h"
 
 #if CONFIG_LIBPOSIX_PROCESS_SIGNAL
-UK_SYSCALL_R_DEFINE(int, pause)
+int uk_sys_pause(void)
 {
 	struct posix_thread *pthread;
 
 	pthread = uk_pthread_current();
-	UK_ASSERT(pthread);
+	if (unlikely(!pthread))
+		return -ENOTSUP;
 
 	/* Return as soon as a signal is queued. The signal will
 	 * be delivered at syscall exit.
@@ -27,9 +29,14 @@ UK_SYSCALL_R_DEFINE(int, pause)
 	return -EINTR;
 }
 #else /* !CONFIG_LIBPOSIX_PROCESS_SIGNAL */
-UK_SYSCALL_R_DEFINE(int, pause)
+int uk_sys_pause(void)
 {
 	UK_WARN_STUBBED();
 	return 0;
 }
 #endif /* !CONFIG_LIBPOSIX_PROCESS_SIGNAL */
+
+UK_SYSCALL_R_DEFINE(int, pause)
+{
+	return uk_sys_pause();
+}
