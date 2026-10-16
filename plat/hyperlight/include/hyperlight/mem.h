@@ -155,7 +155,8 @@ static inline __u64 hl_scratch_transport_end_for(__u64 arena)
 __u64 hl_scratch_alloc_pages(__u64 n);
 /* Exclusive GPA limit of the bump allocator: the transport arena, or the
  * reserved top pages when the host keeps the arena at the scratch base
- * (Hyperlight 0.18.0).  Crashes if the host published any other arena.
+ * (Hyperlight 0.18.0).  Aborts the guest if the host published any other
+ * arena.
  * Defined in cow.c.
  */
 __u64 hl_scratch_alloc_limit_gpa(void);

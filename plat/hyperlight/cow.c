@@ -40,6 +40,7 @@
 #include <uk/lcpu.h>
 
 #include <hyperlight/mem.h>
+#include <hyperlight/outb.h>
 
 static int cow_initialized;
 
@@ -90,6 +91,35 @@ static inline void cow_write_pte(__u64 pte_phys, __u64 value)
 }
 
 /*
+ * Scratch failures are reported from inside page faults, the copy-on-write
+ * ones included, so the report must not write kernel data: that data may
+ * sit on a CoW page, and the fault taken for it would land here again,
+ * until the vCPU triple-faults.  UK_CRASH writes (printk state, the
+ * console), so these print through the debug port from the stack and
+ * abort on port 102 as UK_CRASH does.
+ */
+static void hl_scratch_puts(const char *s)
+{
+	while (*s)
+		hyperlight_debug_putc((unsigned char)*s++);
+}
+
+static void hl_scratch_puthex(__u64 v)
+{
+	int shift;
+
+	hl_scratch_puts("0x");
+	for (shift = 60; shift >= 0; shift -= 4)
+		hyperlight_debug_putc("0123456789abcdef"[(v >> shift) & 0xf]);
+}
+
+static void __noreturn hl_scratch_abort(void)
+{
+	for (;;)
+		hyperlight_out32(HYPERLIGHT_PORT_ABORT, 0x0000FF01);
+}
+
+/*
  * End of the scratch the bump allocator may hand out.  A host that can
  * resize scratch across a snapshot places the transport arena at a fixed
  * address that ends HL_SCRATCH_TRANSPORT_GAP_PAGES below the reserved top
@@ -107,11 +137,32 @@ __u64 hl_scratch_alloc_limit_gpa(void)
 
 	if (arena == base)
 		return HL_SCRATCH_RESERVED_TOP_GPA;
-	if (arena < base || arena >= HL_SCRATCH_TRANSPORT_END_GPA)
-		UK_CRASH("transport arena at 0x%lx is neither the scratch base 0x%lx nor below the transport end 0x%lx\n",
-			 (unsigned long)arena, (unsigned long)base,
-			 (unsigned long)HL_SCRATCH_TRANSPORT_END_GPA);
+	if (arena < base || arena >= HL_SCRATCH_TRANSPORT_END_GPA) {
+		hl_scratch_puts("transport arena at ");
+		hl_scratch_puthex(arena);
+		hl_scratch_puts(" is neither the scratch base ");
+		hl_scratch_puthex(base);
+		hl_scratch_puts(" nor below the transport end ");
+		hl_scratch_puthex(HL_SCRATCH_TRANSPORT_END_GPA);
+		hl_scratch_puts("\n");
+		hl_scratch_abort();
+	}
 	return arena;
+}
+
+static void __noreturn hl_scratch_exhausted(__u64 nbytes, __u64 at,
+					    __u64 limit)
+{
+	hl_scratch_puts("Out of scratch memory: need ");
+	hl_scratch_puthex(nbytes);
+	hl_scratch_puts(" bytes at ");
+	hl_scratch_puthex(at);
+	hl_scratch_puts(", limit ");
+	hl_scratch_puthex(limit);
+	hl_scratch_puts(", scratch ");
+	hl_scratch_puthex(*(volatile __u64 *)HL_SCRATCH_SIZE_GVA);
+	hl_scratch_puts(" bytes\n");
+	hl_scratch_abort();
 }
 
 /*
@@ -139,10 +190,7 @@ __u64 hl_scratch_alloc_pages(__u64 n)
 #endif
 
 	if (old + nbytes > max_avail)
-		UK_CRASH("Out of scratch memory: need %lu bytes at %lx, limit %lx, scratch %lu bytes\n",
-			 (unsigned long)nbytes, (unsigned long)old,
-			 (unsigned long)max_avail,
-			 (unsigned long)*(volatile __u64 *)HL_SCRATCH_SIZE_GVA);
+		hl_scratch_exhausted(nbytes, old, max_avail);
 
 	return old;
 }
