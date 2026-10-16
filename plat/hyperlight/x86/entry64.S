@@ -234,7 +234,7 @@ END(_hyperlight_entry)
  *   7. Flushing the TLB entry with invlpg
  *
  * Non-CoW faults print diagnostic info via DebugPrint (port 103)
- * and halt the guest.
+ * and abort the guest.
  *
  * CPU pushes onto the stack before entry:
  *   [SS] [RSP_old] [RFLAGS] [CS] [RIP] [error_code] ← RSP
@@ -415,7 +415,7 @@ _cow_asm_pf_handler:
 
 	/*
 	 * Unhandled fault — print CR2, error code, and RIP via
-	 * DebugPrint (port 103) for diagnostics, then halt.
+	 * DebugPrint (port 103) for diagnostics, then abort.
 	 */
 .Lpf_unhandled:
 	pushq	%rax
@@ -510,9 +510,11 @@ _cow_asm_pf_handler:
 	popq	%rdx
 	popq	%rax
 
-	/* Halt via port 108 */
-	movw	$108, %dx
-	xorl	%eax, %eax
+	/* Abort via port 102 with a lone 0xFF terminator, as UK_CRASH does
+	 * (shutdown.c).  A halt would look like a completed guest function call.
+	 */
+	movw	$102, %dx
+	movl	$0xff01, %eax
 	outl	%eax, %dx
 1:	pause
 	jmp	1b
