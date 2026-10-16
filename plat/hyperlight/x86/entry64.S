@@ -7,14 +7,19 @@
 #include <uk/config.h>
 #include <uk/asm.h>
 #include <uk/lcpu.h>
+#include <hyperlight/scratch_top.h>
 
 /* Boot startup args struct offsets */
 #define LCPU_SARGS_ENTRY_OFFSET		0x00
 #define LCPU_SARGS_STACKP_OFFSET	0x08
 
-/* Hyperlight scratch region metadata (from hyperlight/mem.h) */
+/* Hyperlight scratch region metadata (from hyperlight/mem.h; the arena slot
+ * and reserved page count come from hyperlight/scratch_top.h) */
 #define SCRATCH_SIZE_GVA	0xFFFFFFFFFFFFEFF8
 #define ALLOCATOR_GVA		0xFFFFFFFFFFFFEFF0
+#define ARENA_GPA_SLOT		(HL_MAX_GVA + 1 - HL_SCRATCH_ARENA_GPA_OFF)
+#define RESERVED_TOP_GPA	(HL_MAX_GPA + 1 - HL_SCRATCH_RESERVED_PAGES * PAGE_SIZE_4K)
+#define TRANSPORT_END_GPA	(RESERVED_TOP_GPA - HL_SCRATCH_TRANSPORT_GAP_PAGES * PAGE_SIZE_4K)
 #define HL_MAX_GPA		0x0000000FFFFFFFFF
 #define HL_MAX_GVA		0xFFFFFFFFFFFFEFFF
 #define PTE_ADDR_MASK		0x000FFFFFFFFFF000
@@ -233,8 +238,9 @@ END(_hyperlight_entry)
  *   6. Updating the PTE: new physical address + RW, clear CoW bit
  *   7. Flushing the TLB entry with invlpg
  *
- * Non-CoW faults print diagnostic info via DebugPrint (port 103)
- * and abort the guest.
+ * Non-CoW faults, and a CoW fault with no scratch left below the
+ * allocation limit (or an arena this kernel does not support), print
+ * diagnostic info via DebugPrint (port 103) and abort the guest.
  *
  * CPU pushes onto the stack before entry:
  *   [SS] [RSP_old] [RFLAGS] [CS] [RIP] [error_code] ← RSP
@@ -375,6 +381,26 @@ _cow_asm_pf_handler:
 	lock xaddq %rax, (%rdi)		/* rax = new page GPA */
 	movq	%rax, %rdx		/* save GPA for new PTE */
 
+	/* The allocation limit, as hl_scratch_alloc_limit_gpa() works it out:
+	 * the reserved top for an arena at the base (Hyperlight 0.18.0), the
+	 * arena for one below the transport end, nothing for any other.
+	 */
+	movabs	$ARENA_GPA_SLOT, %rdi
+	movq	(%rdi), %rcx		/* rcx = published arena GPA */
+	cmpq	%r9, %rcx
+	jb	.Lpf_no_scratch
+	jne	.Lpf_arena_fixed
+	movabs	$RESERVED_TOP_GPA, %rcx	/* arena at the base: older host */
+	jmp	.Lpf_limit
+.Lpf_arena_fixed:
+	movabs	$TRANSPORT_END_GPA, %rdi
+	cmpq	%rdi, %rcx
+	jae	.Lpf_no_scratch
+.Lpf_limit:				/* rcx = limit */
+	leaq	PAGE_SIZE_4K(%rax), %rdi
+	cmpq	%rcx, %rdi
+	ja	.Lpf_no_scratch
+
 	/* Convert new page GPA → GVA for the copy */
 	subq	%r9, %rax
 	addq	%r10, %rax		/* rax = new page GVA */
@@ -412,6 +438,24 @@ _cow_asm_pf_handler:
 	popq	%rax
 	addq	$8, %rsp		/* discard error code */
 	iretq
+
+.macro pf_putc c
+	movb	$\c, %al
+	outb	%al, %dx
+.endm
+	/* No scratch below the limit, or an unsupported arena: say so
+	 * before the fault dump.
+	 */
+.Lpf_no_scratch:
+	movw	$103, %dx
+	pf_putc	'S'
+	pf_putc	'C'
+	pf_putc	'R'
+	pf_putc	'A'
+	pf_putc	'T'
+	pf_putc	'C'
+	pf_putc	'H'
+	pf_putc	' '
 
 	/*
 	 * Unhandled fault — print CR2, error code, and RIP via

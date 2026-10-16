@@ -14,6 +14,8 @@
 #ifndef __HYPERLIGHT_MEM_H__
 #define __HYPERLIGHT_MEM_H__
 
+#include <hyperlight/scratch_top.h>
+
 /*
  * Scratch region — always-writable memory at the top of the virtual
  * address space.  Used for I/O buffers, the guest stack, exception
@@ -37,7 +39,7 @@
 #define HL_SCRATCH_GUEST_LOG_LEVEL_OFF	0x30
 
 /* Virtqueue transport geometry (u64 each), published by the host */
-#define HL_SCRATCH_ARENA_GPA_OFF	0x38 /* GPA of the transport arena */
+/* HL_SCRATCH_ARENA_GPA_OFF (GPA of the transport arena): scratch_top.h */
 #define HL_SCRATCH_G2H_QUEUE_SIZE_OFF	0x40 /* G2H descriptors */
 #define HL_SCRATCH_G2H_POOL_PAGES_OFF	0x48 /* G2H pool pages */
 #define HL_SCRATCH_H2G_QUEUE_SIZE_OFF	0x58 /* H2G descriptors */
@@ -116,9 +118,33 @@
  */
 #define HL_SCRATCH_GVA_MINUS_GPA	((__u64)HL_MAX_GVA - (__u64)HL_MAX_GPA)
 
+/* Hyperlight's page, which scratch is handed out in */
+#define HL_PAGE_SIZE	4096ULL
+
+/* Start of the reserved pages at the top of scratch. */
+#define HL_SCRATCH_RESERVED_TOP_GPA \
+	(HL_MAX_GPA + 1 - HL_SCRATCH_RESERVED_PAGES * HL_PAGE_SIZE)
+
+/* End of the transport arena: the free pages below the reserved ones. */
+#define HL_SCRATCH_TRANSPORT_END_GPA \
+	(HL_SCRATCH_RESERVED_TOP_GPA - HL_SCRATCH_TRANSPORT_GAP_PAGES * HL_PAGE_SIZE)
+
 static inline __u64 hl_scratch_base_gpa(void)
 {
 	return HL_MAX_GPA - *(volatile __u64 *)HL_SCRATCH_SIZE_GVA + 1;
+}
+
+/*
+ * Where the transport arena may end, given where the host put it: an arena
+ * at the scratch base (Hyperlight 0.18.0) may reach the reserved top pages;
+ * one above it sits at a fixed address that ends
+ * HL_SCRATCH_TRANSPORT_GAP_PAGES below them, so scratch can change size
+ * across a snapshot.
+ */
+static inline __u64 hl_scratch_transport_end_for(__u64 arena)
+{
+	return arena == hl_scratch_base_gpa() ? HL_SCRATCH_RESERVED_TOP_GPA
+					      : HL_SCRATCH_TRANSPORT_END_GPA;
 }
 
 /*
@@ -127,16 +153,12 @@ static inline __u64 hl_scratch_base_gpa(void)
  * Defined in cow.c.
  */
 __u64 hl_scratch_alloc_pages(__u64 n);
-
-/* Hyperlight's page, which scratch is handed out in */
-#define HL_PAGE_SIZE	4096ULL
-
-/* Pages at the top of scratch the host keeps, and the end of what
- * hl_scratch_alloc_pages() hands out below them
+/* Exclusive GPA limit of the bump allocator: the transport arena, or the
+ * reserved top pages when the host keeps the arena at the scratch base
+ * (Hyperlight 0.18.0).  Crashes if the host published any other arena.
+ * Defined in cow.c.
  */
-#define HL_SCRATCH_RESERVED_PAGES 2
-#define HL_SCRATCH_LIMIT \
-	(HL_MAX_GPA + 1 - HL_SCRATCH_RESERVED_PAGES * HL_PAGE_SIZE)
+__u64 hl_scratch_alloc_limit_gpa(void);
 
 /*
  * Give the copy-on-write page at @va a fresh scratch page, without

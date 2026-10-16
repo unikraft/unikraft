@@ -102,7 +102,7 @@ static __sz hl_paging_fa_size(void)
 
 	/* Dynamic fallback: read bump pointer, compute remaining */
 	bump_pos = *(volatile __u64 *)HL_SCRATCH_ALLOC_GVA;
-	max_avail = HL_SCRATCH_LIMIT;
+	max_avail = hl_scratch_alloc_limit_gpa();
 	if (bump_pos >= max_avail)
 		return 0;
 
@@ -319,7 +319,7 @@ static void hl_fa_uncount(struct uk_falloc *fa, __sz cut)
 static int hl_fa_grow(unsigned long frames)
 {
 	struct uk_falloc *fa = hyperlight_pt.fa;
-	__u64 max_avail = HL_SCRATCH_LIMIT;
+	__u64 max_avail = hl_scratch_alloc_limit_gpa();
 	__sz size = HL_FA_CHUNK, len, left, added;
 	__paddr_t start;
 	__u64 bump;
@@ -403,8 +403,10 @@ static int hl_falloc_from_range_grow(struct uk_falloc *fa, __paddr_t *paddr,
  * The frame allocator (FA) struct, zone metadata, bitmaps, and free-list
  * entries all live in scratch memory — allocated there by ukplat_mem_init
  * during the initial boot (evolve).  Snapshot/restore zeroes scratch
- * (only the rebuilt page tables are copied back), so every byte of FA
- * state is lost.
+ * (only the rebuilt page tables, the transport rings and the host's
+ * metadata are copied back), so every byte of FA state is lost.  The new
+ * FA takes its budget from what lies between the bump pointer and the
+ * allocation limit (hl_scratch_alloc_limit_gpa).
  *
  * Without re-initialisation, the first demand fault after restore
  * (e.g. a new mmap page, stack growth) calls through the FA's NULL
@@ -445,7 +447,7 @@ void hyperlight_paging_reinit(void)
 	 * fatal here.
 	 */
 	bump_pos = *(volatile __u64 *)HL_SCRATCH_ALLOC_GVA;
-	max_avail = HL_SCRATCH_LIMIT;
+	max_avail = hl_scratch_alloc_limit_gpa();
 	if (bump_pos >= max_avail)
 		UK_CRASH("paging reinit: no scratch left (allocator at 0x%lx, limit 0x%lx)\n",
 			 (unsigned long)bump_pos, (unsigned long)max_avail);

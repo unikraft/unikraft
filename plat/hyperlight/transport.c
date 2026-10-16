@@ -290,7 +290,7 @@ int hl_transport_init(void)
 	__u64 g2h_pages = meta(HL_SCRATCH_G2H_POOL_PAGES_OFF);
 	__u64 h2g_size = meta(HL_SCRATCH_H2G_QUEUE_SIZE_OFF);
 	__u64 h2g_pages = meta(HL_SCRATCH_H2G_POOL_PAGES_OFF);
-	__u64 base_gpa, h2g_ring, mbx_off, g2h_pool, end;
+	__u64 base_gpa, arena_end, h2g_ring, mbx_off, g2h_pool, end;
 	__u8 *arena;
 
 	h2g_buf_size = meta(HL_SCRATCH_H2G_BUFFER_SIZE_OFF);
@@ -319,11 +319,17 @@ int hl_transport_init(void)
 	 * scratch alias at the top of the address space.
 	 */
 	base_gpa = HL_MAX_GPA - scratch_size + 1;
-	if (arena_gpa < base_gpa || arena_gpa & (HL_PAGE - 1)) {
-		uk_pr_err("transport: arena at 0x%lx is outside scratch\n",
+	if (arena_gpa & (HL_PAGE - 1)) {
+		uk_pr_err("transport: arena at 0x%lx is not page aligned\n",
 			  (unsigned long)arena_gpa);
 		return -1;
 	}
+	if (arena_gpa < base_gpa) {
+		uk_pr_err("transport: arena at 0x%lx is below the scratch base 0x%lx\n",
+			  (unsigned long)arena_gpa, (unsigned long)base_gpa);
+		return -1;
+	}
+	arena_end = hl_scratch_transport_end_for(arena_gpa);
 	arena = (__u8 *)(arena_gpa + HL_SCRATCH_GVA_MINUS_GPA);
 
 	/* TransportArena::new */
@@ -331,9 +337,15 @@ int hl_transport_init(void)
 	mbx_off = ALIGN_UP(h2g_ring + vq_ring_len(h2g_size), sizeof(__u64));
 	g2h_pool = ALIGN_UP(mbx_off + sizeof(__u64), HL_PAGE);
 	end = g2h_pool + (g2h_pages + h2g_pages) * HL_PAGE;
-	if (arena_gpa - base_gpa > scratch_size ||
-	    end > scratch_size - (arena_gpa - base_gpa)) {
-		uk_pr_err("transport: arena overruns scratch\n");
+	/* The arena must end where the host's placement allows
+	 * (hl_scratch_transport_end_for).  A host that reserves fewer top or
+	 * gap pages than this kernel (scratch_top.h) fails here; one that
+	 * reserves more is not caught.
+	 */
+	if (arena_gpa >= arena_end || end > arena_end - arena_gpa) {
+		uk_pr_err("transport: arena 0x%lx-0x%lx overruns its end at 0x%lx\n",
+			  (unsigned long)arena_gpa, (unsigned long)(arena_gpa + end),
+			  (unsigned long)arena_end);
 		return -1;
 	}
 

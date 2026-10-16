@@ -90,19 +90,41 @@ static inline void cow_write_pte(__u64 pte_phys, __u64 value)
 }
 
 /*
+ * End of the scratch the bump allocator may hand out.  A host that can
+ * resize scratch across a snapshot places the transport arena at a fixed
+ * address that ends HL_SCRATCH_TRANSPORT_GAP_PAGES below the reserved top
+ * pages and publishes its GPA in the scratch-top metadata; allocation
+ * stops at the arena.  Hyperlight 0.18.0 keeps the arena at the scratch
+ * base, below the allocator, so allocation stops at the reserved top
+ * pages.  Any other arena is a host this kernel does not support.  The
+ * early asm fault handlers in x86/entry64.S and arm/entry64.S apply the
+ * same rule.
+ */
+__u64 hl_scratch_alloc_limit_gpa(void)
+{
+	__u64 arena = *(volatile __u64 *)HL_SCRATCH_META_GVA(HL_SCRATCH_ARENA_GPA_OFF);
+	__u64 base = hl_scratch_base_gpa();
+
+	if (arena == base)
+		return HL_SCRATCH_RESERVED_TOP_GPA;
+	if (arena < base || arena >= HL_SCRATCH_TRANSPORT_END_GPA)
+		UK_CRASH("transport arena at 0x%lx is neither the scratch base 0x%lx nor below the transport end 0x%lx\n",
+			 (unsigned long)arena, (unsigned long)base,
+			 (unsigned long)HL_SCRATCH_TRANSPORT_END_GPA);
+	return arena;
+}
+
+/*
  * Bump allocator: allocate n pages from scratch memory (atomic).
  * Returns the GPA of the first page.  Aborts on scratch exhaustion
  * (matches hyperlight-guest-bin behaviour).
- *
- * Two pages at the top of scratch are reserved for the exception
- * stack and shared metadata — the allocator must not touch them.
  */
 __u64 hl_scratch_alloc_pages(__u64 n)
 {
 	volatile __u64 *alloc_ptr = (volatile __u64 *)HL_SCRATCH_ALLOC_GVA;
 	__u64 nbytes = n * HL_PAGE_SIZE;
 	__u64 old;
-	__u64 max_avail = HL_SCRATCH_LIMIT;
+	__u64 max_avail = hl_scratch_alloc_limit_gpa();
 
 #if defined(__x86_64__)
 	__asm__ volatile("lock xaddq %0, (%1)"
@@ -117,9 +139,10 @@ __u64 hl_scratch_alloc_pages(__u64 n)
 #endif
 
 	if (old + nbytes > max_avail)
-		UK_CRASH("Out of scratch memory: need %lu bytes at %lx, max %lx\n",
+		UK_CRASH("Out of scratch memory: need %lu bytes at %lx, limit %lx, scratch %lu bytes\n",
 			 (unsigned long)nbytes, (unsigned long)old,
-			 (unsigned long)max_avail);
+			 (unsigned long)max_avail,
+			 (unsigned long)*(volatile __u64 *)HL_SCRATCH_SIZE_GVA);
 
 	return old;
 }

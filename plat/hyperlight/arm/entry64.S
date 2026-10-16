@@ -8,10 +8,14 @@
 #include <uk/asm.h>
 #include <uk/arch/arm64.h>
 #include <uk/asm/lcpu.h>
+#include <hyperlight/scratch_top.h>
 
 /* Hyperlight layout (from hyperlight/mem.h and hyperlight/outb.h) */
 #define HL_SCRATCH_SIZE_GVA	0x0000FFFFFFFFDFF8
 #define HL_SCRATCH_ALLOC_GVA	0x0000FFFFFFFFDFF0
+#define HL_SCRATCH_ARENA_GPA_SLOT	(HL_MAX_GVA + 1 - HL_SCRATCH_ARENA_GPA_OFF)
+#define HL_SCRATCH_RESERVED_TOP	(HL_MAX_GPA + 1 - HL_SCRATCH_RESERVED_PAGES * HL_PAGE_SIZE)
+#define HL_SCRATCH_TRANSPORT_END	(HL_SCRATCH_RESERVED_TOP - HL_SCRATCH_TRANSPORT_GAP_PAGES * HL_PAGE_SIZE)
 #define HL_MAX_GPA		0x0000000FFFFFBFFF
 #define HL_MAX_GVA		0x0000FFFFFFFFDFFF
 #define HL_IO_PAGE_GVA		0x0000FFFFFFFFE000
@@ -342,9 +346,26 @@ hl_early_sync:
 	ldr	x0, =HL_SCRATCH_ALLOC_GVA
 2:	ldxr	x7, [x0]			/* x7 = new page GPA */
 	add	x1, x7, #HL_PAGE_SIZE
-	stxr	w2, x1, [x0]
-	cbnz	w2, 2b
+	stxr	w11, x1, [x0]			/* w11: x2 still holds the base */
+	cbnz	w11, 2b
 	dmb	ish
+
+	/* ---- The allocation limit (hl_scratch_alloc_limit_gpa): the
+	 * reserved top for an arena at the base (Hyperlight 0.18.0), the
+	 * arena for one below the transport end, nothing for any other.
+	 */
+	ldr	x0, =HL_SCRATCH_ARENA_GPA_SLOT
+	ldr	x0, [x0]			/* x0 = published arena GPA */
+	cmp	x0, x2
+	b.lo	hl_early_no_scratch
+	b.ne	6f
+	ldr	x0, =HL_SCRATCH_RESERVED_TOP	/* arena at the base: older host */
+	b	7f
+6:	ldr	x9, =HL_SCRATCH_TRANSPORT_END
+	cmp	x0, x9
+	b.hs	hl_early_no_scratch
+7:	cmp	x1, x0				/* x0 = limit */
+	b.hi	hl_early_no_scratch
 
 	/* ---- Copy the page -------------------------------------- */
 	add	x0, x7, x3			/* x0 = new page GVA */
@@ -404,10 +425,22 @@ hl_early_sync:
 .endm
 
 /*
- * Anything but a CoW fault: print FAR, ESR and ELR, then abort.  Port
- * 102 carries up to three bytes of message per exit and ends with 0xFF;
- * a single 0xFF terminator is enough to stop the guest.
+ * Anything but a CoW fault, or a CoW fault with no scratch left below the
+ * allocation limit (or an arena this kernel does not support): print FAR,
+ * ESR and ELR, then abort.  Port 102 carries up to three bytes of message
+ * per exit and ends with 0xFF; a single 0xFF terminator is enough to stop
+ * the guest, as UK_CRASH does (shutdown.c).
  */
+hl_early_no_scratch:
+	ldr	x9, =HL_DEBUG_PRINT_GVA
+	hl_early_print_char 'S'
+	hl_early_print_char 'C'
+	hl_early_print_char 'R'
+	hl_early_print_char 'A'
+	hl_early_print_char 'T'
+	hl_early_print_char 'C'
+	hl_early_print_char 'H'
+	hl_early_print_char ' '
 hl_early_bad:
 hl_early_unhandled:
 	mrs	x4, far_el1
