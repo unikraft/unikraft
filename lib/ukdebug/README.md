@@ -152,3 +152,144 @@ With the QEMU-internal GDB stub, you can safely set breakpoints on functions in 
 
 The connection between the Unikraft-native GDB stub and its GDB host can time out if you set a breakpoint at an unfortunate point in the GDB stub and take too long to do your debugging.
 For this reason, it's recommended that you use the command `set remotetimeout 1000000` to make the GDB host that's connected to the Unikraft-native stub wait for a very long time before timing out (here `1000000` is the number of seconds that GDB waits before it times out, any high value works).
+
+## Tracepoints
+
+Unikraft provides some infrastructure to enable tracing in your application.
+
+First, enable `CONFIG_LIBUKDEBUG_TRACEPOINTS=y`. Then in your application:
+
+```C
+/* Enable tracing for this file, must be placed before includes */
+#define UK_DEBUG_TRACE
+
+#include <uk/trace.h>
+
+/* Define a tracepoint with optional arguments to be formatted */
+UK_TRACEPOINT(my_tracepoint, "%d", int)
+
+int main(int argc, char **argv)
+{
+    for (int i=0; i<3; i++) {
+        /* Emit a trace event at this point */
+        my_tracepoint(i);
+    }
+
+    return 0;
+}
+```
+
+Alternatively, enable the config symbol `CONFIG_LIBUKDEBUG_ALL_TRACEPOINTS=y`
+to enable all tracepoints, regardless of the `UK_DEBUG_TRACE` define.
+
+A tracepoint may take up to 7 arguments.
+
+### Collecting traces
+
+Samples live in the guest memory, so they are read with GDB through QEMU's
+GDB server. The build generates the GDB helper `build/uk-gdb.py`, which adds
+the `uk trace` commands; it relies on the Python modules in `support/scripts`.
+
+Start the unikernel with the GDB server enabled, with the following options:
+
+* `-s` listens on port 1234
+* `-no-shutdown` to avoid stopping the qemu machine when the application has completed;
+  its active memory must still exist to fetch tracepoint samples.
+  _This is not required if the application keeps running by itself_
+
+```bash
+qemu-system-x86_64 -s -no-shutdown -kernel build/helloworld_qemu-x86_64
+```
+
+Then fetch the trace buffer (don't forget to pass the **debug image** as argument):
+
+```bash
+support/scripts/uk_trace/trace.py \
+    fetch --out helloworld.trace \
+    build/helloworld_qemu-x86_64.dbg
+```
+
+A saved trace file can be decoded offline, using the `uk_trace` script:
+
+```bash
+support/scripts/uk_trace/trace.py list helloworld.trace
+```
+
+The above could also be run directly from gdb itself, using provided gdb scripts.
+First, attach to the application running in qemu:
+
+```bash
+gdb build/helloworld_qemu-x86_64.dbg \
+    -ex 'target remote :1234' \
+    -ex 'source build/uk-gdb.py'
+```
+
+Then use `uk trace` in the gdb console:
+
+```
+(gdb) uk trace
+0000000102399612 my_tracepoint: 0
+0000000102418879 my_tracepoint: 1
+0000000102419383 my_tracepoint: 2
+(gdb)
+```
+
+### Tracepoints binary format internals
+
+Tracepoints consist of 2 parts:
+* Tracepoint definitions (the name and signature of the tracepoints).
+  They are placed in a special section, which is not linked into the final
+  executable application, only in the debug variant. It provides the schema
+  for decoding tracepoint samples from the debug host.
+* Tracepoint samples, a buffer of fixed size (which can be adjusted with
+  `CONFIG_LIBUKDEBUG_TRACE_BUFFER_SIZE`) placed in the BSS segment.
+
+When the samples buffer is full, tracepoints are permanently disabled;
+in other words, the number of trace events is limited and does not roll over.
+
+As indicated below, a sample takes a fixed 24 Bytes plus some additional
+space for its arguments. With the default trace buffer size of 16 kiB, this
+gives at most `16384 / 24 = 682` trace samples.
+
+#### Tracepoint definitions memory layout
+
+This section is available in the debug target, at the name `.uk_tracepoints_list`
+
+It contains consecutive records, in the form:
+
+|   Start | Length | Field                                                     |
+|---------|--------|-----------------------------------------------------------|
+|       0 |      4 | Magic "TPde" (or 0x65645054 little-endian uint32)         |
+|       4 |      4 | Total size of the record, including magic, in Bytes       |
+|       8 |      8 | "Cookie", or the unique identifier of that tracepoint     |
+|      16 |      1 | Number of arguments to that tracepoint (`N`)              |
+|      17 |      1 | Length of this tracepoint's name, in Bytes (`L`)          |
+|      18 |      1 | Length of this tracepoint's format string, in Bytes (`F`) |
+|      19 |      N | Argument sizes (in Bytes, array of [N] elements)          |
+|    19+N |      N | Argument types (1=string, 0=int, array of [N] elements)   |
+|   19+2N |      L | Name of that tracepoint (string, null-terminated)         |
+| 19+2N+L |      F | Format string for this tracepoint's arguments (null-term) |
+
+`\0` bytes may be inserted after the record, both for struct padding and
+alignment. The `size` field account for the internal padding (ie. ensuring
+the record ends on a machine-sized word), but it doesn't account for extra
+alignment (ie. records start at addresses that are efficiently accessed), which
+is platform dependent.
+
+To reliably jump to the next record, look for the next `TPde` magic.
+
+#### Tracepoint samples memory layout
+
+|   Start |   Length | Field                                                     |
+|---------|----------|-----------------------------------------------------------|
+|       0 |        4 | Magic "TRhd" (or 0x64685254 little-endian uint32)         |
+|       4 |        4 | Total size of arguments, in Bytes                         |
+|       8 |        8 | Timestamp (ns since boot) of the trace sample             |
+|      16 |        8 | "Cookie", referring to the definition of that tracepoint  |
+|      24 | variable | **Arguments**, packed according to tracepoint definition  |
+
+Integer arguments are encoded in the native architecture endianness
+(usually little-endian).
+
+String arguments are prefixed with the string length, so for example
+`\x0cHello world!`
