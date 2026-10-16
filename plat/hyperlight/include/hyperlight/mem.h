@@ -157,9 +157,11 @@ void _cow_asm_pf_handler(void);
 /*
  * Re-initialise the paging frame allocator after snapshot restore.
  *
- * Called from hyperlight_dispatch_function's snapshot fixup path.
- * On non-restore dispatches (FA still valid) this returns immediately.
- * Defined in memory.c (CONFIG_LIBUKPAGING); no-op stub otherwise.
+ * Called from hyperlight_dispatch_function's snapshot fixup path, so on
+ * the first dispatch after each restore.  Crashes the guest if the
+ * restored scratch leaves too little room for the frame allocator (a
+ * snapshot resized too small).  Defined in memory.c (CONFIG_LIBUKPAGING);
+ * no-op stub otherwise.
  */
 void hyperlight_paging_reinit(void);
 #endif /* !__ASSEMBLY__ */

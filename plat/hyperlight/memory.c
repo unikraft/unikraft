@@ -436,24 +436,28 @@ void hyperlight_paging_reinit(void)
 	hyperlight_pt.pt_vbase = pgarch_directmap_paddr_to_vaddr(root);
 
 	/* Compute remaining scratch dynamically.  The host-provided
-	 * GetPagingBudget was set at evolve time and does not account
-	 * for scratch consumed by the PT copy and CoW pre-fault, so
-	 * we always use the bump-pointer calculation here.
+	 * GetPagingBudget was set at evolve time: the restored scratch can be
+	 * smaller (a resized snapshot), and the budget does not account for
+	 * scratch consumed by the PT copy and CoW pre-fault, so we always use
+	 * the bump-pointer calculation here.  The frame allocator from the
+	 * snapshot sat in scratch, which the restore zeroed: leaving it in
+	 * place would fail later, far from the cause, so too little scratch is
+	 * fatal here.
 	 */
 	bump_pos = *(volatile __u64 *)HL_SCRATCH_ALLOC_GVA;
 	max_avail = HL_SCRATCH_LIMIT;
 	if (bump_pos >= max_avail)
-		return;
+		UK_CRASH("paging reinit: no scratch left (allocator at 0x%lx, limit 0x%lx)\n",
+			 (unsigned long)bump_pos, (unsigned long)max_avail);
 
 	available = max_avail - bump_pos;
 	fa_size = (__sz)((available * 3 / 4) & ~((__u64)__PAGE_SIZE - 1));
 	fa_struct_size = ALIGN_UP(uk_fallocbuddy_size(), __PAGE_SIZE);
 
-	if (fa_size < fa_struct_size + HL_FA_CHUNK * 2) {
-		uk_pr_warn("paging reinit: not enough scratch (%lu bytes)\n",
-			   (unsigned long)fa_size);
-		return;
-	}
+	if (fa_size < fa_struct_size + HL_FA_CHUNK * 2)
+		UK_CRASH("paging reinit: not enough scratch (%lu bytes for the frame allocator, %lu needed)\n",
+			 (unsigned long)fa_size,
+			 (unsigned long)(fa_struct_size + HL_FA_CHUNK * 2));
 
 	/* The FA struct gets page(s) of its own; hl_fa_grow() takes the rest
 	 * of the budget as it is needed.
@@ -461,10 +465,8 @@ void hyperlight_paging_reinit(void)
 	scratch_block = hl_scratch_alloc_pages(fa_struct_size / __PAGE_SIZE);
 	fa = (struct uk_falloc *)pgarch_directmap_paddr_to_vaddr(scratch_block);
 	rc = uk_fallocbuddy_init(fa);
-	if (unlikely(rc)) {
-		uk_pr_warn("paging reinit: fallocbuddy_init failed: %d\n", rc);
-		return;
-	}
+	if (unlikely(rc))
+		UK_CRASH("paging reinit: fallocbuddy_init failed: %d\n", rc);
 	hyperlight_pt.fa = fa;
 	hl_fa_budget = fa_size - fa_struct_size;
 
