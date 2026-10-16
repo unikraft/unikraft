@@ -102,17 +102,24 @@
 #include <uk/arch/types.h>
 
 /*
- * Scratch region base addresses (GPA and GVA).  Set by
- * hyperlight_cow_init() at boot; used by the paging arch layer
- * to translate between physical and virtual addresses.
+ * Scratch sits at the top of both guest-physical and guest-virtual
+ * memory, so GVA - GPA is the same for every scratch size, and the base
+ * follows from the size the host publishes.  The translation caches
+ * nothing, so it stays right when a restore changes the scratch size (the
+ * frame allocator and page-table root are rebuilt by
+ * hyperlight_paging_reinit).
  *
  * For GPAs in the scratch region:
- *   GVA = hl_scratch_base_gva + (GPA - hl_scratch_base_gpa)
+ *   GVA = GPA + HL_SCRATCH_GVA_MINUS_GPA
  * For GPAs in the identity-mapped low region:
  *   GVA = GPA
  */
-extern __u64 hl_scratch_base_gpa;
-extern __u64 hl_scratch_base_gva;
+#define HL_SCRATCH_GVA_MINUS_GPA	((__u64)HL_MAX_GVA - (__u64)HL_MAX_GPA)
+
+static inline __u64 hl_scratch_base_gpa(void)
+{
+	return HL_MAX_GPA - *(volatile __u64 *)HL_SCRATCH_SIZE_GVA + 1;
+}
 
 /*
  * Bump allocator: allocate n contiguous pages from scratch memory.

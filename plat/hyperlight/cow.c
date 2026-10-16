@@ -25,8 +25,10 @@
  *      vectors are installed, page faults are dispatched through the
  *      event system and land here.
  *
- * hyperlight_cow_init() computes the scratch region base addresses; it
- * runs before that switch, while the asm handler still serves faults.
+ * hyperlight_cow_init() turns this handler on once the host has published
+ * the scratch size; it runs before the switch to the native PAL's vectors,
+ * while the asm handler still serves faults.  The handlers cache no scratch
+ * address: the base is read from the size each time (mem.h).
  */
 
 #include <uk/assert.h>
@@ -39,13 +41,6 @@
 
 #include <hyperlight/mem.h>
 
-/*
- * Scratch region base addresses, computed at init from scratch metadata.
- * Non-static so the paging arch layer can translate scratch GPAs to GVAs.
- */
-__u64 hl_scratch_base_gpa;
-__u64 hl_scratch_base_gva;
-
 static int cow_initialized;
 
 /*
@@ -56,8 +51,9 @@ static int cow_initialized;
  *   GPA: [HL_MAX_GPA - scratch_size + 1,  HL_MAX_GPA]   (top of guest RAM)
  *   GVA: [HL_MAX_GVA - scratch_size + 1,  HL_MAX_GVA]   (top of the address space; see mem.h)
  *
- * The mapping is contiguous and linear, so the offset between GVA
- * and GPA is constant: (cow_scratch_base_gva - cow_scratch_base_gpa).
+ * The mapping is contiguous and linear, and both ends sit at the top, so
+ * the offset between GVA and GPA is HL_SCRATCH_GVA_MINUS_GPA whatever the
+ * scratch size.
  *
  * Page table pages live in the scratch region, so
  * every PTE the CoW handler reads contains a GPA that needs this
@@ -65,7 +61,7 @@ static int cow_initialized;
  */
 static inline __u64 cow_phys_to_virt(__u64 gpa)
 {
-	return hl_scratch_base_gva + (gpa - hl_scratch_base_gpa);
+	return gpa + HL_SCRATCH_GVA_MINUS_GPA;
 }
 
 /* The root page table's physical address. */
@@ -198,9 +194,8 @@ static inline void cow_copy_page(void *dst, const void *src)
  * in place: the architecture requires break-before-make, invalidating the
  * old entry and its TLB entry first.  Nothing else can use the page
  * meanwhile, there is one vCPU and this runs with interrupts masked, but
- * this code itself must not touch it: the scratch bases the descriptor's
- * address is computed from are kernel data, possibly on that very page,
- * so the address is computed before the break.
+ * this code itself must not touch the page between the break and the
+ * make.
  */
 static inline void cow_set_pte(__u64 pte_addr, __u64 va, __u64 new_pte)
 {
@@ -347,19 +342,14 @@ UK_EVENT_HANDLER_PRIO(UK_LCPU_EXCEPT_EVENT_ERR_PAGE_FAULT,
 /*
  * Initialise the C CoW handler.  Called from setup.c before
  * uk_lcpu_init() installs the native PAL's vectors, while the early asm
- * handler still serves page faults: the writes below may themselves
- * fault on a CoW page, which the C handler could not serve before
- * cow_initialized is set.
+ * handler still serves page faults: the write below may itself fault on
+ * a CoW page, which the C handler could not serve before cow_initialized
+ * is set.
  */
 void hyperlight_cow_init(void)
 {
-	__u64 scratch_size;
-
-	scratch_size = *(volatile __u64 *)HL_SCRATCH_SIZE_GVA;
-	if (scratch_size == 0)
+	if (*(volatile __u64 *)HL_SCRATCH_SIZE_GVA == 0)
 		return;
 
-	hl_scratch_base_gpa = HL_MAX_GPA - scratch_size + 1;
-	hl_scratch_base_gva = HL_MAX_GVA - scratch_size + 1;
 	cow_initialized = 1;
 }

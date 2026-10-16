@@ -17,8 +17,8 @@
  *
  *   2. Scratch region (page tables, I/O buffers, CoW copies):
  *      GPAs at the top of guest RAM, GVAs near the top of the
- *      address space (see hyperlight/mem.h).  Linear offset: GVA = hl_scratch_base_gva +
- *                                   (GPA - hl_scratch_base_gpa).
+ *      address space (see hyperlight/mem.h).  Linear offset:
+ *      GVA = GPA + HL_SCRATCH_GVA_MINUS_GPA.
  *
  * There is no single-offset directmap.  Instead,
  * pgarch_directmap_paddr_to_vaddr() dispatches based on which
@@ -53,16 +53,15 @@ struct uk_pagetable;
 /**
  * Translate a guest physical address to a guest virtual address.
  *
- * For scratch-region GPAs (>= hl_scratch_base_gpa), applies the
+ * For scratch-region GPAs (>= hl_scratch_base_gpa()), applies the
  * scratch offset.  For identity-mapped low GPAs, returns the GPA
  * directly (since GVA == GPA in the identity-mapped region).
  */
 static inline
 __vaddr_t pgarch_directmap_paddr_to_vaddr(__paddr_t paddr)
 {
-	if (paddr >= hl_scratch_base_gpa)
-		return (__vaddr_t)(hl_scratch_base_gva +
-				   (paddr - hl_scratch_base_gpa));
+	if (paddr >= hl_scratch_base_gpa())
+		return (__vaddr_t)(paddr + HL_SCRATCH_GVA_MINUS_GPA);
 	return (__vaddr_t)paddr;
 }
 
@@ -74,9 +73,11 @@ __vaddr_t pgarch_directmap_paddr_to_vaddr(__paddr_t paddr)
 static inline
 __paddr_t pgarch_directmap_vaddr_to_paddr(__vaddr_t vaddr)
 {
-	if (vaddr >= hl_scratch_base_gva)
-		return (__paddr_t)(hl_scratch_base_gpa +
-				   (vaddr - hl_scratch_base_gva));
+	/* Identity-mapped addresses are GPAs, all at or below HL_MAX_GPA;
+	 * every scratch GVA is above it, whatever the scratch size.
+	 */
+	if (vaddr > HL_MAX_GPA)
+		return (__paddr_t)(vaddr - HL_SCRATCH_GVA_MINUS_GPA);
 	return (__paddr_t)vaddr;
 }
 

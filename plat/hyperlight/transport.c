@@ -290,7 +290,7 @@ int hl_transport_init(void)
 	__u64 g2h_pages = meta(HL_SCRATCH_G2H_POOL_PAGES_OFF);
 	__u64 h2g_size = meta(HL_SCRATCH_H2G_QUEUE_SIZE_OFF);
 	__u64 h2g_pages = meta(HL_SCRATCH_H2G_POOL_PAGES_OFF);
-	__u64 base_gpa, base_gva, h2g_ring, mbx_off, g2h_pool, end;
+	__u64 base_gpa, h2g_ring, mbx_off, g2h_pool, end;
 	__u8 *arena;
 
 	h2g_buf_size = meta(HL_SCRATCH_H2G_BUFFER_SIZE_OFF);
@@ -319,13 +319,12 @@ int hl_transport_init(void)
 	 * scratch alias at the top of the address space.
 	 */
 	base_gpa = HL_MAX_GPA - scratch_size + 1;
-	base_gva = HL_MAX_GVA - scratch_size + 1;
 	if (arena_gpa < base_gpa || arena_gpa & (HL_PAGE - 1)) {
 		uk_pr_err("transport: arena at 0x%lx is outside scratch\n",
 			  (unsigned long)arena_gpa);
 		return -1;
 	}
-	arena = (__u8 *)(base_gva + (arena_gpa - base_gpa));
+	arena = (__u8 *)(arena_gpa + HL_SCRATCH_GVA_MINUS_GPA);
 
 	/* TransportArena::new */
 	h2g_ring = ALIGN_UP(vq_ring_len(g2h_size), VQ_DESC_ALIGN);
