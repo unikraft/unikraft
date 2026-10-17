@@ -29,18 +29,18 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-import struct
-import sys
-import subprocess
+import logging
 import re
-import tempfile
+import struct
+import subprocess
+import sys
 
-TP_HEADER_MAGIC = "TRhd"
-TP_DEF_MAGIC = "TPde"
+logger = logging.getLogger(__name__)
+
+TP_HEADER_MAGIC = b"TRhd"
+TP_DEF_MAGIC = b"TPde"
 UK_TRACE_ARG_INT = 0
 UK_TRACE_ARG_STRING = 1
-# Not sure why gcc aligns data on 32 bytes
-__STRUCT_ALIGNMENT = 32
 
 FORMAT_VERSION = 1
 
@@ -59,13 +59,19 @@ class tp_sample:
         self.args = args
         self.time = time
 
+    @property
+    def formatted_args(self):
+        try:
+            return self.tp.fmt % tuple(self.args)
+        except TypeError:
+            # Mismatch between format string and actual arguments
+            return f"{self.args!r} (format error {self.tp.fmt!r})"
+
     def __str__(self):
-        return ("%016d %s: " % (self.time, self.tp.name)) + (
-            self.tp.fmt % self.args
-        )
+        return f"{self.time:016d} {self.tp.name} {self.formatted_args}"
 
     def tabulate_fmt(self):
-        return [self.time, self.tp.name, (self.tp.fmt % self.args)]
+        return [self.time, self.tp.name, self.formatted_args]
 
 
 class EndOfBuffer(Exception):
@@ -106,19 +112,10 @@ class sample_parser:
         except EndOfBuffer:
             raise StopIteration
 
-        magic = magic.decode()
         if magic != TP_HEADER_MAGIC:
             raise StopIteration
 
-        tp = self.tps[cookie]
-        args = []
-        for i in range(tp.args_nr):
-            if tp.types[i] == UK_TRACE_ARG_STRING:
-                args += [self.data.unpack_string()]
-            else:
-                args += [self.data.unpack_int(tp.sizes[i])]
-
-        return tp_sample(tp, time, tuple(args))
+        return self.tps[cookie].parse_sample(time, self.data)
 
 
 class unpacker:
@@ -127,57 +124,81 @@ class unpacker:
         self.pos = 0
         self.endian = "<"
 
+    def __len__(self):
+        return len(self.data) - self.pos
+
+    def lstrip(self, chars):
+        while self.pos < len(self.data) and self.data[self.pos] in chars:
+            self.pos += 1
+
+    def seek_to_pattern(self, pattern):
+        position = self.data[self.pos :].find(pattern)
+        if position < 0:
+            raise ValueError(f"{pattern!r} not found")
+        self.pos += position
+
+    def read(self, size):
+        res = self.data[self.pos : self.pos + size]
+        self.pos += size
+        return res
+
     def unpack(self, fmt):
         fmt = self.endian + fmt
         size = struct.calcsize(fmt)
         if size > len(self.data) - self.pos:
             raise EndOfBuffer("No data in buffer for unpacking %s bytes" % size)
-        cur = self.data[self.pos : self.pos + size]
-        self.pos += size
-        return struct.unpack(fmt, cur)
+        return struct.unpack(fmt, self.read(size))
 
     def unpack_string(self):
-        (strlen,) = self.unpack("B")
-        fmt = "%ds" % strlen
-        (ret,) = self.unpack(fmt)
-        return ret.decode()
+        (strlen,) = self.read(1)
+        return self.read(strlen).decode()
 
-    def unpack_int(self, size):
-        if size == 1:
-            fmt = "B"
-        elif size == 2:
-            fmt = "H"
-        elif size == 4:
-            fmt = "I"
-        elif size == 8:
-            fmt = "Q"
-        (ret,) = self.unpack(fmt)
-        return ret
+    def unpack_int(self, size, signed=False):
+        return int.from_bytes(
+            self.read(size),
+            byteorder="little" if self.endian == "<" else "big",
+            signed=signed,
+        )
 
     def align_pos(self, alignment):
         self.pos = align_up(self.pos, alignment)
 
 
 class tp_definition:
-    def __init__(self, name, args_nr, fmt, sizes, types):
+    def __init__(self, name, args_nr, fmt, sizes, types, signed=None):
         self.name = name
         self.args_nr = args_nr
         self.fmt = fmt
         self.sizes = sizes
         self.types = types
+        self.signed = signed if signed is not None else [False] * args_nr
 
     def __str__(self):
         return "%s %s" % (self.name, self.fmt)
 
+    def parse_sample(self, time, data):
+        args = tuple(
+            (
+                data.unpack_string()
+                if typ == UK_TRACE_ARG_STRING
+                else data.unpack_int(size, signed)
+            )
+            for (typ, size, signed) in zip(
+                self.types, self.sizes, self.signed, strict=True
+            )
+        )
+        return tp_sample(self, time, args)
+
 
 def get_tp_definitions(tp_data, ptr_size):
-    ptr_fmt = "0x%0" + "%dx" % (ptr_size * 2)
+    ptr_fmt = f"0x%0{2 * ptr_size}x"
     data = unpacker(tp_data)
 
     ret = dict()
 
-    while True:
-        data.align_pos(__STRUCT_ALIGNMENT)
+    while data:
+        data.seek_to_pattern(TP_DEF_MAGIC)
+
         try:
             magic, _, cookie, args_nr, name_len, fmt_len = data.unpack(
                 "4sIQBBB"
@@ -185,45 +206,113 @@ def get_tp_definitions(tp_data, ptr_size):
         except EndOfBuffer:
             break
 
-        magic = magic.decode()
         if magic != TP_DEF_MAGIC:
-            raise Exception("Wrong tracepoint definition magic")
+            raise ValueError("Wrong tracepoint definition magic")
 
         sizes = data.unpack("B" * args_nr)
         types = data.unpack("B" * args_nr)
-        name, fmt = data.unpack("%ds%ds" % (name_len, fmt_len))
         # Strange, but terminating '\0' makes a problem if the script
         # is running in the gdb
-        name = name[:-1].decode()
-        fmt = fmt[:-1].decode()
+        name = data.read(name_len).rstrip(b"\x00").decode()
+        fmt = data.read(fmt_len).rstrip(b"\x00").decode()
 
-        # Convert from c-printf format into python one
-        fmt = fmt.replace("%p", ptr_fmt)
+        # Determine signed-ness of each integer argument from the format string
+        # Per printf(3): %[flags][width][.precision][length]specifier
+        #
+        # Length modifiers: hh, h, l, ll, z, t, j, q
+        # Signed specifiers: d, i
+        # Unsigned specifiers: u, o, x, X
+        # Pointer: p (always unsigned, size = ptr_size)
 
-        ret[cookie] = tp_definition(name, args_nr, fmt, sizes, types)
+        _FLAGS = r"(?P<flags>[#0\- +']*)"
+        _WIDTH = r"(?P<width>\*|\d+)?"
+        _PRECISION = r"(?:\.(?:\*|\d+))?"
+        _LEN = r"(?P<len>hh|h|ll|l|z|t|j|q)?"
+        _CONV = r"(?P<conv>[diouxXs])"
+
+        # fmt: off
+        _FMT_SPEC_RE = re.compile(
+            # literal %% (skip, consumes no arg)
+            r'%%' +
+            # General case: %... specifiers
+            r"|%" + _FLAGS + _WIDTH + _PRECISION + _LEN + _CONV +
+            # pointer (no length modifier)
+            r'|%p'
+        )
+        # fmt: on
+
+        signs = [False] * args_nr
+        args_found = 0
+
+        def pythonize_fmt(m, signs=signs, types=types, args_nr=args_nr, name=name):
+            """
+            This is a callback for regexp substitution that does 3 things in
+            a single pass of re.sub:
+            - Find the number of specified format arguments
+            - Find sign-ness of integer arguments
+            - Tweak format specifiers from C printf to Python
+                - %p -> %N0x (where N is the machine size)
+                - %'d -> %d (thousands separator is not supported in Python)
+            """
+            nonlocal args_found
+
+            if m.group() == "%%":
+                return "%%"
+
+            if m.group() == "%p":
+                # %p is a special case without modifiers
+                args_found += 1
+                return ptr_fmt
+
+            if m["width"] == "*":
+                # %*d consumes one more argument for the width specifier
+                args_found += 1
+
+            if args_found < args_nr:
+                signs[args_found] = m["conv"] == "d" or m["conv"] == "i"
+
+                if types[args_found] == UK_TRACE_ARG_STRING and m["conv"] != "s":
+                    logger.warning(
+                        f"{name}: Expected string formatter for "
+                        f"arg[{1 + args_found}], got {m.group()} instead"
+                    )
+
+            args_found += 1
+
+            # Python does not support %'d flag (thousands separator)
+            flags = (m["flags"] or "").replace("'", "")
+            return f"%{flags}{m['width'] or ''}{m['conv']}"
+
+        fmt = re.sub(_FMT_SPEC_RE, pythonize_fmt, fmt)
+        if args_found != args_nr:
+            logger.warning(
+                f"{name}: Expected to find {args_nr} argument "
+                f"format specifiers, got {args_found} instead"
+            )
+
+        ret[cookie] = tp_definition(name, args_nr, fmt, sizes, types, signs)
+        data.lstrip(b"\x00")
 
     return ret
 
 
 def get_tp_sections(elf):
-    f = tempfile.NamedTemporaryFile()
-    objcopy_cmd = "objcopy -O binary %s " % elf
-    objcopy_cmd += "--only-section=.uk_tracepoints_list " + f.name
-    objcopy_cmd = objcopy_cmd.split()
-    subprocess.check_call(objcopy_cmd)
-    return f.read()
+    # NOTE: When reading a cross-architecture ELF file, make sure the objcopy utility supports that architecture.
+    return subprocess.check_output(
+        [
+            "objcopy",
+            "--dump-section",
+            ".uk_tracepoints_list=/dev/stdout",
+            elf,
+            "/dev/null",
+        ]
+    )
 
 
 def get_keyvals(elf):
-    readelf_cmd = "readelf -p .uk_trace_keyvals %s" % elf
-    readelf_cmd = readelf_cmd.split()
+    readelf_cmd = ["readelf", "-p", ".uk_trace_keyvals", elf]
     raw_data = subprocess.check_output(readelf_cmd).decode()
     filtered = re.findall(
         r"^\s*\[ *\d+\]\s+(.+) = (.+)$", raw_data, re.MULTILINE
     )
-
-    ret = dict()
-    for key, val in filtered:
-        ret[key] = val
-
-    return ret
+    return dict(filtered)

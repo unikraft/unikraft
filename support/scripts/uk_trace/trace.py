@@ -51,7 +51,6 @@ def parse_tf(trace_file):
             unpickler = pickle.Unpickler(tf)
 
             keyvals = unpickler.load()
-            # elf = unpickler.load()
             ptr_size = unpickler.load()
             tp_defs = unpickler.load()
             trace_buff = unpickler.load()
