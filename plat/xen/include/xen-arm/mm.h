@@ -69,20 +69,8 @@ extern paddr_t _libxenplat_paddr_offset;
 /* Number of virtual address bits for 4KB page */
 #define VA_BITS         39
 
-#define SZ_2M           0x00200000
-
 #define PAGE_OFFSET     ((0xffffffffffffffff << (VA_BITS - 1))\
 						 & 0xffffffffffffffff)
-#define FIX_FDT_TOP     (PAGE_OFFSET)
-#define FIX_FDT_START   (FIX_FDT_TOP - SZ_2M)
-#define FIX_CON_TOP     (FIX_FDT_START)
-#define FIX_CON_START   (FIX_CON_TOP - SZ_2M)
-#define FIX_GIC_TOP     (FIX_CON_START)
-#define FIX_GIC_START   (FIX_GIC_TOP - SZ_2M)
-#define FIX_XS_TOP      (FIX_GIC_START)
-#define FIX_XS_START    (FIX_XS_TOP - SZ_2M)
-#define FIX_GNT_TOP     (FIX_XS_START)
-#define FIX_GNT_START   (FIX_GNT_TOP - SZ_2M)
 
 /* SCTLR_EL1 - System Control Register */
 #define	SCTLR_RES0          0xc8222400  /* Reserved, write 0 */
@@ -223,6 +211,11 @@ extern paddr_t _libxenplat_paddr_offset;
 /* The page tables that entry64.S reserves for us */
 extern lpae_t boot_l1_pgtable[];
 extern lpae_t fixmap_pgtable[];
+
+/* The hierarchy we booted with, see _libxenplat_armentry() */
+struct uk_pt;
+extern struct uk_pt uk_plat_xen_pt;
+
 void arch_mm_prepare(unsigned long *start_pfn_p, unsigned long *max_pfn_p);
 #endif
 

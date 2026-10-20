@@ -35,14 +35,17 @@
 #include <xen/memory.h>
 #include <uk/intctlr.h>
 #include <uk/intctlr/gic.h>
+#include <uk/intctlr/gic-v3.h>
 #include <xen/hvm/params.h>
 #include <libfdt.h>
 #include <xen-arm/setup.h>
 #include <uk/arch.h>
 #include <uk/lcpu.h>
-#include <common/fixmap.h>
+#include <uk/errptr.h>
+#include <uk/fixmap.h>
 #include <uk/plat/xen/addr.h>
-#include <common/pt.h>
+#include <uk/plat/xen/fixmap.h>
+#include <uk/pt.h>
 #include <uk/plat/common/bootinfo.h>
 
 /*
@@ -67,6 +70,13 @@ void *HYPERVISOR_dtb;
  */
 paddr_t _libxenplat_paddr_offset;
 
+struct uk_pt uk_plat_xen_pt;
+
+UK_FIXMAP_IMPORT(fdt_fixmap, FDT);
+UK_FIXMAP_IMPORT(con_fixmap, CON);
+UK_FIXMAP_IMPORT(xs_fixmap, XS);
+UK_FIXMAP_IMPORT(gic_fixmap, GIC);
+
 uk_smccc_conduit_func smccc_psci_call;
 
 static int hvm_get_parameter(int idx, uint64_t *value)
@@ -84,6 +94,19 @@ static int hvm_get_parameter(int idx, uint64_t *value)
 	return ret;
 }
 
+static __vaddr_t fixmap_or_crash(unsigned int window, paddr_t paddr,
+				 __sz len)
+{
+	__vaddr_t vaddr;
+
+	vaddr = uk_fixmap_map(window, paddr, len);
+	if (unlikely(PTRISERR(vaddr)))
+		UK_CRASH("Could not map 0x%lx in the fixmap: %d\n", paddr,
+			 PTR2ERR(vaddr));
+
+	return vaddr;
+}
+
 static xen_pfn_t map_console(xen_pfn_t mfn)
 {
 	paddr_t phys;
@@ -91,7 +114,8 @@ static xen_pfn_t map_console(xen_pfn_t mfn)
 	phys = PFN_PHYS(mfn);
 	uk_pr_debug("%s, phys = 0x%lx\n", __func__, phys);
 
-	return (xen_pfn_t)uk_plat_xen_fixmap_set(UK_PLAT_XEN_FIXMAP_CON, phys);
+	return (xen_pfn_t)fixmap_or_crash(con_fixmap, phys,
+					  PAGE_SIZE);
 }
 
 static xen_pfn_t map_xenbus(xen_pfn_t mfn)
@@ -101,7 +125,8 @@ static xen_pfn_t map_xenbus(xen_pfn_t mfn)
 	phys = PFN_PHYS(mfn);
 	uk_pr_debug("%s, phys = 0x%lx\n", __func__, phys);
 
-	return (xen_pfn_t)uk_plat_xen_fixmap_set(UK_PLAT_XEN_FIXMAP_XS, phys);
+	return (xen_pfn_t)fixmap_or_crash(xs_fixmap, phys,
+					  PAGE_SIZE);
 }
 
 static void get_console(void)
@@ -145,15 +170,30 @@ void get_xenbus(void)
 }
 
 /*
- * Map device_tree (paddr) to FIX_FDT_START (vaddr)
+ * Map the device tree. Its size is only known once the header is mapped,
+ * so map the header first and remap if the tree crosses into the next slot.
  */
 static void *map_fdt(paddr_t device_tree)
 {
-	/*
-	 * FIXME: To deal with the 2M alignment, only 4KB space is usable
-	 * because device_tree is aligned to a (2M - 4KB) address.
-	 */
-	return uk_plat_xen_fixmap_set(UK_PLAT_XEN_FIXMAP_FDT, device_tree);
+	__vaddr_t vaddr;
+	__sz size;
+	int rc;
+
+	vaddr = fixmap_or_crash(fdt_fixmap, device_tree,
+				sizeof(struct fdt_header));
+
+	rc = fdt_check_header((void *)vaddr);
+	if (unlikely(rc))
+		UK_CRASH("Invalid DTB from Xen: %s\n", fdt_strerror(rc));
+
+	size = fdt_totalsize((void *)vaddr);
+	if ((device_tree & (UK_FIXMAP_SLOT_SIZE - 1)) + size >
+	    UK_FIXMAP_SLOT_SIZE) {
+		uk_fixmap_unmap(vaddr, sizeof(struct fdt_header));
+		vaddr = fixmap_or_crash(fdt_fixmap, device_tree, size);
+	}
+
+	return (void *)vaddr;
 }
 
 static inline void _get_cmdline(struct ukplat_bootinfo *bi)
@@ -180,6 +220,8 @@ static inline void _get_cmdline(struct ukplat_bootinfo *bi)
 int uk_intctlr_plat_probe(void *arg)
 {
 	struct _gic_dev *gic = (struct _gic_dev *)arg;
+	paddr_t start, end;
+	__vaddr_t vaddr;
 
 	UK_ASSERT(gic);
 
@@ -187,12 +229,19 @@ int uk_intctlr_plat_probe(void *arg)
 	gic->dist_mem_addr = to_virt((long)fdt64_ld(gic->dist_mem_addr));
 	gic->rdist_mem_addr = to_virt((long)fdt64_ld(gic->rdist_mem_addr));
 #else
-	gic->dist_mem_addr =
-		(__u64)uk_plat_xen_fixmap_set(UK_PLAT_XEN_FIXMAP_GIC,
-					      gic->dist_mem_addr);
-	/* The redistributor is in the same window */
-	gic->rdist_mem_addr = (FIX_GIC_START + (gic->rdist_mem_addr &
-						L2_OFFSET));
+	/* The distributor and the redistributors share a 2 MiB block, so
+	 * map them together. Xen advertises the redistributors of all the
+	 * vCPUs it supports: cover only those of the vCPUs we can have.
+	 */
+	start = MIN(gic->dist_mem_addr, gic->rdist_mem_addr);
+	end = MAX(gic->dist_mem_addr + gic->dist_mem_size,
+		  gic->rdist_mem_addr +
+		  MIN(gic->rdist_mem_size,
+		      (__u64)CONFIG_UKPLAT_CPU_MAXCOUNT * GICR_STRIDE));
+	vaddr = fixmap_or_crash(gic_fixmap, start, end - start);
+
+	gic->dist_mem_addr = vaddr + (gic->dist_mem_addr - start);
+	gic->rdist_mem_addr = vaddr + (gic->rdist_mem_addr - start);
 #endif
 	/* Setting memory barrier to get access to mapped pages */
 	uk_arch_wmb();
@@ -353,21 +402,21 @@ void _libxenplat_armentry(void *dtb_pointer, paddr_t physical_offset)
 	uk_plat_xen_directmap_set(_libxenplat_paddr_offset, __PTR_MAX);
 
 	/* From here on the page tables are ours */
-	if (unlikely(xenplat_pt_init(to_phys(boot_l1_pgtable))))
+	if (unlikely(uk_pal_paging_init() ||
+		     uk_pt_init_active(&uk_plat_xen_pt)))
 		BUG();
 
-	if (unlikely(uk_plat_xen_fixmap_init()))
+	/* The page table of the fixmap slots, reserved by entry64.S */
+	if (unlikely(uk_pt_table_create((__vaddr_t)fixmap_pgtable,
+					UK_PLAT_XEN_FIXMAP_LEVEL) ||
+		     uk_pt_table_link(&uk_plat_xen_pt, UK_PLAT_XEN_FIXMAP_BASE,
+				      UK_PLAT_XEN_FIXMAP_LEVEL + 1,
+				      to_phys(fixmap_pgtable),
+				      UK_PT_TMPL_NONE, UK_PT_TMPL_LEVEL_NONE) ||
+		     uk_fixmap_init(&uk_plat_xen_pt)))
 		BUG();
 
-	dtb_pointer = map_fdt((paddr_t) dtb_pointer);
-
-	uk_pr_debug("Checking DTB at %p...\n", dtb_pointer);
-
-	if ((r = fdt_check_header(dtb_pointer))) {
-		uk_pr_debug("Invalid DTB from Xen: %s\n", fdt_strerror(r));
-		BUG();
-	}
-	HYPERVISOR_dtb = dtb_pointer;
+	HYPERVISOR_dtb = map_fdt((paddr_t)dtb_pointer);
 
 	_init_mem(bi, physical_offset); /* relocates dtb */
 

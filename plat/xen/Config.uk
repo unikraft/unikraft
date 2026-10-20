@@ -45,6 +45,7 @@ config PLAT_XEN_X86_64
 
 config PLAT_XEN_ARM64
 	bool
+	select HAVE_FIXMAP
 	select HAVE_PAGING
 	select LIBUKPLAT_NATIVE
 	select LIBUKPLAT_NATIVE_ADDR

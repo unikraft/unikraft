@@ -24,13 +24,14 @@
  */
 /* Ported from Mini-OS */
 
-#include <common/pt.h>
+#include <errno.h>
 #include <xen-arm/os.h>
 #include <xen-arm/mm.h>
 #include <libfdt.h>
 #include <uk/arch/util.h>
 #include <uk/print.h>
 #include <uk/assert.h>
+#include <uk/pt.h>
 
 #if defined(__aarch64__)
 extern char stack[];
@@ -42,20 +43,22 @@ static void build_pagetable(unsigned long start_pfn, unsigned long max_pfn)
 {
 	unsigned int level = UK_PAL_PAGE_LARGE_LEVEL;
 	__sz pgsize = UK_PAL_PAGE_Lx_SIZE(level);
-	paddr_t start_paddr;
-	__sz len;
+	paddr_t paddr, end;
 	int rc;
 
-	start_paddr = PFN_PHYS(start_pfn);
-	len = PFN_PHYS(max_pfn);
+	paddr = PFN_PHYS(start_pfn);
+	end = paddr + PFN_PHYS(max_pfn);
 
-	UK_ASSERT(UK_PAL_PAGE_Lx_ALIGNED(start_paddr, level));
+	UK_ASSERT(UK_PAL_PAGE_Lx_ALIGNED(paddr, level));
 
-	rc = xenplat_pt_map((__vaddr_t)to_virt(start_paddr), start_paddr,
-			    (len + pgsize - 1) / pgsize, level,
-			    XENPLAT_PT_ATTR_MEM);
-	if (unlikely(rc))
-		UK_CRASH("Could not map RAM: %d\n", rc);
+	for (; paddr < end; paddr += pgsize) {
+		rc = uk_pt_map(&uk_plat_xen_pt, (__vaddr_t)to_virt(paddr),
+			       paddr, level, XENPLAT_PT_ATTR_MEM,
+			       UK_PT_TMPL_NONE, UK_PT_TMPL_LEVEL_NONE);
+		/* entry64.S has already mapped the kernel image */
+		if (unlikely(rc && rc != -EEXIST))
+			UK_CRASH("Could not map RAM: %d\n", rc);
+	}
 }
 
 void arch_mm_prepare(unsigned long *start_pfn_p, unsigned long *max_pfn_p)

@@ -4,45 +4,37 @@
  * You may not use this file except in compliance with the License.
  */
 
-#include <common/fixmap.h>
-#include <common/pt.h>
+#include <uk/essentials.h>
+#include <uk/plat/xen/fixmap.h>
+#include <uk/pt.h>
 #include <xen-arm/mm.h>
 
-#include <uk/arch/types.h>
-#include <uk/assert.h>
-#include <uk/essentials.h>
-#include <uk/print.h>
+/* A single page table, linked by _libxenplat_armentry(), covers the slots */
+UK_CTASSERT(UK_PLAT_XEN_FIXMAP_NR <=
+	    UK_PAL_PT_Lx_PTES(UK_PLAT_XEN_FIXMAP_LEVEL));
+UK_CTASSERT(!(UK_PLAT_XEN_FIXMAP_TOP &
+	      (UK_PAL_PAGE_Lx_SIZE(UK_PLAT_XEN_FIXMAP_LEVEL + 1) - 1)));
+UK_CTASSERT(UK_PLAT_XEN_FIXMAP_TOP == PAGE_OFFSET);
 
-static const struct {
-	__vaddr_t vaddr;
-	unsigned long attr;
-} fixmap[] = {
-	[UK_PLAT_XEN_FIXMAP_FDT] = {FIX_FDT_START, XENPLAT_PT_ATTR_MEM},
-	[UK_PLAT_XEN_FIXMAP_CON] = {FIX_CON_START, XENPLAT_PT_ATTR_MEM},
-	[UK_PLAT_XEN_FIXMAP_XS]  = {FIX_XS_START,  XENPLAT_PT_ATTR_MEM},
-	[UK_PLAT_XEN_FIXMAP_GIC] = {FIX_GIC_START, XENPLAT_PT_ATTR_DEV},
-	[UK_PLAT_XEN_FIXMAP_GNT] = {FIX_GNT_START, XENPLAT_PT_ATTR_MEM},
-};
-
-int uk_plat_xen_fixmap_init(void)
+unsigned long uk_plat_xen_fixmap_attr(unsigned int slot)
 {
-	return xenplat_pt_link(FIX_FDT_START, UK_PAGING_PT_LEVELS - 1,
-			       fixmap_pgtable);
+	if (slot == UK_PLAT_XEN_FIXMAP_IDX_GIC)
+		return XENPLAT_PT_ATTR_DEV;
+
+	return XENPLAT_PT_ATTR_MEM;
 }
 
-void *uk_plat_xen_fixmap_set(enum uk_plat_xen_fixmap win, __paddr_t paddr)
+unsigned int uk_plat_xen_fixmap_window_slots(unsigned int slot)
 {
-	int rc;
-
-	UK_ASSERT(win < ARRAY_SIZE(fixmap));
-
-	rc = xenplat_pt_map(fixmap[win].vaddr, paddr & L2_MASK, 1,
-			    UK_PAGING_PAGE_LARGE_LEVEL, fixmap[win].attr);
-	if (unlikely(rc)) {
-		uk_pr_err("fixmap: could not map 0x%lx: %d\n",
-			  (unsigned long)paddr, rc);
-		return __NULL;
+	switch (slot) {
+	case UK_PLAT_XEN_FIXMAP_IDX_FDT:
+		return UK_PLAT_XEN_FIXMAP_FDT_NR;
+	case UK_PLAT_XEN_FIXMAP_IDX_CON:
+	case UK_PLAT_XEN_FIXMAP_IDX_XS:
+	case UK_PLAT_XEN_FIXMAP_IDX_GIC:
+	case UK_PLAT_XEN_FIXMAP_IDX_GNT:
+		return 1;
+	default:
+		return 0;
 	}
-
-	return (void *)(fixmap[win].vaddr + (paddr & L2_OFFSET));
 }
