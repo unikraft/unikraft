@@ -140,6 +140,7 @@ static struct uk_vas kernel_vas;
 static struct uk_alloc *heap_init()
 {
 	struct uk_alloc *a = NULL;
+	struct ukplat_memregion_desc *md __maybe_unused;
 #ifdef CONFIG_LIBUKBOOT_HEAP_BASE
 	struct uk_pagetable *pt = uk_paging_pt_get_active();
 	__sz free_pages, alloc_pages;
@@ -148,9 +149,7 @@ static struct uk_alloc *heap_init()
 	__vaddr_t vaddr;
 #endif /* CONFIG_LIBUKVMEM */
 	int rc;
-#else /* CONFIG_LIBUKBOOT_HEAP_BASE */
-	struct ukplat_memregion_desc *md;
-#endif /* !CONFIG_LIBUKBOOT_HEAP_BASE */
+#endif /* CONFIG_LIBUKBOOT_HEAP_BASE */
 
 #ifdef CONFIG_LIBUKBOOT_HEAP_BASE
 	UK_ASSERT(pt);
@@ -210,6 +209,25 @@ static struct uk_alloc *heap_init()
 			     (alloc_pages - HEAP_INITIAL_PAGES) << UK_PAGING_PAGE_SHIFT);
 	if (unlikely(rc))
 		return NULL;
+
+	/* The initrd (initrd0) stays mapped for good, and files extracted
+	 * from it may borrow its memory: represent that mapping, so that an
+	 * mmap() hint cannot be placed over it and swap its pages out from
+	 * under the kernel.  A DMA VMA maps the physical range it is given and
+	 * never hands those frames, which the platform owns, to the frame
+	 * allocator.
+	 */
+	if (ukplat_memregion_find_initrd0(&md) >= 0 && md->pg_count) {
+		UK_ASSERT_VALID_MRD(md);
+		vaddr = md->vbase;
+		rc = uk_vma_map_dma(&kernel_vas, &vaddr,
+				    md->pg_count << UK_PAGING_PAGE_SHIFT,
+				    UK_PAGING_PAGE_ATTR_PROT_READ, 0, "initrd",
+				    md->pbase);
+		if (unlikely(rc))
+			uk_pr_warn("Could not reserve the initrd at %p: %d\n",
+				   (void *)md->vbase, rc);
+	}
 #else /* CONFIG_LIBUKVMEM */
 	free_pages  = pt->fa->free_memory >> UK_PAGING_PAGE_SHIFT;
 	alloc_pages = free_pages - UK_PAGING_PT_PAGES(free_pages);

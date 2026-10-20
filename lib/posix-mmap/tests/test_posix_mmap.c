@@ -40,7 +40,9 @@ static void vas_clean(struct uk_vas *vas)
 	do {
 		restart = 0;
 		uk_list_for_each_entry(vma, &vas->vma_list, vma_list) {
-			if (vma->name && strcmp("heap", vma->name) == 0)
+			/* The boot heap and initrd VMAs are not the test's */
+			if (vma->name && (strcmp("heap", vma->name) == 0 ||
+					  strcmp("initrd", vma->name) == 0))
 				continue;
 
 			rc = uk_vma_unmap(vas, vma->start,
