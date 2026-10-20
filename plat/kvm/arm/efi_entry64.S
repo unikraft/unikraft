@@ -5,9 +5,19 @@
  */
 #include <uk/config.h>
 #include <uk/asm.h>
+#include <uk/arch/arm64.h>
 
 .section .text
 ENTRY(uk_efi_entry64)
+#if __ARM_FEATURE_ATOMICS
+	/* Built w/ LSE atomics: stop here if the CPU lacks FEAT_LSE */
+	mrs	x9, ID_AA64ISAR0_EL1
+	lsr	x9, x9, #UK_ARCH_ARM64_ID_AA64ISAR0_EL1_ATOMIC_SHIFT
+	and	x9, x9, #UK_ARCH_ARM64_ID_AA64ISAR0_EL1_ATOMIC_MASK
+	cmp	x9, #2	/* 0b0010: FEAT_LSE */
+	b.lo	lse_unsupported
+#endif /* __ARM_FEATURE_ATOMICS */
+
 	stp	x0, x1, [sp, #16]
 
 	mov	x0, xzr
@@ -21,3 +31,9 @@ uk_efi_fail:
 	wfi
 	b	uk_efi_fail
 END(uk_efi_entry64)
+
+#if __ARM_FEATURE_ATOMICS
+lse_unsupported:
+	wfi
+	b	lse_unsupported
+#endif /* __ARM_FEATURE_ATOMICS */
