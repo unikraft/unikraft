@@ -27,6 +27,7 @@
 !.gitignore
 .*
 !.github/
+!.devcontainer/
 
 # gnu global files
 GPATH
