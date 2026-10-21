@@ -252,9 +252,9 @@ void hostfs_resume_list(const char *mounts, __sz mounts_len)
 				w->satisfied = 1;
 				continue;
 			}
-			/* hostfs_unmount() takes m off the list.  vfscore
-			 * hands some failures back as a positive errno rather
-			 * than through errno.
+			/* hostfs_unmount() takes m off the list.  An older
+			 * vfscore handed some failures back as a positive
+			 * errno rather than through errno.
 			 */
 			rc = umount2(m->mp->m_path, 0);
 			if (rc == 0) {

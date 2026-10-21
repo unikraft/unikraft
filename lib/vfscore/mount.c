@@ -109,6 +109,30 @@ int device_close(struct device *dev)
 	return 0;
 }
 
+/*
+ * The length of a mount point's path without the slashes it may end in,
+ * which "/mnt/data/" may, as a user writes it.  A mount's path never
+ * keeps them (but "/" itself): lookups match it whole, followed by a
+ * slash or the end of the path, so "/mnt/data/sub" would not match
+ * "/mnt/data/".
+ */
+static size_t
+mount_path_len(const char *path)
+{
+	size_t len = strlen(path);
+
+	while (len > 1 && path[len - 1] == '/')
+		len--;
+	return len;
+}
+
+/* Whether @mp is mounted at @path, of mount_path_len() @len */
+static int
+mount_path_is(const struct mount *mp, const char *path, size_t len)
+{
+	return strlen(mp->m_path) == len && !strncmp(mp->m_path, path, len);
+}
+
 UK_SYSCALL_R_DEFINE(int, mount, const char*, dev, const char*, dir,
 		const char*, fsname, unsigned long, flags, const void*, data)
 {
@@ -117,12 +141,14 @@ UK_SYSCALL_R_DEFINE(int, mount, const char*, dev, const char*, dir,
 	struct device *device;
 	struct dentry *dp_covered = NULL;
 	struct vnode *vp = NULL;
+	size_t dirlen;
 	int error;
 
 	uk_pr_info("VFS: mounting %s at %s\n", fsname, dir);
 
 	if (!dir || *dir == '\0')
 		return -ENOENT;
+	dirlen = mount_path_len(dir);
 
 	/* Find a file system. */
 	if (!(fs = fs_getfs(fsname)))
@@ -150,7 +176,7 @@ UK_SYSCALL_R_DEFINE(int, mount, const char*, dev, const char*, dir,
 
 	uk_mutex_lock(&mount_lock);
 	uk_list_for_each_entry(mp, &mount_list, mnt_list) {
-		if (!strcmp(mp->m_path, dir) ||
+		if (mount_path_is(mp, dir, dirlen) ||
 		    (device && mp->m_dev == device)) {
 			error = EBUSY;  /* Already mounted */
 			uk_mutex_unlock(&mount_lock);
@@ -171,7 +197,7 @@ UK_SYSCALL_R_DEFINE(int, mount, const char*, dev, const char*, dir,
 	mp->m_flags = flags;
 	mp->m_dev = device;
 	mp->m_data = NULL;
-	mp->m_path = strndup(dir, PATH_MAX - 1);
+	mp->m_path = strndup(dir, MIN(dirlen, (size_t)PATH_MAX - 1));
 	if (!mp->m_path) {
 		error = ENOMEM;
 		goto err_free_mp;
@@ -185,7 +211,7 @@ UK_SYSCALL_R_DEFINE(int, mount, const char*, dev, const char*, dir,
 	/*
 	 * Get vnode to be covered in the upper file system.
 	 */
-	if (*dir == '/' && *(dir + 1) == '\0') {
+	if (*dir == '/' && dirlen == 1) {
 		/* Ignore if it mounts to global root directory. */
 		dp_covered = NULL;
 	} else {
@@ -285,7 +311,7 @@ UK_SYSCALL_R_DEFINE(int, umount2, const char*, path, int, flags)
 
 	/* Get mount entry */
 	uk_list_for_each_entry(tmp, &mount_list, mnt_list) {
-		if (!strcmp(path, tmp->m_path)) {
+		if (mount_path_is(tmp, path, mount_path_len(path))) {
 			mp = tmp;
 			goto found;
 		}
@@ -319,7 +345,8 @@ found:
 	free(mp);
  out:
 	uk_mutex_unlock(&mount_lock);
-	return error;
+	/* A raw system call returns its error negated, as mount() does */
+	return -error;
 }
 
 #if UK_LIBC_SYSCALLS
