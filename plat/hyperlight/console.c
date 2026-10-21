@@ -28,6 +28,7 @@
  * Input uses the ReadStdin host function, which hands over the host
  * process's stdin, as bytes, a chunk at a time.  The console_in callback
  * drains each chunk; when the host has no more, the read returns 0 (EOF).
+ * ConsoleIsTerminal says whether the streams reach a terminal on the host.
  *
  * TODO: Route uk_pr_* output through G2H Log messages instead of
  * HostWriteErr.  A Log message delivers a GuestLogData FlatBuffer to the
@@ -141,10 +142,33 @@ static __ssz hyperlight_console_in(struct uk_console *dev __unused,
 	return (__ssz)n;
 }
 
+/*
+ * Whether a stream reaches a terminal: the host's ConsoleIsTerminal says
+ * for its own stdin, stdout and stderr, which the console's streams are.
+ * Asked each time, as a restored guest runs for another host process.  A
+ * host without it, or before the hcall subsystem is up, is taken to be a
+ * terminal, as the console was before hosts said.
+ */
+static __bool hyperlight_console_terminal(struct uk_console *dev __unused,
+					  int stream)
+{
+	struct hl_param p[1];
+	__s32 terminal;
+
+	if (!hl_hcall_ready())
+		return __true;
+	p[0].type = HL_PV_HLINT;
+	p[0].i32_val = stream;
+	if (hl_hcall_int("ConsoleIsTerminal", p, 1, &terminal) < 0)
+		return __true;
+	return terminal != 0;
+}
+
 static struct uk_console_ops hyperlight_console_ops = {
 	.out = hyperlight_console_out,
 	.in = hyperlight_console_in,
 	.err = hyperlight_console_err,
+	.terminal = hyperlight_console_terminal,
 };
 
 static struct uk_console hyperlight_console;
