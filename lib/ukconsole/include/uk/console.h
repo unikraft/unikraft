@@ -74,6 +74,35 @@ __ssz uk_console_out(const char *buf, __sz len);
 __ssz uk_console_err(const char *buf, __sz len);
 
 /**
+ * uk_console_err(), but only to the STDOUT devices without a `log`
+ * operation, or whose `log` declined the last message: a kernel
+ * message's text, for the devices that did not take the message itself
+ * from uk_console_log().
+ *
+ * @param buf
+ *   Source of bytes to write
+ * @param len
+ *   Number of bytes to write starting at buf
+ * @return
+ *   - (>=0): Number of bytes written
+ *   - (<0): Error
+ */
+__ssz uk_console_err_unlogged(const char *buf, __sz len);
+
+struct uk_console_log_msg;
+
+/**
+ * Hand a kernel message to the STDOUT devices with a `log` operation,
+ * which keep it apart from a program's output (in a host's log, say).
+ * The others, and those that decline it, get its text from
+ * uk_console_err_unlogged().
+ *
+ * @param msg
+ *   The message
+ */
+void uk_console_log(const struct uk_console_log_msg *msg);
+
+/**
  * uk_console_out(), writing each newline as CR-LF if
  * CONFIG_LIBUKCONSOLE_ONLCR is set and as written otherwise.
  *
@@ -100,6 +129,20 @@ __ssz uk_console_out_onlcr(const char *buf, __sz len);
  *   - (<0): Error
  */
 __ssz uk_console_err_onlcr(const char *buf, __sz len);
+
+/**
+ * uk_console_err_unlogged(), writing each newline as CR-LF if
+ * CONFIG_LIBUKCONSOLE_ONLCR is set and as written otherwise.
+ *
+ * @param buf
+ *   Source of bytes to write
+ * @param len
+ *   Number of bytes to write starting at buf
+ * @return
+ *   - (>=0): Number of bytes written
+ *   - (<0): Error
+ */
+__ssz uk_console_err_unlogged_onlcr(const char *buf, __sz len);
 
 /* The console's streams, as uk_console_is_terminal() tells them apart */
 #define UK_CONSOLE_STREAM_INOUT		0	/* input and output */

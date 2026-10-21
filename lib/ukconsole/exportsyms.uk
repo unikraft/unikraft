@@ -1,8 +1,11 @@
 uk_console_get
 uk_console_out
 uk_console_err
+uk_console_log
+uk_console_err_unlogged
 uk_console_out_onlcr
 uk_console_err_onlcr
+uk_console_err_unlogged_onlcr
 uk_console_in
 uk_console_out_direct
 uk_console_err_direct

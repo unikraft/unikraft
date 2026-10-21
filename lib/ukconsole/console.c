@@ -42,8 +42,11 @@ __u16 uk_console_count(void)
 	return uk_console_device_count;
 }
 
+enum console_stream { CONSOLE_OUT, CONSOLE_ERR, CONSOLE_ERR_UNLOGGED };
+
 /* There is no STDERR flag: standard error goes to the STDOUT devices */
-static __ssz console_write(const char *buf, __sz len, __bool err)
+static __ssz console_write(const char *buf, __sz len,
+			   enum console_stream stream)
 {
 	struct uk_console *dev = __NULL;
 
@@ -56,7 +59,10 @@ static __ssz console_write(const char *buf, __sz len, __bool err)
 	uk_list_for_each_entry(dev, &uk_console_device_list, _list) {
 		if (!(dev->flags & UK_CONSOLE_FLAG_STDOUT))
 			continue;
-		if (err)
+		if (stream == CONSOLE_ERR_UNLOGGED && dev->ops->log &&
+		    !dev->_log_declined)
+			continue;
+		if (stream != CONSOLE_OUT)
 			uk_console_err_direct(dev, buf, len);
 		else
 			uk_console_out_direct(dev, buf, len);
@@ -81,12 +87,29 @@ __bool uk_console_is_terminal(int stream)
 
 __ssz uk_console_out(const char *buf, __sz len)
 {
-	return console_write(buf, len, __false);
+	return console_write(buf, len, CONSOLE_OUT);
 }
 
 __ssz uk_console_err(const char *buf, __sz len)
 {
-	return console_write(buf, len, __true);
+	return console_write(buf, len, CONSOLE_ERR);
+}
+
+__ssz uk_console_err_unlogged(const char *buf, __sz len)
+{
+	return console_write(buf, len, CONSOLE_ERR_UNLOGGED);
+}
+
+void uk_console_log(const struct uk_console_log_msg *msg)
+{
+	struct uk_console *dev = __NULL;
+
+	UK_ASSERT(msg);
+
+	uk_list_for_each_entry(dev, &uk_console_device_list, _list) {
+		if ((dev->flags & UK_CONSOLE_FLAG_STDOUT) && dev->ops->log)
+			dev->_log_declined = dev->ops->log(dev, msg) != 0;
+	}
 }
 
 /* One place for the CR-LF serial consoles need and byte-keeping hosts do not */
@@ -137,6 +160,11 @@ __ssz uk_console_out_onlcr(const char *buf, __sz len)
 __ssz uk_console_err_onlcr(const char *buf, __sz len)
 {
 	return console_write_onlcr(uk_console_err, buf, len);
+}
+
+__ssz uk_console_err_unlogged_onlcr(const char *buf, __sz len)
+{
+	return console_write_onlcr(uk_console_err_unlogged, buf, len);
 }
 
 __ssz uk_console_in(char *buf, __sz len)
