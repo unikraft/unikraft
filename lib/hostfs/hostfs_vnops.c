@@ -509,8 +509,10 @@ hostfs_setattr(struct vnode *vp, struct vattr *attr)
 		p[1].type = HL_PV_HLSTRING;
 		p[1].str.ptr = np->hf_path;
 		p[1].str.len = strlen(np->hf_path);
-		p[2].type = HL_PV_HLINT;
-		p[2].i32_val = (int)attr->va_mode;
+		/* Unsigned, as the host takes it: a call with the wrong
+		 * kind of argument fails whole. */
+		p[2].type = HL_PV_HLUINT;
+		p[2].u32_val = (__u32)attr->va_mode;
 
 		if (hl_hcall_int("fs_chmod", p, 3, &ret) < 0)
 			return EIO;
