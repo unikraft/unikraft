@@ -30,8 +30,11 @@ extern "C" {
 
 #define __ARM64_PADDR_VALID(paddr)		    \
 	((paddr) <= (__paddr_t)__ARM64_PADDR_MAX)
+/* Only the TTBR0 half, where Unikraft maps everything: an address with
+ * any bit above the VA size set is out of reach.
+ */
 #define __ARM64_VADDR_VALID(vaddr)		    \
-	(((vaddr) & __ARM64_VADDR_MAX) <= (__vaddr_t)__ARM64_VADDR_MAX)
+	((__vaddr_t)(vaddr) <= (__vaddr_t)__ARM64_VADDR_MAX)
 
 /* Any address controlled by TTBR1, ie bit[55] == 1 */
 #define __ARM64_INVALID_ADDR		0xBAADBAADBAADBAADUL
