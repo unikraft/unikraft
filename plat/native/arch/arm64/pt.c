@@ -51,15 +51,25 @@ __pte_t uk_plat_native_pte_create(__paddr_t paddr, unsigned long attr,
 	if (!(attr & UK_PLAT_NATIVE_PAGE_ATTR_PROT_EXEC))
 		pte |= UK_ARCH_ARM64_PTE_ATTR_XN;
 
+	/* The generic page attributes carry no shareability, so a request for
+	 * Non-shareable (0) is indistinguishable from none: keep the
+	 * template's, or else map the page Inner Shareable, as the boot page
+	 * tables (PTE_ATTR_DEFAULT) do. The architecture does not keep a
+	 * Non-shareable page coherent between CPUs, and a hypervisor may run
+	 * the vCPU on any of them: under nested Hyper-V, plain loads from
+	 * such pages returned data older than the stores before them.
+	 */
 	switch (attr & UK_ARCH_ARM64_PTE_ATTR_SH_MASK) {
 	case UK_ARCH_ARM64_PTE_ATTR_SH(UK_ARCH_ARM64_PTE_ATTR_SH_IS):
-		pte |= UK_ARCH_ARM64_PTE_ATTR_SH(UK_ARCH_ARM64_PTE_ATTR_SH_IS);
-		break;
 	case UK_ARCH_ARM64_PTE_ATTR_SH(UK_ARCH_ARM64_PTE_ATTR_SH_OS):
-		pte |= UK_ARCH_ARM64_PTE_ATTR_SH(UK_ARCH_ARM64_PTE_ATTR_SH_OS);
+		pte &= ~UK_ARCH_ARM64_PTE_ATTR_SH_MASK;
+		pte |= attr & UK_ARCH_ARM64_PTE_ATTR_SH_MASK;
 		break;
 	case UK_ARCH_ARM64_PTE_ATTR_SH(UK_ARCH_ARM64_PTE_ATTR_SH_NS):
-		pte |= UK_ARCH_ARM64_PTE_ATTR_SH(UK_ARCH_ARM64_PTE_ATTR_SH_NS);
+		if ((pte & UK_ARCH_ARM64_PTE_ATTR_SH_MASK) !=
+		    UK_ARCH_ARM64_PTE_ATTR_SH(UK_ARCH_ARM64_PTE_ATTR_SH_OS))
+			pte |= UK_ARCH_ARM64_PTE_ATTR_SH(
+				UK_ARCH_ARM64_PTE_ATTR_SH_IS);
 		break;
 	default:
 		UK_ASSERT(0 && "Invalid shareability type\n");
