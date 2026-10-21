@@ -8,6 +8,10 @@
 #include <uk/console.h>
 #include <uk/console/driver.h>
 #include <uk/test.h>
+#include <string.h>
+#if CONFIG_LIBUKPRINT_PRINTK
+#include <uk/print.h>
+#endif /* CONFIG_LIBUKPRINT_PRINTK */
 
 #define UK_CONSOLE_TEST_BUF_SIZE 512
 static char uk_console_test_out_buf[UK_CONSOLE_TEST_BUF_SIZE];
@@ -87,6 +91,8 @@ struct uk_console_test_sink {
 static struct uk_console_test_sink uk_console_test_sink_out;
 static struct uk_console_test_sink uk_console_test_sink_err;
 static struct uk_console_test_sink uk_console_test_sink_plain;
+static struct uk_console_test_sink uk_console_test_sink_logdev;
+static struct uk_console_test_sink uk_console_test_sink_log;
 
 static __ssz uk_console_test_sink_put(struct uk_console_test_sink *sink,
 				      const char *buf, __sz len)
@@ -114,6 +120,38 @@ static __ssz uk_console_test_plain_out(struct uk_console *dev __unused,
 	return uk_console_test_sink_put(&uk_console_test_sink_plain, buf, len);
 }
 
+static __ssz uk_console_test_logdev_out(struct uk_console *dev __unused,
+					const char *buf, __sz len)
+{
+	return uk_console_test_sink_put(&uk_console_test_sink_logdev, buf, len);
+}
+
+static int uk_console_test_log_level;
+static int uk_console_test_log_decline;
+
+static int uk_console_test_logdev_log(struct uk_console *dev __unused,
+				      const struct uk_console_log_msg *msg)
+{
+	if (uk_console_test_log_decline)
+		return -1;
+	uk_console_test_log_level = msg->level;
+	uk_console_test_sink_put(&uk_console_test_sink_log, msg->text,
+				 msg->len);
+	return 0;
+}
+
+/* Whether @sink holds @str */
+static __bool uk_console_test_sink_has(struct uk_console_test_sink *sink,
+				       const char *str)
+{
+	__sz n = strlen(str);
+
+	for (__sz i = 0; i + n <= sink->len; i++)
+		if (!memcmp(sink->buf + i, str, n))
+			return __true;
+	return __false;
+}
+
 static struct uk_console_ops uk_console_test_split_ops = {
 	.out = uk_console_test_split_out,
 	.err = uk_console_test_split_err,
@@ -123,8 +161,14 @@ static struct uk_console_ops uk_console_test_plain_ops = {
 	.out = uk_console_test_plain_out,
 };
 
+static struct uk_console_ops uk_console_test_logdev_ops = {
+	.out = uk_console_test_logdev_out,
+	.log = uk_console_test_logdev_log,
+};
+
 static struct uk_console uk_console_test_split_dev;
 static struct uk_console uk_console_test_plain_dev;
+static struct uk_console uk_console_test_logdev_dev;
 
 static void uk_console_test_capture(void)
 {
@@ -137,19 +181,26 @@ static void uk_console_test_capture(void)
 		uk_console_init(&uk_console_test_plain_dev, "test-plain",
 				&uk_console_test_plain_ops, 0);
 		uk_console_register(&uk_console_test_plain_dev);
+		uk_console_init(&uk_console_test_logdev_dev, "test-log",
+				&uk_console_test_logdev_ops, 0);
+		uk_console_register(&uk_console_test_logdev_dev);
 		registered = __true;
 	}
 	uk_console_test_sink_out.len = 0;
 	uk_console_test_sink_err.len = 0;
 	uk_console_test_sink_plain.len = 0;
+	uk_console_test_sink_logdev.len = 0;
+	uk_console_test_sink_log.len = 0;
 	uk_console_test_split_dev.flags |= UK_CONSOLE_FLAG_STDOUT;
 	uk_console_test_plain_dev.flags |= UK_CONSOLE_FLAG_STDOUT;
+	uk_console_test_logdev_dev.flags |= UK_CONSOLE_FLAG_STDOUT;
 }
 
 static void uk_console_test_capture_end(void)
 {
 	uk_console_test_split_dev.flags &= ~UK_CONSOLE_FLAG_STDOUT;
 	uk_console_test_plain_dev.flags &= ~UK_CONSOLE_FLAG_STDOUT;
+	uk_console_test_logdev_dev.flags &= ~UK_CONSOLE_FLAG_STDOUT;
 }
 
 UK_TESTCASE(uk_console_testsuite, uk_console_test_err)
@@ -173,6 +224,78 @@ UK_TESTCASE(uk_console_testsuite, uk_console_test_err)
 	UK_TEST_EXPECT_SNUM_EQ(uk_console_test_sink_plain.len, 6);
 	UK_TEST_EXPECT_BYTES_EQ(uk_console_test_sink_plain.buf, "outerr", 6);
 }
+
+UK_TESTCASE(uk_console_testsuite, uk_console_test_log)
+{
+	struct uk_console_log_msg msg = {
+		.level = 2,
+		.libname = "uk_console_test",
+		.text = "log",
+		.len = 3,
+	};
+	__ssz err_rc;
+
+	/* A device with log takes a kernel message whole; the text goes
+	 * only to the devices without it.
+	 */
+	uk_console_test_capture();
+	uk_console_log(&msg);
+	err_rc = uk_console_err_unlogged("txt\n", 4);
+	uk_console_test_capture_end();
+
+	UK_TEST_EXPECT_SNUM_EQ(uk_console_test_sink_log.len, 3);
+	UK_TEST_EXPECT_BYTES_EQ(uk_console_test_sink_log.buf, "log", 3);
+	UK_TEST_EXPECT_SNUM_EQ(uk_console_test_log_level, 2);
+	UK_TEST_EXPECT_SNUM_EQ(err_rc, 4);
+	UK_TEST_EXPECT_SNUM_EQ(uk_console_test_sink_logdev.len, 0);
+	UK_TEST_EXPECT_SNUM_EQ(uk_console_test_sink_out.len, 0);
+	UK_TEST_EXPECT_SNUM_EQ(uk_console_test_sink_err.len, 4);
+	UK_TEST_EXPECT_BYTES_EQ(uk_console_test_sink_err.buf, "txt\n", 4);
+	UK_TEST_EXPECT_SNUM_EQ(uk_console_test_sink_plain.len, 4);
+	UK_TEST_EXPECT_BYTES_EQ(uk_console_test_sink_plain.buf, "txt\n", 4);
+
+	/* One that declines the message gets its text, as the others do */
+	uk_console_test_capture();
+	uk_console_test_log_decline = 1;
+	uk_console_log(&msg);
+	uk_console_err_unlogged("txt\n", 4);
+	uk_console_test_log_decline = 0;
+	uk_console_test_capture_end();
+
+	UK_TEST_EXPECT_SNUM_EQ(uk_console_test_sink_log.len, 0);
+	UK_TEST_EXPECT_SNUM_EQ(uk_console_test_sink_logdev.len, 4);
+	UK_TEST_EXPECT_BYTES_EQ(uk_console_test_sink_logdev.buf, "txt\n", 4);
+}
+
+/* Only where errors are printed: compiled in, and no console level to
+ * turn them off at run time
+ */
+#if CONFIG_LIBUKPRINT_PRINTK && UK_PRINT_KLVL_MAX >= UK_PRINT_KLVL_ERR && \
+	!CONFIG_LIBUKPRINT_PRINTK_UKSTORE
+UK_TESTCASE(uk_console_testsuite, uk_console_test_kernel_messages)
+{
+	/* An error goes whole to a device with log, as text to the others;
+	 * a crash is standard error on all of them.
+	 */
+	uk_console_test_capture();
+	uk_pr_err("uk_console_test: an error\n");
+	uk_pr_crit("uk_console_test: a crash\n");
+	uk_console_test_capture_end();
+
+	UK_TEST_EXPECT(uk_console_test_sink_has(&uk_console_test_sink_log,
+						"an error"));
+	UK_TEST_EXPECT(!uk_console_test_sink_has(&uk_console_test_sink_log,
+						 "a crash"));
+	UK_TEST_EXPECT(uk_console_test_sink_has(&uk_console_test_sink_logdev,
+						"a crash"));
+	UK_TEST_EXPECT(!uk_console_test_sink_has(&uk_console_test_sink_logdev,
+						 "an error"));
+	UK_TEST_EXPECT(uk_console_test_sink_has(&uk_console_test_sink_err,
+						"an error"));
+	UK_TEST_EXPECT(uk_console_test_sink_has(&uk_console_test_sink_err,
+						"a crash"));
+}
+#endif /* CONFIG_LIBUKPRINT_PRINTK && ... */
 
 UK_TESTCASE(uk_console_testsuite, uk_console_test_onlcr)
 {

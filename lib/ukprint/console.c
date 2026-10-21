@@ -21,6 +21,7 @@
 
 #if CONFIG_LIBUKCONSOLE
 #include <uk/console.h>
+#include <uk/console/driver.h>
 #endif /* CONFIG_LIBUKCONSOLE */
 
 #include "print.h"
@@ -81,7 +82,7 @@ static struct vprint_console kconsole  = {
 #if CONFIG_LIBUKCONSOLE
 	/* Kernel messages are diagnostics: they go to the consoles' error
 	 * stream, kept apart from a program's standard output where a
-	 * console can.
+	 * console can, and to their logs (see kconsole_cout()).
 	 */
 	.cout = uk_console_err_onlcr,
 #else /* !CONFIG_LIBUKCONSOLE */
@@ -113,6 +114,46 @@ static __sz utf8_whole(const char *buf, __sz len)
 	n = (lead >= 0xF0) ? 4 : (lead >= 0xE0) ? 3 : 2;
 	return (len - (i - 1) < n) ? i - 1 : len;
 }
+
+#if CONFIG_LIBUKCONSOLE
+/* Where the text of a message of level @lvl goes.  A crash is for
+ * whoever reads the program's standard error, on every console.  The
+ * rest, which a program's own failure can bring on (a missing file it
+ * tries to run, say), and what is printed without a level (a syscall
+ * trace, test results), is the kernel's log: a console that keeps one
+ * took the message whole (kconsole_log()), and only the others print it.
+ */
+static cout_func kconsole_cout(int lvl)
+{
+	if (lvl == UK_PRINT_KLVL_CRIT)
+		return uk_console_err_onlcr;
+	return uk_console_err_unlogged_onlcr;
+}
+
+/* Hand the message in @text[0..@len) to the consoles that keep a log */
+static void kconsole_log(struct uk_print_msg *msg, int lvl,
+			 const char *libname, const char *text, int len)
+{
+	struct uk_console_log_msg lmsg = {
+		.level = lvl,
+		.libname = libname,
+		.text = text,
+	};
+
+	if (len > 0 && text[len - 1] == '\n')
+		len--;
+	if (len <= 0)
+		return;
+	lmsg.len = len;
+#if CONFIG_LIBUKPRINT_PRINT_SRCNAME
+	lmsg.srcname = msg->srcname;
+	lmsg.srcline = msg->srcline;
+#else /* !CONFIG_LIBUKPRINT_PRINT_SRCNAME */
+	(void)msg;
+#endif /* !CONFIG_LIBUKPRINT_PRINT_SRCNAME */
+	uk_console_log(&lmsg);
+}
+#endif /* CONFIG_LIBUKCONSOLE */
 
 static inline void vprint_cout(struct vprint_console *cons,
 			       const char *buf, __sz len)
@@ -228,6 +269,10 @@ void uk_print_console_write(struct uk_print_msg *msg)
 			 */
 			vprint_cout(cons, "\n", 1);
 		}
+#if CONFIG_LIBUKCONSOLE
+		/* After the line it closes, on the stream that line is on */
+		cons->cout = kconsole_cout(lvl);
+#endif /* CONFIG_LIBUKCONSOLE */
 		cons->prevlvl = lvl;
 		cons->newline = 1; /* enforce printing the message header */
 	}
@@ -242,6 +287,10 @@ void uk_print_console_write(struct uk_print_msg *msg)
 		if (!raw && (!len || lbuf[len - 1] != '\n'))
 			lbuf[len++] = '\n';
 	}
+#if CONFIG_LIBUKCONSOLE
+	if (lvl != UK_PRINT_KLVL_CRIT)
+		kconsole_log(msg, lvl, libname, lbuf, len);
+#endif /* CONFIG_LIBUKCONSOLE */
 	lptr = lbuf;
 	while (len > 0) {
 		if (cons->newline && !raw) {
