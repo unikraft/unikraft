@@ -198,6 +198,33 @@ __ssz hl_call_host_write(const char *buf, __sz len);
  */
 __ssz hl_call_host_write_err(const char *buf, __sz len);
 
+/* GuestLogData levels (guest_log_level.fbs LogLevel) */
+#define HL_LOG_TRACE		0
+#define HL_LOG_DEBUG		1
+#define HL_LOG_INFORMATION	2
+#define HL_LOG_WARNING		3
+#define HL_LOG_ERROR		4
+#define HL_LOG_CRITICAL		5
+
+/**
+ * Send a kernel message to the host's log, as a Hyperlight guest log
+ * message (GuestLogData), which the host logs as the `hyperlight_guest`
+ * target.  Bytes of @a msg that are not UTF-8 are sent as '?': the host
+ * refuses a message that is not, and the guest function call in flight
+ * with it.
+ *
+ * @param level   HL_LOG_*
+ * @param source  The library that printed it ("" for none)
+ * @param file    Its source file ("" for none)
+ * @param line    Its line
+ * @param msg     The message, @a len bytes
+ * @return 0 if the host has it; -1 if it was not sent: before the
+ *         transport is up, while a guest function result is queued, or
+ *         from inside a host call (a message printed by one).
+ */
+int hl_hcall_log(__u8 level, const char *source, const char *file,
+		 __u32 line, const char *msg, __sz len);
+
 /*
  * FlatBuffer ReturnType constants (from function_types.fbs).
  * Used as expected_return_type in FunctionCall.

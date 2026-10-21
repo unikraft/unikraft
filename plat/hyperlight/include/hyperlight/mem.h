@@ -31,6 +31,10 @@
 /* Offsets downward from (HL_SCRATCH_TOP_GVA + 1) */
 #define HL_SCRATCH_SIZE_OFF	0x08 /* u64: total scratch size */
 #define HL_SCRATCH_ALLOC_OFF	0x10 /* u64: bump allocator pointer */
+/* u64: a guest log level the host asks for, bit 63 set while pending;
+ * the guest clears it once taken
+ */
+#define HL_SCRATCH_GUEST_LOG_LEVEL_OFF	0x30
 
 /* Virtqueue transport geometry (u64 each), published by the host */
 #define HL_SCRATCH_ARENA_GPA_OFF	0x38 /* GPA of the transport arena */

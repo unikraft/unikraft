@@ -481,6 +481,36 @@ int hl_transport_call(__u64 payload_len,
 	return 0;
 }
 
+int hl_transport_log(__u64 payload_len)
+{
+	__u64 addr = (__u64)g2h_req;
+	__u32 len = HL_MSG_HEADER_SIZE + payload_len;
+	__u16 flags = 0;
+	__u16 used_id;
+	__u32 written;
+	int id;
+
+	if (unlikely(!hl_transport_ready() ||
+		     payload_len > g2h_half - HL_MSG_HEADER_SIZE))
+		return HL_TRANSPORT_NOT_SENT;
+	id = g2h_begin();
+	if (id < 0)
+		return HL_TRANSPORT_NOT_SENT;
+
+	/* A log carries no correlation ID: nothing answers it. */
+	put_header(g2h_req, HL_MSG_LOG, 0, payload_len);
+	if (vq_submit(&g2h, id, &addr, &len, &flags, 1) < 0)
+		return HL_TRANSPORT_NOT_SENT;
+
+	/* The host logs it during this exit; the request half is the next
+	 * message's.
+	 */
+	vq_notify();
+	if (vq_poll_used(&g2h, &used_id, &written) <= 0 || used_id != id)
+		transport_lost("log not acknowledged");
+	return 0;
+}
+
 int hl_transport_respond(__u32 cid, const __u8 *payload, __u64 len)
 {
 	__u64 addr = (__u64)g2h_req;

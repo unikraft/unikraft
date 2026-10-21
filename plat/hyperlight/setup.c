@@ -39,6 +39,7 @@
 #include <uk/plat/common/sections.h>
 #include <uk/plat/common/bootinfo.h>
 
+#include <hyperlight/console.h>
 #include <hyperlight/dispatch.h>
 #include <hyperlight/hcall.h>
 #include <hyperlight/peb.h>
@@ -257,6 +258,7 @@ void hyperlight_entry(struct uk_lcpu *lcpu __unused,
 
 	/* Initialize console so uk_pr_* works */
 	_ukplat_init_console();
+	hyperlight_console_log_init(entry_args->max_log_level);
 
 	/* Store PEB globally */
 	g_peb = (struct hyperlight_peb *)entry_args->peb_address;

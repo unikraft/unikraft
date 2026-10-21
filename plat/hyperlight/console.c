@@ -17,30 +17,31 @@
  *   2. HostWrite (host function call) — one VM exit per host call's
  *      worth of the buffer.  Uses the FlatBuffer-based hcall protocol
  *      over the G2H virtqueue.  Requires hl_hcall_init() to have been
- *      called.  Standard error and kernel messages go through
- *      HostWriteErr, the same call under another name, so the host keeps
- *      them apart.  A host that refuses HostWriteErr is taken to lack it:
- *      from then on standard error goes through HostWrite; one that
- *      refuses HostWrite, likewise, gets standard output, and with it
- *      standard error, through DebugPrint.  A snapshot restore asks the
- *      new host afresh (hyperlight_console_resume()).
+ *      called.  Standard error goes through HostWriteErr, the same
+ *      call under another name, so the host keeps them apart.  A host
+ *      that refuses HostWriteErr is taken to lack it: from then on
+ *      standard error goes through HostWrite; one that refuses
+ *      HostWrite, likewise, gets standard output, and with it standard
+ *      error, through DebugPrint.  A snapshot restore asks the new host
+ *      afresh (hyperlight_console_resume()).
+ *
+ * Kernel messages are not the program's output: each goes to the host's
+ * log as a Hyperlight guest log message (hl_hcall_log()), at the levels
+ * the host asks for.  A crash report goes to standard error instead
+ * (ukprint), and so does a message that cannot be sent (before the
+ * transport is up, say).
  *
  * Input uses the ReadStdin host function, which hands over the host
  * process's stdin, as bytes, a chunk at a time.  The console_in callback
  * drains each chunk; when the host has no more, the read returns 0 (EOF).
  * ConsoleIsTerminal says whether the streams reach a terminal on the host.
- *
- * TODO: Route uk_pr_* output through G2H Log messages instead of
- * HostWriteErr.  A Log message delivers a GuestLogData FlatBuffer to the
- * host's tracing framework, keeping kernel warnings out of the program's
- * standard error.  This requires
- * encoding GuestLogData FlatBuffers (level, source_file, line, source,
- * message) in the kernel — a different schema from hcall FlatBuffers.
  */
 
 #include <uk/console/driver.h>
+#include <uk/print.h>
 #include <hyperlight/console.h>
 #include <hyperlight/hcall.h>
+#include <hyperlight/mem.h>
 #include <hyperlight/outb.h>
 
 /* Set once the host refuses HostWrite or HostWriteErr: it lacks it.  A
@@ -114,6 +115,93 @@ static __ssz hyperlight_console_err(struct uk_console *dev,
 }
 
 /*
+ * The most verbose guest log level the host takes (GuestLogFilter: 0 off,
+ * 1 error, 2 warn, 3 info, 4 debug, 5 trace): given at entry, and changed
+ * by the host through its scratch slot, which it writes while the guest
+ * is stopped, with HL_LOG_FILTER_PENDING set; the guest clears it.  Guest
+ * memory, so a snapshot keeps it, and a restoring host that wants another
+ * sets it again.
+ */
+#define HL_LOG_FILTER_PENDING	(1ULL << 63)
+#define HL_LOG_FILTER_MAX	5
+
+static __u64 log_filter = 1;
+
+static void hyperlight_console_log_filter_refresh(void)
+{
+	volatile __u64 *slot = (volatile __u64 *)
+		HL_SCRATCH_META_GVA(HL_SCRATCH_GUEST_LOG_LEVEL_OFF);
+	__u64 req = *slot;
+
+	if (!(req & HL_LOG_FILTER_PENDING))
+		return;
+	req &= ~HL_LOG_FILTER_PENDING;
+	if (req <= HL_LOG_FILTER_MAX)
+		log_filter = req;
+	*slot = 0;
+}
+
+/* The filter level a message of ukprint level @lvl needs, and its level
+ * in the host's log
+ */
+static void hyperlight_console_log_level(int lvl, __u64 *needs, __u8 *level)
+{
+	/* GuestLogData's levels, by filter level: 1 error ... 5 trace */
+	static const __u8 at_filter[] = {
+		0, HL_LOG_ERROR, HL_LOG_WARNING, HL_LOG_INFORMATION,
+		HL_LOG_DEBUG, HL_LOG_TRACE,
+	};
+
+	switch (lvl) {
+	case UK_PRINT_KLVL_NONE:
+		/* "Print always": at any level but off, as the most verbose
+		 * the host takes, which its own filter lets through
+		 */
+		*needs = 1, *level = at_filter[log_filter];
+		break;
+	case UK_PRINT_KLVL_ERR:
+		*needs = 1, *level = HL_LOG_ERROR;
+		break;
+	case UK_PRINT_KLVL_WARN:
+		*needs = 2, *level = HL_LOG_WARNING;
+		break;
+	case UK_PRINT_KLVL_DEBUG:
+		*needs = 4, *level = HL_LOG_DEBUG;
+		break;
+	default: /* INFO */
+		*needs = 3, *level = HL_LOG_INFORMATION;
+		break;
+	}
+}
+
+/*
+ * A kernel message, to the host's log, if the host wants its level.  One
+ * that cannot be sent (before the transport is up, or from inside a host
+ * call) is declined: ukprint prints it as text, on standard error.
+ */
+static int hyperlight_console_log(struct uk_console *dev __unused,
+				  const struct uk_console_log_msg *msg)
+{
+	__u64 needs;
+	__u8 level;
+
+	/* The slot is there from entry, the transport or not */
+	hyperlight_console_log_filter_refresh();
+	hyperlight_console_log_level(msg->level, &needs, &level);
+	if (log_filter < needs)
+		return 0;
+	return hl_hcall_log(level, msg->libname ? msg->libname : "",
+			    msg->srcname ? msg->srcname : "", msg->srcline,
+			    msg->text, msg->len);
+}
+
+/* Called from setup.c, with the level the host gave at entry */
+void hyperlight_console_log_init(__u64 max_log_level)
+{
+	log_filter = max_log_level <= HL_LOG_FILTER_MAX ? max_log_level : 1;
+}
+
+/*
  * Console input via the ReadStdin host function.
  *
  * The host hands over its process's stdin a chunk at a time.  Each call
@@ -168,6 +256,7 @@ static struct uk_console_ops hyperlight_console_ops = {
 	.out = hyperlight_console_out,
 	.in = hyperlight_console_in,
 	.err = hyperlight_console_err,
+	.log = hyperlight_console_log,
 	.terminal = hyperlight_console_terminal,
 };
 

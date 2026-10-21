@@ -42,6 +42,7 @@
 /* Message kinds (hyperlight-common transport.rs MsgKind). */
 #define HL_MSG_REQUEST			0x01
 #define HL_MSG_RESPONSE			0x02
+#define HL_MSG_LOG			0x06
 #define HL_MSG_SNAPSHOT_CHECKPOINT	0x07
 
 #define HL_MSG_HEADER_SIZE		12
@@ -98,6 +99,17 @@ __u64 hl_transport_payload_cap(void);
  */
 int hl_transport_call(__u64 payload_len,
 		      const __u8 **reply, __u64 *reply_len);
+
+/**
+ * Send the GuestLogData in hl_transport_request_buf() as a Log message,
+ * which the host logs during the exit and acknowledges without a reply.
+ * Refused, without a VM exit, as hl_transport_call() is; one the host
+ * does not acknowledge crashes the guest, the same way.
+ *
+ * @param payload_len  Bytes of the GuestLogData.
+ * @return 0 on success, HL_TRANSPORT_NOT_SENT.
+ */
+int hl_transport_log(__u64 payload_len);
 
 /**
  * Largest H2G message payload the posted buffers can hold.  A message

@@ -44,6 +44,33 @@
  */
 static __spinlock g_hcall_lock = UKARCH_SPINLOCK_INITIALIZER();
 
+/* Set while g_hcall_lock is held: a host call or kernel message made on
+ * the way through one (no other thread runs here then, so it is printed
+ * by that call: an assertion, say) cannot take the lock again, which on
+ * one vCPU is no lock at all, and fails instead, as not sent.
+ */
+static int g_hcall_busy;
+
+/* Take g_hcall_lock for a host call or log message; -1, with nothing
+ * taken, from inside another.
+ */
+static int hcall_enter(unsigned long *irqf)
+{
+	ukplat_spin_lock_irqsave(&g_hcall_lock, *irqf);
+	if (g_hcall_busy) {
+		ukplat_spin_unlock_irqrestore(&g_hcall_lock, *irqf);
+		return -1;
+	}
+	g_hcall_busy = 1;
+	return 0;
+}
+
+static void hcall_exit(unsigned long irqf)
+{
+	g_hcall_busy = 0;
+	ukplat_spin_unlock_irqrestore(&g_hcall_lock, irqf);
+}
+
 void hl_hcall_init(void)
 {
 	/* Nothing works without host calls: not even the command line. */
@@ -780,7 +807,8 @@ static int hl_call(const char *func_name, __u8 ret_type,
 	hl_touch_params(params, nparams);
 	hl_touch(out->buf, out->cap);
 
-	ukplat_spin_lock_irqsave(&g_hcall_lock, irqf);
+	if (hcall_enter(&irqf) < 0)
+		return -1;
 	/* Checked under the lock, which no thread runs through on this
 	 * vCPU: what is checked is what is sent.
 	 */
@@ -799,7 +827,7 @@ static int hl_call(const char *func_name, __u8 ret_type,
 		/* The host saw the request: it ran the call. */
 		rc = HL_HCALL_BAD_RESULT;
 out:
-	ukplat_spin_unlock_irqrestore(&g_hcall_lock, irqf);
+	hcall_exit(irqf);
 	return rc;
 }
 
@@ -808,9 +836,108 @@ int hl_hcall_respond(__u32 cid, const __u8 *payload, __u64 len)
 	unsigned long irqf;
 	int rc;
 
-	ukplat_spin_lock_irqsave(&g_hcall_lock, irqf);
+	if (hcall_enter(&irqf) < 0)
+		return -1;
 	rc = hl_transport_respond(cid, payload, len);
-	ukplat_spin_unlock_irqrestore(&g_hcall_lock, irqf);
+	hcall_exit(irqf);
+	return rc;
+}
+
+/* ── Guest log messages ──────────────────────────────────────────── */
+
+/*
+ * GuestLogData (guest_log_data.fbs), size-prefixed as the host reads it:
+ *
+ *   0  size of what follows          24  table: soffset to the vtable
+ *   4  offset to the table (20)      28  message    36  caller
+ *   8  vtable: 16, 28, then the      32  source     40  source_file
+ *      fields' offsets in the table  44  line       48  level
+ *  52  the strings, each a length, its bytes, a NUL, 4-aligned
+ */
+#define LOG_TBL		24
+#define LOG_STRINGS	52
+
+/* Where the string at @p (in @buf, room to @cap) ends, 0 if past @cap.
+ * Bytes that are not UTF-8 are written as '?'.
+ */
+static __u64 log_put_string(__u8 *buf, __u64 cap, __u64 p, __u64 field,
+			    const char *s, __u64 len)
+{
+	__u64 i = 0, n;
+	__u32 cp;
+
+	if (p + 4 + len + 1 > cap)
+		return 0;
+	ew32(buf, field, (__u32)(p - field));
+	ew32(buf, p, (__u32)len);
+	while (i < len) {
+		n = hl_utf8_decode((const __u8 *)s + i, len - i, &cp);
+		if (n) {
+			memcpy(buf + p + 4 + i, s + i, n);
+			i += n;
+		} else {
+			buf[p + 4 + i++] = '?';
+		}
+	}
+	buf[p + 4 + len] = 0;
+	return GA4(p + 4 + len + 1);
+}
+
+static __u64 log_encode(__u8 *buf, __u64 cap, __u8 level, const char *source,
+			const char *file, __u32 line, const char *msg, __sz len)
+{
+	__u64 p = LOG_STRINGS;
+
+	if (cap < LOG_STRINGS)
+		return 0;
+	memset(buf, 0, LOG_STRINGS);
+	ew32(buf, 4, LOG_TBL - 4);
+	ew16(buf, 8, 16);			/* vtable size */
+	ew16(buf, 10, 28);			/* table size */
+	ew16(buf, 12, 4);			/* message */
+	ew16(buf, 14, 8);			/* source */
+	ew16(buf, 16, 24);			/* level */
+	ew16(buf, 18, 12);			/* caller */
+	ew16(buf, 20, 16);			/* source_file */
+	ew16(buf, 22, 20);			/* line */
+	ew32(buf, LOG_TBL, LOG_TBL - 8);	/* soffset to the vtable */
+	ew32(buf, LOG_TBL + 20, line);
+	buf[LOG_TBL + 24] = level;
+
+	p = log_put_string(buf, cap, p, LOG_TBL + 4, msg, len);
+	if (p)
+		p = log_put_string(buf, cap, p, LOG_TBL + 8,
+				   source, strlen(source));
+	if (p)
+		p = log_put_string(buf, cap, p, LOG_TBL + 12, "", 0);
+	if (p)
+		p = log_put_string(buf, cap, p, LOG_TBL + 16,
+				   file, strlen(file));
+	if (!p)
+		return 0;
+	ew32(buf, 0, (__u32)(p - 4));
+	return p;
+}
+
+int hl_hcall_log(__u8 level, const char *source, const char *file,
+		 __u32 line, const char *msg, __sz len)
+{
+	unsigned long irqf;
+	__u8 *req;
+	__u64 n;
+	int rc = -1;
+
+	if (!hl_hcall_ready())
+		return -1;
+
+	if (hcall_enter(&irqf) < 0)
+		return -1;
+	req = hl_transport_request_buf();
+	n = req ? log_encode(req, hl_transport_payload_cap(), level, source,
+			     file, line, msg, len) : 0;
+	if (n && hl_transport_log(n) == 0)
+		rc = 0;
+	hcall_exit(irqf);
 	return rc;
 }
 
