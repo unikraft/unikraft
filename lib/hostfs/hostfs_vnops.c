@@ -66,17 +66,36 @@ static int build_path(char *out, size_t sz,
 	return len < sz ? 0 : ENAMETOOLONG;
 }
 
+/* Little-endian integers in a host reply. */
+static __u64 le_get(const __u8 *b, unsigned int n)
+{
+	__u64 v = 0;
+
+	while (n--)
+		v = v << 8 | b[n];
+	return v;
+}
+
+/* A successful fs_stat reply: status, size, mode, is_dir, is_file, then
+ * the access, modification and status change times, each as 8 bytes of
+ * seconds and 4 of nanoseconds.
+ */
+#define HOST_STAT_TIMES 18
+#define HOST_STAT_LEN (HOST_STAT_TIMES + 3 * 12)
+
 /*
  * Call fs_stat(mount_idx, path) and decode the packed result.
  *
  * Returns 0 on success, positive errno on failure.
- * On success fills size, mode, is_dir, is_file.
+ * On success fills size, mode, is_dir, is_file, and @times (access,
+ * modification, status change) when it is not NULL.
  */
 static int host_stat(int mount_idx, const char *path, uint64_t *size,
-		     uint32_t *mode, int *is_dir, int *is_file)
+		     uint32_t *mode, int *is_dir, int *is_file,
+		     struct timespec *times)
 {
 	struct hl_param p[2];
-	__u8 buf[32];
+	__u8 buf[HOST_STAT_LEN];
 	__sz len;
 
 	p[0].type = HL_PV_HLINT;
@@ -96,21 +115,23 @@ static int host_stat(int mount_idx, const char *path, uint64_t *size,
 	if (status < 0)
 		return -status;
 
-	if (len < 18)
+	if (len < HOST_STAT_LEN)
 		return EIO;
 
 	if (size)
-		*size = buf[4] | ((uint64_t)buf[5] << 8) |
-			((uint64_t)buf[6] << 16) | ((uint64_t)buf[7] << 24) |
-			((uint64_t)buf[8] << 32) | ((uint64_t)buf[9] << 40) |
-			((uint64_t)buf[10] << 48) | ((uint64_t)buf[11] << 56);
+		*size = le_get(&buf[4], 8);
 	if (mode)
-		*mode = buf[12] | (buf[13] << 8) |
-			(buf[14] << 16) | (buf[15] << 24);
+		*mode = (uint32_t)le_get(&buf[12], 4);
 	if (is_dir)
 		*is_dir = buf[16];
 	if (is_file)
 		*is_file = buf[17];
+	for (int i = 0; times && i < 3; i++) {
+		const __u8 *t = &buf[HOST_STAT_TIMES + 12 * i];
+
+		times[i].tv_sec = (time_t)le_get(t, 8);
+		times[i].tv_nsec = (long)le_get(t + 8, 4);
+	}
 
 	return 0;
 }
@@ -137,7 +158,7 @@ hostfs_lookup(struct vnode *dvp, const char *name, struct vnode **vpp)
 		return err;
 
 	err = host_stat(dnp->hf_mount_idx, path, &size, &mode,
-			&is_dir, &is_file);
+			&is_dir, &is_file, NULL);
 	if (err)
 		return err;
 
@@ -468,13 +489,14 @@ hostfs_getattr(struct vnode *vp, struct vattr *attr)
 	uint64_t size = 0;
 	uint32_t mode = 0;
 	int is_dir = 0, is_file = 0;
+	struct timespec times[3];
 	int err;
 
 	if (hostfs_stale(np))
 		return ESTALE;
 
 	err = host_stat(np->hf_mount_idx, np->hf_path, &size, &mode,
-			&is_dir, &is_file);
+			&is_dir, &is_file, times);
 	if (err)
 		return err;
 
@@ -483,6 +505,9 @@ hostfs_getattr(struct vnode *vp, struct vattr *attr)
 	attr->va_mode = mode;
 	attr->va_size = size;
 	attr->va_nodeid = vp->v_ino;
+	attr->va_atime = times[0];
+	attr->va_mtime = times[1];
+	attr->va_ctime = times[2];
 
 	vp->v_size = size;
 	vp->v_mode = mode;
