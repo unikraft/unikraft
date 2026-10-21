@@ -580,6 +580,21 @@ sys_telldir(struct vfscore_file *fp, long *loc)
 	return 0;
 }
 
+/*
+ * Drop the slashes at the end of a directory's path: "a/b/" names the
+ * directory "a/b", as `mkdir -p` asks for each one it makes.  lookup()
+ * splits a path at its last slash, so it would otherwise look for "a/b"
+ * as the parent of an empty name.  "/" stays as it is.
+ */
+static void
+strip_trailing_slashes(char *path)
+{
+	size_t len = strlen(path);
+
+	while (len > 1 && path[len - 1] == '/')
+		path[--len] = '\0';
+}
+
 int
 sys_mkdir(char *path, mode_t mode)
 {
@@ -587,6 +602,7 @@ sys_mkdir(char *path, mode_t mode)
 	struct dentry *dp, *ddp;
 	int error;
 
+	strip_trailing_slashes(path);
 	DPRINTF(VFSDB_SYSCALL, ("sys_mkdir: path=%s mode=%d\n",	path, mode));
 
 	error = namei(path, &dp);
@@ -622,6 +638,7 @@ sys_rmdir(char *path)
 	int error;
 	char *name;
 
+	strip_trailing_slashes(path);
 	DPRINTF(VFSDB_SYSCALL, ("sys_rmdir: path=%s\n", path));
 
 	if ((error = check_dir_empty(path)) != 0)
