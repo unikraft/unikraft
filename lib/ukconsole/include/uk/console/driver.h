@@ -22,6 +22,8 @@ typedef __ssz (*uk_console_out_func)(struct uk_console *dev, const char *buf,
 				     __sz len);
 typedef __ssz (*uk_console_in_func)(struct uk_console *dev, char *buf,
 				    __sz len);
+/* Whether @stream (UK_CONSOLE_STREAM_*) of the device reaches a terminal */
+typedef __bool (*uk_console_terminal_func)(struct uk_console *dev, int stream);
 
 struct uk_console_ops {
 	uk_console_out_func out;
@@ -30,6 +32,11 @@ struct uk_console_ops {
 	 * error through `out`, like standard output.
 	 */
 	uk_console_out_func err;
+	/* Optional: whether a stream reaches a terminal.  A device without
+	 * it is a terminal, as a serial line is; one whose other end may be
+	 * a pipe or a file says.
+	 */
+	uk_console_terminal_func terminal;
 };
 
 #define UK_CONSOLE_FLAG_STDOUT		UK_BIT(0)

@@ -65,6 +65,20 @@ static __ssz console_write(const char *buf, __sz len, __bool err)
 	return len;
 }
 
+__bool uk_console_is_terminal(int stream)
+{
+	struct uk_console *dev = __NULL;
+
+	uk_list_for_each_entry(dev, &uk_console_device_list, _list) {
+		if (!(dev->flags & (UK_CONSOLE_FLAG_STDOUT |
+				    UK_CONSOLE_FLAG_STDIN)))
+			continue;
+		if (dev->ops->terminal && !dev->ops->terminal(dev, stream))
+			return __false;
+	}
+	return __true;
+}
+
 __ssz uk_console_out(const char *buf, __sz len)
 {
 	return console_write(buf, len, __false);

@@ -101,6 +101,21 @@ __ssz uk_console_out_onlcr(const char *buf, __sz len);
  */
 __ssz uk_console_err_onlcr(const char *buf, __sz len);
 
+/* The console's streams, as uk_console_is_terminal() tells them apart */
+#define UK_CONSOLE_STREAM_INOUT		0	/* input and output */
+#define UK_CONSOLE_STREAM_ERR		1	/* standard error */
+
+/**
+ * Whether a stream of the console reaches a terminal: unless a device
+ * that serves it says it does not.
+ *
+ * @param stream
+ *   UK_CONSOLE_STREAM_INOUT or UK_CONSOLE_STREAM_ERR
+ * @return
+ *   __true or __false
+ */
+__bool uk_console_is_terminal(int stream);
+
 /**
  * Read bytes from the STDIN console device(s).
  *
