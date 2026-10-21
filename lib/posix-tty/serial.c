@@ -69,11 +69,24 @@ static struct termios serial_termios = {
 static int serial_eof;
 #endif /* CONFIG_LIBPOSIX_TTY_SERIAL_EOF_FINAL */
 
+/* Whether @f reaches a terminal, as the console says: on the other side
+ * of it may be a pipe or a file, which programs must not take for one.
+ */
+static __bool serial_is_terminal(const struct uk_file *f __maybe_unused)
+{
+#if CONFIG_LIBPOSIX_TTY_SERIAL_STDERR
+	if (f == &uk_file_serial_err)
+		return uk_console_is_terminal(UK_CONSOLE_STREAM_ERR);
+#endif /* CONFIG_LIBPOSIX_TTY_SERIAL_STDERR */
+	return uk_console_is_terminal(UK_CONSOLE_STREAM_INOUT);
+}
+
 static ssize_t serial_read(const struct uk_file *f,
 			   const struct iovec *iov, size_t iovcnt,
 			   size_t off, long flags __unused)
 {
 	ssize_t total = 0;
+	__bool terminal, echo;
 
 	UK_ASSERT(f->vol == SERIAL_VOLID);
 	if (unlikely(off))
@@ -86,6 +99,10 @@ static ssize_t serial_read(const struct uk_file *f,
 
 	if (!uk_file_poll_immediate(f, UKFD_POLLIN))
 		return 0;
+
+	/* What a pipe or a file feeds in is not shown: no terminal sees it */
+	terminal = serial_is_terminal(f);
+	echo = terminal && (serial_termios.c_lflag & ECHO);
 
 	for (size_t i = 0; i < iovcnt; i++) {
 		char *buf = iov[i].iov_base;
@@ -105,7 +122,8 @@ static ssize_t serial_read(const struct uk_file *f,
 		total += bytes_read;
 
 		last = buf + bytes_read - 1;
-		if (*last == '\r')
+		/* A terminal's Enter; a pipe's bytes stay as they are */
+		if (*last == '\r' && terminal)
 			*last = '\n';
 
 		/*
@@ -126,7 +144,7 @@ static ssize_t serial_read(const struct uk_file *f,
 #else /* !CONFIG_LIBPOSIX_TTY_SERIAL_EOF_FINAL */
 			uk_file_event_clear(f, UKFD_POLLIN);
 #endif /* !CONFIG_LIBPOSIX_TTY_SERIAL_EOF_FINAL */
-			if (bytes_read > 1 && (serial_termios.c_lflag & ECHO))
+			if (bytes_read > 1 && echo)
 				uk_console_out_onlcr(buf, bytes_read - 1);
 			break;
 		}
@@ -134,7 +152,7 @@ static ssize_t serial_read(const struct uk_file *f,
 		/* Echo the input to the console (NOT stdout!), unless a
 		 * program turned ECHO off to do its own -- otherwise every
 		 * character would appear twice. */
-		if (serial_termios.c_lflag & ECHO)
+		if (echo)
 			uk_console_out_onlcr(buf, bytes_read);
 
 		if (*last == '\n')
@@ -196,6 +214,11 @@ static int serial_ctl(const struct uk_file *f __maybe_unused,
 
 	switch (fam) {
 	case UKFILE_CTL_IOCTL:
+		/* Not a terminal: no terminal requests, as on a pipe; what is
+		 * queued can still be asked.
+		 */
+		if (req != TIOCINQ && req != TIOCOUTQ && !serial_is_terminal(f))
+			return -ENOTTY;
 		switch (req) {
 		case TCGETS:
 		{
