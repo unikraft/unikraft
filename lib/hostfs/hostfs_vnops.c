@@ -548,6 +548,34 @@ hostfs_setattr(struct vnode *vp, struct vattr *attr)
 		vp->v_mode = attr->va_mode;
 	}
 
+	if (attr->va_mask & (AT_ATIME | AT_MTIME)) {
+		struct hl_param p[7];
+		__s32 ret;
+
+		p[0].type = HL_PV_HLINT;
+		p[0].i32_val = np->hf_mount_idx;
+		p[1].type = HL_PV_HLSTRING;
+		p[1].str.ptr = np->hf_path;
+		p[1].str.len = strlen(np->hf_path);
+		p[2].type = HL_PV_HLINT;
+		p[2].i32_val = (attr->va_mask & AT_ATIME ? 1 : 0) |
+			       (attr->va_mask & AT_MTIME ? 2 : 0);
+		p[3].type = HL_PV_HLLONG;
+		p[3].i64_val = attr->va_atime.tv_sec;
+		p[4].type = HL_PV_HLINT;
+		p[4].i32_val = (__s32)attr->va_atime.tv_nsec;
+		p[5].type = HL_PV_HLLONG;
+		p[5].i64_val = attr->va_mtime.tv_sec;
+		p[6].type = HL_PV_HLINT;
+		p[6].i32_val = (__s32)attr->va_mtime.tv_nsec;
+
+		if (hl_hcall_int("fs_set_times", p, 7, &ret) < 0)
+			return EIO;
+
+		if (ret < 0)
+			return -ret;
+	}
+
 	return 0;
 }
 
