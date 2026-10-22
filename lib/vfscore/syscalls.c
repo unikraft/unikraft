@@ -959,7 +959,7 @@ out:
 int
 sys_link(char *oldpath, char *newpath)
 {
-	struct dentry *olddp, *newdp, *newdirdp;
+	struct dentry *olddp, *newdp = NULL, *newdirdp;
 	struct vnode *vp;
 	char *name;
 	int error;
@@ -1014,7 +1014,9 @@ sys_link(char *oldpath, char *newpath)
  out:
 	vn_unlock(vp);
 	drele(olddp);
-	drele(newdp);
+	/* Taken only when newpath exists or its dentry was made */
+	if (newdp)
+		drele(newdp);
 	return error;
 }
 
