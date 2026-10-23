@@ -813,7 +813,7 @@ libs: $(UK_ALIBS) $(UK_ALIBS-y) $(UK_OLIBS) $(UK_OLIBS-y)
 
 images: $(UK_DEBUG_IMAGES) $(UK_DEBUG_IMAGES-y) $(UK_IMAGES) $(UK_IMAGES-y)
 
-GDB_HELPER_LINKS := $(addsuffix .gdb.py,$(UK_DEBUG_IMAGES) $(UK_DEBUG_IMAGES-y))
+GDB_HELPER_LINKS := $(addsuffix -gdb.py,$(UK_DEBUG_IMAGES) $(UK_DEBUG_IMAGES-y))
 $(GDB_HELPER_LINKS):
 	$(call verbose_cmd,LN,$(notdir $@),$(HOSTLN) -sf uk-gdb.py $@)
 
