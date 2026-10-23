@@ -3,3 +3,12 @@ config LIBUKTIMECONV
        default n
        select LIBUKDEBUG
        select LIBNOLIBC if !HAVE_LIBC
+
+if LIBUKTIMECONV
+
+config LIBUKTIMECONV_TEST
+	bool "Enable unit tests"
+	default n
+	select LIBUKTEST
+
+endif
