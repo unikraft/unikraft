@@ -325,6 +325,7 @@ static __u64 hl_call_cap;
 static __u64 hl_call_len;              /* 0 = nothing queued */
 static struct uk_thread *hl_call_reader; /* thread blocked in read() */
 static int hl_call_opened;             /* a driver has opened the device */
+static __u64 hl_restores;              /* HLCALL_IOC_RESTORES */
 
 /* The host's environment as the kernel last fetched it, and its version:
  * HLCALL_IOC_GETENV answers from here, with no host call, while the call
@@ -651,6 +652,7 @@ static int hl_host_call(struct hlcall_hostcall *arg)
 /* HLCALL_IOC_MAXLEN: tell the driver how big a call can get, so it sizes
  * its buffers from the host's number rather than a guess of its own.
  * HLCALL_IOC_GETENV: hand it the host's environment (see step.h).
+ * HLCALL_IOC_RESTORES: how many times the guest was restored (step.h).
  */
 static int hlcall_ioctl(struct device *dev __unused, unsigned long cmd,
 			void *arg)
@@ -664,6 +666,9 @@ static int hlcall_ioctl(struct device *dev __unused, unsigned long cmd,
 		return 0;
 	case HLCALL_IOC_HOSTCALL:
 		return hl_host_call(arg);
+	case HLCALL_IOC_RESTORES:
+		*(__u64 *)arg = hl_restores;
+		return 0;
 	case HLCALL_IOC_GETENV: {
 		struct hlcall_env *env = arg;
 		const char *buf;
@@ -854,6 +859,9 @@ out:
  *   which the snapshot's may have lacked (hyperlight_console_resume()),
  *   first, so the reports of what follows take the right way out;
  *
+ *   the restore count goes up, which drivers read (HLCALL_IOC_RESTORES)
+ *   to reseed what their runtimes seeded before the snapshot;
+ *
  *   the CSPRNG is reseeded: its state lives in guest memory, so without
  *   this every clone of one snapshot would draw the same "random" bytes
  *   (the same UUIDs, tokens and TLS nonces) until the periodic reseed
@@ -881,6 +889,7 @@ static void hl_resume(void)
 #endif /* CONFIG_LIBUKRANDOM */
 
 	hyperlight_console_resume();
+	hl_restores++;
 #if CONFIG_LIBUKRANDOM
 	rc = uk_random_reseed();
 	if (unlikely(rc))

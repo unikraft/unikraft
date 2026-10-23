@@ -144,6 +144,17 @@ struct hlcall_hostcall {
  */
 #define HLCALL_IOC_HOSTCALL _IOWR('H', 3, struct hlcall_hostcall)
 
+/**
+ * Store how many times this guest has been restored from a snapshot, as a
+ * __u64, at the argument: 0 on a fresh boot, one more on every restore.
+ * A snapshot keeps the count, so a guest restored from a restored one
+ * counts on.  What a runtime seeded before the snapshot (a random
+ * generator, say) is the same in every guest restored from it: a driver
+ * that remembers the count it last saw learns, at the top of its next
+ * call, that it runs in one of them, and reseeds.
+ */
+#define HLCALL_IOC_RESTORES _IOR('H', 4, __u64)
+
 #if CONFIG_HYPERLIGHT_STEP
 
 /**
