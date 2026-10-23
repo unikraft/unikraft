@@ -499,3 +499,43 @@ UK_LLSYSCALL_R_DEFINE(int, membarrier, int, cmd, unsigned int, flags,
 		return -EINVAL;
 	}
 }
+
+/* TODO: Temporary implementation — only sets priority of current thread */
+struct uk_sched_attr {
+	__u32 size;
+	__u32 sched_policy;
+	__u64 sched_flags;
+	__s32 sched_nice;
+	__u32 sched_priority;
+	__u64 sched_runtime;
+	__u64 sched_deadline;
+	__u64 sched_period;
+};
+
+UK_LLSYSCALL_R_DEFINE(int, sched_setattr, int, pid,
+		      const void *, uattr, unsigned int, flags)
+{
+	const struct uk_sched_attr *attr = (const struct uk_sched_attr *)uattr;
+	struct uk_thread *t;
+
+	if (flags != 0)
+		return -EINVAL;
+
+	if (unlikely(!attr))
+		return -EINVAL;
+
+	if (attr->size < sizeof(struct uk_sched_attr))
+		return -EINVAL;
+
+	if (pid != 0)
+		return -ESRCH; /* Only current thread supported */
+
+	if (attr->sched_priority < UK_THREAD_PRIO_MIN ||
+	    attr->sched_priority > UK_THREAD_PRIO_MAX)
+		return -EINVAL;
+
+	t = uk_thread_current();
+	t->prio = (int)attr->sched_priority;
+
+	return 0;
+}
