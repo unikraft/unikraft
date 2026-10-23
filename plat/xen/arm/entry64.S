@@ -205,6 +205,18 @@ ENTRY(_libxenplat_start)
 
 	PRINT("- Unikraft booting -\n")
 
+#if __ARM_FEATURE_ATOMICS
+	/* Built w/ LSE atomics: stop here if the CPU lacks FEAT_LSE */
+	mrs	x0, ID_AA64ISAR0_EL1
+	lsr	x0, x0, #UK_ARCH_ARM64_ID_AA64ISAR0_EL1_ATOMIC_SHIFT
+	and	x0, x0, #UK_ARCH_ARM64_ID_AA64ISAR0_EL1_ATOMIC_MASK
+	cmp	x0, #2	/* 0b0010: FEAT_LSE */
+	b.hs	.Llse_ok
+	PRINT("- CRIT: Unsupported CPU, FEAT_LSE is missing -\n")
+	b	lse_unsupported
+.Llse_ok:
+#endif /* __ARM_FEATURE_ATOMICS */
+
 	PRINT("- Setup CPU -\n")
 	/* Setup CPU for turnning the MMU on. */
 	bl      _libxenplat_setup_cpu
@@ -294,6 +306,12 @@ mmu_on:
 
 	b       _libxenplat_armentry
 ENDPROC(_libxenplat_start)
+
+#if __ARM_FEATURE_ATOMICS
+lse_unsupported:
+	wfi
+	b	lse_unsupported
+#endif /* __ARM_FEATURE_ATOMICS */
 
 .section .text
 
