@@ -29,6 +29,7 @@ int uk_acpi_madt_fill_cpu_idmap(void)
 		struct uk_acpi_subsdt_hdr *h;
 	} m;
 	int bsp_found __maybe_unused = 0;
+	int max_warned = 0;
 	struct uk_acpi_madt *madt;
 	__sz off, len;
 	__u64 cpu_id;
@@ -74,15 +75,23 @@ int uk_acpi_madt_fill_cpu_idmap(void)
 			continue;
 		}
 
+		/* Ignore cores that exceed max configured value. Check
+		 * before writing: the per-CPU variables only have
+		 * CONFIG_UKPLAT_CPU_MAXCOUNT slots. Keep scanning, so that
+		 * the bootstrap processor is found even if its entry comes
+		 * after the ignored ones.
+		 */
+		if (unlikely(idx >= CONFIG_UKPLAT_CPU_MAXCOUNT)) {
+			if (!max_warned) {
+				uk_pr_warn("Maximum number of cores exceeded.\n");
+				max_warned = 1;
+			}
+			continue;
+		}
+
 		uk_pcpuvar_lval(idx, uk_pcpuvar_cpu_id) = cpu_id;
 		uk_pcpuvar_lval(idx, uk_pcpuvar_cpu_idx) = idx;
 		idx++;
-
-		/* Ignore cores that exceed max configured value */
-		if (unlikely(idx == CONFIG_UKPLAT_CPU_MAXCOUNT)) {
-			uk_pr_warn("Maximum number of cores exceeded.\n");
-			break;
-		}
 	}
 	UK_ASSERT(bsp_found);
 
