@@ -31,10 +31,13 @@
 #include <libfdt.h>
 #include <xen/grant_table.h>
 #include <common/hypervisor.h>
+#include <uk/crash.h>
+#include <uk/errptr.h>
+#include <uk/fixmap.h>
 #include <xen-arm/os.h>
 #include <xen-arm/mm.h>
 
-extern lpae_t fixmap_pgtable[512];
+UK_FIXMAP_IMPORT(gnt_fixmap, GNT);
 
 /* Get Xen's suggested physical page assignments for the grant table. */
 static paddr_t get_gnttab_base(void)
@@ -64,14 +67,18 @@ static paddr_t get_gnttab_base(void)
 	return gnttab_base;
 }
 
-static paddr_t map_gnttab(paddr_t phys)
+static paddr_t map_gnttab(paddr_t phys, int nr_grant_frames)
 {
+	__vaddr_t vaddr;
+
 	uk_pr_debug("%s, phys = 0x%lx\n", __func__, phys);
 
-	set_pgt_entry(&fixmap_pgtable[l2_pgt_idx(FIX_GNT_START)],
-		      ((phys & L2_MASK) | BLOCK_DEF_ATTR | L2_BLOCK));
+	vaddr = uk_fixmap_map(gnt_fixmap, phys, nr_grant_frames * PAGE_SIZE);
+	if (unlikely(PTRISERR(vaddr)))
+		UK_CRASH("Could not map the grant table: %d\n",
+			 PTR2ERR(vaddr));
 
-	return (paddr_t)(FIX_GNT_START + (phys & L2_OFFSET));
+	return (paddr_t)vaddr;
 }
 
 grant_entry_v1_t *gnttab_arch_init(int nr_grant_frames)
@@ -92,5 +99,5 @@ grant_entry_v1_t *gnttab_arch_init(int nr_grant_frames)
 			BUG();
 	}
 
-	return (grant_entry_v1_t *)map_gnttab(gnttab_table);
+	return (grant_entry_v1_t *)map_gnttab(gnttab_table, nr_grant_frames);
 }

@@ -38,7 +38,7 @@
 #include <uk/alloc.h>
 #include <uk/essentials.h>
 #include <uk/arch/limits.h>
-#include <uk/page.h>
+#include <uk/paging.h>
 #include <uk/blkdev_driver.h>
 #if defined(__i386__) || defined(__x86_64__)
 #include <xen-x86/mm.h>
@@ -56,6 +56,9 @@
 
 #define SECTOR_INDEX_IN_PAGE(a, sector_size) \
 	(((a) & ~UK_PAGING_PAGE_MASK) / (sector_size))
+
+#define round_pgdown(a)		UK_PAGING_PAGE_ALIGN_DOWN(a)
+#define round_pgup(a)		UK_PAGING_PAGE_ALIGN_UP(a)
 
 /* TODO Same interrupt macros we use in virtio-blk */
 #define BLKFRONT_INTR_EN             (1 << 0)

@@ -1,0 +1,7 @@
+config LIBUKFIXMAP
+	bool "ukfixmap: Fixed virtual address mappings"
+	depends on HAVE_FIXMAP
+	select LIBUKPT
+	help
+		Maps physical memory into virtual address slots that the
+		platform reserves at fixed locations
