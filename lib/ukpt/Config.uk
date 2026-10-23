@@ -1,0 +1,6 @@
+menuconfig LIBUKPT
+	bool "ukpt: Page table management"
+	depends on HAVE_PAGING
+	select LIBUKPAL
+	help
+		Low-level primitives for direct page table manipulation
