@@ -219,7 +219,9 @@ EXIT_FREE:
 int uk_paging_pt_init(struct uk_pagetable *pt, __paddr_t start, __sz len)
 {
 	static __u8 initialized; /* = 0 on startup */
+#ifndef CONFIG_PLAT_HYPERLIGHT
 	unsigned int lvl;
+#endif /* !CONFIG_PLAT_HYPERLIGHT */
 	int rc;
 
 	/* If this is the first time we setup a new page table, perform
@@ -230,12 +232,21 @@ int uk_paging_pt_init(struct uk_pagetable *pt, __paddr_t start, __sz len)
 		if (unlikely(rc))
 			return rc;
 
-		/* Find out largest supported level that can map a page */
+		/* Find out largest supported level that can map a page.
+		 * Hyperlight's snapshot page-table walk does not handle large
+		 * pages (it reads a 2 MiB page as a page table), so a guest on
+		 * it maps 4 KiB pages only.
+		 *
+		 * TODO: the fix belongs in Hyperlight's snapshot page-table
+		 * walker; drop this once it handles large pages.
+		 */
+#ifndef CONFIG_PLAT_HYPERLIGHT
 		for (lvl = UK_PAL_PT_LEVELS - 1; lvl > UK_PAL_PAGE_LEVEL; lvl--)
 			if (UK_PAL_PAGE_Lx_HAS(lvl)) {
 				pg_page_largest_level = lvl;
 				break;
 			}
+#endif /* !CONFIG_PLAT_HYPERLIGHT */
 
 		initialized = 1;
 	}
