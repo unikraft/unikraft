@@ -314,9 +314,20 @@ int uk_sys_prlimit64(int pid, unsigned int resource,
 	 * Lookup if resource can be set/retrieved
 	 */
 	switch (resource) {
+	case RLIMIT_CPU:
+	case RLIMIT_FSIZE:
 	case RLIMIT_DATA:
 	case RLIMIT_STACK:
+	case RLIMIT_CORE:
+	case RLIMIT_RSS:
+	case RLIMIT_NPROC:
+	case RLIMIT_MEMLOCK:
 	case RLIMIT_AS:
+	case RLIMIT_LOCKS:
+	case RLIMIT_SIGPENDING:
+	case RLIMIT_MSGQUEUE:
+	case RLIMIT_NICE:
+	case RLIMIT_RTPRIO:
 		break;
 #if CONFIG_LIBPOSIX_FDTAB
 	case RLIMIT_NOFILE:
@@ -334,10 +345,10 @@ int uk_sys_prlimit64(int pid, unsigned int resource,
 	if (new_limit) {
 		switch (resource) {
 		default:
-			uk_pr_err("Ignore updating resource %u: cur = %llu, max = %llu\n",
-				  resource,
-				  (unsigned long long) new_limit->rlim_cur,
-				  (unsigned long long) new_limit->rlim_max);
+			uk_pr_debug("Ignore updating resource %u: cur = %llu, max = %llu\n",
+				    resource,
+				    (unsigned long long)new_limit->rlim_cur,
+				    (unsigned long long)new_limit->rlim_max);
 			break;
 		}
 	}
@@ -352,19 +363,30 @@ int uk_sys_prlimit64(int pid, unsigned int resource,
 		old_limit->rlim_cur = __STACK_SIZE;
 		old_limit->rlim_max = __STACK_SIZE;
 		break;
-	case RLIMIT_AS:
-		old_limit->rlim_cur = RLIM_INFINITY;
-		old_limit->rlim_max = RLIM_INFINITY;
+#if CONFIG_LIBPOSIX_PROCESS_MAX_PID
+	case RLIMIT_NPROC:
+		old_limit->rlim_cur = CONFIG_LIBPOSIX_PROCESS_MAX_PID;
+		old_limit->rlim_max = CONFIG_LIBPOSIX_PROCESS_MAX_PID;
 		break;
-
+#else
+	case RLIMIT_NPROC:
+		old_limit->rlim_cur = 1;
+		old_limit->rlim_max = 1;
+		break;
+#endif
+	case RLIMIT_CORE:
+		old_limit->rlim_cur = 0;
+		old_limit->rlim_max = 0;
+		break;
 #if CONFIG_LIBPOSIX_FDTAB
 	case RLIMIT_NOFILE:
 		old_limit->rlim_cur = CONFIG_LIBPOSIX_FDTAB_MAXFDS;
 		old_limit->rlim_max = CONFIG_LIBPOSIX_FDTAB_MAXFDS;
 		break;
 #endif
-
 	default:
+		old_limit->rlim_cur = RLIM_INFINITY;
+		old_limit->rlim_max = RLIM_INFINITY;
 		break;
 	}
 
