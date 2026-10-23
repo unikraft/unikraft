@@ -122,6 +122,13 @@ static int do_mmap(void **addr, size_t len, int prot, int flags, int fd,
 			vflags |= UK_VMA_MAP_UNINITIALIZED;
 
 		if (flags & MAP_HUGETLB) {
+#ifdef CONFIG_PLAT_HYPERLIGHT
+			/* Hyperlight's snapshot drops large pages (see
+			 * ukpaging), so there are none to give: ENOMEM, as
+			 * on Linux without a hugepage pool.
+			 */
+			return -ENOMEM;
+#endif /* CONFIG_PLAT_HYPERLIGHT */
 #ifdef UK_PAGING_PAGE_LARGE_SHIFT
 			order = (flags >> MAP_HUGE_SHIFT) & MAP_HUGE_MASK;
 			if (order == 0)
