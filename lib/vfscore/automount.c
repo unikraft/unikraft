@@ -688,7 +688,7 @@ static inline int vfscore_mount_volume(const struct vfscore_volume *vv)
 		    vv->ukopts);
 
 	if (vv->ukopts & LIBVFSCORE_UKOPT_MKMP) {
-		rc = vfscore_ukopt_mkmp(path);
+		rc = vfscore_ukopt_mkmp((const char *)path);
 		if (unlikely(rc < 0))
 			return rc;
 	}
