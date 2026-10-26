@@ -51,7 +51,7 @@ def main():
             if GCOV_BEGIN in line:
                 start_line = i + 1
             if GCOV_END in line:
-                end_line = i - 1
+                end_line = i
                 break
 
         if start_line > end_line:
