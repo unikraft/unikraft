@@ -440,7 +440,7 @@ void uk_file_release(const struct uk_file *f)
 
 	if (r)
 		f->_release(f, r);
-	if (r | UK_SWREFCOUNT_LAST_STRONG)
+	if (r & UK_SWREFCOUNT_LAST_STRONG)
 		uk_file_refcnt_finalize(f->refcnt);
 }
 
