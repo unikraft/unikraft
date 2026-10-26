@@ -15,8 +15,8 @@
  * can switch to a more efficient bespoke implementation.
  */
 
-#define SELECT_READ   UKFD_POLLIN
-#define SELECT_WRITE  UKFD_POLLOUT
+#define SELECT_READ   (UKFD_POLLIN|UKFD_POLL_ALWAYS)
+#define SELECT_WRITE  (UKFD_POLLOUT|EPOLLERR)
 #define SELECT_EXCEPT (EPOLLPRI|UKFD_POLL_ALWAYS)
 
 /* Internal syscalls */
@@ -122,8 +122,16 @@ int uk_sys_pselect(int nfds, fd_set *restrict readfds,
 
 	if (!ret) {
 		struct epoll_event ev[monitored];
+		fd_set want_rd, want_wr, want_ex;
 		__nsec t0;
+		int nev;
 
+		if (readfds)
+			want_rd = *readfds;
+		if (writefds)
+			want_wr = *writefds;
+		if (exceptfds)
+			want_ex = *exceptfds;
 		if (timeout)
 			t0 = ukplat_monotonic_clock();
 		/* Wait */
@@ -141,15 +149,27 @@ int uk_sys_pselect(int nfds, fd_set *restrict readfds,
 			*timeout = uk_time_spec_from_nsec(left > 0 ? left : 0);
 		}
 		zero_fdsets(readfds, writefds, exceptfds);
-		for (int i = 0; i < ret; i++) {
+		nev = ret;
+		if (nev > 0)
+			ret = 0;
+		for (int i = 0; i < nev; i++) {
 			int fd = ev[i].data.fd;
 
-			if (readfds && ev[i].events & SELECT_READ)
+			if (readfds && FD_ISSET(fd, &want_rd) &&
+			    ev[i].events & SELECT_READ) {
 				FD_SET(fd, readfds);
-			if (writefds && ev[i].events & SELECT_WRITE)
+				ret++;
+			}
+			if (writefds && FD_ISSET(fd, &want_wr) &&
+			    ev[i].events & SELECT_WRITE) {
 				FD_SET(fd, writefds);
-			if (exceptfds && ev[i].events & SELECT_EXCEPT)
+				ret++;
+			}
+			if (exceptfds && FD_ISSET(fd, &want_ex) &&
+			    ev[i].events & SELECT_EXCEPT) {
 				FD_SET(fd, exceptfds);
+				ret++;
+			}
 		}
 	}
 

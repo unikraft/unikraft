@@ -17,4 +17,8 @@ if LIBPOSIX_POLL
 			This can improve compatibility with some applications that assume
 			starvation-free scheduling, and would otherwise live-lock.
 
+	config LIBPOSIX_POLL_TEST
+		bool "Enable unit tests"
+		select LIBUKTEST
+
 endif
