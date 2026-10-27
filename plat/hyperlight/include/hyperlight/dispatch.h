@@ -39,6 +39,14 @@ void hyperlight_dispatch_init(void);
  */
 __u64 hyperlight_dispatch_max_call(void);
 
+#ifdef __x86_64__
+/**
+ * XCR0 as x86/xsave.c set it on the first AVX instruction, 0 until then,
+ * for the snapshot restore fixup to set back.
+ */
+extern __u64 g_xcr0;
+#endif /* __x86_64__ */
+
 /**
  * Dispatch entry point for guest function calls.
  *

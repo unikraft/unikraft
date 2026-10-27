@@ -61,8 +61,7 @@ __u64 g_exn_stack_top;
 
 #ifdef __x86_64__
 /*
- * XCR0 as lcpu_start64 set it, with AVX where the CPU has it.  Restore
- * resets XCR0 to x87 only, so the snapshot fixup in
+ * Restore resets XCR0 to x87 only, so the snapshot fixup in
  * hyperlight_dispatch_function() sets it back before anything saves or
  * loads the extended context.
  */
@@ -220,17 +219,6 @@ void hyperlight_dispatch_init(void)
 	g_exn_stack_top = hl_call_get_exn_stack_top();
 	if (!g_exn_stack_top)
 		UK_CRASH("GetExnStackTop host function failed\n");
-#ifdef __x86_64__
-	__u64 cr4;
-
-	__asm__ volatile("movq %%cr4, %0" : "=r"(cr4));
-	if (cr4 & UK_ARCH_X86_64_CR4_OSXSAVE) {
-		__u32 lo, hi;
-
-		__asm__ volatile("xgetbv" : "=a"(lo), "=d"(hi) : "c"(0));
-		g_xcr0 = ((__u64)hi << 32) | lo;
-	}
-#endif /* __x86_64__ */
 }
 
 /* ── Dispatch inner ─────────────────────────────────────────────── */
@@ -560,9 +548,9 @@ hyperlight_dispatch_function(void)
 		"movq g_exn_stack_top(%%rip), %%rsp\n\t"
 
 		/*
-		 * Restore reset XCR0 to x87 only: set back what boot
-		 * enabled, before the extended context is saved or
-		 * loaded with the AVX state it now holds.
+		 * Restore reset XCR0 to x87 only: set back what
+		 * x86/xsave.c enabled, before the extended context is
+		 * saved or loaded with the AVX state it now holds.
 		 */
 		"movq g_xcr0(%%rip), %%rax\n\t"
 		"testq %%rax, %%rax\n\t"
