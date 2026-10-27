@@ -20,6 +20,7 @@ uk_plat_native_lcpu_wakeup
 uk_plat_native_ectx_assert_equal
 uk_plat_native_ectx_init
 uk_plat_native_ectx_load
+uk_plat_native_ectx_reinit
 uk_plat_native_ectx_sanitize
 uk_plat_native_ectx_store
 uk_plat_native_except_err_handler

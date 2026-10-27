@@ -79,6 +79,14 @@ __isr void uk_plat_native_ectx_sanitize(struct uk_plat_native_ectx *state);
 __isr void uk_plat_native_ectx_store(struct uk_plat_native_ectx *state);
 
 /**
+ * Choose the save method again, after a platform has enabled XSAVE
+ * (CR4.OSXSAVE and XCR0) since boot.  Contexts saved before still load:
+ * their FXSAVE images carry an XSAVE header for x87 and SSE.  The save
+ * method is global, so only a single-CPU platform can do this.
+ */
+__isr void uk_plat_native_ectx_reinit(void);
+
+/**
  * Restore extended state from memory to CPU.
  * Uses XRSTOR/FXRSTOR/FRSTOR (matches save method).
  * RFBM = 0xFFFFFFFF_FFFFFFFF, components restored per XSTATE_BV bitmap.

@@ -195,6 +195,12 @@ static enum x86_save_method ectx_method;
 static __sz ectx_size;
 static __sz ectx_align;
 static __bool have_mpx;
+/*
+ * The CPU has XSAVE but the OS has not enabled it yet: FXSAVE images
+ * get an XSAVE header too, so XRSTOR can load them if a platform
+ * enables XSAVE later (see uk_plat_native_ectx_reinit()).
+ */
+static __bool fxsave_xsave_hdr;
 
 static void _init_ectx_store(void)
 {
@@ -269,7 +275,10 @@ static void _init_ectx_store(void)
 
 	} else if (edx & UK_ARCH_X86_64_CPUID1_EDX_FXSR) {
 		ectx_method = X86_SAVE_FXSAVE;
-		ectx_size = sizeof(struct x86_fxsave_ctx);
+		fxsave_xsave_hdr = !!(ecx & UK_ARCH_X86_64_CPUID1_ECX_XSAVE);
+		ectx_size = fxsave_xsave_hdr
+			? __offsetof(struct x86_xsave_ctx, avx_state)
+			: sizeof(struct x86_fxsave_ctx);
 		ectx_align = __alignof(struct x86_fxsave_ctx);
 		uk_pr_debug("Load/store of extended CPU state: FXSAVE\n");
 	} else {
@@ -287,6 +296,11 @@ static void _init_ectx_store(void)
 
 UK_CTOR_PRIO(_init_ectx_store, 0);
 
+void uk_plat_native_ectx_reinit(void)
+{
+	_init_ectx_store();
+}
+
 /*
  * Return a pointer to the AVX-512 sub-state within an XSAVE context,
  * selecting the correct union arm depending on whether MPX is present.
@@ -297,6 +311,23 @@ x86_xsave_avx512(const struct x86_xsave_ctx *ctx)
 	if (have_mpx)
 		return &ctx->post_avx_state.mpx_and_avx512_state.avx512_state;
 	return &ctx->post_avx_state.avx512_state;
+}
+
+/*
+ * Write the 64-byte XSAVE header (offset 512): XSTATE_BV, then XCOMP_BV
+ * and the reserved bytes, which XRSTOR wants zero.
+ */
+static inline void xsave_hdr_set(struct uk_plat_native_ectx *state,
+				 __u64 xstate_bv)
+{
+	((__u64 *)state)[64] = xstate_bv;
+	((__u64 *)state)[65] = 0;
+	((__u64 *)state)[66] = 0;
+	((__u64 *)state)[67] = 0;
+	((__u64 *)state)[68] = 0;
+	((__u64 *)state)[69] = 0;
+	((__u64 *)state)[70] = 0;
+	((__u64 *)state)[71] = 0;
 }
 
 void uk_plat_native_ectx_sanitize(struct uk_plat_native_ectx *state)
@@ -312,14 +343,7 @@ void uk_plat_native_ectx_sanitize(struct uk_plat_native_ectx *state)
 		 * (64 bytes starting at offset 512 from the base address)
 		 * and will raise #GP on garbage data. We must zero them out.
 		 */
-		((__u64 *)state)[64] = 0;
-		((__u64 *)state)[65] = 0;
-		((__u64 *)state)[66] = 0;
-		((__u64 *)state)[67] = 0;
-		((__u64 *)state)[68] = 0;
-		((__u64 *)state)[69] = 0;
-		((__u64 *)state)[70] = 0;
-		((__u64 *)state)[71] = 0;
+		xsave_hdr_set(state, 0);
 		break;
 	default: /* Nothing to be done in the general case. */
 		break;
@@ -341,6 +365,10 @@ void uk_plat_native_ectx_store(struct uk_plat_native_ectx *state)
 		break;
 	case X86_SAVE_FXSAVE:
 		asm volatile("fxsave (%0)" :: "r"(state) : "memory");
+		/* x87 and SSE are in the legacy area FXSAVE just wrote */
+		if (fxsave_xsave_hdr)
+			xsave_hdr_set(state, UK_ARCH_X86_64_XCR0_X87 |
+					     UK_ARCH_X86_64_XCR0_SSE);
 		break;
 	case X86_SAVE_XSAVE:
 		asm volatile("xsave64 (%0)" :: "r"(state),
