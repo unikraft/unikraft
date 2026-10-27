@@ -445,6 +445,37 @@ static void virtqueue_vring_init(struct virtqueue_vring *vrq, __u16 nr_desc,
 	vrq->vring.desc[nr_desc - 1].next = VIRTQUEUE_MAX_SIZE;
 }
 
+#if !CONFIG_LIBUKVMEM
+/* The device uses only the physical base, so find a contiguous ring.
+ * Keep the blocks that fail until the end, or the allocator gives them again.
+ */
+static void *virtqueue_vring_alloc(struct uk_alloc *a, __sz size)
+{
+	void *mem = NULL, *next, *rejected = NULL;
+
+	while (!uk_posix_memalign(a, &mem, __PAGE_SIZE, size)) {
+		if (uk_sglist_count(mem, size) == 1)
+			break;
+
+		uk_pr_debug_isr("vring at %p is not physically contiguous\n",
+				mem);
+		*(void **)mem = rejected;
+		rejected = mem;
+
+		/* uk_posix_memalign() can keep the old mem when it fails */
+		mem = NULL;
+	}
+
+	while (rejected) {
+		next = *(void **)rejected;
+		uk_free(a, rejected);
+		rejected = next;
+	}
+
+	return mem;
+}
+#endif /* !CONFIG_LIBUKVMEM */
+
 struct virtqueue *virtqueue_create(__u16 queue_id, __u16 nr_descs, __u16 align,
 				   virtqueue_callback_t callback,
 				   virtqueue_notify_host_t notify,
@@ -492,8 +523,8 @@ struct virtqueue *virtqueue_create(__u16 queue_id, __u16 nr_descs, __u16 align,
 
 	vrq->vring_mem = (void *)vaddr;
 #else /* !CONFIG_LIBUKVMEM */
-	if (uk_posix_memalign(a, &vrq->vring_mem,
-			      __PAGE_SIZE, ring_size) != 0) {
+	vrq->vring_mem = virtqueue_vring_alloc(a, ring_size);
+	if (unlikely(!vrq->vring_mem)) {
 		rc = -ENOMEM;
 		goto err_freevq;
 	}
