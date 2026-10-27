@@ -214,7 +214,7 @@ ramfs_rename_node(struct ramfs_node *np, const char *name)
 		/* Expand name buffer */
 		tmp = (char *) malloc(len + 1);
 		if (tmp == NULL)
-			return ENOMEM;
+			return ENOSPC;
 		strlcpy(tmp, name, len + 1);
 		free(np->rn_name);
 		np->rn_name = tmp;
@@ -289,7 +289,7 @@ ramfs_mkdir(struct vnode *dvp, const char *name, mode_t mode)
 
 	np = ramfs_add_node(dvp->v_data, name, VDIR, mode);
 	if (np == NULL)
-		return ENOMEM;
+		return ENOSPC;
 	np->rn_size = 0;
 
 	return 0;
@@ -299,19 +299,25 @@ static int
 ramfs_symlink(struct vnode *dvp, const char *name, const char *link)
 {
 	struct ramfs_node *np;
+	char *target;
 	size_t len;
 
 	if (strlen(name) > NAME_MAX)
 		return ENAMETOOLONG;
 
-	np = ramfs_add_node(dvp->v_data, name, VLNK, 0);
-
-	if (np == NULL)
-		return ENOMEM;
 	// Save the link target without the final null, as readlink() wants it.
 	len = strlen(link);
+	target = strndup(link, len);
+	if (target == NULL)
+		return ENOSPC;
 
-	np->rn_buf = strndup(link, len);
+	np = ramfs_add_node(dvp->v_data, name, VLNK, 0);
+
+	if (np == NULL) {
+		free(target);
+		return ENOSPC;
+	}
+	np->rn_buf = target;
 	np->rn_bufsize = np->rn_size = len;
 
 	return 0;
@@ -383,7 +389,7 @@ ramfs_truncate(struct vnode *vp, off_t length)
 		/* Zeroed: past its old end the file reads as zeros. */
 		new_buf = calloc(1, new_size);
 		if (!new_buf)
-			return EIO;
+			return ENOSPC;
 		if (np->rn_size != 0) {
 			memcpy(new_buf, np->rn_buf, vp->v_size);
 			if (np->rn_owns_buf)
@@ -421,7 +427,7 @@ ramfs_create(struct vnode *dvp, const char *name, mode_t mode)
 
 	np = ramfs_add_node(dvp->v_data, name, VREG, mode);
 	if (np == NULL)
-		return ENOMEM;
+		return ENOSPC;
 	return 0;
 }
 
@@ -502,7 +508,7 @@ ramfs_write(struct vnode *vp, struct uio *uio, int ioflag)
 		void *new_buf = new_size ? calloc(1, new_size) : NULL;
 
 		if (new_size && !new_buf)
-			return EIO;
+			return ENOSPC;
 		if (new_size)
 			memcpy(new_buf, np->rn_buf, np->rn_size);
 		np->rn_buf = (char *) new_buf;
@@ -520,7 +526,7 @@ ramfs_write(struct vnode *vp, struct uio *uio, int ioflag)
 			void *new_buf = calloc(1, new_size);
 
 			if (!new_buf)
-				return EIO;
+				return ENOSPC;
 			if (np->rn_size != 0) {
 				memcpy(new_buf, np->rn_buf, vp->v_size);
 				if (np->rn_owns_buf)
@@ -571,7 +577,7 @@ ramfs_rename(struct vnode *dvp1, struct vnode *vp1, const char *name1 __unused,
 		np = ramfs_add_node(dvp2->v_data, name2,
 				    old_np->rn_type, old_np->rn_mode);
 		if (np == NULL)
-			return ENOMEM;
+			return ENOSPC;
 
 		/* Copy children structure */
 		np->rn_child = old_np->rn_child;
