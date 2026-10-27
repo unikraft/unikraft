@@ -235,6 +235,12 @@ int pprocess_signal_send(struct posix_process *proc, int signum,
 	struct uk_signal *sig;
 	int rc;
 
+	/* A standard signal pending already stands for this one (see
+	 * pprocess_signal_enqueue()): no memory needed for it
+	 */
+	if (signum < SIGRTMIN && IS_PENDING(proc->signal->sigqueue, signum))
+		return 0;
+
 	sig = uk_signal_alloc(proc->_a);
 	if (unlikely(!sig)) {
 		uk_pr_err("Could not allocate signal\n");
@@ -389,12 +395,20 @@ static int pprocess_signal_process_one(struct posix_process *pproc,
 		return 0;
 
 	rc = pprocess_signal_send(pproc, signum, siginfo);
-	if (unlikely(rc))
-		return rc;
 
-	if (pprocess_signal_is_fatal(pproc, signum))
+	/* A fatal signal ends the process without being queued, so a
+	 * standard one ends it even when there is no memory to queue it, as
+	 * on Linux, which never fails to send one: a SIGKILL sent to win
+	 * memory back has to.  A realtime signal that finds its queue full
+	 * fails, the process untouched.
+	 */
+	if (rc && signum >= SIGRTMIN)
+		return rc;
+	if (pprocess_signal_is_fatal(pproc, signum)) {
 		pprocess_signal_end(pproc, signum);
-	return 0;
+		return 0;
+	}
+	return rc;
 }
 
 int pprocess_signal_notify_parent(struct posix_process *parent, int signum)
@@ -533,8 +547,19 @@ int pprocess_signal_thread_do(int tid, int signum, siginfo_t *siginfo)
 	if (pprocess_signal_should_drop(pproc, signum))
 		return 0;
 
+	/* A standard signal pending already stands for this one */
+	if (signum < SIGRTMIN && IS_PENDING(pthread->signal->sigqueue, signum))
+		goto queued;
+
 	sig = uk_signal_alloc(pthread->_a);
 	if (unlikely(!sig)) {
+		/* As for a process (see pprocess_signal_process_one()) */
+		if (signum < SIGRTMIN &&
+		    pprocess_signal_is_fatal(pproc, signum) &&
+		    (signum == SIGKILL || !IS_MASKED(pthread, signum))) {
+			pprocess_signal_end(pproc, signum);
+			return 0;
+		}
 		uk_pr_err("Could not allocate signal\n");
 		return -EAGAIN;
 	}
@@ -558,6 +583,7 @@ int pprocess_signal_thread_do(int tid, int signum, siginfo_t *siginfo)
 		return rc;
 	}
 
+queued:
 	if (pthread_signal_wakes(pproc, pthread, signum))
 		uk_semaphore_up(&pthread->signal->deliver_semaphore);
 	/* To a thread or not, a signal that ends the process ends it now;
