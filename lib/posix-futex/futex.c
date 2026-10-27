@@ -466,4 +466,34 @@ static int pthread_exit_handler(void *arg)
 
 POSIX_PROCESS_PTEXIT_HANDLER_PRIO(pthread_exit_handler, UK_PRIO_EARLIEST);
 
+#if CONFIG_LIBPOSIX_PROCESS_EXECVE
+/* The reference points into the image execve() replaces, which may be
+ * unmapped with it, and a new image that never calls set_tid_address()
+ * would have it written at its exit. Clear it now, as Linux does at exec,
+ * while the old image is still mapped: a vfork() parent sharing that
+ * memory sees the write.
+ */
+static int pfutex_execve_handler(void *arg)
+{
+	struct posix_process_execve_event_data *event_data = arg;
+	pid_t **ref;
+
+	UK_ASSERT(event_data);
+
+	/* The thread that execs: uk_posix_process_run() raises the event
+	 * from the thread that starts the process
+	 */
+	ref = &uk_thread_uktls_var(event_data->thread, child_tid_clear_ref);
+	if (*ref != NULL) {
+		**ref = 0;
+		futex_wake((uint32_t *)*ref, 0);
+		*ref = NULL;
+	}
+
+	return 0;
+}
+
+POSIX_PROCESS_EXECVE_HANDLER(pfutex_execve_handler);
+#endif /* CONFIG_LIBPOSIX_PROCESS_EXECVE */
+
 #endif /* CONFIG_LIBPOSIX_PROCESS_MULTITHREADING */
