@@ -69,6 +69,13 @@ pid_t uk_sys_gettid(void);
 pid_t uk_sys_getppid(void);
 pid_t uk_sys_getpid(void);
 
+#if CONFIG_LIBPOSIX_PROCESS_MULTIPROCESS && CONFIG_LIBPOSIX_MMAP
+/* The owner to tag a new mmap() mapping of the calling process with, for
+ * uk_vma_map_owned(): NULL outside a process, for the kernel's mappings.
+ */
+const void *uk_process_mmap_owner(void);
+#endif
+
 /* pause() and rt_sigsuspend(), for another library's system call to wait
  * for a signal with.  With CONFIG_LIBPOSIX_PROCESS_SIGNAL they wait, then
  * return -EINTR, and the signal is taken at the exit of that call; without

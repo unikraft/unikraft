@@ -176,10 +176,15 @@ UK_SYSCALL_R_E_DEFINE(int, execve, const char *, pathname,
 	execenv_new = (struct ukarch_execenv *)loader_args.ctx.sp;
 
 	/* Load executable */
+#if CONFIG_LIBPOSIX_PROCESS_MULTIPROCESS && CONFIG_LIBPOSIX_MMAP
+	rc = uk_process_mmap_exec_begin();
+	if (unlikely(rc))
+		goto err_free_stack_new;
+#endif
 	rc = uk_binfmt_load(&loader_args);
 	if (unlikely(rc)) {
 		uk_pr_err("%s: Unable to load (%d)\n", pathname, rc);
-		goto err_free_stack_new;
+		goto err_abort_image;
 	}
 
 	/* Do arch-specific context (execenv) initialization */
@@ -199,7 +204,7 @@ UK_SYSCALL_R_E_DEFINE(int, execve, const char *, pathname,
 	rc = pprocess_raise_execve_event(&event_data);
 	if (unlikely(rc < 0)) {
 		uk_pr_err("execve event error (%d)\n", rc);
-		goto err_free_stack_new;
+		goto err_abort_image;
 	}
 	pprocess_cleanup(uk_pprocess_current());
 
@@ -221,6 +226,13 @@ UK_SYSCALL_R_E_DEFINE(int, execve, const char *, pathname,
 		uk_pr_debug("%s: Old stack at %p\n",
 			    loader_args.progname, stack_old);
 
+#if CONFIG_LIBPOSIX_PROCESS_MULTIPROCESS && CONFIG_LIBPOSIX_MMAP
+	/* This unmaps the old image, where argv and envp may live: nothing
+	 * may read them from here on.
+	 */
+	uk_process_mmap_exec_commit();
+#endif
+
 	this_thread->_mem.stack = stack_new;
 	this_thread->_mem.stack_a = stack_a;
 	this_thread->ctx = loader_args.ctx;
@@ -233,6 +245,10 @@ UK_SYSCALL_R_E_DEFINE(int, execve, const char *, pathname,
 	ukarch_ctx_switch(&ctx_old, &loader_args.ctx);
 	UK_BUG(); /* noreturn */
 
+err_abort_image:
+#if CONFIG_LIBPOSIX_PROCESS_MULTIPROCESS && CONFIG_LIBPOSIX_MMAP
+	uk_process_mmap_exec_abort();
+#endif
 err_free_stack_new:
 	uk_free(stack_a, stack_new);
 
