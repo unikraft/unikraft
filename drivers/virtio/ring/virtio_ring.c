@@ -445,6 +445,36 @@ static void virtqueue_vring_init(struct virtqueue_vring *vrq, __u16 nr_desc,
 	vrq->vring.desc[nr_desc - 1].next = VIRTQUEUE_MAX_SIZE;
 }
 
+#if !CONFIG_LIBUKVMEM
+#define VRING_ALLOC_TRIES 8
+
+static int virtqueue_vring_alloc(struct uk_alloc *a, void **mem, __sz size)
+{
+	void *rejected[VRING_ALLOC_TRIES];
+	int i, rc = -ENOMEM;
+
+	for (i = 0; i < VRING_ALLOC_TRIES; i++) {
+		if (uk_posix_memalign(a, mem, __PAGE_SIZE, size) != 0)
+			break;
+		if (uk_sglist_count(*mem, size) == 1) {
+			rc = 0;
+			break;
+		}
+		uk_pr_debug_isr("vring at %p is not physically contiguous\n",
+				*mem);
+		rejected[i] = *mem;
+	}
+	if (i == VRING_ALLOC_TRIES)
+		uk_pr_err_isr("No physically contiguous vring in %d tries\n",
+			      i);
+	if (rc)
+		*mem = NULL;
+	while (i > 0)
+		uk_free(a, rejected[--i]);
+	return rc;
+}
+#endif /* !CONFIG_LIBUKVMEM */
+
 struct virtqueue *virtqueue_create(__u16 queue_id, __u16 nr_descs, __u16 align,
 				   virtqueue_callback_t callback,
 				   virtqueue_notify_host_t notify,
@@ -492,11 +522,9 @@ struct virtqueue *virtqueue_create(__u16 queue_id, __u16 nr_descs, __u16 align,
 
 	vrq->vring_mem = (void *)vaddr;
 #else /* !CONFIG_LIBUKVMEM */
-	if (uk_posix_memalign(a, &vrq->vring_mem,
-			      __PAGE_SIZE, ring_size) != 0) {
-		rc = -ENOMEM;
+	rc = virtqueue_vring_alloc(a, &vrq->vring_mem, ring_size);
+	if (unlikely(rc))
 		goto err_freevq;
-	}
 #endif /* !CONFIG_LIBUKVMEM */
 	memset(vrq->vring_mem, 0, ring_size);
 	virtqueue_vring_init(vrq, nr_descs, align);
