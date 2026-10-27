@@ -472,7 +472,7 @@ pid_t uk_posix_process_run(uk_posix_process_mainlike_func fn,
 	ret = raise_process_clone_event(child, parent);
 	if (unlikely(ret)) {
 		uk_pr_err("clone event error (%d)\n", ret);
-		goto err_free_thread;
+		goto err_free_process;
 	}
 
 	/* Raise the execve event */
@@ -484,7 +484,7 @@ pid_t uk_posix_process_run(uk_posix_process_mainlike_func fn,
 	ret = pprocess_raise_execve_event(&execve_data);
 	if (unlikely(ret < 0)) {
 		uk_pr_err("exeve event error (%d)\n", ret);
-		goto err_free_thread;
+		goto err_free_process;
 	}
 
 	/* Schedule the process */
@@ -496,16 +496,35 @@ pid_t uk_posix_process_run(uk_posix_process_mainlike_func fn,
 	if (unlikely(ret < 0)) {
 		uk_pr_err("Unable to add tid %d to scheduler (%d)\n",
 			  ukthread2tid(child), ret);
-		goto err_free_thread;
+		goto err_free_process;
 	}
 
 	return ukthread2pid(child);
+
+err_free_process:
+	pprocess_release_unrun(child_process, child);
+	return ret;
 
 err_free_thread:
 	/* also issues exit events */
 	uk_thread_release(child);
 
 	return ret;
+}
+
+void pprocess_release_unrun(struct posix_process *pprocess,
+			    struct uk_thread *thread)
+{
+	/* No child of its caller's, as the call that made it failed: it
+	 * ends with no exit signal and leaves no zombie to wait for
+	 */
+	if (pprocess->parent) {
+		uk_list_del(&pprocess->child_list_entry);
+		pprocess->parent = NULL;
+	}
+	/* Ends the process (see posix_thread_fini()), with exit events */
+	uk_thread_release(thread);
+	pprocess_release(pprocess);
 }
 #endif /* CONFIG_LIBPOSIX_PROCESS_MULTIPROCESS */
 

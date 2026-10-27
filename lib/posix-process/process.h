@@ -223,6 +223,14 @@ void pprocess_release_pthread(struct posix_thread *pthread);
  */
 void pprocess_release(struct posix_process *pprocess);
 
+#if CONFIG_LIBPOSIX_PROCESS_MULTIPROCESS
+/* Release @pprocess, just made with its only thread @thread, which never
+ * ran: the call making it failed
+ */
+void pprocess_release_unrun(struct posix_process *pprocess,
+			    struct uk_thread *thread);
+#endif /* CONFIG_LIBPOSIX_PROCESS_MULTIPROCESS */
+
 /**
  * INTERNAL. Create pthread
  *

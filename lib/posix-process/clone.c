@@ -128,7 +128,7 @@ int uk_clone(struct clone_args *cl_args, size_t cl_args_len,
 	     struct ukarch_execenv *execenv)
 {
 	struct posix_process_clone_event_data clone_event;
-	struct posix_process *child_process __maybe_unused;
+	struct posix_process *child_process __maybe_unused = NULL;
 	struct posix_process *pprocess;
 	struct posix_thread *pthread;
 	struct uk_thread *child = NULL;
@@ -141,6 +141,7 @@ int uk_clone(struct clone_args *cl_args, size_t cl_args_len,
 	__u64 flags;
 	__u64 tls;
 	__uptr utlsp;
+	char *name;
 	int ret;
 
 	t = uk_thread_current();
@@ -251,6 +252,8 @@ int uk_clone(struct clone_args *cl_args, size_t cl_args_len,
 		}
 	}
 
+	/* The child's: freed with it (_clone_child_gc()), or below */
+	name = t->name ? strdup(t->name) : NULL;
 	if ((flags & CLONE_SETTLS)
 #if CONFIG_LIBSYSCALL_SHIM_HANDLER_ULTLS
 	    && (uk_lcpu_sysctx_get(execenv->sysctx, TLSP) == 0x0)
@@ -269,8 +272,7 @@ int uk_clone(struct clone_args *cl_args, size_t cl_args_len,
 						    (__uptr)tls,
 						    true, /* TLS is an UKTLS */
 						    false, /* We want ECTX */
-						    (t->name) ? strdup(t->name)
-							      : NULL,
+						    name,
 						    NULL,
 						    _clone_child_gc);
 	} else {
@@ -292,13 +294,14 @@ int uk_clone(struct clone_args *cl_args, size_t cl_args_len,
 						   s->a_auxstack, AUXSTACK_SIZE,
 						   s->a_uktls,
 						   false, /* We want ECTX */
-						   (t->name) ? strdup(t->name)
-							     : NULL,
+						   name,
 						   NULL,
 						   _clone_child_gc);
 	}
-	if (PTRISERR(child)) {
-		ret = (PTR2ERR(child) != 0) ? PTR2ERR(child) : -ENOMEM;
+	/* uk_thread_create_container*() return NULL on error: out of memory */
+	if (!child) {
+		free(name);
+		ret = -ENOMEM;
 		goto err_out;
 	}
 #ifdef CONFIG_LIBUKDEBUG_ENABLE_ASSERT
@@ -384,6 +387,7 @@ int uk_clone(struct clone_args *cl_args, size_t cl_args_len,
 						child, t);
 		if (unlikely(PTRISERR(child_process))) {
 			ret = PTR2ERR(child_process);
+			child_process = NULL;
 			uk_pr_err("Could not create process (%d)\n", ret);
 			goto err_free_child;
 		}
@@ -467,6 +471,12 @@ out:
 	return ret;
 
 err_free_child:
+#if CONFIG_LIBPOSIX_PROCESS_MULTIPROCESS
+	if (child_process) {
+		pprocess_release_unrun(child_process, child);
+		return ret;
+	}
+#endif /* CONFIG_LIBPOSIX_PROCESS_MULTIPROCESS */
 	/* also issues exit events */
 	uk_thread_release(child);
 err_out:
