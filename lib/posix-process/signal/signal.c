@@ -698,7 +698,13 @@ int pprocess_signal_pdesc_init(struct posix_process *process)
 	pprocess_signal_foreach(signum)
 		pprocess_signal_sigaction_clear(KERN_SIGACTION(process, signum));
 
-	pd->altstack.ss_flags = SS_DISABLE;
+	/* No alternate signal stack until one is inherited or set with
+	 * sigaltstack(2): the record must read SS_DISABLE, not whatever the
+	 * allocation held.  A record with flags 0 and no stack reads as
+	 * installed, and a runtime that asks before installing its own
+	 * (.NET does) then leaves its SA_ONSTACK handlers with nowhere to run.
+	 */
+	pd->altstack = (stack_t){ .ss_flags = SS_DISABLE };
 
 #if CONFIG_LIBPOSIX_PROCESS_SIGNALFD
 	uk_signal_files_ctx_init(&pd->sigfiles_ctx);

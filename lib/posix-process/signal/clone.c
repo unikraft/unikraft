@@ -28,8 +28,6 @@ int uk_posix_clone_sighand(void *arg)
 	struct posix_thread *ct; /* child thread */
 	pid_t ppid; /* parent pid */
 	pid_t cpid; /* child pid */
-	int signum;
-	int rc;
 
 	event_data = (struct posix_process_clone_event_data *)arg;
 	UK_ASSERT(event_data);
@@ -65,17 +63,10 @@ int uk_posix_clone_sighand(void *arg)
 		     !(cl_args->flags & CLONE_SIGHAND)))
 		return -EINVAL;
 
-	/* Initialize the new thread's signal descriptor */
-	rc = pprocess_signal_tdesc_alloc(ct);
-	if (unlikely(rc)) {
-		uk_pr_err("Could not allocate signal descriptor\n");
-		return rc;
-	}
-	rc = pprocess_signal_tdesc_init(ct);
-	if (unlikely(rc)) {
-		uk_pr_err("Could not initialize signal descriptor\n");
-		return rc;
-	}
+	/* The new thread's signal descriptor is the one it was made with (see
+	 * pprocess_create_pthread())
+	 */
+	UK_ASSERT(ct->signal);
 
 	/* If CLONE_THREAD was passed, the child is assigned to the
 	 * calling process, so no further action is required.
@@ -83,67 +74,44 @@ int uk_posix_clone_sighand(void *arg)
 	if (cl_args->flags & CLONE_THREAD)
 		return 0;
 
-	/* Initialize the new process' signal descriptor */
-	cp->signal = uk_malloc(cp->_a, sizeof(struct uk_signal_pdesc));
-	if (unlikely(!cp->signal)) {
-		uk_pr_err("Could not allocate memory\n");
-		rc = -ENOMEM;
-		goto fail_tdesc_alloc;
-	}
-	/* No alternate signal stack until one is inherited below or set
-	 * with sigaltstack(2): the record must read SS_DISABLE, not
-	 * whatever the allocation held.  A record with flags 0 and no
-	 * stack reads as installed, and a runtime that asks before
-	 * installing its own (.NET does) then leaves its SA_ONSTACK
-	 * handlers with nowhere to run.
+	/* The new process' signal descriptor is the one it was made with (see
+	 * pprocess_signal_pdesc_init()): default dispositions in a table of
+	 * its own, nothing pending, no alternate signal stack, an empty
+	 * signal file context.
+	 *
+	 * TODO: At this time we do not support proper open file inheritance
+	 * across vfork/execve for those that do not have the O_CLOEXEC flag.
+	 * Therefore, for now, the child process' signal file context stays
+	 * empty.
 	 */
-	cp->signal->altstack = (stack_t){ .ss_flags = SS_DISABLE };
+	UK_ASSERT(cp->signal);
 
-	/* CLONE_CLEAR_SIGHAND: Reset child's signal dispositions to default. */
-	if (!pp || (cl_args->flags & CLONE_CLEAR_SIGHAND)) {
-		uk_pr_debug("CLONE_SIGHAND: pid %d gets default signal dispositions\n",
-			    cpid);
-
-		if (!(cl_args->flags & CLONE_THREAD)) {
-			rc = pprocess_signal_sigaction_new(cp->_a, cp->signal);
-			if (unlikely(rc))
-				goto fail_malloc;
+	/* No parent, or CLONE_CLEAR_SIGHAND: the child keeps the default
+	 * signal dispositions it was made with.
+	 */
+	if (pp && !(cl_args->flags & CLONE_CLEAR_SIGHAND)) {
+		if (cl_args->flags & CLONE_SIGHAND) {
+			/* CLONE_SIGHAND: Inherit a reference of the parent's
+			 * signal handler table.
+			 */
+			uk_pr_debug("CLONE_SIGHAND: pid %d gets a reference of the parent's handlers\n",
+				    cpid);
+			pprocess_signal_sigaction_release(cp->signal->sigaction);
+			pprocess_signal_sigaction_acquire(pp->signal->sigaction);
+			cp->signal->sigaction = pp->signal->sigaction;
+		} else {
+			/* Default: Inherit a copy of the parent's signal
+			 * dispositions; the handlers only: the table's
+			 * allocator and reference count are the new table's
+			 * own.
+			 */
+			uk_pr_debug("pid %d gets a copy of the parent's handlers\n",
+				    cpid);
+			memcpy(cp->signal->sigaction->ks,
+			       pp->signal->sigaction->ks,
+			       sizeof(cp->signal->sigaction->ks));
 		}
-
-		pprocess_signal_foreach(signum)
-			pprocess_signal_sigaction_clear(KERN_SIGACTION(cp, signum));
-
-	/* CLONE_SIGHAND: Inherit a reference of the parent's signal handler
-	 *                table.
-	 */
-	} else if (cl_args->flags & CLONE_SIGHAND) {
-		uk_pr_debug("CLONE_SIGHAND: pid %d gets a reference of the parent's handlers\n",
-			    cpid);
-		pprocess_signal_sigaction_acquire(pp->signal->sigaction);
-		cp->signal->sigaction = pp->signal->sigaction;
-	/* Default: Iherit a copy of the parent's signal dispositions. */
-	} else {
-		uk_pr_debug("pid %d gets a copy of the parent's handlers\n",
-			    cpid);
-
-		rc = pprocess_signal_sigaction_new(cp->_a, cp->signal);
-		if (unlikely(rc))
-			goto fail_malloc;
-
-		/* The handlers only: the table's allocator and reference
-		 * count are the new table's own.
-		 */
-		memcpy(cp->signal->sigaction->ks, pp->signal->sigaction->ks,
-		       sizeof(cp->signal->sigaction->ks));
 	}
-
-	/* The child process has no pending signals */
-	cp->signal->queued_count = 0;
-	cp->signal->queued_max = _POSIX_SIGQUEUE_MAX;
-
-	uk_sigemptyset(&cp->signal->sigqueue.pending);
-	pprocess_signal_foreach(signum)
-		UK_INIT_LIST_HEAD(&cp->signal->sigqueue.list_head[signum]);
 
 	if (pp) {
 		/* sigaltstack(2): Children created with clone() inherit the
@@ -156,25 +124,7 @@ int uk_posix_clone_sighand(void *arg)
 			cp->signal->altstack.ss_flags = SS_DISABLE;
 	}
 
-#if CONFIG_LIBPOSIX_PROCESS_SIGNALFD
-	/*
-	 * TODO: At this time we do not support proper open file inheritance
-	 * across vfork/execve for those that do not have the O_CLOEXEC flag.
-	 * Therefore, for now, simply just initialize child process' signal
-	 * descriptor signal file context as empty.
-	 */
-	uk_signal_files_ctx_init(&cp->signal->sigfiles_ctx);
-#endif /* CONFIG_LIBPOSIX_PROCESS_SIGNALFD */
-
 	return 0;
-
-fail_malloc:
-	uk_free(cp->_a, cp->signal);
-
-fail_tdesc_alloc:
-	pprocess_signal_tdesc_free(ct);
-
-	return rc;
 }
 #else /* !CONFIG_LIBPOSIX_PROCESS_SIGNAL */
 static int uk_posix_clone_sighand(void *arg)
