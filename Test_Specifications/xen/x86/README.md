@@ -13,8 +13,8 @@ the workspace-level `.kiro/steering/` directory:
 - `xen-x86.md` adds implementation-specific guidance for this folder.
 
 Both use file-match inclusion for their relevant source/specification paths.
-The empty `Test_Specifications/.kiro/steering/` directory is not the steering
-location for this workspace setup.
+Keep steering at the repository root; `Test_Specifications/` contains the
+resulting specification documents.
 
 ## Suggested first task in Kiro
 
