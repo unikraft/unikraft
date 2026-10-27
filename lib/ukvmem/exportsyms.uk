@@ -5,6 +5,8 @@ uk_vas_destroy
 
 uk_vma_find
 uk_vma_map
+uk_vma_map_owned
+uk_vma_unmap_owner
 uk_vma_unmap
 uk_vma_set_attr
 uk_vma_advise

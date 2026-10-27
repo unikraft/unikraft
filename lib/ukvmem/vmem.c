@@ -262,7 +262,8 @@ static inline int vmem_vma_can_merge(struct uk_vma *vma, struct uk_vma *next)
 		(vma->attr == next->attr) &&
 		(vma->flags == next->flags) &&
 		(vma->page_lvl == next->page_lvl) &&
-		(vma->name == next->name));
+		(vma->name == next->name) &&
+		(vma->owner == next->owner));
 }
 
 static int vmem_vma_do_try_merge_with_next(struct uk_vma *vma)
@@ -353,6 +354,7 @@ static int vmem_vma_split(struct uk_vma *vma, __vaddr_t vaddr,
 	v->flags	= vma->flags;
 	v->page_lvl	= vma->page_lvl;
 	v->name		= vma->name;
+	v->owner	= vma->owner;
 
 	vma->end	= vaddr;
 
@@ -601,9 +603,10 @@ static int vmem_mapx_populate(struct uk_pagetable *pt __unused,
 	return 0;
 }
 
-int uk_vma_map(struct uk_vas *vas, __vaddr_t *vaddr, __sz len,
-	       unsigned long attr, unsigned long flags, const char *name,
-	       const struct uk_vma_ops *ops, void *args)
+int uk_vma_map_owned(struct uk_vas *vas, __vaddr_t *vaddr, __sz len,
+		     unsigned long attr, unsigned long flags, const char *name,
+		     const struct uk_vma_ops *ops, void *args,
+		     const void *owner)
 {
 	unsigned int order = UK_VMA_MAP_SIZE_TO_ORDER(flags);
 	int rc, to_lvl, algn_lvl, strict;
@@ -731,6 +734,7 @@ int uk_vma_map(struct uk_vas *vas, __vaddr_t *vaddr, __sz len,
 	vma->attr	= attr;
 	vma->flags	= extf;
 	vma->page_lvl	= to_lvl;
+	vma->owner	= owner;
 	if (name)
 		vma->name = name;
 
@@ -771,6 +775,36 @@ int uk_vma_map(struct uk_vas *vas, __vaddr_t *vaddr, __sz len,
 
 	*vaddr = va;
 	return 0;
+}
+
+int uk_vma_map(struct uk_vas *vas, __vaddr_t *vaddr, __sz len,
+	       unsigned long attr, unsigned long flags, const char *name,
+	       const struct uk_vma_ops *ops, void *args)
+{
+	return uk_vma_map_owned(vas, vaddr, len, attr, flags, name, ops,
+				args, __NULL);
+}
+
+void uk_vma_unmap_owner(struct uk_vas *vas, const void *owner)
+{
+	struct uk_vma *vma, *next;
+	UK_LIST_HEAD(owned);
+
+	UK_ASSERT(owner);
+
+	/* Unlink them all first, as uk_vma_unmap() does: unmapping a VMA
+	 * can sleep (a file's), and the list may change meanwhile. Whole
+	 * VMAs only, so there is nothing to split.
+	 */
+	uk_list_for_each_entry_safe(vma, next, &vas->vma_list, vma_list) {
+		if (vma->owner != owner)
+			continue;
+		uk_list_del(&vma->vma_list);
+		uk_list_add_tail(&vma->vma_list, &owned);
+	}
+
+	uk_list_for_each_entry_safe(vma, next, &owned, vma_list)
+		vmem_vma_unmap_and_free(vma);
 }
 
 int uk_vma_op_set_attr(struct uk_vma *vma, unsigned long attr)
