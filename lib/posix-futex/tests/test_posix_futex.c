@@ -60,6 +60,9 @@ struct test_args {
 	struct timespec *timeout;
 
 	int *rets;
+
+	/* Set by the thread as it exits */
+	volatile int done;
 };
 
 /**
@@ -126,6 +129,7 @@ static __noreturn void waiter_func(void *arg)
 
 		var_to_change_vals[i] = ++(*args->var_to_change);
 	}
+	args->done = 1;
 	uk_sched_thread_exit();
 }
 
@@ -147,6 +151,7 @@ static __noreturn void waker_func(void *arg)
 				NULL, NULL, 0);
 		uk_sched_yield();
 	}
+	args->done = 1;
 	uk_sched_thread_exit();
 }
 
@@ -167,6 +172,7 @@ static __noreturn void requeuer_func(void *arg)
 				args->requeue_futex_val, args->val);
 		uk_sched_yield();
 	}
+	args->done = 1;
 	uk_sched_thread_exit();
 }
 
@@ -175,9 +181,16 @@ static __noreturn void requeuer_func(void *arg)
  *
  * this is sufficient for now
  */
-static void wait_thread(struct uk_thread *t)
+/* Wait for thread @t to finish. Not on its struct uk_thread, only checked
+ * to have been made: an exited thread is released when the scheduler next
+ * collects them, which making another thread does.
+ */
+static void wait_thread(struct uk_thread *t, struct test_args *args)
 {
-	while (!uk_thread_is_exited(t))
+	/* Never made: the expectations that follow fail */
+	if (!t)
+		return;
+	while (!args->done)
 		uk_sched_yield();
 }
 
@@ -247,7 +260,7 @@ UK_TESTCASE(posix_futex_testsuite, test_one_waiter_one_waker)
 
 	/* Wait for the threads to finish */
 	for (i = 0; i < num_threads; ++i)
-		wait_thread(threads[i]);
+		wait_thread(threads[i], args + i);
 
 	CHECK_ITERATIONS(rets, var_to_change_vals, num_iterations, num_threads,
 			 var_to_change, 1, true);
@@ -288,7 +301,7 @@ UK_TESTCASE(posix_futex_testsuite, test_two_waiters_one_waker)
 
 	/* Wait for the threads to finish */
 	for (i = 0; i < num_threads; ++i)
-		wait_thread(threads[i]);
+		wait_thread(threads[i], args + i);
 
 	CHECK_ITERATIONS(rets, var_to_change_vals, num_iterations, num_threads,
 			 var_to_change, 2, false);
@@ -360,7 +373,7 @@ UK_TESTCASE(posix_futex_testsuite, test_cmp_requeue_two_waiters_no_requeue)
 
 	/* Wait for the threads to finish */
 	for (i = 0; i < num_threads; ++i)
-		wait_thread(threads[i]);
+		wait_thread(threads[i], args + i);
 
 	/* Requeuer should have woken up one waiter and requeued no thread */
 	UK_TEST_EXPECT_SNUM_EQ(rets[2][0], 1);
@@ -419,7 +432,7 @@ UK_TESTCASE(posix_futex_testsuite, test_cmp_requeue_two_waiters_one_waker)
 	threads[2] = uk_sched_thread_create(uk_sched_current(),
 			requeuer_func, args + 2, "Requeuer");
 
-	wait_thread(threads[2]);
+	wait_thread(threads[2], args + 2);
 
 	/* Requeuer should have woken up one waiter and requeued the other */
 	UK_TEST_EXPECT_SNUM_EQ(rets[2][0], 2);
@@ -430,7 +443,7 @@ UK_TESTCASE(posix_futex_testsuite, test_cmp_requeue_two_waiters_one_waker)
 	/* Wait for the threads to finish */
 	for (i = 0; i < num_threads; ++i)
 		if (i != 2)
-			wait_thread(threads[i]);
+			wait_thread(threads[i], args + i);
 
 	/* Waiters 1 and 2 should have been woken */
 	UK_TEST_EXPECT_SNUM_EQ(rets[0][0], 0);

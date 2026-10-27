@@ -714,6 +714,8 @@ struct uk_thread *uk_thread_create_container(struct uk_alloc *a,
 	if (!no_ectx && !a_uktls)
 		t_size += UK_LCPU_ECTX_SIZE + UK_LCPU_ECTX_ALIGN;
 
+	uk_sched_thread_gc_current();
+
 	t = uk_malloc(a, t_size);
 	if (!t)
 		goto err_out;
@@ -788,6 +790,8 @@ struct uk_thread *uk_thread_create_container2(struct uk_alloc *a,
 	t_size = sizeof(*t);
 	if (!no_ectx)
 		t_size += UK_LCPU_ECTX_SIZE + UK_LCPU_ECTX_ALIGN;
+
+	uk_sched_thread_gc_current();
 
 	t = uk_malloc(a, t_size);
 	if (!t)
