@@ -39,6 +39,18 @@
 #define __syscall_rret0		X0
 #define __syscall_rret1		X1
 
+#elif (defined __RISCV_64__)
+#define __syscall_rip		PC
+#define __syscall_rsyscall	A7
+#define __syscall_rarg0		A0
+#define __syscall_rarg1		A1
+#define __syscall_rarg2		A2
+#define __syscall_rarg3		A3
+#define __syscall_rarg4		A4
+#define __syscall_rarg5		A5
+
+#define __syscall_rret0		A0
+#define __syscall_rret1		A1
 #else
 #error "Missing register mappings for selected target architecture"
 #endif

@@ -22,6 +22,9 @@ KVM_LDFLAGS-y += -Wl,--entry=_libkvmplat_entry
 KVM_LDFLAGS-y += -Wl,-m,aarch64elf
 KVM_LDLIBS-y += -lgcc
 endif
+else ifeq (riscv64,$(CONFIG_UK_ARCH))
+KVM_LDFLAGS-y += -Wl,--entry=_libkvmplat_entry
+KVM_LDLIBS-y += -lgcc
 endif
 
 ##

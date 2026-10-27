@@ -486,7 +486,7 @@ int do_main(int argc, char *argv[])
 
 		uk_pr_debug("Call constructor: %p(%d, %p)...\n", *ctorfn,
 			    argc, argv);
-		(*ctorfn)(argc, argv);
+		(*ctorfn)();
 	}
 
 #if CONFIG_LIBUKPRINT_KLVL_INFO
