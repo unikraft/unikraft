@@ -268,6 +268,112 @@ UK_SYSCALL_R_DEFINE(int, munmap, void *, addr, size_t, len)
 	return 0;
 }
 
+static int do_mremap(void *addr, size_t old_len, size_t new_len, int flags,
+		     void *new_addr)
+{
+	struct uk_vas *vas = uk_vas_get_active();
+	__vaddr_t start = (__vaddr_t)addr, extension;
+	__vaddr_t target = (__vaddr_t)new_addr;
+	const struct uk_vma *vma;
+	unsigned long vflags;
+	int rc;
+
+	if (!UK_PAGING_PAGE_ALIGNED(start) || !old_len || !new_len)
+		return -EINVAL;
+	if (flags & ~(MREMAP_MAYMOVE | MREMAP_FIXED))
+		return -EINVAL;
+	if ((flags & MREMAP_FIXED) && !(flags & MREMAP_MAYMOVE))
+		return -EINVAL;
+	/* Linux aligns them up, wrapping to zero, which it refuses */
+	if (old_len > __SZ_MAX - (UK_PAGING_PAGE_SIZE - 1) ||
+	    new_len > __SZ_MAX - (UK_PAGING_PAGE_SIZE - 1))
+		return -EINVAL;
+
+	old_len = UK_PAGING_PAGE_ALIGN_UP(old_len);
+	new_len = UK_PAGING_PAGE_ALIGN_UP(new_len);
+	if (start > __VADDR_MAX - old_len)
+		return -EFAULT;
+	if (start > __VADDR_MAX - new_len)
+		return -ENOMEM;
+
+	/* MREMAP_FIXED's target: Linux checks it first */
+	if (flags & MREMAP_FIXED) {
+		if (!UK_PAGING_PAGE_ALIGNED(target) ||
+		    target > __VADDR_MAX - new_len)
+			return -EINVAL;
+		if (target < start + old_len && start < target + new_len)
+			return -EINVAL;
+	}
+
+	vma = uk_vma_find(vas, start);
+	if (!vma)
+		return -EFAULT;
+
+	/* A stack's guard pages are not part of it: musl finds the main
+	 * thread's stack by growing one page after another in place until
+	 * that fails with something else than ENOMEM.
+	 */
+	if (vma->ops == &uk_vma_stack_ops) {
+		__vaddr_t lo = vma->start + UK_VMA_STACK_BOTTOM_GUARD_SIZE;
+		__vaddr_t hi = vma->end - UK_VMA_STACK_TOP_GUARD_SIZE;
+
+		if (start < lo || start >= hi || old_len > hi - start)
+			return -EFAULT;
+	}
+
+	/* Mappings are never relocated. MREMAP_MAYMOVE only permits a move,
+	 * so try in place and fail with ENOMEM as Linux does when it cannot
+	 * move either: realloc() then falls back to allocate and copy.
+	 * MREMAP_FIXED asks for a move, which fails the same way.
+	 */
+	if (flags & MREMAP_FIXED)
+		return -ENOMEM;
+
+	/* Shrinking unmaps the tail, whatever it covers, as on Linux, and
+	 * the same size leaves it be
+	 */
+	if (new_len < old_len)
+		return uk_vma_unmap(vas, start + new_len,
+				    old_len - new_len, 0);
+	if (new_len == old_len)
+		return 0;
+	if (old_len > vma->end - start)
+		return -EFAULT;
+
+	/* A subrange cannot grow into the rest of its original mapping. */
+	extension = start + old_len;
+	if (extension < vma->end)
+		return -ENOMEM;
+	/* Anonymous memory in small pages only: a large page mapping grows
+	 * by large pages, which may not fit
+	 */
+	if (vma->ops != &uk_vma_anon_ops || vma->page_lvl > UK_PAGING_PAGE_LEVEL)
+		return -ENOMEM;
+
+	/* The mapping's own flags and owner, so that the two parts merge:
+	 * the type flags as they are, UK_VMA_FLAG_UNINITIALIZED as the map
+	 * flag that sets it (its bit means UK_VMA_MAP_POPULATE there).
+	 */
+	vflags = vma->flags & (UK_VMA_MAP_EXTF_MASK << UK_VMA_MAP_EXTF_SHIFT);
+	if (vma->flags & UK_VMA_FLAG_UNINITIALIZED)
+		vflags |= UK_VMA_MAP_UNINITIALIZED;
+	if (vma->page_lvl >= 0)
+		vflags |= UK_VMA_MAP_SIZE(UK_PAGING_PAGE_Lx_SHIFT(vma->page_lvl));
+	rc = uk_vma_map_owned(vas, &extension, new_len - old_len, vma->attr,
+			      vflags, vma->name, &uk_vma_anon_ops, NULL,
+			      vma->owner);
+	return rc == -EEXIST ? -ENOMEM : rc;
+}
+
+UK_LLSYSCALL_R_DEFINE(void *, mremap, void *, addr, size_t, old_len,
+		      size_t, new_len, int, flags, void *, new_addr)
+{
+	int rc;
+
+	rc = do_mremap(addr, old_len, new_len, flags, new_addr);
+	return rc ? (void *)(long)rc : addr;
+}
+
 UK_SYSCALL_R_DEFINE(int, mprotect, void *, addr, size_t, len, int, prot)
 {
 	struct uk_vas *vas = uk_vas_get_active();
