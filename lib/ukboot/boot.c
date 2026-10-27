@@ -115,6 +115,148 @@ struct uk_semaphore main_sema;
 
 #if defined(CONFIG_LIBUKBOOT_HEAP_BASE) && defined(CONFIG_LIBUKVMEM)
 static struct uk_vas kernel_vas;
+
+#if CONFIG_LIBUKBOOT_INITBBUDDY
+/* The heap is a VMA paged in on demand, and processes' mappings take frames
+ * from the same allocator. Paged in on first touch, a heap page the kernel
+ * touches once processes hold every frame faults with none to give, in the
+ * kernel, which cannot recover. So the heap backs the pages it hands out when
+ * it hands them out, and fails the allocation when it cannot. And it gives
+ * back the frames of the pages it takes back: the memory of a large file,
+ * once deleted, is the processes' again.
+ */
+
+/* Free blocks smaller than this keep their frames */
+#define HEAP_RELEASE_MIN_PAGES	16
+
+/* How much larger than the memory the heap's address range is */
+#define HEAP_RANGE_FACTOR	4
+
+/* Pages of 4 KiB: backing a large aligned block could otherwise take large
+ * pages, which a release of part of it has to split, with a frame for the
+ * new page table it may not find.
+ */
+#define HEAP_MAP_SIZE		UK_VMA_MAP_SIZE_4KB
+
+static uk_alloc_palloc_func_t heap_palloc_backend;
+static uk_alloc_getpsize_func_t heap_pmaxalloc_backend;
+static uk_alloc_getpsize_func_t heap_pavailmem_backend;
+
+/* The pages the heap can still back, with the page tables mapping them:
+ * its range is larger than that
+ */
+static long heap_pages_left(void)
+{
+	__sz free = kernel_vas.pt->fa->free_memory >> UK_PAGING_PAGE_SHIFT;
+	__sz left;
+
+	if (free <= CONFIG_LIBUKVMEM_RESERVE_PAGES)
+		return 0;
+	left = free - CONFIG_LIBUKVMEM_RESERVE_PAGES;
+	return (long)(left - MIN(left, (__sz)UK_PAGING_PT_PAGES(left)));
+}
+
+static long heap_pmaxalloc(struct uk_alloc *a)
+{
+	return MIN(heap_pmaxalloc_backend(a), heap_pages_left());
+}
+
+static long heap_pavailmem(struct uk_alloc *a)
+{
+	return MIN(heap_pavailmem_backend(a), heap_pages_left());
+}
+
+/* The allocator does not use these free pages, the block at @base less one
+ * page but its first (see uk_allocbbuddy_release_func_t): their frames are
+ * the processes' again. Not those of a small free block, which the next
+ * small allocations split; nor, in a larger one, the pages where splitting
+ * it writes the heads of the halves it leaves free (its 1st, 2nd, 4th, ...
+ * page): a split would fault them back in, for a free to give them back
+ * again.
+ */
+static void heap_release(struct uk_alloc *a __unused, void *base,
+			 unsigned long num_pages)
+{
+	__vaddr_t block = (__vaddr_t)base - UK_PAGING_PAGE_SIZE;
+	unsigned long half;
+
+	if (num_pages + 1 < HEAP_RELEASE_MIN_PAGES)
+		return;
+	for (half = 2; half <= num_pages; half <<= 1)
+		uk_vma_advise(&kernel_vas,
+			      block + ((half + 1) << UK_PAGING_PAGE_SHIFT),
+			      (half - 1) << UK_PAGING_PAGE_SHIFT,
+			      UK_VMA_ADV_DONTNEED, 0);
+}
+
+/* Whether every page of [@obj, @obj + @num_pages pages) is backed and
+ * writable: not a page a write will have to copy first (a platform's
+ * copy-on-write page), which takes a frame of its own
+ */
+static int heap_backed(void *obj, unsigned long num_pages)
+{
+	__vaddr_t vaddr = (__vaddr_t)obj;
+	unsigned int lvl;
+	__pte_t pte;
+
+	for (; num_pages; num_pages--, vaddr += UK_PAGING_PAGE_SIZE) {
+		lvl = UK_PAGING_PAGE_LEVEL;
+		if (uk_paging_pt_walk(kernel_vas.pt, vaddr, &lvl, __NULL,
+				      &pte) ||
+		    !UK_PAGING_PT_Lx_PTE_PRESENT(pte, lvl) ||
+		    !(uk_pal_attr_from_pte(pte, lvl) &
+		      UK_PAGING_PAGE_ATTR_PROT_WRITE))
+			return 0;
+	}
+	return 1;
+}
+
+static void *heap_palloc(struct uk_alloc *a, unsigned long num_pages)
+{
+	const __sz reserve = (__sz)CONFIG_LIBUKVMEM_RESERVE_PAGES
+			     << UK_PAGING_PAGE_SHIFT;
+	struct uk_falloc *fa = kernel_vas.pt->fa;
+	void *obj;
+
+	/* Leave the frames ukvmem keeps for faults that cannot fail, after
+	 * backing the pages and the page tables that map them. Short of
+	 * them, a block whose pages are all backed still, as a freed block's
+	 * may be, will do: taken while half of them is left, as the
+	 * allocator's own writes to the free blocks it splits are such
+	 * faults.
+	 */
+	if (fa->free_memory < ((num_pages + UK_PAGING_PT_PAGES(num_pages))
+			       << UK_PAGING_PAGE_SHIFT) + reserve) {
+		if (fa->free_memory < reserve / 2)
+			goto err_nomem;
+		obj = heap_palloc_backend(a, num_pages);
+		if (unlikely(!obj))
+			return __NULL;
+		if (heap_backed(obj, num_pages))
+			return obj;
+		uk_pfree(a, obj, num_pages);
+		goto err_nomem;
+	}
+
+	obj = heap_palloc_backend(a, num_pages);
+	if (unlikely(!obj))
+		return __NULL;
+
+	if (unlikely(uk_vma_advise(&kernel_vas, (__vaddr_t)obj,
+				   num_pages << UK_PAGING_PAGE_SHIFT,
+				   UK_VMA_ADV_WILLNEED, 0))) {
+		uk_pfree(a, obj, num_pages);
+		goto err_nomem;
+	}
+	return obj;
+
+err_nomem:
+	errno = ENOMEM;
+	return __NULL;
+}
+#else /* !CONFIG_LIBUKBOOT_INITBBUDDY */
+#define HEAP_MAP_SIZE		0
+#endif /* !CONFIG_LIBUKBOOT_INITBBUDDY */
 #endif /* CONFIG_LIBUKBOOT_HEAP_BASE && CONFIG_LIBUKVMEM */
 
 static struct uk_alloc *heap_init()
@@ -176,11 +318,26 @@ static struct uk_alloc *heap_init()
 	free_pages  = pt->fa->free_memory >> UK_PAGING_PAGE_SHIFT;
 	alloc_pages = free_pages - UK_PAGING_PT_PAGES(free_pages);
 
+#if CONFIG_LIBUKBOOT_INITBBUDDY
+	/* Its pages backed only as they are handed out (see heap_palloc()),
+	 * the heap can span more than the memory, and has to: the buddy
+	 * allocator serves a block from a free range aligned to the next
+	 * power of two, and a block that grows by copy (a file in ramfs)
+	 * needs the old and the new at once.  Up to the base of other VMAs.
+	 */
+	alloc_pages *= HEAP_RANGE_FACTOR;
+#if CONFIG_LIBUKVMEM_DEFAULT_BASE > CONFIG_LIBUKBOOT_HEAP_BASE
+	alloc_pages = MIN(alloc_pages,
+			  ((CONFIG_LIBUKVMEM_DEFAULT_BASE - heap_base)
+			   >> UK_PAGING_PAGE_SHIFT) - HEAP_INITIAL_PAGES);
+#endif /* CONFIG_LIBUKVMEM_DEFAULT_BASE > CONFIG_LIBUKBOOT_HEAP_BASE */
+#endif /* CONFIG_LIBUKBOOT_INITBBUDDY */
+
 	vaddr = heap_base;
 	rc = uk_vma_map_anon(&kernel_vas, &vaddr,
 			     (alloc_pages + HEAP_INITIAL_PAGES) << UK_PAGING_PAGE_SHIFT,
 			     UK_PAGING_PAGE_ATTR_PROT_RW,
-			     UK_VMA_MAP_UNINITIALIZED,
+			     UK_VMA_MAP_UNINITIALIZED | HEAP_MAP_SIZE,
 			     "heap");
 	if (unlikely(rc))
 		return NULL;
@@ -189,6 +346,16 @@ static struct uk_alloc *heap_init()
 			     (alloc_pages - HEAP_INITIAL_PAGES) << UK_PAGING_PAGE_SHIFT);
 	if (unlikely(rc))
 		return NULL;
+
+#if CONFIG_LIBUKBOOT_INITBBUDDY
+	heap_palloc_backend = a->palloc;
+	heap_pmaxalloc_backend = a->pmaxalloc;
+	heap_pavailmem_backend = a->pavailmem;
+	a->palloc = heap_palloc;
+	a->pmaxalloc = heap_pmaxalloc;
+	a->pavailmem = heap_pavailmem;
+	uk_allocbbuddy_set_release(a, heap_release);
+#endif /* CONFIG_LIBUKBOOT_INITBBUDDY */
 
 #if CONFIG_LIBVFSCORE_AUTOMOUNT_EXTRACT_BORROW
 	/* Files extracted from the initrd (initrd0) borrow its memory, so it
