@@ -27,6 +27,9 @@
 !.gitignore
 .*
 !.github/
+!.kiro/
+.kiro/*
+!.kiro/steering/
 
 # gnu global files
 GPATH
