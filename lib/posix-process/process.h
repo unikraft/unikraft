@@ -77,6 +77,9 @@ struct posix_process {
 	__u64 exit_signal;
 	int exit_status;
 	int term_signal; /* the signal ending it, while it ends; 0 before */
+#if CONFIG_LIBPOSIX_PROCESS_MULTIPROCESS && CONFIG_LIBPOSIX_MMAP
+	struct process_mmap_owner *mmap_owner;
+#endif
 #if CONFIG_LIBPOSIX_PROCESS_BRK
 	struct {
 		struct uk_mutex mtx;
@@ -104,6 +107,10 @@ struct posix_thread {
 	pid_t wait_pid;
 	/* With wait_pid == -1: the process group waited on, 0 for any */
 	pid_t wait_pgid;
+#if CONFIG_LIBPOSIX_PROCESS_MULTIPROCESS && CONFIG_LIBPOSIX_MMAP
+	/* The owner of the image this thread's execve() is loading */
+	struct process_mmap_owner *mmap_exec_owner;
+#endif
 
 	/* TODO: Mutex */
 };
@@ -179,6 +186,16 @@ void pprocess_exit_pthread(struct posix_thread *pthread,
  * vfork child
  */
 void pprocess_wait_vfork(struct posix_process *pprocess);
+
+#if CONFIG_LIBPOSIX_PROCESS_MULTIPROCESS && CONFIG_LIBPOSIX_MMAP
+/* execve() loads the new image under an owner of the calling thread's
+ * (begin), which a failed exec unmaps (abort); a successful one makes it
+ * the process's and drops the old image's owner (commit).
+ */
+int uk_process_mmap_exec_begin(void);
+void uk_process_mmap_exec_commit(void);
+void uk_process_mmap_exec_abort(void);
+#endif
 
 /* Wake every thread of @pprocess waiting in wait(), to look again */
 void pprocess_wake_waiters(struct posix_process *pprocess);
