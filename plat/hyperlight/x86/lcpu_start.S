@@ -19,8 +19,8 @@
  *   RDI = pointer to lcpu_sargs (entry function + stack pointer)
  *   RSI = pointer to hyperlight_entry_args
  *
- * Initializes FPU/SSE, switches to the boot stack, and calls
- * hyperlight_entry() in C.
+ * Initializes FPU/SSE (and AVX where available), switches to the boot
+ * stack, and calls hyperlight_entry() in C.
  */
 .code64
 .section .text.boot.64
@@ -44,6 +44,58 @@ ENTRY(lcpu_start64)
 	movq	%cr4, %rax
 	orq	$(UK_ARCH_X86_64_CR4_OSFXSR | UK_ARCH_X86_64_CR4_OSXMMEXCPT | UK_ARCH_X86_64_CR4_FSGSBASE), %rax
 	movq	%rax, %cr4
+
+	/*
+	 * Enable XSAVE, then AVX and AVX-512 where the CPU has them.
+	 * Programs built for x86-64-v3 (e.g. glibc's libc.a on Ubuntu 26.04)
+	 * use AVX2 without checking for it, and fault with #UD otherwise.
+	 * The extended context store picks XSAVE up from CPUID at boot.
+	 */
+	movl	$1, %eax
+	xorl	%ecx, %ecx
+	cpuid
+	testl	$(UK_ARCH_X86_64_CPUID1_ECX_XSAVE), %ecx
+	jz	.Lno_xsave
+	movl	%ecx, %r10d
+
+	movq	%cr4, %rax
+	orq	$(UK_ARCH_X86_64_CR4_OSXSAVE), %rax
+	movq	%rax, %cr4
+
+	/* Only ask XSETBV for components CPUID 0xD says it supports */
+	movl	$0xd, %eax
+	xorl	%ecx, %ecx
+	cpuid
+	movl	%eax, %r11d
+
+	movl	$(UK_ARCH_X86_64_XCR0_X87 | UK_ARCH_X86_64_XCR0_SSE), %esi
+	testl	$(UK_ARCH_X86_64_CPUID1_ECX_AVX), %r10d
+	jz	.Lset_xcr0
+	testl	$(UK_ARCH_X86_64_XCR0_AVX), %r11d
+	jz	.Lset_xcr0
+	orl	$(UK_ARCH_X86_64_XCR0_AVX), %esi
+
+	movl	$7, %eax
+	xorl	%ecx, %ecx
+	cpuid
+	testl	$(UK_ARCH_X86_64_CPUID7_EBX_AVX512F), %ebx
+	jz	.Lset_xcr0
+	movl	%r11d, %eax
+	andl	$(UK_ARCH_X86_64_XCR0_AVX512_OPMASK |			\
+		  UK_ARCH_X86_64_XCR0_AVX512_ZMM_HI256 |		\
+		  UK_ARCH_X86_64_XCR0_AVX512_HI16_ZMM), %eax
+	cmpl	$(UK_ARCH_X86_64_XCR0_AVX512_OPMASK |			\
+		  UK_ARCH_X86_64_XCR0_AVX512_ZMM_HI256 |		\
+		  UK_ARCH_X86_64_XCR0_AVX512_HI16_ZMM), %eax
+	jne	.Lset_xcr0
+	orl	%eax, %esi
+
+.Lset_xcr0:
+	xorl	%ecx, %ecx
+	xgetbv
+	orl	%esi, %eax
+	xsetbv
+.Lno_xsave:
 
 	/* Initialize MXCSR to default (mask all SIMD exceptions) */
 	pushq	$0x1f80

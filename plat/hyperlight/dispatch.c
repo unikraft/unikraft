@@ -59,6 +59,16 @@ static __u32 g_call_cid;
  */
 __u64 g_exn_stack_top;
 
+#ifdef __x86_64__
+/*
+ * XCR0 as lcpu_start64 set it, with AVX where the CPU has it.  Restore
+ * resets XCR0 to x87 only, so the snapshot fixup in
+ * hyperlight_dispatch_function() sets it back before anything saves or
+ * loads the extended context.
+ */
+__u64 g_xcr0;
+#endif /* __x86_64__ */
+
 /* ── Host-provided environment variables ─────────────────────────── */
 
 /* setenv() each KEY=VALUE entry of @buf (@len bytes, NUL-separated). */
@@ -210,6 +220,17 @@ void hyperlight_dispatch_init(void)
 	g_exn_stack_top = hl_call_get_exn_stack_top();
 	if (!g_exn_stack_top)
 		UK_CRASH("GetExnStackTop host function failed\n");
+#ifdef __x86_64__
+	__u64 cr4;
+
+	__asm__ volatile("movq %%cr4, %0" : "=r"(cr4));
+	if (cr4 & UK_ARCH_X86_64_CR4_OSXSAVE) {
+		__u32 lo, hi;
+
+		__asm__ volatile("xgetbv" : "=a"(lo), "=d"(hi) : "c"(0));
+		g_xcr0 = ((__u64)hi << 32) | lo;
+	}
+#endif /* __x86_64__ */
 }
 
 /* ── Dispatch inner ─────────────────────────────────────────────── */
@@ -537,6 +558,20 @@ hyperlight_dispatch_function(void)
 		 * value from the new page tables.
 		 */
 		"movq g_exn_stack_top(%%rip), %%rsp\n\t"
+
+		/*
+		 * Restore reset XCR0 to x87 only: set back what boot
+		 * enabled, before the extended context is saved or
+		 * loaded with the AVX state it now holds.
+		 */
+		"movq g_xcr0(%%rip), %%rax\n\t"
+		"testq %%rax, %%rax\n\t"
+		"jz 2f\n\t"
+		"movq %%rax, %%rdx\n\t"
+		"shrq $32, %%rdx\n\t"
+		"xorl %%ecx, %%ecx\n\t"
+		"xsetbv\n\t"
+		"2:\n\t"
 
 		/* Save the original IDTR (10 bytes, 16 allocated). */
 		"subq $16, %%rsp\n\t"
