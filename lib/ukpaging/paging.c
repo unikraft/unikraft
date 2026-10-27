@@ -953,6 +953,20 @@ EXIT_FREE:
 	return rc;
 }
 
+/* The distance from vaddr to the start of the next page of page_size. A
+ * walk that steps over a PTE mapping nothing at a level above the
+ * smallest is inside that PTE's page, not at its start, when the range
+ * began there: stepping a whole page_size from there would enter the
+ * next page table past its first entries and leave their pages as they
+ * were. An invalid vaddr walks a whole table with a page_size of 0.
+ */
+static inline __sz pg_step(__vaddr_t vaddr, __sz page_size)
+{
+	if (vaddr == UK_PAL_VADDR_INV)
+		return page_size;
+	return page_size - (vaddr & (page_size - 1));
+}
+
 static int pg_page_unmap(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 			 unsigned int level, __vaddr_t vaddr, __sz len,
 			 unsigned long flags)
@@ -966,6 +980,7 @@ static int pg_page_unmap(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 	unsigned int first_pte_idx[UK_PAL_PT_LEVELS];
 	unsigned int pte_idx, i;
 	int rc, skip_pt_free;
+	__sz step;
 
 	UK_ASSERT(lvl >= to_lvl);
 	pt_vaddr_cache[lvl] = pt_vaddr;
@@ -1083,20 +1098,22 @@ static int pg_page_unmap(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 					 lvl);
 		}
 
+		step = pg_step(vaddr, page_size);
+
 		/* If this is not the last PTE and there are still pages to
 		 * unmap, we continue to the next PTE in this level
 		 */
-		if ((pte_idx < UK_PAL_PT_Lx_PTES(lvl) - 1) && len > page_size) {
-			UK_ASSERT(vaddr <= __VADDR_MAX - page_size);
-			vaddr += page_size;
-			len -= page_size;
+		if ((pte_idx < UK_PAL_PT_Lx_PTES(lvl) - 1) && len > step) {
+			UK_ASSERT(vaddr <= __VADDR_MAX - step);
+			vaddr += step;
+			len -= step;
 			pte_idx++;
 
 			continue;
 		}
 
 		UK_ASSERT((pte_idx == UK_PAL_PT_Lx_PTES(lvl) - 1) ||
-			  (len <= page_size));
+			  (len <= step));
 
 		/* At this point, we either invalidated the last PTE in this
 		 * page table and we have to walk up again, or we tried to
@@ -1108,7 +1125,7 @@ static int pg_page_unmap(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 		 * the PTEs and all other PTEs are INVALID.
 		 */
 		while ((pte_idx == UK_PAL_PT_Lx_PTES(lvl) - 1) ||
-		       ((len <= page_size) && !skip_pt_free)) {
+		       ((len <= step) && !skip_pt_free)) {
 
 			/* If we reached the top level, stop. */
 			if (lvl == level)
@@ -1185,14 +1202,14 @@ static int pg_page_unmap(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 			pg_pt_free(pt, pt_vaddr_cache[plvl], plvl);
 		}
 
-		if (len <= page_size)
+		if (len <= step)
 			break;
 
 		pt_vaddr = pt_vaddr_cache[lvl];
 
-		UK_ASSERT(vaddr <= __VADDR_MAX - page_size);
-		vaddr += page_size;
-		len -= page_size;
+		UK_ASSERT(vaddr <= __VADDR_MAX - step);
+		vaddr += step;
+		len -= step;
 
 		if (vaddr != UK_PAL_VADDR_INV)
 			page_size = UK_PAL_PAGE_Lx_SIZE(lvl);
@@ -1249,6 +1266,7 @@ static int pg_page_set_attr(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 	__sz page_size;
 	unsigned int pte_idx_cache[UK_PAL_PT_LEVELS];
 	unsigned int pte_idx;
+	__sz step;
 	int rc;
 
 	UK_ASSERT(lvl >= to_lvl);
@@ -1347,14 +1365,16 @@ static int pg_page_set_attr(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 				uk_pal_tlb_flush_entry(vaddr);
 		}
 
+		step = pg_step(vaddr, page_size);
+
 		/* Bail out if there is nothing more to do */
-		if (page_size >= len)
+		if (step >= len)
 			break;
 
-		len -= page_size;
+		len -= step;
 
-		UK_ASSERT(vaddr <= __VADDR_MAX - page_size);
-		vaddr += page_size;
+		UK_ASSERT(vaddr <= __VADDR_MAX - step);
+		vaddr += step;
 
 		/* We need to change more pages. If we have reached the last PTE
 		 * in this page table, we have to walk up again until we reach
