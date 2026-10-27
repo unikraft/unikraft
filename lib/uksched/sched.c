@@ -266,6 +266,14 @@ unsigned int uk_sched_thread_gc(struct uk_sched *sched)
 	struct uk_thread *thread, *tmp;
 	unsigned int num = 0;
 
+	/* A destructor that makes a thread collects them too (see
+	 * uk_sched_thread_gc_current()): not from within this walk, whose
+	 * next entry it could release
+	 */
+	if (sched->collecting)
+		return 0;
+	sched->collecting = true;
+
 	/* Cleanup finished threads */
 	UK_TAILQ_FOREACH_SAFE(thread, &sched->exited_threads,
 			      thread_list, tmp) {
@@ -283,7 +291,21 @@ unsigned int uk_sched_thread_gc(struct uk_sched *sched)
 		++num;
 	}
 
+	sched->collecting = false;
 	return num;
+}
+
+void uk_sched_thread_gc_current(void)
+{
+	struct uk_sched *s = uk_sched_current();
+	unsigned long flags;
+
+	if (!s)
+		return;
+	/* As the idle thread does it */
+	flags = uk_lcpu_save_irqf();
+	uk_sched_thread_gc(s);
+	uk_lcpu_restore_irqf(flags);
 }
 
 void uk_sched_thread_terminate(struct uk_thread *thread)
