@@ -84,6 +84,17 @@ config LIBUKVMEM_STACK_GUARD_PAGES_BOTTOM
 	help
 		Number of guard pages for the bottom of the stack (low address)
 
+config LIBUKVMEM_RESERVE_PAGES
+	int "Frames kept from process mappings"
+	default 256
+	range 0 1048576
+	help
+		A page fault in a mapping that has an owner (a process's,
+		see uk_vma_map_owned()) fails once fewer than this many
+		frames are free, which ends that process. The frames left
+		serve the faults the kernel cannot fail, on its own stacks
+		say. 0 keeps none.
+
 config LIBUKVMEM_DEVFS_MAPS
 	bool "Register /dev/maps to devfs"
 	depends on LIBVFSCORE
