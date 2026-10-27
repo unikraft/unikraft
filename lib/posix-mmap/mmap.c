@@ -54,6 +54,13 @@ static inline unsigned long prot_to_attr(int prot)
 	return attr;
 }
 
+#if CONFIG_LIBPOSIX_PROCESS_MULTIPROCESS
+#include <uk/process.h>
+#define MMAP_OWNER() uk_process_mmap_owner()
+#else
+#define MMAP_OWNER() NULL
+#endif
+
 static int do_mmap(void **addr, size_t len, int prot, int flags, int fd,
 		   off_t offset)
 {
@@ -213,15 +220,16 @@ static int do_mmap(void **addr, size_t len, int prot, int flags, int fd,
 	/* MAP_NONBLOCKED: Ignored for now */
 	/* MAP_NORESERVE : Ignored for now */
 
-	rc = uk_vma_map(vas, &vaddr, len, vattr, vflags, NULL, vops, vargs);
+	rc = uk_vma_map_owned(vas, &vaddr, len, vattr, vflags, NULL, vops,
+			      vargs, MMAP_OWNER());
 	if (unlikely(rc && !(flags & MAP_FIXED) &&
 		     vaddr != UK_PAGING_VADDR_ANY)) {
 		/* If addr was meant as a hint and we fail to map, we retry
 		 * without specifying an address.
 		 */
 		vaddr = UK_PAGING_VADDR_ANY;
-		rc = uk_vma_map(vas, &vaddr, len, vattr, vflags, NULL, vops,
-				vargs);
+		rc = uk_vma_map_owned(vas, &vaddr, len, vattr, vflags, NULL,
+				      vops, vargs, MMAP_OWNER());
 	}
 
 #if CONFIG_LIBPOSIX_FDTAB && CONFIG_LIBPOSIX_FDIO
@@ -348,6 +356,12 @@ static int do_mremap(void *addr, size_t old_len, size_t new_len, int flags,
 	 * by large pages, which may not fit
 	 */
 	if (vma->ops != &uk_vma_anon_ops || vma->page_lvl > UK_PAGING_PAGE_LEVEL)
+		return -ENOMEM;
+	/* Nor another's: what grows takes the mapping's owner, and the
+	 * caller's memory would live as long as the kernel's (brk) or
+	 * another process's
+	 */
+	if (vma->owner != MMAP_OWNER())
 		return -ENOMEM;
 
 	/* The mapping's own flags and owner, so that the two parts merge:

@@ -34,6 +34,7 @@ wait4
 waitpid
 waitid
 uk_sys_getpid
+uk_process_mmap_owner
 getpid
 uk_sys_getppid
 getppid
