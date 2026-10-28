@@ -8,6 +8,7 @@
 /..config.tmp
 /.config
 *.depend
+/hello
 *.o
 *.a
 *.d
