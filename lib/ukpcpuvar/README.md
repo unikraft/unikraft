@@ -33,7 +33,7 @@ The total section size is reserved at link time; `mkukpcpuvar.py` fills in the c
 At runtime, each CPU's copy is reached by offsetting from the template symbol address by `idx * _uk_pcpuvar_tmpl_size`:
 
 - **x86_64**: The GS base register is pre-loaded with the CPU's slot offset, so any per-CPU access compiles to a single GS-relative RIP instruction — `%gs:sym(%rip)` — with no extra arithmetic at the access site.
-- **arm64**: `TPIDR_EL1` holds the equivalent slot offset; accesses compute `TPIDR_EL1 + (sym - _uk_pcpuvar_base)` at the access site.
+- **arm64**: `TPIDR_EL1` holds the equivalent slot offset; accesses compute `TPIDR_EL1 + sym` at the access site.
 
 ### Referencing a Symbol Directly
 
