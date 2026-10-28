@@ -218,6 +218,7 @@ static struct epoll_entry **epoll_find(const struct uk_file *epf, int fd,
 static void epoll_autodel(void *arg)
 {
 	struct epoll_entry *ent = arg;
+	const struct uk_file *epf = ent->epf;
 	union epoll_shim_file sf;
 	struct epoll_entry **entp;
 
@@ -226,19 +227,20 @@ static void epoll_autodel(void *arg)
 #endif /* CONFIG_LIBVFSCORE */
 
 	sf.file = ent->f;
-	uk_file_wlock(ent->epf);
+	uk_file_wlock(epf);
 
 #if CONFIG_LIBVFSCORE
-	entp = epoll_find(ent->epf, ent->fd, 0, sf);
+	entp = epoll_find(epf, ent->fd, 0, sf);
 #else /* !CONFIG_LIBVFSCORE */
-	entp = epoll_find(ent->epf, ent->fd, sf);
+	entp = epoll_find(epf, ent->fd, sf);
 #endif /* !CONFIG_LIBVFSCORE */
 
-	if (entp) {
+	/* Frees @ent: not to be read past here */
+	if (*entp) {
 		uk_pr_info("Removing closed file fd:%d (@%p)\n", ent->fd, ent);
-		epoll_entry_del(ent->epf, entp);
+		epoll_entry_del(epf, entp);
 	}
-	uk_file_wunlock(ent->epf);
+	uk_file_wunlock(epf);
 }
 
 static void epoll_register(const struct uk_file *epf, struct epoll_entry *ent,
@@ -508,6 +510,15 @@ int uk_sys_epoll_ctl(const struct uk_file *epf, int op, int fd,
 			ret = -EFAULT;
 		else if (unlikely(*entp))
 			ret = -EEXIST;
+#if CONFIG_LIBVFSCORE
+		else if (unlikely(!legacy && esf.file == epf))
+#else /* !CONFIG_LIBVFSCORE */
+		else if (unlikely(esf.file == epf))
+#endif /* !CONFIG_LIBVFSCORE */
+			/* As on Linux: the instance would watch itself, and
+			 * closing it frees what it then still reads
+			 */
+			ret = -EINVAL;
 		else
 #if CONFIG_LIBVFSCORE
 			if (legacy)
