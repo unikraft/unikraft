@@ -68,6 +68,9 @@
 #define LIBVFSCORE_EXTRACT_DRV					"extract"
 #define LIBVFSCORE_EXTRACT_DEV_INITRD0				"initrd0"
 #define LIBVFSCORE_EXTRACT_DEV_EMBEDDED				"embedded"
+#define LIBVFSCORE_INITRD_OPT_MKMP				"mkmp"
+#define LIBVFSCORE_INITRD_OPT_IFINITRD0				"ifinitrd0"
+#define LIBVFSCORE_INITRD_OPT_IFNOINITRD0			"ifnoinitrd0"
 
 #define LIBVFSCORE_UKOPT_MKMP					(0x1 << 0)
 #define LIBVFSCORE_UKOPT_IFINITRD0				(0x1 << 1)
@@ -735,15 +738,15 @@ static unsigned int vfscore_volume_parse_ukopts(char *ukopts)
 			continue; /* empty option */
 		}
 
-		if (!strcmp(opt, "mkmp")) {
+		if (!strcmp(opt, LIBVFSCORE_INITRD_OPT_MKMP)) {
 			ret |= LIBVFSCORE_UKOPT_MKMP;
 			continue;
 		}
-		if (!strcmp(opt, "ifinitrd0")) {
+		if (!strcmp(opt, LIBVFSCORE_INITRD_OPT_IFINITRD0)) {
 			ret |= LIBVFSCORE_UKOPT_IFINITRD0;
 			continue;
 		}
-		if (!strcmp(opt, "ifnoinitrd0")) {
+		if (!strcmp(opt, LIBVFSCORE_INITRD_OPT_IFNOINITRD0)) {
 			ret |= LIBVFSCORE_UKOPT_IFNOINITRD0;
 			continue;
 		}
