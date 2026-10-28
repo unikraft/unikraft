@@ -73,6 +73,13 @@
 
 #include <uk/console/driver.h>
 #include <common/hypervisor.h>
+#if CONFIG_ARCH_ARM_64 || CONFIG_ARCH_ARM_32
+#include <xen-arm/hypercall.h>
+#elif CONFIG_ARCH_X86_64
+#include <xen-x86/hypercall.h>
+#else
+#error "Unsupported Xen architecture"
+#endif
 #include <uk/boot/earlytab.h>
 #include <uk/prio.h>
 #include <uk/plat/common/bootinfo.h>
