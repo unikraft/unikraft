@@ -121,6 +121,13 @@ extern __u64 hl_scratch_base_gva;
  */
 __u64 hl_scratch_alloc_pages(__u64 n);
 
+/* Pages at the top of scratch the host keeps, and the end of what
+ * hl_scratch_alloc_pages() hands out below them
+ */
+#define HL_SCRATCH_RESERVED_PAGES 2
+#define HL_SCRATCH_LIMIT \
+	(HL_MAX_GPA + 1 - HL_SCRATCH_RESERVED_PAGES * 4096ULL)
+
 /*
  * Give the copy-on-write page at @va a fresh scratch page, without
  * copying its contents.  Defined in cow.c.

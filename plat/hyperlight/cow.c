@@ -103,13 +103,12 @@ static inline void cow_write_pte(__u64 pte_phys, __u64 value)
  * Two pages at the top of scratch are reserved for the exception
  * stack and shared metadata — the allocator must not touch them.
  */
-#define HL_SCRATCH_RESERVED_PAGES 2
 __u64 hl_scratch_alloc_pages(__u64 n)
 {
 	volatile __u64 *alloc_ptr = (volatile __u64 *)HL_SCRATCH_ALLOC_GVA;
 	__u64 nbytes = n * HL_PAGE_SIZE;
 	__u64 old;
-	__u64 max_avail = HL_MAX_GPA + 1 - HL_SCRATCH_RESERVED_PAGES * HL_PAGE_SIZE;
+	__u64 max_avail = HL_SCRATCH_LIMIT;
 
 #if defined(__x86_64__)
 	__asm__ volatile("lock xaddq %0, (%1)"

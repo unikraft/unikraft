@@ -102,7 +102,7 @@ static __sz hl_paging_fa_size(void)
 
 	/* Dynamic fallback: read bump pointer, compute remaining */
 	bump_pos = *(volatile __u64 *)HL_SCRATCH_ALLOC_GVA;
-	max_avail = HL_MAX_GPA + 1 - 2 * __PAGE_SIZE; /* 2 reserved pages */
+	max_avail = HL_SCRATCH_LIMIT;
 	if (bump_pos >= max_avail)
 		return 0;
 
@@ -256,6 +256,11 @@ int ukplat_mem_init(void)
 /* Pieces smaller than this are not worth a zone of their own. */
 #define HL_FA_MIN_ZONE (64UL << 10)
 
+/* Scratch the allocator leaves for copy-on-write faults between two of its
+ * looks at what is left (see hl_fa_grow())
+ */
+#define HL_FA_COW_MARGIN (1UL << 20)
+
 /* What the allocator may still take from scratch. */
 static __sz hl_fa_budget;
 
@@ -301,19 +306,52 @@ static int hl_fa_add_range(__paddr_t start, __sz len)
  * such a chunk is an aligned free block.  The scratch skipped to reach that
  * boundary is added too, as smaller zones.
  */
+/* Stop counting what is left of the budget: it is not to be had */
+static void hl_fa_drop_budget(struct uk_falloc *fa)
+{
+	fa->total_memory -= MIN(hl_fa_budget, fa->total_memory);
+	fa->free_memory -= MIN(hl_fa_budget, fa->free_memory);
+	hl_fa_budget = 0;
+}
+
 static int hl_fa_grow(unsigned long frames)
 {
 	struct uk_falloc *fa = hyperlight_pt.fa;
-	__sz size = HL_FA_CHUNK, len;
+	__u64 max_avail = HL_SCRATCH_LIMIT;
+	__sz size = HL_FA_CHUNK, len, left, cut, added;
 	__paddr_t start;
 	__u64 bump;
+	int rc;
 
 	while (size < (__sz)frames * __PAGE_SIZE * 2)
 		size <<= 1;
 	bump = *(volatile __u64 *)HL_SCRATCH_ALLOC_GVA;
+
+	/* Copy-on-write faults take from the same scratch: the budget, and
+	 * the free memory counted with it, cannot be more than is left, less
+	 * what those faults may take before the next look here.
+	 */
+	left = bump + HL_FA_COW_MARGIN < max_avail ?
+		(max_avail - bump - HL_FA_COW_MARGIN) &
+		~((__sz)__PAGE_SIZE - 1) : 0;
+	if (hl_fa_budget > left) {
+		cut = hl_fa_budget - left;
+		hl_fa_budget = left;
+		fa->total_memory -= MIN(cut, fa->total_memory);
+		fa->free_memory -= MIN(cut, fa->free_memory);
+	}
+
+	/* With no room for a whole chunk, the rest of the budget, in the
+	 * pieces it makes: the free memory counted should be there to take.
+	 */
 	len = ALIGN_UP(bump, size) - bump + size;
 	if (len > hl_fa_budget)
+		len = hl_fa_budget;
+	if (len < HL_FA_MIN_ZONE) {
+		/* Too little to make a zone of: not to be had */
+		hl_fa_drop_budget(fa);
 		return -ENOMEM;
+	}
 	start = hl_scratch_alloc_pages(len / __PAGE_SIZE);
 	hl_fa_budget -= len;
 
@@ -322,7 +360,19 @@ static int hl_fa_grow(unsigned long frames)
 	 */
 	fa->total_memory -= len;
 	fa->free_memory -= len;
-	return hl_fa_add_range(start, len);
+	added = fa->total_memory;
+	rc = hl_fa_add_range(start, len);
+	if (unlikely(rc))
+		return rc;
+
+	/* A tail cut from the budget can be all pieces too small for a zone:
+	 * then there is no more to grow into
+	 */
+	if (fa->total_memory == added) {
+		hl_fa_drop_budget(fa);
+		return -ENOMEM;
+	}
+	return 0;
 }
 
 static int hl_falloc_grow(struct uk_falloc *fa, __paddr_t *paddr,
@@ -393,7 +443,7 @@ void hyperlight_paging_reinit(void)
 	 * we always use the bump-pointer calculation here.
 	 */
 	bump_pos = *(volatile __u64 *)HL_SCRATCH_ALLOC_GVA;
-	max_avail = HL_MAX_GPA + 1 - 2 * __PAGE_SIZE;
+	max_avail = HL_SCRATCH_LIMIT;
 	if (bump_pos >= max_avail)
 		return;
 
