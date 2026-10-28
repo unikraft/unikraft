@@ -39,8 +39,6 @@
 
 #include <hyperlight/mem.h>
 
-#define HL_PAGE_SIZE	4096ULL
-
 /*
  * Scratch region base addresses, computed at init from scratch metadata.
  * Non-static so the paging arch layer can translate scratch GPAs to GVAs.

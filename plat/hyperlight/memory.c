@@ -299,6 +299,16 @@ static int hl_fa_add_range(__paddr_t start, __sz len)
 	return 0;
 }
 
+/* Stop counting @cut of the budget, and the memory it stood for: it is
+ * not to be had
+ */
+static void hl_fa_uncount(struct uk_falloc *fa, __sz cut)
+{
+	hl_fa_budget -= cut;
+	fa->total_memory -= MIN(cut, fa->total_memory);
+	fa->free_memory -= MIN(cut, fa->free_memory);
+}
+
 /*
  * Give the allocator a chunk of scratch large enough for an aligned block
  * of @frames: a power of two, at least twice that, on a multiple of its
@@ -306,19 +316,11 @@ static int hl_fa_add_range(__paddr_t start, __sz len)
  * such a chunk is an aligned free block.  The scratch skipped to reach that
  * boundary is added too, as smaller zones.
  */
-/* Stop counting what is left of the budget: it is not to be had */
-static void hl_fa_drop_budget(struct uk_falloc *fa)
-{
-	fa->total_memory -= MIN(hl_fa_budget, fa->total_memory);
-	fa->free_memory -= MIN(hl_fa_budget, fa->free_memory);
-	hl_fa_budget = 0;
-}
-
 static int hl_fa_grow(unsigned long frames)
 {
 	struct uk_falloc *fa = hyperlight_pt.fa;
 	__u64 max_avail = HL_SCRATCH_LIMIT;
-	__sz size = HL_FA_CHUNK, len, left, cut, added;
+	__sz size = HL_FA_CHUNK, len, left, added;
 	__paddr_t start;
 	__u64 bump;
 	int rc;
@@ -334,12 +336,8 @@ static int hl_fa_grow(unsigned long frames)
 	left = bump + HL_FA_COW_MARGIN < max_avail ?
 		(max_avail - bump - HL_FA_COW_MARGIN) &
 		~((__sz)__PAGE_SIZE - 1) : 0;
-	if (hl_fa_budget > left) {
-		cut = hl_fa_budget - left;
-		hl_fa_budget = left;
-		fa->total_memory -= MIN(cut, fa->total_memory);
-		fa->free_memory -= MIN(cut, fa->free_memory);
-	}
+	if (hl_fa_budget > left)
+		hl_fa_uncount(fa, hl_fa_budget - left);
 
 	/* With no room for a whole chunk, the rest of the budget, in the
 	 * pieces it makes: the free memory counted should be there to take.
@@ -349,7 +347,7 @@ static int hl_fa_grow(unsigned long frames)
 		len = hl_fa_budget;
 	if (len < HL_FA_MIN_ZONE) {
 		/* Too little to make a zone of: not to be had */
-		hl_fa_drop_budget(fa);
+		hl_fa_uncount(fa, hl_fa_budget);
 		return -ENOMEM;
 	}
 	start = hl_scratch_alloc_pages(len / __PAGE_SIZE);
@@ -369,7 +367,7 @@ static int hl_fa_grow(unsigned long frames)
 	 * then there is no more to grow into
 	 */
 	if (fa->total_memory == added) {
-		hl_fa_drop_budget(fa);
+		hl_fa_uncount(fa, hl_fa_budget);
 		return -ENOMEM;
 	}
 	return 0;
