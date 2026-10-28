@@ -42,6 +42,24 @@ extern "C" {
 
 struct uk_alloc *uk_allocbbuddy_init(void *base, size_t len);
 
+/**
+ * Called, once a free is done, with each free block the free made or grew
+ * (merged with its free buddies) but for its first page, which holds its free
+ * list entry: pages the allocator does not read or write until it splits the
+ * block. Over memory paged in on demand, their frames can be given back. Some
+ * may have been given back already, before the block grew.
+ */
+typedef void (*uk_allocbbuddy_release_func_t)(struct uk_alloc *a,
+					       void *base,
+					       unsigned long num_pages);
+
+/**
+ * Set the function called with the pages the allocator stops using
+ * (see uk_allocbbuddy_release_func_t), or none.
+ */
+void uk_allocbbuddy_set_release(struct uk_alloc *a,
+				uk_allocbbuddy_release_func_t release);
+
 #ifdef __cplusplus
 }
 #endif
