@@ -60,7 +60,7 @@
 #include "../../pci_ecam.h"
 
 #define DEVFN(dev, fn)   ((dev << PCI_FN_BIT_NBR) | fn)
-#define SIZE_PER_PCI_DEV 0x20	/* legacy pci device size, no msi */
+#define SIZE_PER_PCI_DEV 0x1000	/* legacy pci device size, no msi */
 
 static int arch_pci_driver_add_device(struct pci_driver *drv,
 					struct pci_address *addr,
@@ -175,7 +175,7 @@ int arch_pci_probe(struct uk_alloc *pha)
 			} else {
 				base = pcw.pci_device_base + (bus << 5 | dev)*SIZE_PER_PCI_DEV;
 				pci_generic_config_write(bus, DEVFN(dev, 0), PCI_COMMAND, 2, PCI_COMMAND_INTX_DISABLE);
-				pci_generic_config_write(bus, DEVFN(dev, 0), PCI_BASE_ADDRESS_0, 4, (bus << 5 | dev)*SIZE_PER_PCI_DEV);
+				pci_generic_config_write(bus, DEVFN(dev, 0), PCI_BASE_ADDRESS_0, 4, ((bus << 5 | dev)*SIZE_PER_PCI_DEV)) & ~0xF;
 				pci_generic_config_write(bus, DEVFN(dev, 0), PCI_COMMAND, 2, PCI_COMMAND_MASTER | PCI_COMMAND_IO);
 			}
 
