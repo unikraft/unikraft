@@ -39,6 +39,7 @@
 #include <uk/print.h>
 #include <uk/alloc.h>
 #include <uk/netdev_driver.h>
+/* cppcheck-suppress missingInclude */
 #include <uk/plat/xen/except.h>
 #if defined(__i386__) || defined(__x86_64__)
 #include <xen-x86/mm.h>
