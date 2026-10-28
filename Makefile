@@ -638,7 +638,12 @@ $(eval $(call verbose_include,$(CONFIG_UK_BASE)/arch/$(UK_FAMILY)/Compiler.uk))
 
 # Make variables (CC, etc...)
 LD		:= $(CONFIG_CROSS_COMPILE)$(CONFIG_COMPILER)
+# Allow CC to be set from environment variable
+ifneq ("$(origin CC)","undefined")
+CC		:= $(CC)
+else
 CC		:= $(CONFIG_CROSS_COMPILE)$(CONFIG_COMPILER)
+endif
 CPP		:= $(CC)
 CXX		:= $(CPP)
 GOC		:= $(CONFIG_CROSS_COMPILE)gccgo
