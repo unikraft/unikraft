@@ -63,11 +63,10 @@ int uk_file_finref_release(struct uk_file_finref *r)
 	return uk_swrefcount_release(&r->cnt);
 }
 
+/* Run the finalizers in list @fin */
 static inline
-void uk_file_finref_finalize(struct uk_file_finref *r)
+void uk_file_finref_run(struct uk_file_finalize_cb *fin)
 {
-	struct uk_file_finalize_cb *fin = r->fins;
-
 	while (fin) {
 		/* The call might free fin, read next before */
 		struct uk_file_finalize_cb *next = fin->next;

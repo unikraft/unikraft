@@ -310,8 +310,6 @@ typedef struct uk_file_finref uk_file_refcnt;
 #define UK_FILE_REFCNT_INIT_VALUE_V(name, v) \
 	UK_FILE_FINREF_INIT_VALUE((name), (v))
 
-#define uk_file_refcnt_finalize uk_file_finref_finalize
-
 #define uk_file_refcnt_acquire		uk_file_finref_acquire
 #define uk_file_refcnt_acquire_weak	uk_file_finref_acquire_weak
 #define uk_file_refcnt_try_acquire	uk_file_finref_try_acquire
@@ -325,8 +323,6 @@ typedef struct uk_swrefcount uk_file_refcnt;
 	UK_SWREFCOUNT_INITIALIZER((v), (v))
 #define UK_FILE_REFCNT_INIT_VALUE_V(name, v) \
 	UK_SWREFCOUNT_INIT_VALUE((v), (v))
-
-#define uk_file_refcnt_finalize(_) do { } while (0)
 
 #define uk_file_refcnt_acquire		uk_swrefcount_acquire
 #define uk_file_refcnt_acquire_weak	uk_swrefcount_acquire_weak
@@ -437,11 +433,20 @@ static inline
 void uk_file_release(const struct uk_file *f)
 {
 	int r = uk_file_refcnt_release(f->refcnt);
+#if CONFIG_LIBUKFILE_FINALIZERS
+	/* The finalizers run once the last strong reference is gone. Read
+	 * before _release(), which frees the file when no weak one is left
+	 * either; run after, as they drop the weak references they hold.
+	 */
+	struct uk_file_finalize_cb *fins =
+		(r & UK_SWREFCOUNT_LAST_STRONG) ? f->refcnt->fins : NULL;
+#endif /* CONFIG_LIBUKFILE_FINALIZERS */
 
 	if (r)
 		f->_release(f, r);
-	if (r | UK_SWREFCOUNT_LAST_STRONG)
-		uk_file_refcnt_finalize(f->refcnt);
+#if CONFIG_LIBUKFILE_FINALIZERS
+	uk_file_finref_run(fins);
+#endif /* CONFIG_LIBUKFILE_FINALIZERS */
 }
 
 static inline
