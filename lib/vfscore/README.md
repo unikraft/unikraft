@@ -37,7 +37,7 @@ You can notice that this is done very similar to defining a new filesystem, as i
 - [`syscalls.c`](https://github.com/unikraft/unikraft/blob/staging/lib/vfscore/syscalls.c) does the actual generic implementation of the `sys_*` function defined in [`vfs.h`](https://github.com/unikraft/unikraft/blob/staging/lib/vfscore/vfs.h#L121).
 
 - [`main.c`](https://github.com/unikraft/unikraft/blob/staging/lib/vfscore/main.c) defines the specific Unikraft system calls for interacting with a filesystem, which are based on the files described above. 
-You can read more about adding a new system call for Unikraft [here](https://unikraft.org/docs/develop/syscall-shim/).
+You can read more about adding a new system call for Unikraft [here](https://unikraft.org/docs/internals/syscall-shim/).
 
 ## Key Functions and Data Structures
 
