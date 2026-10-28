@@ -122,9 +122,9 @@ SECTIONS {
 	_ectors = .;
 	. = ALIGN(__PAGE_SIZE);
 
-	TLS_SECTIONS
-
 	DATA_SECTIONS
+
+	TLS_SECTIONS
 
 	/*
 	 * TODO
