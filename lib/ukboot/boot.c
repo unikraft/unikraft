@@ -41,6 +41,9 @@
 #include <errno.h>
 
 #include <uk/boot.h>
+#if CONFIG_LIBUKBOOT_HEAP_RELEASE
+#include <uk/heap.h>
+#endif
 #ifdef CONFIG_LIBUKPAGING
 #include <uk/falloc.h>
 #include <uk/paging.h>
@@ -138,6 +141,7 @@ static struct uk_vas kernel_vas;
  */
 #define HEAP_MAP_SIZE		UK_VMA_MAP_SIZE_4KB
 
+static struct uk_alloc *heap_alloc;
 static uk_alloc_palloc_func_t heap_palloc_backend;
 static uk_alloc_getpsize_func_t heap_pmaxalloc_backend;
 static uk_alloc_getpsize_func_t heap_pavailmem_backend;
@@ -166,85 +170,311 @@ static long heap_pavailmem(struct uk_alloc *a)
 	return MIN(heap_pavailmem_backend(a), heap_pages_left());
 }
 
+/* An allocation's pages in question, for the chunks it is freed as, which
+ * are the allocator's to say (uk_allocbbuddy_foreach_chunk()). The pages of
+ * a chunk the allocator keeps frames behind (heap_keeps()), as
+ * heap_release() does for a free block: all of a small chunk, which the
+ * next small allocations split; of a larger one its first, where its head
+ * is written, and those a power of two from its start, where the heads of
+ * the halves it is split into are.
+ */
+struct heap_walk {
+	__vaddr_t start, end;	/* the pages in question */
+	__vaddr_t lowest;	/* the lowest address given back */
+	int rc;			/* the first failure to take frames */
+};
+
+/* Whether the allocator keeps a frame behind page @page, from its start, of
+ * a chunk of @size pages (see struct heap_walk): all of a small chunk, and
+ * of a larger one its first and those a power of two from it
+ */
+static bool heap_keeps(unsigned long size, unsigned long page)
+{
+	return size < HEAP_RELEASE_MIN_PAGES || page == 0 || POWER_OF_2(page);
+}
+
+/* The first page from @page on where heap_keeps() says otherwise than for
+ * @page, or @size: the kept pages of a large chunk are 0, 1, 2 and the
+ * powers of two, so a kept run past page 2 is one page, and an unkept run
+ * ends at the next power of two
+ */
+static unsigned long heap_keeps_until(unsigned long size, unsigned long page)
+{
+	unsigned long next;
+
+	if (size < HEAP_RELEASE_MIN_PAGES)
+		return size;
+	if (page < 3)
+		return 3;
+	if (heap_keeps(size, page))
+		return page + 1;
+	next = 1UL << (sizeof(long) * 8 - __builtin_clzl(page));
+	return MIN(next, size);
+}
+
+/* The chunk's pages from @lo to @hi, by runs the allocator keeps (@kept) or
+ * does not, each run to @fn
+ */
+static void heap_chunk_runs(__vaddr_t chunk, unsigned long size,
+			    __vaddr_t lo, __vaddr_t hi, bool kept,
+			    void (*fn)(__vaddr_t lo, __vaddr_t hi, void *arg),
+			    void *arg)
+{
+	unsigned long page, end, run;
+
+	/* A chunk the range does not reach, or reaches past: nothing of it */
+	if (lo >= hi)
+		return;
+	page = (lo - chunk) >> UK_PAGING_PAGE_SHIFT;
+	end = (hi - chunk) >> UK_PAGING_PAGE_SHIFT;
+	while (page < end) {
+		run = MIN(end, heap_keeps_until(size, page));
+		if (heap_keeps(size, page) == kept)
+			fn(chunk + (page << UK_PAGING_PAGE_SHIFT),
+			   chunk + (run << UK_PAGING_PAGE_SHIFT), arg);
+		page = run;
+	}
+}
+
+/* Give the frames behind a run of pages the allocator does not keep back.
+ * Failed part-way, some pages are gone: all are taken to be, the safe way
+ * round for whoever writes to them next.
+ */
+static void heap_release_run(__vaddr_t lo, __vaddr_t hi, void *arg)
+{
+	struct heap_walk *w = arg;
+	int rc = uk_vma_advise(&kernel_vas, lo, hi - lo, UK_VMA_ADV_DONTNEED,
+			       0);
+
+	if (unlikely(rc))
+		uk_pr_warn("Could not give the frames of %#lx-%#lx back: %d\n",
+			   lo, hi, rc);
+	w->lowest = MIN(w->lowest, lo);
+}
+
+/* Give the frames behind the chunk's pages the allocator does not keep,
+ * among the pages in question, back
+ */
+static void heap_release_chunk(void *chunk, unsigned long size, void *arg)
+{
+	struct heap_walk *w = arg;
+	__vaddr_t c = (__vaddr_t)chunk;
+
+	heap_chunk_runs(c, size, MAX(w->start, c),
+			MIN(w->end, c + (size << UK_PAGING_PAGE_SHIFT)),
+			false, heap_release_run, w);
+}
+
+/* See uk/heap.h */
+__vaddr_t uk_heap_release_range(void *base, unsigned long num_pages,
+				__vaddr_t start, __vaddr_t end)
+{
+	struct heap_walk w = { .start = start, .end = end, .lowest = end };
+
+	uk_allocbbuddy_foreach_chunk(base, num_pages, heap_release_chunk, &w);
+	return w.lowest;
+}
+
 /* The allocator does not use these free pages, the block at @base less one
  * page but its first (see uk_allocbbuddy_release_func_t): their frames are
- * the processes' again. Not those of a small free block, which the next
- * small allocations split; nor, in a larger one, the pages where splitting
- * it writes the heads of the halves it leaves free (its 1st, 2nd, 4th, ...
- * page): a split would fault them back in, for a free to give them back
- * again.
+ * the processes' again, but for the pages heap_release_chunk() keeps.
  */
 static void heap_release(struct uk_alloc *a __unused, void *base,
 			 unsigned long num_pages)
 {
-	__vaddr_t block = (__vaddr_t)base - UK_PAGING_PAGE_SIZE;
-	unsigned long half;
-
-	if (num_pages + 1 < HEAP_RELEASE_MIN_PAGES)
-		return;
-	for (half = 2; half <= num_pages; half <<= 1)
-		uk_vma_advise(&kernel_vas,
-			      block + ((half + 1) << UK_PAGING_PAGE_SHIFT),
-			      (half - 1) << UK_PAGING_PAGE_SHIFT,
-			      UK_VMA_ADV_DONTNEED, 0);
+	uk_heap_release_range((char *)base - UK_PAGING_PAGE_SIZE,
+			      num_pages + 1, (__vaddr_t)base,
+			      (__vaddr_t)base +
+			      (num_pages << UK_PAGING_PAGE_SHIFT));
 }
 
-/* Whether every page of [@obj, @obj + @num_pages pages) is backed and
- * writable: not a page a write will have to copy first (a platform's
- * copy-on-write page), which takes a frame of its own
+/* Whether there are frames for @pages more heap pages: what heap_pages_left()
+ * counts, the page tables mapping them and the frames ukvmem keeps for faults
+ * that cannot fail set aside
  */
-static int heap_backed(void *obj, unsigned long num_pages)
+static bool heap_can_back(unsigned long pages)
 {
-	__vaddr_t vaddr = (__vaddr_t)obj;
+	return pages <= (unsigned long)heap_pages_left();
+}
+
+/* Whether half of the frames ukvmem keeps for faults that cannot fail are
+ * gone: then the allocator is not asked for a block, as its own writes to
+ * the free blocks it splits are such faults
+ */
+static bool heap_reserve_drained(void)
+{
+	const __sz reserve = (__sz)CONFIG_LIBUKVMEM_RESERVE_PAGES
+			     << UK_PAGING_PAGE_SHIFT;
+
+	return kernel_vas.pt->fa->free_memory < reserve / 2;
+}
+
+/* The pages of [@start, @end) without a frame: counted up to one past
+ * @limit, where there is no point in going on. A page present but not
+ * writable (a platform's copy-on-write page, after a restore) is counted
+ * in @cow instead: a write to it takes a frame of its own, on the fault,
+ * which nothing here can take beforehand. One past the limit, such a page
+ * further on goes unseen, and need not be: the answer is no either way.
+ */
+static unsigned long heap_unbacked(__vaddr_t start, __vaddr_t end,
+				   unsigned long limit, unsigned long *cow)
+{
+	unsigned long pages = 0;
 	unsigned int lvl;
 	__pte_t pte;
 
-	for (; num_pages; num_pages--, vaddr += UK_PAGING_PAGE_SIZE) {
+	*cow = 0;
+	for (; start < end && pages <= limit; start += UK_PAGING_PAGE_SIZE) {
 		lvl = UK_PAGING_PAGE_LEVEL;
-		if (uk_paging_pt_walk(kernel_vas.pt, vaddr, &lvl, __NULL,
+		if (uk_paging_pt_walk(kernel_vas.pt, start, &lvl, __NULL,
 				      &pte) ||
-		    !UK_PAGING_PT_Lx_PTE_PRESENT(pte, lvl) ||
-		    !(uk_pal_attr_from_pte(pte, lvl) &
-		      UK_PAGING_PAGE_ATTR_PROT_WRITE))
-			return 0;
+		    !UK_PAGING_PT_Lx_PTE_PRESENT(pte, lvl))
+			pages++;
+		else if (!(uk_pal_attr_from_pte(pte, lvl) &
+			   UK_PAGING_PAGE_ATTR_PROT_WRITE))
+			(*cow)++;
 	}
-	return 1;
+	return pages;
+}
+
+/* See uk/heap.h: the headroom heap_palloc() leaves, reckoned for the whole
+ * range first, as heap_palloc() reckons it (a page a write will have to
+ * copy takes its frame then, from that headroom, before anything else can:
+ * the write follows in the same call, and nothing runs in between), and
+ * for the pages without a frame only when that is short. Then a page a
+ * write would have to copy is one too many: its frame cannot be taken here.
+ */
+int uk_heap_back_range(__vaddr_t start, __vaddr_t end)
+{
+	unsigned long pages = (end - start) >> UK_PAGING_PAGE_SHIFT;
+	unsigned long cow;
+
+	if (!heap_can_back(pages)) {
+		pages = heap_unbacked(start, end, heap_pages_left(), &cow);
+		if (cow)
+			return -ENOMEM;
+		if (!pages)
+			return 0;
+		if (!heap_can_back(pages))
+			return -ENOMEM;
+	}
+	return uk_vma_advise(&kernel_vas, start, end - start,
+			     UK_VMA_ADV_WILLNEED, 0);
+}
+
+/* Frames behind a run of pages the allocator keeps, the first failure kept */
+static void heap_back_run(__vaddr_t lo, __vaddr_t hi, void *arg)
+{
+	struct heap_walk *w = arg;
+
+	if (!w->rc)
+		w->rc = uk_heap_back_range(lo, hi);
+}
+
+/* Frames behind the chunk's pages the allocator keeps frames behind (see
+ * heap_keeps()), among the pages in question, its first excepted
+ * (heap_back_head()): splitting the chunk later writes the heads of its
+ * halves there. (The heads the allocator writes trimming a chunk to a
+ * smaller allocation lie elsewhere, and are faults the reserve serves, as
+ * for a free block heap_release() gave back.)
+ */
+static void heap_back_chunk(void *chunk, unsigned long size, void *arg)
+{
+	struct heap_walk *w = arg;
+	__vaddr_t c = (__vaddr_t)chunk;
+
+	heap_chunk_runs(c, size, MAX(w->start, c + UK_PAGING_PAGE_SIZE),
+			MIN(w->end, c + (size << UK_PAGING_PAGE_SHIFT)),
+			true, heap_back_run, w);
+}
+
+/* A frame behind the chunk's first page, where its head is written when
+ * the allocation is freed: every chunk's, whatever else fails, so that the
+ * allocation can be freed without a fault; the first failure is kept
+ */
+static void heap_back_head(void *chunk, unsigned long size __unused,
+			   void *arg)
+{
+	struct heap_walk *w = arg;
+	int rc = uk_heap_back_range((__vaddr_t)chunk,
+				    (__vaddr_t)chunk + UK_PAGING_PAGE_SIZE);
+
+	if (rc && !w->rc)
+		w->rc = rc;
+}
+
+/* See uk/heap.h: what heap_palloc() does, but for the pages past the first
+ * @backed, which get frames behind the pages the allocator writes to only.
+ * The chunks' heads come first, so that the block can be freed should the
+ * rest fail (a head that could not be backed is the reserve's to serve on
+ * the free, which the headroom checks left whole), then the first @backed
+ * pages, then the rest the allocator keeps: -ENOMEM when the frames for the
+ * first two are not to be had, -ENOSPC for the last, as for a run of pages,
+ * which a smaller room may yet find.
+ */
+int uk_heap_palloc_backed(unsigned long num_pages, unsigned long backed,
+			  void **obj)
+{
+	struct heap_walk w = { .rc = 0 };
+	__vaddr_t o;
+
+	UK_ASSERT(backed <= num_pages);
+	if (heap_reserve_drained() || !heap_can_back(backed))
+		return -ENOMEM;
+	/* Asked for a run it has not got, the allocator warns: a caller
+	 * trying for room before it settles for less is not news
+	 */
+	if (num_pages > (unsigned long)heap_pmaxalloc_backend(heap_alloc))
+		return -ENOSPC;
+	o = (__vaddr_t)heap_palloc_backend(heap_alloc, num_pages);
+	if (unlikely(!o))
+		return -ENOSPC;
+	w.start = o + (backed << UK_PAGING_PAGE_SHIFT);
+	w.end = o + (num_pages << UK_PAGING_PAGE_SHIFT);
+	uk_allocbbuddy_foreach_chunk((void *)o, num_pages, heap_back_head, &w);
+	if (!w.rc) {
+		/* The room's few pages before the many of the contents: an
+		 * attempt that fails here has cost little
+		 */
+		uk_allocbbuddy_foreach_chunk((void *)o, num_pages,
+					     heap_back_chunk, &w);
+		if (w.rc == -ENOMEM)
+			w.rc = -ENOSPC;
+	}
+	if (!w.rc)
+		w.rc = uk_heap_back_range(o, w.start);
+	if (w.rc) {
+		uk_pfree(heap_alloc, (void *)o, num_pages);
+		return w.rc;
+	}
+	*obj = (void *)o;
+	return 0;
+}
+
+/* See uk/heap.h */
+void uk_heap_pfree(void *obj, unsigned long num_pages)
+{
+	uk_pfree(heap_alloc, obj, num_pages);
 }
 
 static void *heap_palloc(struct uk_alloc *a, unsigned long num_pages)
 {
-	const __sz reserve = (__sz)CONFIG_LIBUKVMEM_RESERVE_PAGES
-			     << UK_PAGING_PAGE_SHIFT;
-	struct uk_falloc *fa = kernel_vas.pt->fa;
 	void *obj;
 
 	/* Leave the frames ukvmem keeps for faults that cannot fail, after
-	 * backing the pages and the page tables that map them. Short of
-	 * them, a block whose pages are all backed still, as a freed block's
-	 * may be, will do: taken while half of them is left, as the
-	 * allocator's own writes to the free blocks it splits are such
-	 * faults.
+	 * backing the pages and the page tables that map them
+	 * (uk_heap_back_range()). A block whose pages are backed still, as a
+	 * freed block's may be, takes none: taken while half of them is
+	 * left, as the allocator's own writes to the free blocks it splits
+	 * are such faults.
 	 */
-	if (fa->free_memory < ((num_pages + UK_PAGING_PT_PAGES(num_pages))
-			       << UK_PAGING_PAGE_SHIFT) + reserve) {
-		if (fa->free_memory < reserve / 2)
-			goto err_nomem;
-		obj = heap_palloc_backend(a, num_pages);
-		if (unlikely(!obj))
-			return __NULL;
-		if (heap_backed(obj, num_pages))
-			return obj;
-		uk_pfree(a, obj, num_pages);
+	if (heap_reserve_drained())
 		goto err_nomem;
-	}
-
 	obj = heap_palloc_backend(a, num_pages);
 	if (unlikely(!obj))
 		return __NULL;
-
-	if (unlikely(uk_vma_advise(&kernel_vas, (__vaddr_t)obj,
-				   num_pages << UK_PAGING_PAGE_SHIFT,
-				   UK_VMA_ADV_WILLNEED, 0))) {
+	if (unlikely(uk_heap_back_range((__vaddr_t)obj, (__vaddr_t)obj +
+					(num_pages << UK_PAGING_PAGE_SHIFT)))) {
 		uk_pfree(a, obj, num_pages);
 		goto err_nomem;
 	}
@@ -348,6 +578,7 @@ static struct uk_alloc *heap_init()
 		return NULL;
 
 #if CONFIG_LIBUKBOOT_INITBBUDDY
+	heap_alloc = a;
 	heap_palloc_backend = a->palloc;
 	heap_pmaxalloc_backend = a->pmaxalloc;
 	heap_pavailmem_backend = a->pavailmem;

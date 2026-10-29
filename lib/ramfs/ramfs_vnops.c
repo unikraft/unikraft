@@ -37,6 +37,7 @@
 
 #include <uk/essentials.h>
 #include <uk/paging.h>
+#include <uk/heap.h>
 #include <sys/stat.h>
 #include <dirent.h>
 #include <sys/param.h>
@@ -44,6 +45,7 @@
 #include <vfscore/borrow.h>
 
 #include <errno.h>
+#include <limits.h>
 #include <string.h>
 #include <stdlib.h>
 
@@ -128,12 +130,29 @@ ramfs_allocate_node(const char *name, int type, mode_t mode)
 	return np;
 }
 
+/* Give the buffer up: its memory when it is the file's own (a file's buffer
+ * is pages, a link's target a string), and the record of it.
+ */
+static void
+ramfs_release_buf(struct ramfs_node *np)
+{
+	if (np->rn_buf && np->rn_owns_buf) {
+		if (np->rn_type == VLNK)
+			free(np->rn_buf);
+		else
+			uk_heap_pfree(np->rn_buf,
+				      UK_PAGING_PAGE_COUNT(np->rn_bufsize));
+	}
+	np->rn_buf = NULL;
+	np->rn_bufsize = 0;
+	np->rn_backed = 0;
+	np->rn_owns_buf = true;
+}
+
 void
 ramfs_free_node(struct ramfs_node *np)
 {
-	if (np->rn_buf != NULL && np->rn_owns_buf)
-		free(np->rn_buf);
-
+	ramfs_release_buf(np);
 	free(np->rn_name);
 	free(np);
 }
@@ -363,49 +382,203 @@ ramfs_remove(struct vnode *dvp, struct vnode *vp,
 	return ramfs_remove_node(dvp->v_data, vp->v_data);
 }
 
+/* What vfscore_uiomove() takes at most, which counts in int */
+#define RAMFS_COPY_MAX		((size_t) (INT_MAX & ~(UK_PAGING_PAGE_SIZE - 1)))
+
+/* The address of the buffer's page @page */
+static inline __vaddr_t
+ramfs_page_addr(struct ramfs_node *np, unsigned long page)
+{
+	return (__vaddr_t) np->rn_buf + (page << UK_PAGING_PAGE_SHIFT);
+}
+
+/* Give the frames behind the buffer's pages [@from, @to) back, the ones the
+ * allocator keeps excepted, and say from which page on some are gone.
+ */
+static unsigned long
+ramfs_release_pages(struct ramfs_node *np, unsigned long from,
+		    unsigned long to)
+{
+	__vaddr_t lowest;
+
+	lowest = uk_heap_release_range(np->rn_buf,
+				       UK_PAGING_PAGE_COUNT(np->rn_bufsize),
+				       ramfs_page_addr(np, from),
+				       ramfs_page_addr(np, to));
+	return (lowest - (__vaddr_t) np->rn_buf) >> UK_PAGING_PAGE_SHIFT;
+}
+
+/* Give the file a buffer that holds @need bytes, its contents kept. A write
+ * asks for room to grow (@grow): half as much again as the buffer has, so
+ * that a file written in pieces is copied a bounded number of times over,
+ * not once per piece, which took minutes for 50 MB with the whole guest
+ * waiting. The room costs address space, not memory: only the contents'
+ * pages have memory behind them, the room's is taken as the file grows into
+ * it (see ramfs_back()) and given back when a truncate cuts the file
+ * (ramfs_release_room()), so a nearly full filesystem fails no earlier than
+ * a file grown to its exact size did. The copy of a borrowed buffer that
+ * stays within it, and the buffer a deep cut leaves (ramfs_release_room()),
+ * take the exact size. The buffer is not zeroed past the contents: nothing
+ * reads past the file's size, and what grows the file inside the buffer
+ * zeroes the gap it leaves.
+ */
+static int
+ramfs_grow(struct ramfs_node *np, size_t need, bool grow)
+{
+	size_t exact = UK_PAGING_PAGE_ALIGN_UP(need);
+	size_t new_size = exact;
+	void *new_buf;
+	int rc;
+
+	UK_ASSERT(need >= np->rn_size);
+	if (grow)
+		new_size = MAX(exact, UK_PAGING_PAGE_ALIGN_UP(
+				np->rn_bufsize + np->rn_bufsize / 2));
+	rc = uk_heap_palloc_backed(UK_PAGING_PAGE_COUNT(new_size),
+				   UK_PAGING_PAGE_COUNT(exact), &new_buf);
+	if (rc == -ENOSPC && new_size > exact) {
+		/* No run of pages that long, or no frames for the few more the
+		 * room's kept pages take: the exact size may fit still
+		 */
+		new_size = exact;
+		rc = uk_heap_palloc_backed(UK_PAGING_PAGE_COUNT(exact),
+					   UK_PAGING_PAGE_COUNT(exact),
+					   &new_buf);
+	}
+	if (rc)
+		return ENOSPC;
+	if (np->rn_size != 0)
+		memcpy(new_buf, np->rn_buf, np->rn_size);
+	ramfs_release_buf(np);
+	np->rn_buf = (char *) new_buf;
+	np->rn_bufsize = new_size;
+	np->rn_backed = UK_PAGING_PAGE_COUNT(exact);
+	return 0;
+}
+
+/* Pages taken again at once, at least: a write a page at a time would ask
+ * for each.
+ */
+#define RAMFS_BACK_PAGES	16
+
+/* Have memory behind the buffer up to @upto bytes, where the room past the
+ * file's end has none (see ramfs_grow(), ramfs_release_room()): a write into
+ * a page without would fault with no frame to take, which the kernel cannot
+ * survive. The frames may not be there: ENOSPC, and what the asking backed
+ * goes back, but for the pages the allocator keeps anyway.
+ */
+static int
+ramfs_back(struct ramfs_node *np, size_t upto)
+{
+	unsigned long need = UK_PAGING_PAGE_COUNT(upto);
+	unsigned long ahead = MIN(UK_PAGING_PAGE_COUNT(np->rn_bufsize),
+				  ALIGN_UP(need, RAMFS_BACK_PAGES));
+	int rc;
+
+	if (need <= np->rn_backed)
+		return 0;
+	rc = uk_heap_back_range(ramfs_page_addr(np, np->rn_backed),
+				ramfs_page_addr(np, ahead));
+	if (rc && ahead > need) {
+		/* No room ahead; the pages the write needs may be there */
+		ramfs_release_pages(np, need, ahead);
+		ahead = need;
+		rc = uk_heap_back_range(ramfs_page_addr(np, np->rn_backed),
+					ramfs_page_addr(np, ahead));
+	}
+	if (rc) {
+		ramfs_release_pages(np, np->rn_backed, ahead);
+		if (rc != -ENOMEM)
+			uk_pr_warn("Could not back a file's pages: %d\n", rc);
+		return rc == -ENOMEM ? ENOSPC : EIO;
+	}
+	np->rn_backed = ahead;
+	return 0;
+}
+
+/* Room for the file's first @upto bytes, with memory behind them: a buffer
+ * of the file's own, with room to grow, when the one it has is borrowed
+ * (see ramfs_set_file_data(): it may be read-only, so it is copied before
+ * the first change, sized for it) or too small; memory behind the pages of
+ * the one it has otherwise. A truncate gets room as a write does: a file
+ * extended a step at a time is copied a bounded number of times over
+ * either way, and the room costs no memory.
+ */
+static int
+ramfs_reserve(struct ramfs_node *np, size_t upto)
+{
+	if (np->rn_buf && !np->rn_owns_buf)
+		return ramfs_grow(np, MAX(np->rn_size, upto),
+				  upto > np->rn_size);
+	if (upto > np->rn_bufsize)
+		return ramfs_grow(np, upto, true);
+	return ramfs_back(np, upto);
+}
+
+/* A cut past which a buffer is given up for one of the file's size, its
+ * address space given back, when what is left to copy is small: the copy
+ * is the price, the address space is only scarce in the extreme
+ */
+#define RAMFS_CUT_PAGES		64
+#define RAMFS_CUT_COPY_PAGES	4096
+
+/* After a truncate cut the file: give the frames behind the room past its
+ * end back, but for the few pages the next append would take again at once
+ * (a write takes no more, see ramfs_back()), and the buffer itself when the
+ * cut is deep, for one the file's size, the old one's address space given
+ * back with it. A buffer that cannot be had leaves the old one, its frames
+ * given back all the same.
+ */
+static void
+ramfs_release_room(struct ramfs_node *np)
+{
+	unsigned long keep = UK_PAGING_PAGE_COUNT(np->rn_size) +
+			     RAMFS_BACK_PAGES;
+	unsigned long pages = UK_PAGING_PAGE_COUNT(np->rn_bufsize);
+	bool deep;
+
+	if (!np->rn_buf || !np->rn_owns_buf)
+		return;
+	if (keep < np->rn_backed)
+		np->rn_backed = ramfs_release_pages(np, keep, np->rn_backed);
+	deep = pages > keep && pages - keep >= MAX(RAMFS_CUT_PAGES, pages / 2) &&
+	       keep <= RAMFS_CUT_COPY_PAGES;
+	if (deep)
+		ramfs_grow(np, np->rn_size, false);
+}
+
 /* Truncate file */
 static int
 ramfs_truncate(struct vnode *vp, off_t length)
 {
 	struct ramfs_node *np;
-	void *new_buf;
-	size_t new_size;
+	bool cut;
+	int rc;
 
 	uk_pr_debug("truncate %s length=%lld\n", RAMFS_NODE(vp)->rn_name,
 		 (long long) length);
+	if (vp->v_type == VDIR)
+		return EISDIR;
+	if (vp->v_type != VREG || length < 0)
+		return EINVAL;
 	np = vp->v_data;
 
 	if (length == 0) {
-		if (np->rn_buf != NULL) {
-			if (np->rn_owns_buf)
-				free(np->rn_buf);
-			np->rn_buf = NULL;
-			np->rn_bufsize = 0;
-		}
-	} else if ((size_t) length > np->rn_bufsize ||
-		   ((size_t) length > np->rn_size && !np->rn_owns_buf)) {
-		/* TODO: this could use a page level allocator */
-		new_size = UK_PAGING_PAGE_ALIGN_UP(length);
-		/* Zeroed: past its old end the file reads as zeros. */
-		new_buf = calloc(1, new_size);
-		if (!new_buf)
-			return ENOSPC;
-		if (np->rn_size != 0) {
-			memcpy(new_buf, np->rn_buf, vp->v_size);
-			if (np->rn_owns_buf)
-				free(np->rn_buf);
-		}
-		np->rn_buf = (char *) new_buf;
-		np->rn_bufsize = new_size;
-		np->rn_owns_buf = true;
+		ramfs_release_buf(np);
 	} else if ((size_t) length > np->rn_size) {
-		/* Growing inside the buffer: what an earlier truncate cut off
-		 * must not come back.
+		rc = ramfs_reserve(np, length);
+		if (rc)
+			return rc;
+		/* Past its old end the file reads as zeros: not what the
+		 * buffer holds, nor what an earlier truncate cut off.
 		 */
 		memset(np->rn_buf + np->rn_size, 0, length - np->rn_size);
 	}
+	cut = (size_t) length < np->rn_size;
 	np->rn_size = length;
 	vp->v_size = length;
+	if (cut)
+		ramfs_release_room(np);
 	set_times_to_now(&(np->rn_mtime), &(np->rn_ctime), NULL);
 	return 0;
 }
@@ -454,6 +627,7 @@ ramfs_read(struct vnode *vp, struct vfscore_file *fp __unused,
 		len = vp->v_size - uio->uio_offset;
 	else
 		len = uio->uio_resid;
+	len = MIN(len, RAMFS_COPY_MAX);
 
 	set_times_to_now(&(np->rn_atime), NULL, NULL);
 
@@ -474,6 +648,7 @@ ramfs_set_file_data(struct vnode *vp, const void *data, size_t size)
 
 	np->rn_buf = (char *) data;
 	np->rn_bufsize = size;
+	np->rn_backed = 0;
 	np->rn_size = size;
 	vp->v_size = size;
 	np->rn_owns_buf = false;
@@ -485,70 +660,57 @@ static int
 ramfs_write(struct vnode *vp, struct uio *uio, int ioflag)
 {
 	struct ramfs_node *np =  vp->v_data;
+	size_t end_pos, len;
+	int rc;
 
 	if (vp->v_type == VDIR)
 		return EISDIR;
 	if (vp->v_type != VREG)
 		return EINVAL;
+	if (ioflag & IO_APPEND)
+		uio->uio_offset = np->rn_size;
 	if (uio->uio_offset < 0)
 		return EINVAL;
 	if (uio->uio_offset >= LONG_MAX)
 		return EFBIG;
 	if (uio->uio_resid == 0)
 		return 0;
-
-	if (ioflag & IO_APPEND)
-		uio->uio_offset = np->rn_size;
-
-	/* A borrowed buffer (see ramfs_set_file_data()) may be read-only:
-	 * copy it before the first change.
+	/* As on Linux, a write is cut short where an offset ends, and to what
+	 * vfscore_uiomove() takes, which counts in int. The request is left
+	 * as it is: what vfscore reports written is what the copy took.
 	 */
-	if (np->rn_buf && !np->rn_owns_buf) {
-		size_t new_size = UK_PAGING_PAGE_ALIGN_UP(np->rn_size);
-		void *new_buf = new_size ? calloc(1, new_size) : NULL;
+	len = MIN((size_t) uio->uio_resid, (size_t) (LONG_MAX - uio->uio_offset));
+	len = MIN(len, RAMFS_COPY_MAX);
 
-		if (new_size && !new_buf)
-			return ENOSPC;
-		if (new_size)
-			memcpy(new_buf, np->rn_buf, np->rn_size);
-		np->rn_buf = (char *) new_buf;
-		np->rn_bufsize = new_size;
-		np->rn_owns_buf = true;
-	}
+	end_pos = uio->uio_offset + len;
 
-	if ((size_t) uio->uio_offset + uio->uio_resid > (size_t) vp->v_size) {
-		/* Expand the file size before writing to it */
-		off_t end_pos = uio->uio_offset + uio->uio_resid;
+	if (end_pos > (size_t) vp->v_size ||
+	    (np->rn_buf && !np->rn_owns_buf)) {
+		/* Room for the write, and the file's end moved to it */
+		size_t old_size = np->rn_size;
 
-		if (end_pos > (off_t) np->rn_bufsize) {
-			// XXX: this could use a page level allocator
-			size_t new_size = UK_PAGING_PAGE_ALIGN_UP(end_pos);
-			void *new_buf = calloc(1, new_size);
-
-			if (!new_buf)
-				return ENOSPC;
-			if (np->rn_size != 0) {
-				memcpy(new_buf, np->rn_buf, vp->v_size);
-				if (np->rn_owns_buf)
-					free(np->rn_buf);
-			}
-			np->rn_buf = (char *) new_buf;
-			np->rn_bufsize = new_size;
-		} else if (uio->uio_offset > (off_t) np->rn_size) {
-			/* Writing past the end inside the buffer: the gap
-			 * reads as zeros, not what a truncate cut off.
-			 */
-			memset(np->rn_buf + np->rn_size, 0,
-			       uio->uio_offset - np->rn_size);
-		}
-		np->rn_size = end_pos;
-		vp->v_size = end_pos;
-		np->rn_owns_buf = true;
+		rc = ramfs_reserve(np, end_pos);
+		if (rc)
+			return rc;
+		/* The gap between the old end and the write reads as zeros,
+		 * not what the buffer holds or a truncate cut off.
+		 */
+		if ((size_t) uio->uio_offset > old_size)
+			memset(np->rn_buf + old_size, 0,
+			       uio->uio_offset - old_size);
 	}
 
 	set_times_to_now(&(np->rn_mtime), &(np->rn_ctime), NULL);
-	return vfscore_uiomove(np->rn_buf + uio->uio_offset, uio->uio_resid,
-			       uio);
+	rc = vfscore_uiomove(np->rn_buf + uio->uio_offset, len, uio);
+	/* The file ends where the copy got to, not where it was to: what
+	 * the buffer holds past that is nobody's to read
+	 */
+	end_pos = uio->uio_offset;
+	if (end_pos > np->rn_size) {
+		np->rn_size = end_pos;
+		vp->v_size = end_pos;
+	}
+	return rc;
 }
 
 static int
@@ -588,6 +750,7 @@ ramfs_rename(struct vnode *dvp1, struct vnode *vp1, const char *name1 __unused,
 			np->rn_buf = old_np->rn_buf;
 			np->rn_size = old_np->rn_size;
 			np->rn_bufsize = old_np->rn_bufsize;
+			np->rn_backed = old_np->rn_backed;
 			np->rn_owns_buf = old_np->rn_owns_buf;
 			old_np->rn_buf = NULL;
 		}

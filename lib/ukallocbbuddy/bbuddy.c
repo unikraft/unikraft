@@ -511,6 +511,22 @@ static void bbuddy_pfree(struct uk_alloc *a, void *obj, unsigned long num_pages)
 	freelist_sanitycheck(b->free_head);
 }
 
+/* See uk/allocbbuddy.h: as bbuddy_pfree() takes the range apart */
+void uk_allocbbuddy_foreach_chunk(void *base, unsigned long num_pages,
+				  uk_allocbbuddy_chunk_func_t fn, void *arg)
+{
+	char *chunk = base;
+	size_t ord;
+
+	UK_ASSERT(IS_ALIGNED((uintptr_t)base, __PAGE_SIZE));
+	while (num_pages) {
+		ord = ptr_order(chunk, npages_order(num_pages));
+		fn(chunk, BBUDDY_PAGES(ord), arg);
+		chunk += BBUDDY_LEN(ord);
+		num_pages -= BBUDDY_PAGES(ord);
+	}
+}
+
 void uk_allocbbuddy_set_release(struct uk_alloc *a,
 				uk_allocbbuddy_release_func_t release)
 {

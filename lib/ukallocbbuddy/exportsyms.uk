@@ -1,2 +1,3 @@
 uk_allocbbuddy_init
 uk_allocbbuddy_set_release
+uk_allocbbuddy_foreach_chunk
