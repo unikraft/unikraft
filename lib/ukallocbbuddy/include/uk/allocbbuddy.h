@@ -60,6 +60,21 @@ typedef void (*uk_allocbbuddy_release_func_t)(struct uk_alloc *a,
 void uk_allocbbuddy_set_release(struct uk_alloc *a,
 				uk_allocbbuddy_release_func_t release);
 
+/**
+ * The chunks a page range is freed as: from its start, the largest the
+ * address is aligned to that fits, and so on. Each goes to @fn with its
+ * first page's address and its size in pages. Freeing writes each chunk's
+ * head on its first page; splitting a free chunk later writes the heads of
+ * its halves a power of two from its start; trimming a free chunk to a
+ * smaller allocation writes the heads of the spare chunks it leaves, from
+ * the chunk's end down, where they fall.
+ */
+typedef void (*uk_allocbbuddy_chunk_func_t)(void *chunk,
+					    unsigned long num_pages,
+					    void *arg);
+void uk_allocbbuddy_foreach_chunk(void *base, unsigned long num_pages,
+				  uk_allocbbuddy_chunk_func_t fn, void *arg);
+
 #ifdef __cplusplus
 }
 #endif
