@@ -47,6 +47,9 @@
 #include <uk/plat/xen/fixmap.h>
 #include <uk/pt.h>
 #include <uk/plat/common/bootinfo.h>
+#ifdef CONFIG_XEN_STATIC_SHM
+#include <xen-arm/shm.h>
+#endif
 
 /*
  * This structure contains start-of-day info, such as pagetable base
@@ -457,6 +460,10 @@ void _libxenplat_armentry(void *dtb_pointer, paddr_t physical_offset)
 
 	/* Do early init */
 	uk_boot_early_init(bi);
+
+#ifdef CONFIG_XEN_STATIC_SHM
+	uk_plat_xen_shm_init();
+#endif
 
 	uk_boot_entry();
 }

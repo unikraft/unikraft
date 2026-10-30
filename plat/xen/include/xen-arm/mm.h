@@ -72,6 +72,21 @@ extern paddr_t _libxenplat_paddr_offset;
 #define PAGE_OFFSET     ((0xffffffffffffffff << (VA_BITS - 1))\
 						 & 0xffffffffffffffff)
 
+#ifdef CONFIG_XEN_STATIC_SHM
+#define SHM_REGION_SIZE     (CONFIG_XEN_SHM_REGION_SIZE_MB * 0x100000UL)
+
+#if (CONFIG_XEN_SHM_REGION_SIZE_MB % 2) != 0
+#error "CONFIG_XEN_SHM_REGION_SIZE_MB must be a multiple of 2"
+#endif
+
+/* SHM uses a dedicated L1 entry (L1[254]), separate from fixmap (L1[255]) */
+#define FIX_SHM_TOP     (PAGE_OFFSET - (1UL << L1_SHIFT))
+#define FIX_SHM_START   (FIX_SHM_TOP - SHM_REGION_SIZE)
+
+/* L3 tables needed for shm region (one per 2MB block) */
+#define SHM_NR_L3_TABLES (SHM_REGION_SIZE / L2_SIZE)
+#endif /* CONFIG_XEN_STATIC_SHM */
+
 /* SCTLR_EL1 - System Control Register */
 #define	SCTLR_RES0          0xc8222400  /* Reserved, write 0 */
 #define	SCTLR_RES1          0x30d00800  /* Reserved, write 1 */
