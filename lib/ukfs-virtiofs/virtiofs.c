@@ -608,6 +608,7 @@ ssize_t virtiofs_live_mem(struct viofs_node *n,
 		if (unlikely(!iovcnt))
 			return 0;
 		__fallthrough;
+	case UKFILE_MEM_ACQUIRE_PINNED:
 	case UKFILE_MEM_ACQUIRE:
 	case UKFILE_MEM_RELEASE:
 		if (unlikely(off >= n->attr.size))
@@ -633,6 +634,14 @@ ssize_t virtiofs_live_mem(struct viofs_node *n,
 		return r;
 
 	switch (op) {
+	case UKFILE_MEM_ACQUIRE_PINNED:
+#if !CONFIG_LIBUKPOD_DEFAULT_EAGER
+		/* Eager PoD never migrates pages. Other backends need an
+		 * explicit pin contract before providing physical aliases.
+		 */
+		return -ENOTSUP;
+#endif
+		__fallthrough;
 	case UKFILE_MEM_ACQUIRE:
 		r = uk_sparsebuf_fill(
 			&ctx, UK_SPARSEBUF_EMBED_HEADP(iohead, &rn->iomem.io),
