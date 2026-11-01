@@ -593,7 +593,15 @@ int virtiofs_fuse_rename(struct virtiofs_fuse_dev *fdev,
 
 	init_hdr(fdev, &hdr, FUSE_RENAME, paylen);
 	rlen = uk_virtiofs_request(fdev->dev, iov, 6, 1);
-	return check_reply(rlen, &ohdr);
+	int result = check_reply(rlen, &ohdr);
+#if CONFIG_LIBUKDEBUG_ENABLE_ASSERT
+	uk_pr_info("FUSE rename source=%lu dest=%lu lengths=%zu,%zu unique=%lu transport=%zd replylen=%u replyerror=%d result=%d\n",
+		   (unsigned long)node, (unsigned long)dest, nlen, dlen,
+		   (unsigned long)hdr.unique, rlen,
+		   rlen >= (ssize_t)sizeof(ohdr) ? ohdr.len : 0,
+		   rlen >= (ssize_t)sizeof(ohdr) ? ohdr.error : 0, result);
+#endif
+	return result;
 }
 
 int virtiofs_fuse_link(struct virtiofs_fuse_dev *fdev, uint64_t node,
