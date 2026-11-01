@@ -52,10 +52,47 @@
  */
 
 #include <string.h>
+#include <errno.h>
 #include <uk/print.h>
 #include <uk/bus/pci.h>
 
 extern int arch_pci_probe(struct uk_alloc *pha);
+extern int arch_pci_cfg_read(const struct pci_address *, __u16, __u8, __u32 *);
+extern int arch_pci_cfg_write(const struct pci_address *, __u16, __u8, __u32);
+
+static int pci_cfg_validate(const struct pci_address *addr, __u16 offset,
+                            __u8 width)
+{
+    if (!addr || addr->devid >= 32 || addr->function >= 8 ||
+        (width != 1 && width != 2 && width != 4) ||
+        offset > 256 - width || (offset & (width - 1)))
+        return -EINVAL;
+    if (addr->domain)
+        return -EOPNOTSUPP;
+    return 0;
+}
+
+int pci_cfg_read(const struct pci_address *addr, __u16 offset, __u8 width,
+                 __u32 *value)
+{
+    int rc = pci_cfg_validate(addr, offset, width);
+
+    if (rc)
+        return rc;
+    if (!value)
+        return -EINVAL;
+    *value = 0;
+    return arch_pci_cfg_read(addr, offset, width, value);
+}
+
+int pci_cfg_write(const struct pci_address *addr, __u16 offset, __u8 width,
+                  __u32 value)
+{
+    int rc = pci_cfg_validate(addr, offset, width);
+
+    return rc ? rc : arch_pci_cfg_write(addr, offset, width, value);
+}
+
 
 static inline int pci_device_id_match(const struct pci_device_id *id0,
 					const struct pci_device_id *id1)

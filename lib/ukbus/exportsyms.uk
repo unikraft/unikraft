@@ -2,3 +2,4 @@ uk_bus_count
 _uk_bus_register
 _uk_bus_unregister
 uk_bus_list
+uk_bus_devmap

@@ -238,59 +238,7 @@ static int pf_init(struct uk_alloc *a)
 #if CONFIG_LIBUKPAGING
 __vaddr_t uk_bus_pf_devmap(__paddr_t base, __sz size)
 {
-	struct uk_pagetable *pt;
-	unsigned long pages;
-	unsigned long attr;
-	__vaddr_t vaddr;
-	__paddr_t paddr;
-	int rc;
-
-	attr = UK_PAGING_PAGE_ATTR_PROT_RW;
-#ifdef CONFIG_ARCH_ARM_64
-	attr |= UK_PLAT_NATIVE_PAGE_ATTR_TYPE_DEVICE_nGnRnE;
-#endif /* CONFIG_ARCH_ARM_64 */
-
-	pages = ALIGN_UP(size, __PAGE_SIZE) >> UK_PAGING_PAGE_SHIFT;
-
-	pt = uk_paging_pt_get_active();
-
-	paddr = ALIGN_DOWN(base, __PAGE_SIZE);
-	vaddr = ALIGN_DOWN(base, __PAGE_SIZE);
-
-	/* We can't use uk_vma_map_dma here as the vmem API is initialized
-	 * way too late for the interrupt controller which is required for
-	 * bringing up secondary cores.
-	 *
-	 * Notice that updating the attributes of an already mapped region
-	 * can potentialy fail, as uk_paging_page_map() will also return EEXIST
-	 * for a partially mapped region too. Addressing this problem by
-	 * remapping a region page-by-page is too slow for devices with large
-	 * regions like PCI.
-	 */
-	rc = uk_paging_page_map(pt, vaddr, paddr, pages, attr, 0);
-	if (unlikely(rc && rc != -EEXIST)) {
-		uk_pr_err("Could not map MMIO Region at 0x%lx - 0x%lx (%d)\n",
-			  base, base + size, rc);
-		return rc;
-	}
-
-	if (rc == -EEXIST) {
-		rc = uk_paging_page_unmap(pt, vaddr, pages, 0);
-		if (unlikely(rc)) {
-			uk_pr_err("Could not unmap MMIO Region at 0x%lx - 0x%lx (%d)\n",
-				  base, base + size, rc);
-			return rc;
-		}
-
-		rc = uk_paging_page_map(pt, vaddr, paddr, pages, attr, 0);
-		if (unlikely(rc)) {
-			uk_pr_err("Could not map MMIO Region at 0x%lx - 0x%lx (%d)\n",
-				  base, base + size, rc);
-			return rc;
-		}
-	}
-
-	return (__vaddr_t)base;
+    return uk_bus_devmap(base, size);
 }
 #endif /* CONFIG_LIBUKPAGING */
 
