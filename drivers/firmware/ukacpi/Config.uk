@@ -6,6 +6,17 @@ menuconfig LIBUKACPI
 
 if LIBUKACPI
 
+config LIBUKACPI_POWER_BUTTON
+	bool "ACPI fixed-hardware power button"
+	depends on ARCH_X86_64 && LIBUKINTCTLR_XPIC
+	depends on LIBUKPM
+	select HAVE_SHUTDOWN_DISPATCHER
+	help
+		Receive the fixed power-button event using the firmware FADT
+		legacy I/O registers and SCI. Request orderly system shutdown
+		through ukpm. Control-method buttons and hardware-reduced or
+		MMIO-only ACPI are not supported by this driver.
+
 config LIBUKACPI_CHECKSUM
 	bool "Verify ACPI structures' checksum"
 
