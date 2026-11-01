@@ -54,6 +54,7 @@
 #include <uk/errptr.h>
 #include <uk/print.h>
 #include <uk/bus/pci.h>
+#include "../../pci_internal.h"
 #include <libfdt_env.h>
 #include <uk/intctlr/gic.h>
 
@@ -62,17 +63,19 @@
 #define DEVFN(dev, fn)   ((dev << PCI_FN_BIT_NBR) | fn)
 
 int arch_pci_cfg_read(const struct pci_address *addr, __u16 offset, __u8 width,
-                     __u32 *value)
+		      __u32 *value)
 {
-    return pci_generic_config_read(addr->bus, DEVFN(addr->devid, addr->function),
-                                   offset, width, value);
+	return pci_generic_config_read(addr->bus,
+				       DEVFN(addr->devid, addr->function),
+				       offset, width, value);
 }
 
 int arch_pci_cfg_write(const struct pci_address *addr, __u16 offset, __u8 width,
-                      __u32 value)
+		       __u32 value)
 {
-    return pci_generic_config_write(addr->bus, DEVFN(addr->devid, addr->function),
-                                    offset, width, value);
+	return pci_generic_config_write(addr->bus,
+					DEVFN(addr->devid, addr->function),
+					offset, width, value);
 }
 
 #define SIZE_PER_PCI_DEV 0x20	/* legacy pci device size, no msi */

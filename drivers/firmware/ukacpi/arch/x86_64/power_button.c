@@ -8,12 +8,13 @@
 #include <errno.h>
 #include <uk/acpi.h>
 #include <uk/arch/util.h>
+#include <uk/bitops.h>
 #include <uk/init.h>
 #include <uk/intctlr.h>
 #include <uk/plat/time.h>
 #include <uk/print.h>
 
-#define PM1_PWRBTN (1U << 8)
+#define PM1_PWRBTN UK_BIT(8)
 #define PM1_SCI_EN 1U
 
 static struct {
@@ -31,7 +32,7 @@ static int power_button_irq(void *arg __unused)
 		if (!button.events[i])
 			continue;
 		if (uk_arch_x86_64_inw(button.events[i]) & PM1_PWRBTN) {
-			/* Status bits are write-one-to-clear. Leave other events. */
+			/* Write-one-to-clear only our own event. */
 			uk_arch_x86_64_outw(button.events[i], PM1_PWRBTN);
 			pressed = 1;
 		}
@@ -92,7 +93,7 @@ static int power_button_init(struct uk_init_ctx *ctx __unused)
 		button.enables[i] = uk_arch_x86_64_inw(button.events[i] + 2);
 		uk_arch_x86_64_outw(button.events[i], PM1_PWRBTN);
 		uk_arch_x86_64_outw(button.events[i] + 2,
-				   button.enables[i] | PM1_PWRBTN);
+				    button.enables[i] | PM1_PWRBTN);
 	}
 #if CONFIG_LIBUKDEBUG_ENABLE_ASSERT
 	uk_pr_info("ACPI fixed power button armed: SCI=%u PM1=%x,%x\n",
@@ -107,7 +108,8 @@ static void power_button_term(struct uk_term_ctx *ctx __unused)
 		return;
 	for (unsigned int i = 0; i < 2; ++i)
 		if (button.events[i])
-			uk_arch_x86_64_outw(button.events[i] + 2, button.enables[i]);
+			uk_arch_x86_64_outw(button.events[i] + 2,
+					    button.enables[i]);
 	uk_intctlr_irq_unregister_arg(button.irq, power_button_irq, &button);
 	button.registered = 0;
 }

@@ -312,7 +312,6 @@ struct uk_vma_ops {
 	 */
 	int (*sync)(struct uk_vma *vma, __vaddr_t vaddr, __sz len);
 
-
 	/**
 	 * Allocates a new VMA and configures its VMA-type specific properties
 	 * when a VMA is split into multiple separate VMAs. This may happen
@@ -686,7 +685,6 @@ int uk_vma_advise(struct uk_vas *vas, __vaddr_t vaddr, __sz len,
  * file knowledge belongs in the VMA walker; each mapping owns its callback.
  */
 int uk_vma_sync(struct uk_vas *vas, __vaddr_t vaddr, __sz len);
-
 
 #ifdef __cplusplus
 }

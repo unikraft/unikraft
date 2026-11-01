@@ -127,24 +127,26 @@ static int vpci_legacy_notify(struct virtio_dev *vdev, __u16 queue_id)
 
 int virtio_pci_irq_dispatch(struct virtio_dev *vdev, __u8 isr_status)
 {
-    struct virtqueue *vq;
-    int rc = 0;
+	struct virtqueue *vq;
+	int rc = 0;
 
-    if (isr_status & VIRTIO_PCI_ISR_CONFIG)
-        uk_pr_warn("Unsupported config change interrupt on virtio-pci device %p\n", vdev);
-    if (isr_status & VIRTIO_PCI_ISR_HAS_INTR)
-        UK_TAILQ_FOREACH(vq, &vdev->vqs, next)
-            rc |= virtqueue_ring_interrupt(vq);
-    return rc;
+	if (isr_status & VIRTIO_PCI_ISR_CONFIG)
+		uk_pr_warn("Unsupported config change interrupt on virtio-pci device %p\n",
+			   vdev);
+	if (isr_status & VIRTIO_PCI_ISR_HAS_INTR)
+		UK_TAILQ_FOREACH(vq, &vdev->vqs, next)
+			rc |= virtqueue_ring_interrupt(vq);
+	return rc;
 }
 
 static int virtio_pci_handle(void *arg)
 {
-    struct virtio_pci_dev *d = arg;
+	struct virtio_pci_dev *d = arg;
+	__u8 isr_status;
 
-    UK_ASSERT(arg);
-    return virtio_pci_irq_dispatch(&d->vdev,
-                                  virtio_cread8((void *)d->pci_isr_addr, 0));
+	UK_ASSERT(arg);
+	isr_status = virtio_cread8((void *)d->pci_isr_addr, 0);
+	return virtio_pci_irq_dispatch(&d->vdev, isr_status);
 }
 
 static struct virtqueue *vpci_legacy_vq_setup(struct virtio_dev *vdev,
@@ -400,9 +402,10 @@ static int virtio_pci_add_dev(struct pci_device *pci_dev)
 	UK_ASSERT(pci_dev != NULL);
 
 #if CONFIG_LIBVIRTIO_PCI_MODERN
-    rc = virtio_pci_modern_add_dev(pci_dev, a);
-    if (rc != -ENOENT || pci_dev->id.device_id >= VIRTIO_PCI_MODERN_DEVICEID_START)
-        return rc;
+	rc = virtio_pci_modern_add_dev(pci_dev, a);
+	if (rc != -ENOENT ||
+	    pci_dev->id.device_id >= VIRTIO_PCI_MODERN_DEVICEID_START)
+		return rc;
 #endif
 
 	vpci_dev = uk_malloc(a, sizeof(*vpci_dev));

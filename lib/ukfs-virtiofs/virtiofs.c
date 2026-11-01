@@ -1371,7 +1371,8 @@ struct virtiofs_lookup_ref {
 
 static
 int virtiofs_lookup_ref_acquire(struct viofs_node *dir,
-	const char *name, size_t len, struct virtiofs_lookup_ref *ref)
+				const char *name, size_t len,
+			      struct virtiofs_lookup_ref *ref)
 {
 	struct fuse_entry_out out;
 	const union virtiofs_fuse_entry_outp op = { .full = &out };
@@ -1409,13 +1410,15 @@ int virtiofs_live_fs_unlink(struct viofs_node *n,
 	if (r)
 		return r;
 	if (flags & UKFS_UNLINK_DIR) {
-		r = virtiofs_fuse_rmdir(&n->dev->fdev, n->inode, name, len);
+		r = virtiofs_fuse_rmdir(&n->dev->fdev, n->inode,
+				     name, len);
 	} else if (flags & UKFS_UNLINK_NODIR) {
 		r = virtiofs_fuse_unlink(&n->dev->fdev, n->inode, name, len);
 	} else {
 		r = virtiofs_fuse_unlink(&n->dev->fdev, n->inode, name, len);
 		if (r == -EISDIR)
-			r = virtiofs_fuse_rmdir(&n->dev->fdev, n->inode, name, len);
+			r = virtiofs_fuse_rmdir(&n->dev->fdev, n->inode,
+						name, len);
 	}
 	virtiofs_lookup_ref_release(&held);
 	return r;
@@ -1444,10 +1447,10 @@ int virtiofs_live_fs_rename(struct viofs_node *n,
 	 */
 	if (flags)
 		r = virtiofs_fuse_rename2(&n->dev->fdev, n->inode, name, nlen,
-					 dest->inode, dname, dlen, flags);
+					  dest->inode, dname, dlen, flags);
 	else
 		r = virtiofs_fuse_rename(&n->dev->fdev, n->inode, name, nlen,
-					dest->inode, dname, dlen);
+					 dest->inode, dname, dlen);
 	virtiofs_lookup_ref_release(&target);
 out_source:
 	virtiofs_lookup_ref_release(&source);

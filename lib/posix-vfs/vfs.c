@@ -22,9 +22,6 @@
 #include <uk/posix-vfs.h>
 #include <uk/posix-vfsroot.h>
 #include <uk/spinlock.h>
-#if CONFIG_LIBUKDEBUG_ENABLE_ASSERT
-#include <uk/print.h>
-#endif
 
 #if CONFIG_LIBPOSIX_VFS_MULTICTX
 #include <uk/init.h>
@@ -1538,10 +1535,6 @@ int uk_sys_renameat(const struct uk_file *olddir, const char *oldpath,
 	struct uk_fs_poslen op;
 	struct uk_fs_poslen np;
 	int ret;
-#if CONFIG_LIBUKDEBUG_ENABLE_ASSERT
-	uk_pr_info("VFS rename enter flags=%d\n", flags);
-#endif
-
 
 	if (unlikely((ret = vfs_check_path(oldpath, 0))))
 		return ret;
@@ -1586,9 +1579,6 @@ out_dest:
 	uk_file_release(ddir);
 out_src:
 	uk_file_release(sdir);
-#if CONFIG_LIBUKDEBUG_ENABLE_ASSERT
-	uk_pr_info("VFS rename result=%d\n", ret);
-#endif
 	return ret;
 }
 

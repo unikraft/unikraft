@@ -303,14 +303,14 @@ static struct pci_bus_handler ph __unused;
  * Returns 0 or a negative errno. Read values are zero-extended.
  */
 int pci_cfg_read(const struct pci_address *addr, __u16 offset, __u8 width,
-                 __u32 *value);
+		 __u32 *value);
 int pci_cfg_write(const struct pci_address *addr, __u16 offset, __u8 width,
-                  __u32 value);
+		  __u32 value);
 
 struct pci_bar_region {
-    __paddr_t base;
-    __u64 size;
-    int io;
+	__paddr_t base;
+	__u64 size;
+	int io;
 };
 
 /* Probe a BAR only while the device is quiescent, before driver activation.

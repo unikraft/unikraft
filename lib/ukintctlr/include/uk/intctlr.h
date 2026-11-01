@@ -122,8 +122,8 @@ int uk_intctlr_irq_unregister(unsigned int irq,
 
 /* Remove only registrations owned by this handler/context pair. */
 int uk_intctlr_irq_unregister_arg(unsigned int irq,
-                                  uk_intctlr_irq_handler_func_t handler, void *arg);
-
+				  uk_intctlr_irq_handler_func_t handler,
+				  void *arg);
 
 /**
  *  Mask an interrupt

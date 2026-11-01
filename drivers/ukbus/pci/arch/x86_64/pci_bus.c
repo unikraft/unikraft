@@ -57,61 +57,63 @@
 #include <uk/spinlock.h>
 #include <uk/print.h>
 #include <uk/bus/pci.h>
+#include "../../pci_internal.h"
 
 static struct uk_spinlock pci_cfg_lock = UK_SPINLOCK_INITIALIZER();
 
 static __u32 pci_cfg_read_raw(__u32 address)
 {
-    unsigned long flags;
-    __u32 value;
+	unsigned long flags;
+	__u32 value;
 
-    uk_spin_lock_irqsave(&pci_cfg_lock, flags);
-    uk_arch_x86_64_outl(PCI_CONFIG_ADDR, address);
-    value = uk_arch_x86_64_inl(PCI_CONFIG_DATA);
-    uk_spin_unlock_irqrestore(&pci_cfg_lock, flags);
-    return value;
+	uk_spin_lock_irqsave(&pci_cfg_lock, flags);
+	uk_arch_x86_64_outl(PCI_CONFIG_ADDR, address);
+	value = uk_arch_x86_64_inl(PCI_CONFIG_DATA);
+	uk_spin_unlock_irqrestore(&pci_cfg_lock, flags);
+	return value;
 }
 
 static __u32 pci_cfg_address(const struct pci_address *addr, __u16 offset)
 {
-    return PCI_CONFIG_ADDRESS_ENABLE | ((__u32)addr->bus << 16) |
-           ((__u32)addr->devid << 11) | ((__u32)addr->function << 8) |
-           (offset & ~3U);
+	return PCI_CONFIG_ADDRESS_ENABLE | ((__u32)addr->bus << 16) |
+		   ((__u32)addr->devid << 11) | ((__u32)addr->function << 8) |
+		   (offset & ~3U);
 }
 
 int arch_pci_cfg_read(const struct pci_address *addr, __u16 offset, __u8 width,
-                     __u32 *value)
+		      __u32 *value)
 {
-    __u32 data = pci_cfg_read_raw(pci_cfg_address(addr, offset));
+	__u32 data = pci_cfg_read_raw(pci_cfg_address(addr, offset));
 
-    data >>= (offset & 3) * 8;
-    *value = width == 4 ? data : data & ((1U << (width * 8)) - 1);
-    return 0;
+	data >>= (offset & 3) * 8;
+	*value = width == 4 ? data : data & ((1U << (width * 8)) - 1);
+	return 0;
 }
 
 int arch_pci_cfg_write(const struct pci_address *addr, __u16 offset, __u8 width,
-                      __u32 value)
+		       __u32 value)
 {
-    unsigned long flags;
-    __u16 port = PCI_CONFIG_DATA + (offset & 3);
+	unsigned long flags;
+	__u16 port = PCI_CONFIG_DATA + (offset & 3);
 
-    uk_spin_lock_irqsave(&pci_cfg_lock, flags);
-    uk_arch_x86_64_outl(PCI_CONFIG_ADDR, pci_cfg_address(addr, offset));
-    if (width == 1)
-        uk_arch_x86_64_outb(port, (__u8)value);
-    else if (width == 2)
-        uk_arch_x86_64_outw(port, (__u16)value);
-    else
-        uk_arch_x86_64_outl(port, value);
-    uk_spin_unlock_irqrestore(&pci_cfg_lock, flags);
-    return 0;
+	uk_spin_lock_irqsave(&pci_cfg_lock, flags);
+	uk_arch_x86_64_outl(PCI_CONFIG_ADDR, pci_cfg_address(addr, offset));
+	if (width == 1)
+		uk_arch_x86_64_outb(port, (__u8)value);
+	else if (width == 2)
+		uk_arch_x86_64_outw(port, (__u16)value);
+	else
+		uk_arch_x86_64_outl(port, value);
+	uk_spin_unlock_irqrestore(&pci_cfg_lock, flags);
+	return 0;
 }
 
 #define PCI_CONF_READ(type, ret, a, s) \
-    do { \
-        __u32 _data = pci_cfg_read_raw((a) | PCI_CONF_##s); \
-        *(ret) = (type)((_data >> PCI_CONF_##s##_SHFT) & PCI_CONF_##s##_MASK); \
-    } while (0)
+	do { \
+		__u32 _data = pci_cfg_read_raw((a) | PCI_CONF_##s); \
+		*(ret) = (type)((_data >> PCI_CONF_##s##_SHFT) & \
+				PCI_CONF_##s##_MASK); \
+	} while (0)
 
 static inline int pci_driver_add_device(struct pci_driver *drv,
 					struct pci_address *addr,
