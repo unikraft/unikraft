@@ -12,6 +12,9 @@
 #include <uk/assert.h>
 #include <uk/atomic.h>
 #include <uk/print.h>
+#if CONFIG_LIBUKDEBUG_ENABLE_ASSERT
+#include <string.h>
+#endif
 
 #include "virtiofs-fuse.h"
 
@@ -680,7 +683,27 @@ ssize_t virtiofs_fuse_read(struct virtiofs_fuse_dev *fdev, uint64_t node,
 	int err;
 
 	init_hdr(fdev, &hdr, FUSE_READ, sizeof(*in));
+#if CONFIG_LIBUKDEBUG_ENABLE_ASSERT
+	const uint64_t sequence = uk_fetch_add(&fdev->debug_reads, 1);
+#endif
 	rlen = uk_virtiofs_request_vec(fdev->dev, iovecs, 2, 2, iovcnt + 1);
+#if CONFIG_LIBUKDEBUG_ENABLE_ASSERT
+	if (sequence < 64 || rlen < (ssize_t)sizeof(ohdr) || ohdr.error) {
+		unsigned char prefix[8] = {0};
+		size_t used = 0;
+		if (rlen > (ssize_t)sizeof(ohdr) && iovcnt) {
+			used = MIN(sizeof(prefix), MIN(read_iov[0].iov_len,
+					(size_t)rlen - sizeof(ohdr)));
+			memcpy(prefix, read_iov[0].iov_base, used);
+		}
+		uk_pr_info("FUSE read seq=%lu node=%lu offset=%lu requested=%u transport=%zd error=%d prefix_bytes=%zu prefix=%02x%02x%02x%02x%02x%02x%02x%02x\n",
+			(unsigned long)sequence, (unsigned long)node,
+			(unsigned long)in->offset, in->size, rlen,
+			rlen >= (ssize_t)sizeof(ohdr) ? ohdr.error : 0, used,
+			prefix[0], prefix[1], prefix[2], prefix[3],
+			prefix[4], prefix[5], prefix[6], prefix[7]);
+	}
+#endif
 	if (unlikely((err = check_reply(rlen, &ohdr))))
 		return err;
 	return payload_len(rlen);

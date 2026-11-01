@@ -238,9 +238,25 @@ __u16 virtiofs_maxsegs(const struct uk_virtiofs_iovec *iov,
 {
 	__sz segs = 0;
 
-	for (int i = 0; i < iovlen; i++)
-		segs += iov[i].iov_len / UK_PAGING_PAGE_SIZE + 1;
-	return (segs > max) ? max : (__u16)segs;
+	for (int i = 0; i < iovlen; i++) {
+		const __sz len = iov[i].iov_len;
+		const __sz offset = (__uptr)iov[i].iov_base &
+				    (UK_PAGING_PAGE_SIZE - 1);
+		__sz pages;
+
+		if (!len)
+			continue;
+		/* Count every page touched, including an unaligned first and
+		 * last page. Divide before adding to avoid len+offset overflow.
+		 */
+		pages = len / UK_PAGING_PAGE_SIZE;
+		pages += (offset + len % UK_PAGING_PAGE_SIZE +
+			  UK_PAGING_PAGE_SIZE - 1) / UK_PAGING_PAGE_SIZE;
+		if (pages >= (__sz)max - segs)
+			return max;
+		segs += pages;
+	}
+	return (__u16)segs;
 }
 
 /**
@@ -253,8 +269,14 @@ int virtiofs_prep_sglist(struct uk_sglist *sg,
 	for (int i = 0; i < iovlen; i++) {
 		int r = uk_sglist_append(sg, iov[i].iov_base, iov[i].iov_len);
 
-		if (unlikely(r))
+		if (unlikely(r)) {
+#if CONFIG_LIBUKDEBUG_ENABLE_ASSERT
+			uk_pr_info("VirtioFS SG append failure base=%p bytes=%zu used=%u capacity=%u error=%d\n",
+				iov[i].iov_base, (__sz)iov[i].iov_len,
+				(unsigned)sg->sg_nseg, (unsigned)sg->sg_maxseg, r);
+#endif
 			return r;
+		}
 	}
 	return 0;
 }
