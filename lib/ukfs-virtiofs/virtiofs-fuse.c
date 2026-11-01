@@ -87,7 +87,15 @@ bool payload_sumv(size_t *s, size_t l0, size_t nelem, size_t elsz)
 static inline
 uint64_t next_unique(struct virtiofs_fuse_dev *fdev)
 {
-	return uk_inc(&fdev->unique);
+	uint64_t unique;
+
+	/* uk_inc is fetch-and-add. Zero is reserved for FUSE notifications,
+	 * so skip it both at initialization and after counter wraparound.
+	 */
+	do {
+		unique = uk_inc(&fdev->unique);
+	} while (!unique);
+	return unique;
 }
 
 /* TODO: use real values from calling context */
@@ -106,6 +114,10 @@ void init_hdr(struct virtiofs_fuse_dev *fdev, struct fuse_in_header *hdr,
 	hdr->len = sizeof(*hdr) + paylen;
 	hdr->opcode = opcode;
 	hdr->unique = next_unique(fdev);
+#if CONFIG_LIBUKFS_VIRTIOFS_DEBUG
+	uk_pr_info("FUSE request opcode=%u unique=%lu\n",
+		   (unsigned int)opcode, (unsigned long)hdr->unique);
+#endif
 	hdr->total_extlen = 0;
 	set_credentials(hdr);
 }
