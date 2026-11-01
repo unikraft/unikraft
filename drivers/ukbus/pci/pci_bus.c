@@ -220,7 +220,7 @@ static inline int pci_device_id_is_any(const struct pci_device_id *id)
 	return 0;
 }
 
-struct pci_driver *pci_find_driver(struct pci_device_id *id)
+struct pci_driver *pci_find_driver(const struct pci_device_id *id)
 {
 	struct pci_driver *drv;
 	const struct pci_device_id *drv_id;
