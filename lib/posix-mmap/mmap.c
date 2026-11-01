@@ -317,10 +317,23 @@ UK_SYSCALL_R_DEFINE(int, madvise, void *, addr, size_t, len, int, advice)
 
 UK_SYSCALL_R_DEFINE(int, msync, void*, addr, size_t, length, int, flags)
 {
-	/* Since writing mmap memory back to file is not supported,
-	 * this doesn't make sense.
+	__vaddr_t vaddr = (__vaddr_t)addr;
+	int rc;
+
+	if (!UK_PAGING_PAGE_ALIGNED(vaddr) ||
+	    (flags & ~(MS_SYNC | MS_ASYNC | MS_INVALIDATE)) ||
+	    ((flags & MS_SYNC) && (flags & MS_ASYNC)))
+		return -EINVAL;
+	if (length > __SZ_MAX - (UK_PAGING_PAGE_SIZE - 1))
+		return -ENOMEM;
+	/* There is no asynchronous writeback worker yet. Never report a
+	 * queued flush that did not happen.
 	 */
-	return 0;
+	if (flags & MS_ASYNC)
+		return -ENOTSUP;
+	rc = uk_vma_sync(uk_vas_get_active(), vaddr,
+			 UK_PAGING_PAGE_ALIGN_UP(length));
+	return rc == -ENOENT ? -ENOMEM : rc;
 }
 
 UK_SYSCALL_R_DEFINE(int, mlock, const void*, addr, size_t, len)
