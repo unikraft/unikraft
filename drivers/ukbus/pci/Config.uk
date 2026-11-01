@@ -14,3 +14,9 @@ config LIBUKBUS_PCI_ECAM
 	select LIBUKBUS_PLATFORM
 	default y if (LIBUKBUS_PCI && LIBFDT && LIBUKOFW)
 	bool
+
+config LIBUKBUS_PCI_TEST
+	bool "Test PCI discovery contracts"
+	depends on LIBUKBUS_PCI && ARCH_X86_64
+	select LIBUKTEST
+	default n
