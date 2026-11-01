@@ -240,6 +240,15 @@ int virtiofs_fuse_init(struct virtiofs_fuse_dev *fdev)
 		goto err_destroy;
 	}
 
+	if (paylen < FIELDLEN(struct fuse_init_out, max_write) || !out.max_write) {
+		err = -EPROTO;
+		goto err_destroy;
+	}
+	fdev->max_write = out.max_write;
+#if CONFIG_LIBUKDEBUG_ENABLE_ASSERT
+	uk_pr_info("FUSE negotiated max_write=%u\n", fdev->max_write);
+#endif
+
 	return 0;
 
 err_destroy:
@@ -673,36 +682,53 @@ ssize_t virtiofs_fuse_write(struct virtiofs_fuse_dev *fdev, uint64_t node,
 			    const struct fuse_write_in *in,
 			    const struct iovec *write_iov, size_t iovcnt)
 {
-	struct fuse_in_header hdr = {
-		.nodeid = node
-	};
+	struct fuse_in_header hdr = { .nodeid = node };
+	struct fuse_write_in limited = *in;
 	struct fuse_write_out out;
 	struct fuse_out_header ohdr;
-	const struct uk_virtiofs_iovec ihdr_iov[] = {
-		{ &hdr, sizeof(hdr) },
-		{ (void *)in, sizeof(*in) },
-	};
-	const struct uk_virtiofs_iovec ohdr_iov[] = {
-		{ &ohdr, sizeof(ohdr) },
-		{ &out, sizeof(out) }
-	};
-	const struct uk_virtiofs_iovecs iovecs[] = {
-		{ ihdr_iov, 2 },
-		{ (const struct uk_virtiofs_iovec *)write_iov, iovcnt },
-		{ ohdr_iov, 2 }
-	};
+	struct iovec tail;
+	size_t count = 0, remaining;
 	size_t paylen;
 	ssize_t rlen;
 	int err;
 
-	if (unlikely(!payload_sum(&paylen, sizeof(*in), in->size)))
-		return -EDOM;
+	if (!in->size)
+		return 0;
+	if (!fdev->max_write)
+		return -EPROTO;
+	limited.size = MIN(in->size, fdev->max_write);
+	remaining = limited.size;
+	while (count < iovcnt && write_iov[count].iov_len <= remaining) {
+		remaining -= write_iov[count].iov_len;
+		count++;
+	}
+	if (remaining) {
+		if (count == iovcnt)
+			return -EINVAL;
+		tail.iov_base = write_iov[count].iov_base;
+		tail.iov_len = remaining;
+	}
+	const struct uk_virtiofs_iovec ihdr_iov[] = {
+		{ &hdr, sizeof(hdr) }, { &limited, sizeof(limited) }
+	};
+	const struct uk_virtiofs_iovec ohdr_iov[] = {
+		{ &ohdr, sizeof(ohdr) }, { &out, sizeof(out) }
+	};
+	const struct uk_virtiofs_iovecs iovecs[] = {
+		{ ihdr_iov, 2 },
+		{ (const struct uk_virtiofs_iovec *)write_iov, count },
+		{ (const struct uk_virtiofs_iovec *)&tail, remaining ? 1 : 0 },
+		{ ohdr_iov, 2 }
+	};
 
+	if (!payload_sum(&paylen, sizeof(limited), limited.size))
+		return -EDOM;
 	init_hdr(fdev, &hdr, FUSE_WRITE, paylen);
-	rlen = uk_virtiofs_request_vec(fdev->dev, iovecs, 3, 2 + iovcnt, 2);
-	if (unlikely((err = check_reply_payload(rlen, &ohdr, sizeof(out)))))
+	rlen = uk_virtiofs_request_vec(fdev->dev, iovecs, 4,
+				     2 + count + (remaining ? 1 : 0), 2);
+	if ((err = check_reply_payload(rlen, &ohdr, sizeof(out))))
 		return err;
-	return out.size;
+	return out.size <= limited.size ? (ssize_t)out.size : -EIO;
 }
 
 int virtiofs_fuse_statfs(struct virtiofs_fuse_dev *fdev,

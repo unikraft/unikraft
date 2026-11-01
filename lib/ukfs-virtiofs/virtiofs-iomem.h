@@ -42,52 +42,36 @@ ssize_t virtiofs_pod_pgin(void *addr, size_t npages, __paddr_t pa __unused,
 			  void *arg, size_t pgoff)
 {
 	struct viofs_node *n = arg;
-	struct iovec iov = {
-		.iov_base = addr,
-		.iov_len = npages * UK_PAGING_PAGE_SIZE
-	};
+	const size_t off = pgoff * UK_PAGING_PAGE_SIZE;
+	const size_t size = npages * UK_PAGING_PAGE_SIZE;
+	size_t done = 0;
 	ssize_t r;
 
-	if (!npages)
-		return 0;
-	r = virtiofs_file_read(n, pgoff * UK_PAGING_PAGE_SIZE,
-			       npages * UK_PAGING_PAGE_SIZE,
-			       &iov, 1, 0);
-	if (unlikely(r < 0))
-		return r;
-	if (!r)
-		/* Offset is past EOF; page in anon mem */
-		return uk_pod_anon_pagein(addr, npages, pa, arg, pgoff);
+	while (done < size) {
+		struct iovec iov = {
+			.iov_base = (char *)addr + done,
+			.iov_len = size - done
+		};
 
-	while (!IS_ALIGNED((size_t)r, UK_PAGING_PAGE_SIZE)) {
-		/* We've likely hit EOF; check & zero out rest */
-		const size_t end = pgoff * UK_PAGING_PAGE_SIZE + r;
-		const size_t rem = npages * UK_PAGING_PAGE_SIZE - r;
-		void *const base = (char *)addr + end;
-
-		if (end != n->attr.size) {
-			/* Size may be out of date; do another read */
-			ssize_t err;
-
-			iov.iov_base = base;
-			iov.iov_len = rem;
-			err = virtiofs_file_read(n, end, rem, &iov, 1, 0);
-			if (unlikely(err < 0)) {
-				/* Return partial success if read min 1 page */
-				if ((size_t)r > UK_PAGING_PAGE_SIZE)
-					break;
-				return err;
-			}
-			if (err > 0) {
-				r += err;
-				continue;
-			}
+		r = virtiofs_file_read(n, off + done, size - done, &iov, 1, 0);
+		if (r < 0)
+			return r;
+		if ((size_t)r > size - done)
+			return -EIO;
+		if (!r) {
+			/* EOF padding belongs to this buffer, not to an absolute
+			 * file offset relative to the buffer's start address.
+			 */
+			memset((char *)addr + done, 0, size - done);
+			break;
 		}
-		/* Confirmed at EOF, clear remaining bytes in page */
-		memset(base, 0, rem);
-		r += rem;
+		done += r;
 	}
-	return r / UK_PAGING_PAGE_SIZE;
+#if CONFIG_LIBUKDEBUG_ENABLE_ASSERT
+	uk_pr_info("VirtioFS pagein offset=%zu bytes=%zu read=%zu\n",
+		   off, size, done);
+#endif
+	return npages;
 }
 
 static
@@ -95,38 +79,39 @@ ssize_t virtiofs_pod_pgwb(const void *addr, size_t npages,
 			  void *arg, size_t pgoff)
 {
 	struct viofs_node *n = arg;
-	size_t off = pgoff * UK_PAGING_PAGE_SIZE;
-	size_t rem = npages * UK_PAGING_PAGE_SIZE;
-	size_t wbytes = 0;
-	size_t wpages;
+	const size_t off = pgoff * UK_PAGING_PAGE_SIZE;
+	const size_t size = npages * UK_PAGING_PAGE_SIZE;
+	/* Bytes after EOF in the last page must never extend the file. */
+	const size_t bytes = off < n->attr.size ?
+		MIN(size, n->attr.size - off) : 0;
+	size_t done = 0;
 	ssize_t r;
 
-	if (!npages)
-		return 0;
-	do {
+	while (done < bytes) {
 		const struct iovec iov = {
-			.iov_base = (char *)addr + off,
-			.iov_len = rem
+			.iov_base = (char *)addr + done,
+			.iov_len = bytes - done
 		};
 
-		r = virtiofs_file_write(n, off, rem, &iov, 1, 0);
-		if (unlikely(!r))
-			r = -EIO; /* Writes should always progress or error */
-		if (unlikely(r < 0))
-			break;
-
-		wbytes += r;
-		off += r;
-		rem -= r;
-	} while (rem && !IS_ALIGNED(wbytes, UK_PAGING_PAGE_SIZE));
-
-	/* If we managed to writeback at least 1 page, report success */
-	wpages = wbytes / UK_PAGING_PAGE_SIZE;
-	if (wpages)
-		return wpages;
-	/* We should only get here on error */
-	UK_ASSERT(r < 0);
-	return r;
+		/* The FUSE writer applies the negotiated limit and can return
+		 * partial progress. File offsets and buffer offsets advance
+		 * independently; pgoff is never added to addr.
+		 */
+		r = virtiofs_file_write(n, off + done, bytes - done, &iov, 1, 0);
+		if (r <= 0)
+			return r ? r : -EIO;
+		if ((size_t)r > bytes - done)
+			return -EIO;
+		done += r;
+	}
+#if CONFIG_LIBUKDEBUG_ENABLE_ASSERT
+	uk_pr_info("VirtioFS writeback offset=%zu window=%zu written=%zu\n",
+		   off, size, done);
+#endif
+	/* A partial EOF page counts as done after all of its file bytes;
+	 * the remaining padding is deliberately not written to storage.
+	 */
+	return npages;
 }
 
 static const struct uk_pod_pgio virtiofs_pod_ops = {
