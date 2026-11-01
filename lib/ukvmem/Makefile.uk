@@ -22,3 +22,5 @@ CXXINCLUDES-y += -I$(LIBUKVMEM_BASE)/tests/include
 
 LIBUKVMEM_SRCS-y += $(LIBUKVMEM_BASE)/tests/test_vmem.c
 endif
+
+LIBUKVMEM_SRCS-$(CONFIG_LIBUKVMEM_SYNC_TEST) += $(LIBUKVMEM_BASE)/tests/test_vma_sync.c

@@ -1124,3 +1124,22 @@ int virtiofs_fuse_statx(struct virtiofs_fuse_dev *fdev, uint64_t node,
 	rlen = uk_virtiofs_request(fdev->dev, iov, 2, 2 + !!out_statx);
 	return check_reply_payload(rlen, &ohdr, sizeof(struct fuse_statx_out));
 }
+
+#if CONFIG_LIBUKFS_VIRTIOFS_TEST
+#include <uk/test.h>
+
+UK_TESTCASE(virtiofs_fuse, nonzero_request_identifiers)
+{
+	struct virtiofs_fuse_dev dev = { 0 };
+
+	UK_TEST_EXPECT_SNUM_EQ(next_unique(&dev), 1);
+	UK_TEST_EXPECT_SNUM_EQ(next_unique(&dev), 2);
+	dev.unique = UINT64_MAX;
+	UK_TEST_EXPECT_ZERO(next_unique(&dev) ^ UINT64_MAX);
+	UK_TEST_EXPECT_SNUM_EQ(next_unique(&dev), 1);
+	UK_TEST_EXPECT_SNUM_EQ(next_unique(&dev), 2);
+}
+
+/* Run before the global statistics initcall at late priority nine. */
+uk_testsuite_late_prio(virtiofs_fuse, NULL, 8);
+#endif /* CONFIG_LIBUKFS_VIRTIOFS_TEST */
