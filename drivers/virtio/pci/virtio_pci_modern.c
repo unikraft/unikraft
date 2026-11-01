@@ -413,7 +413,7 @@ static struct virtqueue *vq_setup(struct virtio_dev *vdev, __u16 queue,
 	return vq;
 fail:
 	uk_spin_unlock_irqrestore(&d->select_lock, flags);
-	virtqueue_destroy(vq, a);
+	virtqueue_destroy(VIRTIO_PCI_VRING_ALIGN, vq, a);
 	return ERR2PTR(rc);
 }
 
@@ -432,7 +432,7 @@ static void vq_release(struct virtio_dev *vdev, struct virtqueue *vq,
 	uk_spin_lock_irqsave(&d->select_lock, flags);
 	UK_TAILQ_REMOVE(&vdev->vqs, vq, next);
 	uk_spin_unlock_irqrestore(&d->select_lock, flags);
-	virtqueue_destroy(vq, a);
+	virtqueue_destroy(VIRTIO_PCI_VRING_ALIGN, vq, a);
 }
 
 static struct virtio_config_ops modern_ops = {
@@ -496,7 +496,8 @@ fail:
 		uk_intctlr_irq_unregister_arg(pdev->irq, irq_handle, d);
 	UK_TAILQ_FOREACH_SAFE(vq, &d->vdev.vqs, next, next) {
 		UK_TAILQ_REMOVE(&d->vdev.vqs, vq, next);
-		virtqueue_destroy(vq, d->queue[vq->queue_id].alloc);
+		virtqueue_destroy(VIRTIO_PCI_VRING_ALIGN, vq,
+				  d->queue[vq->queue_id].alloc);
 	}
 	if (enabled)
 		pci_cfg_write(&pdev->addr, PCI_COMMAND, 2, original_command);

@@ -131,7 +131,8 @@ int virtio_pci_irq_dispatch(struct virtio_dev *vdev, __u8 isr_status)
 	int rc = 0;
 
 	if (isr_status & VIRTIO_PCI_ISR_CONFIG)
-		uk_pr_warn("Unsupported config change interrupt on virtio-pci device %p\n",
+		uk_pr_warn_isr("Unsupported config change interrupt "
+			       "on virtio-pci device %p\n",
 			   vdev);
 	if (isr_status & VIRTIO_PCI_ISR_HAS_INTR)
 		UK_TAILQ_FOREACH(vq, &vdev->vqs, next)

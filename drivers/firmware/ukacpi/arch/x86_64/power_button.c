@@ -40,7 +40,7 @@ static int power_button_irq(void *arg __unused)
 	if (!pressed)
 		return 0;
 #if CONFIG_LIBUKDEBUG_ENABLE_ASSERT
-	uk_pr_info("ACPI fixed power button received on SCI %u\n", button.irq);
+	uk_pr_info_isr("ACPI fixed power button received on SCI %u\n", button.irq);
 #endif
 	uk_pm_raise_shutdown_event(UK_PM_SHUTDOWN_OP_SYSHALT);
 	return 1;
