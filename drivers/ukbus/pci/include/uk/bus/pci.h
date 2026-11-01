@@ -307,6 +307,17 @@ int pci_cfg_read(const struct pci_address *addr, __u16 offset, __u8 width,
 int pci_cfg_write(const struct pci_address *addr, __u16 offset, __u8 width,
                   __u32 value);
 
+struct pci_bar_region {
+    __paddr_t base;
+    __u64 size;
+    int io;
+};
+
+/* Probe a BAR only while the device is quiescent, before driver activation.
+ * PCI decode/bus-master enables and original BAR values are restored.
+ */
+int pci_bar_get(struct pci_device *dev, __u8 index, struct pci_bar_region *bar);
+
 struct pci_driver *pci_find_driver(struct pci_device_id *id);
 
 #ifdef __cplusplus

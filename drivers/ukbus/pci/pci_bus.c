@@ -94,6 +94,83 @@ int pci_cfg_write(const struct pci_address *addr, __u16 offset, __u8 width,
 }
 
 
+int pci_bar_get(struct pci_device *dev, __u8 index, struct pci_bar_region *bar)
+{
+    const struct pci_address *addr;
+    __u32 low, high = 0, mask_low = 0, mask_high = 0, command;
+    __u16 offset = PCI_BASE_ADDRESS_0 + index * 4;
+    __u64 mask, size, base;
+    int wide, rc, restore_rc;
+    __u8 i;
+
+    if (!dev || !bar || index >= 6)
+        return -EINVAL;
+    addr = &dev->addr;
+    /* A 64-bit BAR's high word cannot itself be selected as another BAR. */
+    for (i = 0; i < index; ++i) {
+        rc = pci_cfg_read(addr, PCI_BASE_ADDRESS_0 + i * 4, 4, &low);
+        if (rc)
+            return rc;
+        if (!(low & 1) && (low & 6) == 4)
+            ++i;
+    }
+    if (i != index)
+        return -EINVAL;
+    if ((rc = pci_cfg_read(addr, offset, 4, &low)))
+        return rc;
+    wide = !(low & 1) && (low & 6) == 4;
+    if (!(low & 1) && (low & 6) != 0 && !wide)
+        return -EOPNOTSUPP;
+    if (wide && (index == 5 ||
+        (rc = pci_cfg_read(addr, offset + 4, 4, &high))))
+        return index == 5 ? -EINVAL : rc;
+    if ((rc = pci_cfg_read(addr, PCI_COMMAND, 2, &command)))
+        return rc;
+    rc = pci_cfg_write(addr, PCI_COMMAND, 2,
+                       command & ~(PCI_COMMAND_DECODE_ENABLE | PCI_COMMAND_MASTER));
+    if (rc)
+        return rc;
+    rc = pci_cfg_write(addr, offset, 4, ~0U);
+    if (!rc && wide)
+        rc = pci_cfg_write(addr, offset + 4, 4, ~0U);
+    if (!rc)
+        rc = pci_cfg_read(addr, offset, 4, &mask_low);
+    if (!rc && wide)
+        rc = pci_cfg_read(addr, offset + 4, 4, &mask_high);
+    restore_rc = pci_cfg_write(addr, offset, 4, low);
+    if (wide) {
+        int r = pci_cfg_write(addr, offset + 4, 4, high);
+        if (!restore_rc)
+            restore_rc = r;
+    }
+    {
+        int r = pci_cfg_write(addr, PCI_COMMAND, 2, command);
+        if (!restore_rc)
+            restore_rc = r;
+    }
+    if (rc || restore_rc)
+        return rc ? rc : restore_rc;
+    bar->io = low & 1;
+    mask_low &= bar->io ? ~3U : ~15U;
+    base = low & (bar->io ? ~3U : ~15U);
+    if (wide) {
+        mask = ((__u64)mask_high << 32) | mask_low;
+        base |= (__u64)high << 32;
+        size = ~mask + 1;
+        if (!mask)
+            return -ENXIO;
+    } else {
+        if (!mask_low)
+            return -ENXIO;
+        size = (1ULL << 32) - mask_low;
+    }
+    if (!base || !size || (size & (size - 1)) || base > ~0ULL - (size - 1))
+        return -EINVAL;
+    bar->base = base;
+    bar->size = size;
+    return 0;
+}
+
 static inline int pci_device_id_match(const struct pci_device_id *id0,
 					const struct pci_device_id *id1)
 {
