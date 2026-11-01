@@ -298,6 +298,15 @@ static struct pci_bus_handler ph __unused;
 #define PCI_MIN_GNT		0x3e	/* 8 bits */
 #define PCI_MAX_LAT		0x3f	/* 8 bits */
 
+/* Width-aligned accesses to the PCI configuration space. Architecture code
+ * owns the access mechanism; callers never manipulate configuration ports.
+ * Returns 0 or a negative errno. Read values are zero-extended.
+ */
+int pci_cfg_read(const struct pci_address *addr, __u16 offset, __u8 width,
+                 __u32 *value);
+int pci_cfg_write(const struct pci_address *addr, __u16 offset, __u8 width,
+                  __u32 value);
+
 struct pci_driver *pci_find_driver(struct pci_device_id *id);
 
 #ifdef __cplusplus
