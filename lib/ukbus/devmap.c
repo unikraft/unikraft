@@ -35,6 +35,9 @@
 #include <uk/errptr.h>
 #include <uk/paging.h>
 #include <uk/plat/native/paging.h>
+#ifdef CONFIG_ARCH_X86_64
+#include <uk/arch/x86_64.h>
+#endif
 
 __vaddr_t uk_bus_devmap(__paddr_t base, __sz size)
 {
@@ -50,7 +53,15 @@ __vaddr_t uk_bus_devmap(__paddr_t base, __sz size)
 	attr |= UK_PLAT_NATIVE_PAGE_ATTR_TYPE_DEVICE_nGnRnE;
 #endif /* CONFIG_ARCH_ARM_64 */
 
-	pages = ALIGN_UP(size, __PAGE_SIZE) >> UK_PAGING_PAGE_SHIFT;
+#ifdef CONFIG_ARCH_X86_64
+    /* Native x86 programs PAT entry 3 as UC. Its existing PWT|PCD selector
+     * is historically named WRITECOMBINE; here it must map device MMIO UC.
+     */
+    attr |= UK_ARCH_X86_64_PAGE_ATTR_WRITECOMBINE;
+#endif
+    if (!size || size > ~(__sz)0 - (base & (__PAGE_SIZE - 1)) - (__PAGE_SIZE - 1))
+        return -EINVAL;
+    pages = ALIGN_UP(size + (base & (__PAGE_SIZE - 1)), __PAGE_SIZE) >> UK_PAGING_PAGE_SHIFT;
 
 	pt = uk_paging_pt_get_active();
 
@@ -75,7 +86,7 @@ __vaddr_t uk_bus_devmap(__paddr_t base, __sz size)
 	}
 
 	if (rc == -EEXIST) {
-		rc = uk_paging_page_unmap(pt, vaddr, pages, 0);
+		rc = uk_paging_page_unmap(pt, vaddr, pages, UK_PAGING_PAGE_FLAG_KEEP_FRAMES);
 		if (unlikely(rc)) {
 			uk_pr_err("Could not unmap MMIO Region at 0x%lx - 0x%lx (%d)\n",
 				  base, base + size, rc);

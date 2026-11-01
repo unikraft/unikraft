@@ -141,7 +141,8 @@ static inline int pci_driver_add_device(struct pci_driver *drv,
 
 	config_addr = (PCI_ENABLE_BIT)
 			| (addr->bus << PCI_BUS_SHIFT)
-			| (addr->devid << PCI_DEVICE_SHIFT);
+			| (addr->devid << PCI_DEVICE_SHIFT)
+			| (addr->function << PCI_FUNCTION_SHIFT);
 	PCI_CONF_READ(__u16, &dev->base, config_addr, IOBAR);
 	PCI_CONF_READ(__u8, &dev->irq, config_addr, IRQ);
 
