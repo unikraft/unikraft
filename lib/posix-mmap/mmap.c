@@ -15,6 +15,9 @@
 #include <uk/arch/limits.h>
 #include <uk/lcpu.h>
 #include <uk/vmem.h>
+#if CONFIG_LIBUKDEBUG_ENABLE_ASSERT
+#include <uk/print.h>
+#endif
 
 #if CONFIG_LIBPOSIX_FDTAB
 #include <uk/posix-fdtab.h>
@@ -234,6 +237,10 @@ UK_SYSCALL_DEFINE(void *, mmap, void *, addr, size_t, len, int, prot,
 
 	rc = do_mmap(&addr, len, prot, flags, fd, offset);
 	if (unlikely(rc)) {
+#if CONFIG_LIBUKDEBUG_ENABLE_ASSERT
+		uk_pr_info("POSIX mmap failure length=%zu prot=%d flags=%d fd=%d offset=%lld error=%d\n",
+			len, prot, flags, fd, (long long)offset, rc);
+#endif
 		errno = -rc;
 		return MAP_FAILED;
 	}
