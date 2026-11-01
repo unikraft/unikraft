@@ -12,9 +12,6 @@
 #include <uk/assert.h>
 #include <uk/atomic.h>
 #include <uk/print.h>
-#if CONFIG_LIBUKDEBUG_ENABLE_ASSERT
-#include <string.h>
-#endif
 
 #include "virtiofs-fuse.h"
 
@@ -243,7 +240,8 @@ int virtiofs_fuse_init(struct virtiofs_fuse_dev *fdev)
 		goto err_destroy;
 	}
 
-	if (paylen < FIELDLEN(struct fuse_init_out, max_write) || !out.max_write) {
+	if (paylen < FIELDLEN(struct fuse_init_out, max_write) ||
+	    !out.max_write) {
 		err = -EPROTO;
 		goto err_destroy;
 	}
@@ -596,15 +594,7 @@ int virtiofs_fuse_rename(struct virtiofs_fuse_dev *fdev,
 
 	init_hdr(fdev, &hdr, FUSE_RENAME, paylen);
 	rlen = uk_virtiofs_request(fdev->dev, iov, 6, 1);
-	int result = check_reply(rlen, &ohdr);
-#if CONFIG_LIBUKDEBUG_ENABLE_ASSERT
-	uk_pr_info("FUSE rename source=%lu dest=%lu lengths=%zu,%zu unique=%lu transport=%zd replylen=%u replyerror=%d result=%d\n",
-		   (unsigned long)node, (unsigned long)dest, nlen, dlen,
-		   (unsigned long)hdr.unique, rlen,
-		   rlen >= (ssize_t)sizeof(ohdr) ? ohdr.len : 0,
-		   rlen >= (ssize_t)sizeof(ohdr) ? ohdr.error : 0, result);
-#endif
-	return result;
+	return check_reply(rlen, &ohdr);
 }
 
 int virtiofs_fuse_link(struct virtiofs_fuse_dev *fdev, uint64_t node,
@@ -683,27 +673,7 @@ ssize_t virtiofs_fuse_read(struct virtiofs_fuse_dev *fdev, uint64_t node,
 	int err;
 
 	init_hdr(fdev, &hdr, FUSE_READ, sizeof(*in));
-#if CONFIG_LIBUKDEBUG_ENABLE_ASSERT
-	const uint64_t sequence = uk_fetch_add(&fdev->debug_reads, 1);
-#endif
 	rlen = uk_virtiofs_request_vec(fdev->dev, iovecs, 2, 2, iovcnt + 1);
-#if CONFIG_LIBUKDEBUG_ENABLE_ASSERT
-	if (sequence < 64 || rlen < (ssize_t)sizeof(ohdr) || ohdr.error) {
-		unsigned char prefix[8] = {0};
-		size_t used = 0;
-		if (rlen > (ssize_t)sizeof(ohdr) && iovcnt) {
-			used = MIN(sizeof(prefix), MIN(read_iov[0].iov_len,
-					(size_t)rlen - sizeof(ohdr)));
-			memcpy(prefix, read_iov[0].iov_base, used);
-		}
-		uk_pr_info("FUSE read seq=%lu node=%lu offset=%lu requested=%u transport=%zd error=%d prefix_bytes=%zu prefix=%02x%02x%02x%02x%02x%02x%02x%02x\n",
-			(unsigned long)sequence, (unsigned long)node,
-			(unsigned long)in->offset, in->size, rlen,
-			rlen >= (ssize_t)sizeof(ohdr) ? ohdr.error : 0, used,
-			prefix[0], prefix[1], prefix[2], prefix[3],
-			prefix[4], prefix[5], prefix[6], prefix[7]);
-	}
-#endif
 	if (unlikely((err = check_reply(rlen, &ohdr))))
 		return err;
 	return payload_len(rlen);
@@ -756,7 +726,7 @@ ssize_t virtiofs_fuse_write(struct virtiofs_fuse_dev *fdev, uint64_t node,
 		return -EDOM;
 	init_hdr(fdev, &hdr, FUSE_WRITE, paylen);
 	rlen = uk_virtiofs_request_vec(fdev->dev, iovecs, 4,
-				     2 + count + (remaining ? 1 : 0), 2);
+				       2 + count + (remaining ? 1 : 0), 2);
 	if ((err = check_reply_payload(rlen, &ohdr, sizeof(out))))
 		return err;
 	return out.size <= limited.size ? (ssize_t)out.size : -EIO;

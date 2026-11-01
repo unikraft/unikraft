@@ -20,9 +20,6 @@ struct virtiofs_fuse_dev {
 	struct uk_virtiofs_dev *dev;
 	uint64_t unique;
 	uint32_t max_write;
-#if CONFIG_LIBUKDEBUG_ENABLE_ASSERT
-	uint64_t debug_reads;
-#endif
 };
 
 /* Lifecycle messages */

@@ -760,9 +760,9 @@ int uk_vma_map(struct uk_vas *vas, __vaddr_t *vaddr, __sz len,
 			 * have an unrecoverable error and the address range
 			 * will be empty!
 			 */
-			/* mapx can leave a partially populated range. Remove its
-			 * PTEs through the owning mapping before dropping backing
-			 * references; private and borrowed frames have different
+			/* A partial mapx can leave PTEs. Remove them through
+			 * the owner before dropping its backing references;
+			 * private and borrowed frames have different
 			 * ownership rules.
 			 */
 			vmem_vma_unmap(vma, vma->start, uk_vma_len(vma));

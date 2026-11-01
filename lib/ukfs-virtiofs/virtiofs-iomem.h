@@ -59,7 +59,7 @@ ssize_t virtiofs_pod_pgin(void *addr, size_t npages, __paddr_t pa __unused,
 		if ((size_t)r > size - done)
 			return -EIO;
 		if (!r) {
-			/* EOF padding belongs to this buffer, not to an absolute
+			/* EOF padding belongs to this buffer, not an absolute
 			 * file offset relative to the buffer's start address.
 			 */
 			memset((char *)addr + done, 0, size - done);
@@ -97,7 +97,8 @@ ssize_t virtiofs_pod_pgwb(const void *addr, size_t npages,
 		 * partial progress. File offsets and buffer offsets advance
 		 * independently; pgoff is never added to addr.
 		 */
-		r = virtiofs_file_write(n, off + done, bytes - done, &iov, 1, 0);
+		r = virtiofs_file_write(n, off + done, bytes - done,
+					&iov, 1, 0);
 		if (r <= 0)
 			return r ? r : -EIO;
 		if ((size_t)r > bytes - done)

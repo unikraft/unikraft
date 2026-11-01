@@ -83,9 +83,6 @@ void virtiofs_init_dev(struct viofs_dev *d, struct uk_virtiofs_dev *vd)
 	d->fdev.dev = vd;
 	d->fdev.unique = 0;
 	d->fdev.max_write = 0;
-#if CONFIG_LIBUKDEBUG_ENABLE_ASSERT
-	d->fdev.debug_reads = 0;
-#endif
 	UK_RB_INIT(&d->nodemap);
 	uk_mutex_init(&d->maplk);
 }

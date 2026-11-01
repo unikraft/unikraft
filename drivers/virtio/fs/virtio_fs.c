@@ -269,14 +269,8 @@ int virtiofs_prep_sglist(struct uk_sglist *sg,
 	for (int i = 0; i < iovlen; i++) {
 		int r = uk_sglist_append(sg, iov[i].iov_base, iov[i].iov_len);
 
-		if (unlikely(r)) {
-#if CONFIG_LIBUKDEBUG_ENABLE_ASSERT
-			uk_pr_info("VirtioFS SG append failure base=%p bytes=%zu used=%u capacity=%u error=%d\n",
-				iov[i].iov_base, (__sz)iov[i].iov_len,
-				(unsigned)sg->sg_nseg, (unsigned)sg->sg_maxseg, r);
-#endif
+		if (unlikely(r))
 			return r;
-		}
 	}
 	return 0;
 }

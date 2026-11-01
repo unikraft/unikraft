@@ -104,7 +104,7 @@ static int cfg_read(struct modern_pci *d, __u16 offset, __u8 width, __u32 *v)
 }
 
 static int map_capability(struct modern_pci *d, __u32 cap, __u32 kind,
-			 __u32 cap_length)
+			  __u32 cap_length)
 {
 	__u32 bar, offset, length, multiplier = 0;
 	struct pci_bar_region *r;
@@ -123,13 +123,15 @@ static int map_capability(struct modern_pci *d, __u32 cap, __u32 kind,
 	if ((rc = cfg_read(d, cap + 8, 4, &offset)) ||
 	    (rc = cfg_read(d, cap + 12, 4, &length)))
 		return rc;
-	if (!length || (kind == COMMON && (length < COMMON_LENGTH || offset % 4)) ||
+	if (!length ||
+	    (kind == COMMON && (length < COMMON_LENGTH || offset % 4)) ||
 	    (kind == NOTIFY && (length < 2 || offset % 2)))
 		return -EINVAL;
 	if (kind == NOTIFY) {
 		if ((rc = cfg_read(d, cap + 16, 4, &multiplier)))
 			return rc;
-		if (multiplier && (multiplier < 2 || (multiplier & (multiplier - 1))))
+		if (multiplier &&
+		    (multiplier < 2 || (multiplier & (multiplier - 1))))
 			return -EINVAL;
 	}
 	r = &d->bars[bar];
@@ -138,8 +140,10 @@ static int map_capability(struct modern_pci *d, __u32 cap, __u32 kind,
 		if (rc)
 			return rc;
 	}
-	if (r->io)
-		return 0; /* Another capability can offer the MMIO alternative. */
+	if (r->io) {
+		/* Another capability can offer the MMIO alternative. */
+		return 0;
+	}
 	if (offset > r->size || length > r->size - offset)
 		return -EINVAL;
 	if (!d->mapped_bar[bar]) {
@@ -254,7 +258,8 @@ static void device_reset(struct virtio_dev *vdev)
 	}
 	if (d->queue)
 		for (unsigned int i = 0; i < d->queues; ++i)
-			__atomic_store_n(&d->queue[i].notify, NULL, __ATOMIC_RELEASE);
+			__atomic_store_n(&d->queue[i].notify, NULL,
+					 __ATOMIC_RELEASE);
 }
 
 static int config_get(struct virtio_dev *vdev, __u16 offset, void *buf,
@@ -269,7 +274,8 @@ static int config_get(struct virtio_dev *vdev, __u16 offset, void *buf,
 
 	if (!r->base || offset > r->length || len > r->length - offset)
 		return -EFAULT;
-	if ((type_len != 1 && type_len != 2 && type_len != 4 && type_len != 8) ||
+	if ((type_len != 1 && type_len != 2 &&
+	     type_len != 4 && type_len != 8) ||
 	    offset % width || len % type_len)
 		return -EINVAL;
 	do {
@@ -293,7 +299,8 @@ static int config_set(struct virtio_dev *vdev, __u16 offset, const void *buf,
 		      __u32 len)
 {
 	struct modern_region *r = &modern(vdev)->region[DEVICE];
-	__u32 width = len == 8 ? 4 : (len == 1 || len == 2 || len == 4 ? len : 1);
+	__u32 width = len == 8 ? 4 :
+		(len == 1 || len == 2 || len == 4 ? len : 1);
 	__u32 value, i;
 
 	if (!r->base || offset > r->length || len > r->length - offset)
@@ -350,7 +357,8 @@ static int vqs_find(struct virtio_dev *vdev, __u16 count, __u16 *sizes)
 		d->irq_registered = 1;
 	}
 	uk_spin_lock_irqsave(&d->select_lock, flags);
-	write16(c, C_MSIX, 0xffff); /* Use INTx, not an unconfigured MSI-X vector. */
+	/* Use INTx, not an unconfigured MSI-X vector. */
+	write16(c, C_MSIX, 0xffff);
 	for (i = 0; i < count; ++i) {
 		sizes[i] = 0;
 		if (i >= d->queues)
@@ -365,7 +373,7 @@ static int vqs_find(struct virtio_dev *vdev, __u16 count, __u16 *sizes)
 }
 
 static struct virtqueue *vq_setup(struct virtio_dev *vdev, __u16 queue,
-				 __u16 size, virtqueue_callback_t callback,
+				  __u16 size, virtqueue_callback_t callback,
 				 struct uk_alloc *a)
 {
 	struct modern_pci *d = modern(vdev);
@@ -395,7 +403,8 @@ static struct virtqueue *vq_setup(struct virtio_dev *vdev, __u16 queue,
 	write64(c, C_QUEUE_DEVICE, virtqueue_get_used_addr(vq));
 	d->queue[queue].alloc = a;
 	__atomic_store_n(&d->queue[queue].notify,
-		mmio(d->region[NOTIFY].base, notify_offset), __ATOMIC_RELEASE);
+			 mmio(d->region[NOTIFY].base, notify_offset),
+			 __ATOMIC_RELEASE);
 	UK_TAILQ_INSERT_TAIL(&vdev->vqs, vq, next);
 	write16(c, C_QUEUE_ENABLE, 1);
 	uk_spin_unlock_irqrestore(&d->select_lock, flags);
@@ -414,9 +423,9 @@ static void vq_release(struct virtio_dev *vdev, struct virtqueue *vq,
 	struct modern_pci *d = modern(vdev);
 	unsigned long flags;
 
-	/* Without negotiated RING_RESET, the specification requires device reset
-	 * before releasing queue memory. Writing zero to queue_enable is invalid.
-	 * A release therefore quiesces this whole device before freeing any ring.
+	/* Without RING_RESET, reset the device before releasing queue memory.
+	 * Writing zero to queue_enable is invalid. Quiesce the entire device
+	 * before freeing a ring.
 	 */
 	device_reset(vdev);
 	vdev->status = VIRTIO_DEV_STOPPED;
@@ -436,65 +445,63 @@ static struct virtio_config_ops modern_ops = {
 
 int virtio_pci_modern_add_dev(struct pci_device *pdev, struct uk_alloc *a)
 {
-    struct modern_pci *d = uk_calloc(a, 1, sizeof(*d));
-    struct virtqueue *vq, *next;
-    __u32 command, original_command = 0;
-    int rc, enabled = 0;
+	struct modern_pci *d = uk_calloc(a, 1, sizeof(*d));
+	struct virtqueue *vq, *next;
+	__u32 command, original_command = 0;
+	int rc, enabled = 0;
 
-    if (!d)
-        return -ENOMEM;
-    d->pdev = pdev;
-    uk_spin_init(&d->select_lock);
-    UK_TAILQ_INIT(&d->vdev.vqs);
-    rc = discover(d);
-    if (rc)
-        goto fail;
-    d->vdev.id.virtio_device_id = pdev->id.device_id >= 0x1040 ?
-        pdev->id.device_id - 0x1040 : pdev->id.subsystem_device_id;
-    d->vdev.cops = &modern_ops;
-    if ((rc = cfg_read(d, PCI_COMMAND, 2, &original_command)))
-        goto fail;
-    command = (original_command | PCI_COMMAND_MEMORY | PCI_COMMAND_MASTER) &
-              ~PCI_COMMAND_INTX_DISABLE;
-    rc = pci_cfg_write(&pdev->addr, PCI_COMMAND, 2, command);
-    if (rc)
-        goto fail;
-    enabled = 1;
-    if (!(features_get(&d->vdev) & (1ULL << VIRTIO_F_VERSION_1))) {
-        rc = -EOPNOTSUPP;
-        goto fail;
-    }
-    d->queues = read16(d->region[COMMON].base, C_QUEUES);
-    if (!d->queues) {
-        rc = -ENODEV;
-        goto fail;
-    }
-    d->queue = uk_calloc(a, d->queues, sizeof(*d->queue));
-    if (!d->queue) {
-        rc = -ENOMEM;
-        goto fail;
-    }
-#if CONFIG_LIBUKDEBUG_ENABLE_ASSERT
-    uk_pr_info("Modern virtio PCI %04x: common=%p notify=%p isr=%p config=%p queues=%u\n",
-               pdev->id.device_id, d->region[COMMON].base, d->region[NOTIFY].base,
-               d->region[ISR].base, d->region[DEVICE].base, d->queues);
-#endif
-    rc = virtio_bus_register_device(&d->vdev);
-    if (!rc)
-        return 0;
+	if (!d)
+		return -ENOMEM;
+	d->pdev = pdev;
+	uk_spin_init(&d->select_lock);
+	UK_TAILQ_INIT(&d->vdev.vqs);
+	rc = discover(d);
+	if (rc)
+		goto fail;
+	d->vdev.id.virtio_device_id = pdev->id.device_id >= 0x1040 ?
+		pdev->id.device_id - 0x1040 : pdev->id.subsystem_device_id;
+	d->vdev.cops = &modern_ops;
+	if ((rc = cfg_read(d, PCI_COMMAND, 2, &original_command)))
+		goto fail;
+	command = (original_command | PCI_COMMAND_MEMORY | PCI_COMMAND_MASTER) &
+			  ~PCI_COMMAND_INTX_DISABLE;
+	rc = pci_cfg_write(&pdev->addr, PCI_COMMAND, 2, command);
+	if (rc)
+		goto fail;
+	enabled = 1;
+	if (!(features_get(&d->vdev) & (1ULL << VIRTIO_F_VERSION_1))) {
+		rc = -EOPNOTSUPP;
+		goto fail;
+	}
+	d->queues = read16(d->region[COMMON].base, C_QUEUES);
+	if (!d->queues) {
+		rc = -ENODEV;
+		goto fail;
+	}
+	d->queue = uk_calloc(a, d->queues, sizeof(*d->queue));
+	if (!d->queue) {
+		rc = -ENOMEM;
+		goto fail;
+	}
+	uk_pr_debug("Modern virtio PCI %04x: common=%p notify=%p\n",
+		    pdev->id.device_id, d->region[COMMON].base,
+		    d->region[NOTIFY].base);
+	rc = virtio_bus_register_device(&d->vdev);
+	if (!rc)
+		return 0;
 fail:
-    if (enabled)
-        device_reset(&d->vdev);
-    if (d->irq_registered)
-        uk_intctlr_irq_unregister_arg(pdev->irq, irq_handle, d);
-    UK_TAILQ_FOREACH_SAFE(vq, &d->vdev.vqs, next, next) {
-        UK_TAILQ_REMOVE(&d->vdev.vqs, vq, next);
-        virtqueue_destroy(vq, d->queue[vq->queue_id].alloc);
-    }
-    if (enabled)
-        pci_cfg_write(&pdev->addr, PCI_COMMAND, 2, original_command);
-    if (d->queue)
-        uk_free(a, d->queue);
-    uk_free(a, d);
-    return rc;
+	if (enabled)
+		device_reset(&d->vdev);
+	if (d->irq_registered)
+		uk_intctlr_irq_unregister_arg(pdev->irq, irq_handle, d);
+	UK_TAILQ_FOREACH_SAFE(vq, &d->vdev.vqs, next, next) {
+		UK_TAILQ_REMOVE(&d->vdev.vqs, vq, next);
+		virtqueue_destroy(vq, d->queue[vq->queue_id].alloc);
+	}
+	if (enabled)
+		pci_cfg_write(&pdev->addr, PCI_COMMAND, 2, original_command);
+	if (d->queue)
+		uk_free(a, d->queue);
+	uk_free(a, d);
+	return rc;
 }

@@ -7,12 +7,12 @@ menuconfig LIBUKFS_VIRTIOFS
 if LIBUKFS_VIRTIOFS
 
 config LIBUKFS_VIRTIOFS_DEBUG
-    bool "Compile development request tracing"
-    depends on LIBUKDEBUG_ENABLE_ASSERT
-    default n
-    help
-      Include request opcode and identifier tracing. When disabled neither
-      the tracing calls nor their messages are part of the kernel.
+	bool "Compile development request tracing"
+	depends on LIBUKDEBUG_ENABLE_ASSERT
+	default n
+	help
+	  Include request opcode and identifier tracing. When disabled neither
+	  the tracing calls nor their messages are part of the kernel.
 
 
 config LIBUKFS_VIRTIOFS_IOMEM

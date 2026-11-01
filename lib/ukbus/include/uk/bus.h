@@ -68,7 +68,6 @@ unsigned int uk_bus_count(void);
 __vaddr_t uk_bus_devmap(__paddr_t base, __sz size);
 #endif
 
-
 /* Do not use this function directly: */
 void _uk_bus_register(struct uk_bus *b);
 /* Do not use this function directly: */

@@ -106,39 +106,40 @@ int uk_intctlr_irq_register(unsigned int irq,
 }
 
 static int irq_unregister(unsigned int irq, uk_intctlr_irq_handler_func_t func,
-                          void *arg, int match_arg)
+			  void *arg, int match_arg)
 {
-    unsigned long flags;
-    unsigned int read, write = 0;
-    int found = 0;
+	unsigned long flags;
+	unsigned int read, write = 0;
+	int found = 0;
 
-    if (!func || irq >= MAX_IRQ)
-        return -EINVAL;
-    flags = uk_lcpu_save_irqf();
-    for (read = 0; read < MAX_HANDLERS_PER_IRQ; ++read) {
-        struct irq_handler h = irq_handlers[irq][read];
-        if (h.func == func && (!match_arg || h.arg == arg)) {
-            found = 1;
-            continue;
-        }
-        irq_handlers[irq][write++] = h;
-    }
-    while (write < MAX_HANDLERS_PER_IRQ)
-        irq_handlers[irq][write++] = (struct irq_handler){ 0 };
-    uk_lcpu_restore_irqf(flags);
-    return found ? 0 : -ENOENT;
+	if (!func || irq >= MAX_IRQ)
+		return -EINVAL;
+	flags = uk_lcpu_save_irqf();
+	for (read = 0; read < MAX_HANDLERS_PER_IRQ; ++read) {
+		struct irq_handler h = irq_handlers[irq][read];
+
+		if (h.func == func && (!match_arg || h.arg == arg)) {
+			found = 1;
+			continue;
+		}
+		irq_handlers[irq][write++] = h;
+	}
+	while (write < MAX_HANDLERS_PER_IRQ)
+		irq_handlers[irq][write++] = (struct irq_handler){ 0 };
+	uk_lcpu_restore_irqf(flags);
+	return found ? 0 : -ENOENT;
 }
 
 int uk_intctlr_irq_unregister(unsigned int irq,
-                              uk_intctlr_irq_handler_func_t func)
+			      uk_intctlr_irq_handler_func_t func)
 {
-    return irq_unregister(irq, func, NULL, 0);
+	return irq_unregister(irq, func, NULL, 0);
 }
 
 int uk_intctlr_irq_unregister_arg(unsigned int irq,
-                                  uk_intctlr_irq_handler_func_t func, void *arg)
+				  uk_intctlr_irq_handler_func_t func, void *arg)
 {
-    return irq_unregister(irq, func, arg, 1);
+	return irq_unregister(irq, func, arg, 1);
 }
 
 /*

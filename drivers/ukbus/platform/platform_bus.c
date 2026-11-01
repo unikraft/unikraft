@@ -238,7 +238,7 @@ static int pf_init(struct uk_alloc *a)
 #if CONFIG_LIBUKPAGING
 __vaddr_t uk_bus_pf_devmap(__paddr_t base, __sz size)
 {
-    return uk_bus_devmap(base, size);
+	return uk_bus_devmap(base, size);
 }
 #endif /* CONFIG_LIBUKPAGING */
 

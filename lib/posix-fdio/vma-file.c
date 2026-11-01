@@ -75,7 +75,8 @@ int file_backing_new(struct uk_vas *vas, const struct uk_file *f,
 	uk_file_wlock(f);
 	while (b->acquired < len) {
 		r = uk_file_mem(f, UKFILE_MEM_ACQUIRE_PINNED,
-				offset + b->acquired, len - b->acquired, __NULL, 0);
+				offset + b->acquired, len - b->acquired,
+				__NULL, 0);
 		if (r <= 0) {
 			rc = r ? r : -ENXIO;
 			goto fail;
@@ -97,7 +98,8 @@ int file_backing_new(struct uk_vas *vas, const struct uk_file *f,
 		 */
 		b->pages[done / UK_PAGING_PAGE_SIZE] =
 			uk_paging_virt_to_phys((__vaddr_t)iov.iov_base);
-		if (b->pages[done / UK_PAGING_PAGE_SIZE] == UK_PAGING_PADDR_INV) {
+		if (b->pages[done / UK_PAGING_PAGE_SIZE] ==
+		    UK_PAGING_PADDR_INV) {
 			rc = -EIO;
 			goto fail;
 		}
@@ -111,7 +113,8 @@ int file_backing_new(struct uk_vas *vas, const struct uk_file *f,
 	return 0;
 fail:
 	if (b->acquired)
-		uk_file_mem(f, UKFILE_MEM_RELEASE, offset, b->acquired, __NULL, 0);
+		uk_file_mem(f, UKFILE_MEM_RELEASE, offset, b->acquired,
+			    __NULL, 0);
 	uk_file_wunlock(f);
 	uk_free(vas->a, b);
 	return rc;
@@ -176,7 +179,8 @@ void file_vma_op_destroy(struct uk_vma *vma)
 		struct file_backing *b = fvma->shared;
 
 		uk_file_wlock(f);
-		uk_file_mem(f, UKFILE_MEM_RELEASE, b->offset, b->acquired, __NULL, 0);
+		uk_file_mem(f, UKFILE_MEM_RELEASE, b->offset, b->acquired,
+			    __NULL, 0);
 		uk_file_wunlock(f);
 #if CONFIG_LIBUKDEBUG_ENABLE_ASSERT
 		uk_pr_info("Released shared file offset=%lld bytes=%zu\n",
@@ -240,7 +244,8 @@ int file_vma_op_fault(struct uk_vma *vma, struct uk_vm_fault *fault)
 		 */
 		if (fault->level != UK_PAGING_PAGE_LEVEL)
 			return -ENOMEM;
-		pos = fvma->offset - fvma->shared->offset + fault->vbase - vma->start;
+		pos = fvma->offset - fvma->shared->offset +
+			fault->vbase - vma->start;
 		if (pos >= fvma->shared->acquired)
 			return -ENXIO;
 		fault->paddr = fvma->shared->pages[pos / UK_PAGING_PAGE_SIZE];
