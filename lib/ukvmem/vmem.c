@@ -970,6 +970,39 @@ int uk_vma_advise(struct uk_vas *vas, __vaddr_t vaddr, __sz len,
 	return vmem_vma_advise(vma, vaddr, vend - vaddr, advice);
 }
 
+int uk_vma_sync(struct uk_vas *vas, __vaddr_t vaddr, __sz len)
+{
+	struct uk_vma *first = __NULL, *last, *vma;
+	__vaddr_t end;
+	int rc;
+
+	if (!UK_PAGING_PAGE_ALIGNED(vaddr) || !UK_PAGING_PAGE_ALIGNED(len))
+		return -EINVAL;
+	if (vaddr > __VADDR_MAX - len)
+		return -ENOMEM;
+	if (!len)
+		return 0;
+	rc = vmem_vma_find_range(vas, &vaddr, &len, &first, &last, 1);
+	if (unlikely(rc))
+		return rc;
+	end = vaddr + len;
+	vma = first;
+	for (;;) {
+		__sz part = MIN(vma->end, end) - vaddr;
+
+		if (vma->ops->sync) {
+			rc = vma->ops->sync(vma, vaddr, part);
+			if (unlikely(rc))
+				return rc;
+		}
+		if (vma == last)
+			break;
+		vma = uk_list_next_entry(vma, vma_list);
+		vaddr = vma->start;
+	}
+	return 0;
+}
+
 #ifdef CONFIG_LIBUKPAGING
 static inline int vmem_largest_level(__vaddr_t vaddr, __sz len,
 				   unsigned int max_lvl)

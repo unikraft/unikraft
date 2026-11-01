@@ -306,6 +306,13 @@ struct uk_vma_ops {
 	 */
 	int (*unmap)(struct uk_vma *vma, __vaddr_t vaddr, __sz len);
 
+	/** Synchronize backing storage for a mapped range. May block in normal
+	 * thread context. Return 0 or a negative errno; no callback means that
+	 * the mapping has no backing storage requiring synchronization.
+	 */
+	int (*sync)(struct uk_vma *vma, __vaddr_t vaddr, __sz len);
+
+
 	/**
 	 * Allocates a new VMA and configures its VMA-type specific properties
 	 * when a VMA is split into multiple separate VMAs. This may happen
@@ -673,6 +680,13 @@ int uk_vma_set_attr(struct uk_vas *vas, __vaddr_t vaddr, __sz len,
  */
 int uk_vma_advise(struct uk_vas *vas, __vaddr_t vaddr, __sz len,
 		  unsigned long advice, unsigned long flags);
+
+/** Synchronize a fully mapped, page-aligned range without changing VMAs.
+ * Returns -ENOENT for holes and propagates backing-store errors. No disk or
+ * file knowledge belongs in the VMA walker; each mapping owns its callback.
+ */
+int uk_vma_sync(struct uk_vas *vas, __vaddr_t vaddr, __sz len);
+
 
 #ifdef __cplusplus
 }

@@ -8,6 +8,7 @@ uk_vma_map
 uk_vma_unmap
 uk_vma_set_attr
 uk_vma_advise
+uk_vma_sync
 
 uk_vma_anon_ops
 uk_vma_dma_ops
