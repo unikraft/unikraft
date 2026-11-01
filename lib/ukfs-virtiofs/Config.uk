@@ -25,4 +25,9 @@ config LIBUKFS_VIRTIOFS_IOMEM
 		Support for the ukfile mem() operation, required for supporting
 		shared file mappings.
 
+config LIBUKFS_VIRTIOFS_TEST
+	bool "Test FUSE protocol contracts"
+	select LIBUKTEST
+	default n
+
 endif
