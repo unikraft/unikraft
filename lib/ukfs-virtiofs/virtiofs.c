@@ -1329,7 +1329,7 @@ struct viofs_node *virtiofs_live_fs_create(struct viofs_node *n,
 
 		virtiofs_live_acquire(n);
 		virtiofs_init_node(newnode, n->dev, entry_out.nodeid, n);
-		UK_ASSERT(virtiofs_node_fmode(n) == S_IFREG);
+		UK_ASSERT(virtiofs_node_fmode(newnode) == S_IFREG);
 		virtiofs_commit_open(newnode, &open_out);
 		uk_mutex_lock(&n->dev->maplk);
 		UK_RB_INSERT(virtiofs_nodemap, &n->dev->nodemap, newnode);
