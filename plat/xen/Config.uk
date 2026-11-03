@@ -35,6 +35,7 @@ if (PLAT_XEN)
 # Hidden option for pulling arm64 platform dependencies
 config PLAT_XEN_ARM64
 	bool
+	select HAVE_FIXMAP
 	select HAVE_PAGING
 	select LIBXENPLAT_PAGING
 	select LIBUKPLAT_NATIVE_AUXSP
