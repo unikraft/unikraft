@@ -69,29 +69,8 @@ extern paddr_t _libxenplat_paddr_offset;
 /* Number of virtual address bits for 4KB page */
 #define VA_BITS         39
 
-#define SZ_2M           0x00200000
-
 #define PAGE_OFFSET     ((0xffffffffffffffff << (VA_BITS - 1))\
 						 & 0xffffffffffffffff)
-#define FIX_FDT_TOP     (PAGE_OFFSET)
-#define FIX_FDT_START   (FIX_FDT_TOP - SZ_2M)
-#define FIX_CON_TOP     (FIX_FDT_START)
-#define FIX_CON_START   (FIX_CON_TOP - SZ_2M)
-#define FIX_GIC_TOP     (FIX_CON_START)
-#define FIX_GIC_START   (FIX_GIC_TOP - SZ_2M)
-#define FIX_XS_TOP      (FIX_GIC_START)
-#define FIX_XS_START    (FIX_XS_TOP - SZ_2M)
-#define FIX_GNT_TOP     (FIX_XS_START)
-#define FIX_GNT_START   (FIX_GNT_TOP - SZ_2M)
-
-/*
- * Memory types available.
- */
-#define MT_DEVICE_nGnRnE    0
-#define MT_DEVICE_nGnRE     1
-#define MT_DEVICE_GRE       2
-#define MT_NORMAL_NC        3
-#define MT_NORMAL           4
 
 /* SCTLR_EL1 - System Control Register */
 #define	SCTLR_RES0          0xc8222400  /* Reserved, write 0 */
@@ -181,10 +160,6 @@ extern paddr_t _libxenplat_paddr_offset;
 #define ATTR_IDX(x)     ((x) << 2)
 #define ATTR_IDX_MASK   (7 << 2)
 
-#define BLOCK_DEF_ATTR (ATTR_AF|ATTR_SH(ATTR_SH_IS)|ATTR_IDX(MT_NORMAL))
-#define BLOCK_DEV_ATTR (ATTR_AF|ATTR_SH(ATTR_SH_IS)|ATTR_IDX(MT_DEVICE_nGnRnE))
-
-/* Attributes of PAL-encoded mappings */
 #define PT_ATTR_MEM						\
 	(UK_PAGING_PAGE_ATTR_PROT_READ |				\
 	 UK_PAGING_PAGE_ATTR_PROT_WRITE |				\
@@ -233,8 +208,15 @@ extern paddr_t _libxenplat_paddr_offset;
 #define map_frames(f, n) (NULL)
 
 #ifndef __ASSEMBLY__
+/* The page tables that entry64.S reserves for us */
+extern lpae_t boot_l1_pgtable[];
+extern lpae_t fixmap_pgtable[];
+
+/* The hierarchy we booted with, see _libxenplat_armentry() */
+struct uk_pt;
+extern struct uk_pt uk_plat_xen_pt;
+
 void arch_mm_prepare(unsigned long *start_pfn_p, unsigned long *max_pfn_p);
-void set_pgt_entry(lpae_t *ptr, lpae_t val);
 #endif
 
 #define arch_mm_init(a)
