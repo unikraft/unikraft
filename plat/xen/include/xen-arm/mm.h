@@ -27,8 +27,11 @@
 #ifndef _ARCH_MM_H_
 #define _ARCH_MM_H_
 
+#include <uk/config.h>
 #include <uk/plat/common/sections.h>
+#include <uk/arch/arm64.h>
 #include <uk/arch/limits.h>
+#include <uk/plat/native/page.h>
 #include <uk/paging.h>
 
 #define PAGE_SIZE	UK_PAGING_PAGE_SIZE
@@ -36,6 +39,8 @@
 #define PAGE_SHIFT	UK_PAGING_PAGE_SHIFT
 
 #ifndef __ASSEMBLY__
+#include <stdint.h>
+
 typedef uint64_t paddr_t;
 typedef uint64_t lpae_t;
 
@@ -178,6 +183,19 @@ extern paddr_t _libxenplat_paddr_offset;
 
 #define BLOCK_DEF_ATTR (ATTR_AF|ATTR_SH(ATTR_SH_IS)|ATTR_IDX(MT_NORMAL))
 #define BLOCK_DEV_ATTR (ATTR_AF|ATTR_SH(ATTR_SH_IS)|ATTR_IDX(MT_DEVICE_nGnRnE))
+
+/* Attributes of PAL-encoded mappings */
+#define PT_ATTR_MEM						\
+	(UK_PAGING_PAGE_ATTR_PROT_READ |				\
+	 UK_PAGING_PAGE_ATTR_PROT_WRITE |				\
+	 UK_PAGING_PAGE_ATTR_PROT_EXEC |				\
+	 UK_ARCH_ARM64_PTE_ATTR_SH(UK_ARCH_ARM64_PTE_ATTR_SH_IS))
+
+#define PT_ATTR_DEV						\
+	(UK_PAGING_PAGE_ATTR_PROT_READ |				\
+	 UK_PAGING_PAGE_ATTR_PROT_WRITE |				\
+	 UK_ARCH_ARM64_PTE_ATTR_SH(UK_ARCH_ARM64_PTE_ATTR_SH_IS) |	\
+	 UK_PLAT_NATIVE_PAGE_ATTR_TYPE_DEVICE_nGnRnE)
 
 #endif
 
