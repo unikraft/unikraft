@@ -42,6 +42,8 @@ config PLAT_XEN_ARM64
 	select LIBUKPLAT_NATIVE_EXCEPT
 	select LIBUKPLAT_NATIVE_PAGING
 	select LIBUKPLAT_NATIVE_TLB
+	select LIBUKFIXMAP
+	select LIBUKPT
 	select LIBUKSMCCC
 
 # Hidden option: this platform implements the paging PAL
