@@ -9,11 +9,11 @@
  *
  * hyperlight_entry() is the first C function called (x86: from
  * lcpu_start.S; arm64: from entry64.S).
- * It initialises the console, parses the PEB to register memory, and
+ * It initialises the console, registers the initrd the host maps, and
  * hands off to _ukplat_entry() for standard Unikraft boot.
  *
  * _ukplat_entry() follows the same pattern as plat/kvm: LCPU init,
- * early init, IRQ controller probe, memory init, stack allocation,
+ * early init, IRQ controller probe, memory init, boot stack switch,
  * then jump to uk_boot_entry().
  */
 
@@ -42,7 +42,7 @@
 #include <hyperlight/console.h>
 #include <hyperlight/dispatch.h>
 #include <hyperlight/hcall.h>
-#include <hyperlight/peb.h>
+#include <hyperlight/peb.h>	/* only for its layout assertion */
 #include <hyperlight/setup.h>
 
 /* Console init provided by console.c */
@@ -51,42 +51,65 @@ void _ukplat_init_console(void);
 /* Entry args saved by entry64.S into .data */
 extern struct hyperlight_entry_args hyperlight_entry_args;
 
-/* Global PEB pointer — other modules may need it later */
-static struct hyperlight_peb *g_peb;
-
 /* Command line buffer — populated from the host via hcall at boot.
  * Falls back to a default if the host doesn't provide GetCmdLine.
  */
 static char hyperlight_cmdline[4096] = "unikraft-hyperlight";
 
-/**
- * Register PEB memory regions in bootinfo.
+/* Boot stack.  It becomes the "init" thread's: it runs the init table,
+ * then waits on it for shutdown (or runs main() on it, without
+ * LIBUKBOOT_MAINTHREAD).
  *
- * The PEB's guest_heap region is registered as FREE memory so that
- * Unikraft's allocator can use it.
+ * 1 MiB leaves room for the init table and a native main().  It is not
+ * __STACK_SIZE, so that raising CONFIG_STACK_SIZE_PAGE_ORDER for the
+ * threads that run guest code does not grow the stack copied into
+ * scratch at every boot.
+ *
+ * It lives in .bss.  This kernel takes no memory from a host heap region
+ * (it reads nothing from the PEB), and the kernel heap comes up only later
+ * in boot.  Memory taken straight from scratch (hl_scratch_alloc_pages(),
+ * used through the scratch window) is not captured by a snapshot, and a
+ * restore zeroes it; .bss is snapshot memory, captured with the init
+ * thread parked on it.
  */
-static void hyperlight_init_mem(struct ukplat_bootinfo *bi,
-				struct hyperlight_peb *peb)
+#define HYPERLIGHT_BOOT_STACK_SIZE ((__sz)__PAGE_SIZE << 8)
+static __u8 hyperlight_boot_stack[HYPERLIGHT_BOOT_STACK_SIZE]
+	__align(__PAGE_SIZE);
+
+/* Written to the boot stack's lowest word before the boot runs on it.
+ * Code that runs the stack that far overwrites it, and may go on into the
+ * .bss below.  A guard page would need the stack in a section of its own,
+ * with the page below it unmapped and kept unmapped across snapshot and
+ * restore; the canary needs neither.  A frame that skips the word goes
+ * unnoticed.
+ *
+ * Checked at four points.  The halt that ends boot
+ * (hyperlight_halt_boot_done()) catches the boot: an overflow during it
+ * fails the boot.  Each later entry from the host
+ * (hyperlight_dispatch_inner()), every guest function call and the
+ * checkpoint before a snapshot, catches later use of the stack, by the
+ * init thread (a native main() without LIBUKBOOT_MAINTHREAD that outlives
+ * the boot halt) or by a stray write, so a guest whose canary is gone
+ * fails the capture rather than being snapshotted.  The end of a call's
+ * entry, before its result, catches the call's own work, so a call that
+ * ran the stack down fails rather than returning.  A shutdown
+ * (hyperlight_shutdown(), shutdown.c), usually run by the init thread, is
+ * checked before it reports the exit, so a call in which the stack was run
+ * down and the guest then shut down fails rather than ending cleanly.  A
+ * snapshot of a guest with no call since its last snapshot or restore
+ * enters no guest code: it captures memory the boot halt or a checkpoint
+ * has already checked.  A host entry runs on the scratch exception stack
+ * while the init thread is parked on this one.  The callers crash through
+ * hyperlight_boot_stack_crash() (shutdown.c), not UK_CRASH, so the crash
+ * cannot re-enter the shutdown's check; each knows whether the host takes
+ * a host call there, and so how the report can reach it.
+ */
+#define HYPERLIGHT_BOOT_STACK_CANARY 0x216b7473746f6f62ULL /* "bootstk!" */
+
+int hyperlight_boot_stack_intact(void)
 {
-	struct ukplat_memregion_desc mrd = {0};
-	int rc;
-
-	if (peb->guest_heap.size > 0) {
-		mrd.pbase = peb->guest_heap.ptr;
-		mrd.vbase = mrd.pbase; /* identity-mapped */
-		mrd.pg_off = 0;
-		mrd.len = peb->guest_heap.size;
-		mrd.pg_count = mrd.len / __PAGE_SIZE;
-		mrd.type = UKPLAT_MEMRT_FREE;
-		mrd.flags = UKPLAT_MEMRF_READ | UKPLAT_MEMRF_WRITE;
-#ifdef CONFIG_UKPLAT_MEMRNAME
-		memcpy(mrd.name, "heap", sizeof("heap"));
-#endif
-		rc = ukplat_memregion_list_insert(&bi->mrds, &mrd);
-		if (unlikely(rc < 0))
-			UK_CRASH("Unable to add heap region\n");
-	}
-
+	return *(volatile __u64 *)hyperlight_boot_stack ==
+	       HYPERLIGHT_BOOT_STACK_CANARY;
 }
 
 static void __noreturn ukplat_entry2(void *arg __unused)
@@ -198,45 +221,30 @@ static void _ukplat_entry(struct ukplat_bootinfo *bi)
 	if (unlikely(rc))
 		UK_CRASH("Interrupt controller init failed: %d\n", rc);
 
-	/* Allocate boot stack before ukplat_mem_init() — paging init
-	 * hands free regions to the frame allocator and clears their
-	 * permission flags, making them invisible to memregion_alloc.
-	 */
-	/* Boot stack: a fixed 1 MiB, independent of
-	 * CONFIG_STACK_SIZE_PAGE_ORDER (which sizes runtime thread stacks and
-	 * may be larger).  The boot stack is used only until the scheduler
-	 * starts the main thread, and the pre-paging boot memory cannot fit a
-	 * large one.
-	 */
-	const __sz boot_stack_size = (__sz)__PAGE_SIZE << 8;
-
-	bstack = ukplat_memregion_alloc(boot_stack_size, UKPLAT_MEMRT_STACK,
-					UKPLAT_MEMRF_READ |
-					UKPLAT_MEMRF_WRITE);
-	if (unlikely(!bstack))
-		UK_CRASH("Boot stack alloc failed\n");
-
-	bstack = (void *)((__uptr)bstack + boot_stack_size);
+	bstack = hyperlight_boot_stack + HYPERLIGHT_BOOT_STACK_SIZE;
 
 	/*
-	 * Pre-fault the new boot stack for CoW before switching.
-	 * The allocator returns heap memory from the PEB, which
-	 * Hyperlight maps as CoW.  Without pre-faulting, the first
-	 * push after switching RSP faults on a read-only page.
+	 * Pre-fault the new boot stack before switching to it: .bss is
+	 * snapshot memory, which Hyperlight maps CoW.  The C CoW handler,
+	 * installed by now and running on the exception stacks on both
+	 * architectures, would also take these faults as the stack grows.
+	 * Faulting every page here makes the copies at one known point,
+	 * before the frame allocator takes its share of scratch, rather
+	 * than scattered over the rest of boot.
 	 */
 	{
 		volatile __u8 *p = (volatile __u8 *)bstack;
 		__sz i;
 
-		for (i = __PAGE_SIZE; i <= boot_stack_size; i += __PAGE_SIZE) {
+		for (i = __PAGE_SIZE; i <= HYPERLIGHT_BOOT_STACK_SIZE;
+		     i += __PAGE_SIZE) {
 			__u8 tmp = *(p - i);
 			*(volatile __u8 *)(p - i) = tmp;
 		}
 	}
+	*(volatile __u64 *)hyperlight_boot_stack = HYPERLIGHT_BOOT_STACK_CANARY;
 
-	/* Initialize memory — after boot stack is allocated, since
-	 * paging init consumes free regions for the frame allocator.
-	 */
+	/* Initialize memory: the frame allocator, from scratch */
 	rc = ukplat_mem_init();
 	if (unlikely(rc))
 		UK_CRASH("Mem init failed: %d\n", rc);
@@ -260,18 +268,17 @@ void hyperlight_entry(struct uk_lcpu *lcpu __unused,
 	_ukplat_init_console();
 	hyperlight_console_log_init(entry_args->max_log_level);
 
-	/* Store PEB globally */
-	g_peb = (struct hyperlight_peb *)entry_args->peb_address;
-	if (unlikely(!g_peb))
+	/* Nothing is read from the PEB (see hyperlight/peb.h), but every
+	 * Hyperlight host passes one: a host that passes none is not one this
+	 * kernel was built for.
+	 */
+	if (unlikely(!entry_args->peb_address))
 		UK_CRASH("PEB address is NULL\n");
 
 	/* Get bootinfo (pre-populated by linker via bootinfo.lds.S) */
 	bi = ukplat_bootinfo_get();
 	if (unlikely(!bi))
 		UK_CRASH("Incompatible or corrupted bootinfo\n");
-
-	/* Register PEB memory regions */
-	hyperlight_init_mem(bi, g_peb);
 
 	/* Attach to the virtqueue transport so we can query the host */
 	hl_hcall_init();

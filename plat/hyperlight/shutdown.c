@@ -28,6 +28,7 @@
 #include <hyperlight/dispatch.h>
 #include <hyperlight/hcall.h>
 #include <hyperlight/outb.h>
+#include <hyperlight/setup.h>
 #include <hyperlight/step.h>
 #include <hyperlight/transport.h>
 
@@ -112,6 +113,12 @@ int hyperlight_booted(void)
  */
 void __noreturn hyperlight_halt_boot_done(void)
 {
+	/* A boot that overflowed its stack fails here, as the boot, rather
+	 * than at the first entry after it.  The host still takes host calls,
+	 * so the report goes the console's usual way.
+	 */
+	if (unlikely(!hyperlight_boot_stack_intact()))
+		hyperlight_boot_stack_crash();
 	/* Interrupts off from here to the halt: a handler that logged
 	 * would post to G2H between the reset and the snapshot.
 	 */
@@ -177,7 +184,20 @@ static int hyperlight_shutdown(void)
 	 * halt before boot has ended (a program that exits during it) is
 	 * the end of boot.  The report goes first: it is a host call, and
 	 * none can follow the result.
+	 *
+	 * The boot stack's canary is checked before either: the init thread,
+	 * whose stack it is, usually runs the shutdown (without
+	 * LIBPOSIX_PROCESS, nolibc's exit() runs it on the exiting thread),
+	 * and a native main() without LIBUKBOOT_MAINTHREAD that ran the stack
+	 * down during a call ends here, where the call would otherwise end
+	 * cleanly.  A shutdown runs from guest code, inside a call's entry or
+	 * during boot, where host calls are taken, so the report goes the
+	 * console's usual way.  One reached by a crash under the reboot crash
+	 * action, in an entry that may be a checkpoint, finds the transport
+	 * already abandoned or the canary already checked.
 	 */
+	if (unlikely(!hyperlight_boot_stack_intact()))
+		hyperlight_boot_stack_crash();
 	hyperlight_report_exit();
 	if (!hyperlight_booted())
 		hyperlight_halt_boot_done();
@@ -195,6 +215,19 @@ static int hyperlight_shutdown(void)
 static int hyperlight_crash(void)
 {
 	hyperlight_out32(102, 0x0000FF01);
+	__builtin_unreachable();
+}
+
+/* The crash for a boot stack canary found overwritten, at any of its
+ * checks (setup.c): the report, then the abort, without UK_CRASH.  With
+ * LIBUKDEBUG_CRASH_ACTION_REBOOT, UK_CRASH ends in uk_pm_sysrestart(),
+ * which is hyperlight_shutdown(); that checks the canary again, finds it
+ * gone, and would crash again, for good.
+ */
+void __noreturn hyperlight_boot_stack_crash(void)
+{
+	uk_pr_crit("Boot stack canary overwritten (stack overflow?)\n");
+	hyperlight_crash();
 	__builtin_unreachable();
 }
 

@@ -12,8 +12,9 @@
  * Hyperlight's guest memory has two regions with different
  * physical-to-virtual translations:
  *
- *   1. Identity-mapped low region (guest code/data/heap):
- *      GVA == GPA.  These pages are CoW-protected by the host.
+ *   1. Identity-mapped low region (guest code and data, PEB, init data,
+ *      and the initrd, which the guest maps itself): GVA == GPA.  These
+ *      pages are CoW-protected by the host.
  *
  *   2. Scratch region (page tables, I/O buffers, CoW copies):
  *      GPAs at the top of guest RAM, GVAs near the top of the
@@ -38,7 +39,6 @@
 extern "C" {
 #endif
 
-#if CONFIG_LIBUKPAGING
 #if !__ASSEMBLY__
 
 #include <uk/assert.h>
@@ -126,7 +126,6 @@ int pgarch_pt_add_mem(struct uk_pagetable *pt, __paddr_t start, __sz len);
 int pgarch_pt_init(struct uk_pagetable *pt, __paddr_t start, __sz len);
 
 #endif /* !__ASSEMBLY__ */
-#endif /* CONFIG_LIBUKPAGING */
 
 #ifdef __cplusplus
 }

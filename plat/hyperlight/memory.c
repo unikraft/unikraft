@@ -10,50 +10,14 @@
  * _ukplat_mem_mappings_init() is a no-op: the host sets up all
  * page-table mappings before guest entry.
  *
- * When CONFIG_LIBUKPAGING is enabled, ukplat_mem_init() allocates a
- * block of scratch memory for the frame allocator and adopts the
- * host's existing page tables.  Scratch memory is EPT-writable, so
- * page table frames allocated from it can be modified by both the CPU
- * page-table walker and guest code — unlike the PEB heap which sits
- * in the read-only snapshot EPT slot.
+ * ukplat_mem_init() allocates a block of scratch memory for the frame
+ * allocator and adopts the host's existing page tables.  Scratch memory
+ * is EPT-writable, so page table frames allocated from it can be
+ * modified by both the CPU page-table walker and guest code — unlike the
+ * snapshot memory, which sits in the read-only snapshot EPT slot.
  */
 
 #include <uk/config.h>
-
-/*
- * Called by plat/common/memory.c during ukplat_memallocator_set().
- * Hyperlight sets up page tables on the host side before guest entry,
- * so there are no guest-side mappings to initialise.
- */
-int _ukplat_mem_mappings_init(void)
-{
-	return 0;
-}
-
-/*
- * Overrides the weak ukplat_mem_init() from plat/common/memory.c.
- *
- * When paging is disabled, this is a simple no-op — the host already
- * set up all mappings, and the boot code will use the identity-mapped
- * FREE regions directly for the buddy allocator.
- *
- * When paging IS enabled, the version below allocates scratch memory
- * for the frame allocator and adopts the host's existing page tables.
- */
-#if !CONFIG_LIBUKPAGING
-
-int ukplat_mem_init(void)
-{
-	return 0;
-}
-
-void hyperlight_paging_reinit(void)
-{
-	/* No frame allocator to reinit without paging. */
-}
-
-#else /* CONFIG_LIBUKPAGING */
-
 #include <uk/arch/limits.h>
 #include <uk/assert.h>
 #include <uk/essentials.h>
@@ -66,6 +30,25 @@ void hyperlight_paging_reinit(void)
 
 #include <hyperlight/hcall.h>
 #include <hyperlight/mem.h>
+
+/* LIBUKBOOT_INITALLOC follows the boot allocator choice, which a platform
+ * cannot select for: without an allocator there is no LIBUKBOOT_HEAP_BASE,
+ * and this kernel registers no free region the boot code could take one
+ * from.
+ */
+#if !CONFIG_LIBUKBOOT_INITALLOC
+#error "plat/hyperlight needs a boot allocator (LIBUKBOOT_INITALLOC)"
+#endif
+
+/*
+ * Called by plat/common/memory.c during ukplat_memallocator_set().
+ * Hyperlight sets up page tables on the host side before guest entry,
+ * so there are no guest-side mappings to initialise.
+ */
+int _ukplat_mem_mappings_init(void)
+{
+	return 0;
+}
 
 static struct uk_pagetable hyperlight_pt;
 
@@ -113,22 +96,19 @@ static __sz hl_paging_fa_size(void)
 /*
  * Overrides the weak ukplat_mem_init() from plat/common/memory.c.
  *
- * Hyperlight's memory has two EPT-backed regions:
- *  - Snapshot (low GPAs): code + PEB heap — EPT read-only
+ * Hyperlight's memory has two EPT-backed regions, and the initrd a third:
+ *  - Snapshot (low GPAs): code and data, PEB, init data — EPT read-only
  *  - Scratch  (high GPAs): I/O + CoW pages — EPT writable
+ *  - Initrd   (map_file_cow, mapped by the guest below) — EPT read-only
  *
- * Standard Unikraft feeds the PEB heap (FREE regions) to the frame
- * allocator, but those GPAs are EPT read-only.  Writing page table
- * entries backed by heap GPAs crashes with MmioWriteUnmapped.
- *
- * Instead, we allocate a block of scratch memory via the bump
- * allocator (hl_scratch_alloc_pages) and feed THAT to the frame
- * allocator.  Since scratch is EPT-writable, page table frames and
- * mapped-page frames are all writable — no CoW aliasing issues.
- *
- * The FREE heap regions are NOT consumed here.  With paging enabled,
- * boot.c uses HEAP_BASE to map the heap via uk_paging_page_map(),
- * backed entirely by scratch-allocated frames.
+ * Standard Unikraft feeds the FREE regions to the frame allocator; this
+ * kernel registers none, as it takes no memory from a host heap region
+ * (it reads nothing from the PEB).  Instead, we allocate a block of
+ * scratch memory via the bump allocator (hl_scratch_alloc_pages) and
+ * feed THAT to the frame allocator.  Since scratch is EPT-writable, page
+ * table frames and mapped-page frames are all writable — no CoW aliasing
+ * issues.  boot.c maps the kernel heap at LIBUKBOOT_HEAP_BASE, backed
+ * entirely by frames from that allocator.
  */
 int ukplat_mem_init(void)
 {
@@ -168,15 +148,6 @@ int ukplat_mem_init(void)
 	if (unlikely(rc)) {
 		uk_pr_err("uk_paging_pt_init failed: %d\n", rc);
 		return rc;
-	}
-
-	/*
-	 * Mark the PEB heap FREE regions as consumed so boot code doesn't
-	 * try to use them for the buddy allocator — with HEAP_BASE
-	 * enabled, the heap is mapped via paging, not identity-mapped.
-	 */
-	ukplat_memregion_foreach(&mrd, UKPLAT_MEMRT_FREE, 0, 0) {
-		mrd->flags &= ~UKPLAT_MEMRF_PERMS;
 	}
 
 	/*
@@ -493,5 +464,3 @@ void hyperlight_paging_reinit(void)
 		   (unsigned long)(fa_size >> 10),
 		   (unsigned long)scratch_block);
 }
-
-#endif /* CONFIG_LIBUKPAGING */

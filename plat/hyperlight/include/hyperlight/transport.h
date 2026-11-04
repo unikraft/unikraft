@@ -59,9 +59,21 @@ int hl_transport_init(void);
 /**
  * Whether host calls can be made: hl_transport_init() succeeded, and the
  * rings have not been marked lost, as they are when the guest finds ring
- * state it cannot account for, or a checkpoint fails (transport.c).
+ * state it cannot account for, when a checkpoint fails, and before a
+ * crash in an entry that may be a checkpoint (hl_transport_abandon(),
+ * transport.c).
  */
 int hl_transport_ready(void);
+
+/**
+ * Mark the rings lost, as ring state the guest cannot account for does:
+ * hl_transport_ready() is 0 from here, so the console reports through
+ * DebugPrint rather than HostWriteErr or HostWrite.  Used when the rings
+ * are lost or a checkpoint fails, and before a crash in an entry that may
+ * be a snapshot checkpoint, during which the host refuses a host call and
+ * would end the run before the report reached it.
+ */
+void hl_transport_abandon(void);
 
 /**
  * Where a host call's payload goes: the FunctionCall FlatBuffer, then

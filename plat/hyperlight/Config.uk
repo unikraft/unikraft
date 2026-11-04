@@ -13,7 +13,14 @@ menuconfig PLAT_HYPERLIGHT
 	select LIBUKRELOC if OPTIMIZE_PIE
 	select LIBUKPLAT_NATIVE_PAL
 	select HAVE_PAGING
-	select LIBUKPLAT_NATIVE_PAGING if LIBUKPAGING
+	# The kernel registers no free memory region (it reads nothing from
+	# the PEB): it allocates from scratch, through the paging frame
+	# allocator (memory.c).  So the kernel heap has to be mapped by
+	# paging, at LIBUKBOOT_HEAP_BASE, which exists once LIBUKPAGING is on
+	# and a boot allocator is chosen (LIBUKBOOT_INITALLOC, which memory.c
+	# requires).
+	select LIBUKPAGING
+	select LIBUKPLAT_NATIVE_PAGING
 	select LIBUKPLAT_NATIVE_LCPU_PM if LIBUKLCPU
 	select HAVE_INTCTLR
 	select LIBUKINTCTLR_HYPERLIGHT

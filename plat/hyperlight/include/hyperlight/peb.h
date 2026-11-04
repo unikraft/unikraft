@@ -9,11 +9,12 @@
  * the Hyperlight host and the guest.
  *
  * The host allocates and populates the PEB before guest entry, then
- * passes its address in RDI.  The guest uses the PEB to locate the init
- * data region (initrd + command line) and the heap.  Host calls go over
- * the virtqueue transport instead (transport.h).
- *
- * Layout must match hyperlight-common mem.rs exactly.
+ * passes its address in RDI (x0 on arm64).  This kernel reads nothing
+ * from it: the initrd and the command line come over host calls
+ * (GetInitrdBase, GetInitrdSize, GetCmdLine), and host calls go over the
+ * virtqueue transport (transport.h).  The struct records the layout of
+ * hyperlight-common's HyperlightPEB (mem.rs); since the kernel reads none
+ * of the PEB, a host that passes a longer one boots it too.
  */
 
 #ifndef __HYPERLIGHT_PEB_H__
@@ -27,15 +28,15 @@ struct hyperlight_mem_region {
 } __packed;
 
 /*
- * The PEB is 32 bytes: two memory regions describing the guest's
- * shared memory areas.
+ * The PEB is 16 bytes: the init data region.
  *
- * init_data:    initrd image + embedded TLV metadata (cmdline, mounts)
- * guest_heap:   heap memory for the guest allocator
+ * init_data:    the host's init data blob; hluk, its host, passes none
  */
 struct hyperlight_peb {
 	struct hyperlight_mem_region init_data;
-	struct hyperlight_mem_region guest_heap;
 } __packed;
+
+/* hyperlight-common's HyperlightPEB (mem.rs) is 16 bytes. */
+UK_CTASSERT(sizeof(struct hyperlight_peb) == 16);
 
 #endif /* __HYPERLIGHT_PEB_H__ */

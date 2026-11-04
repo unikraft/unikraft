@@ -46,6 +46,7 @@
 #include <hyperlight/hcall.h>
 #include <hyperlight/mem.h>
 #include <hyperlight/outb.h>
+#include <hyperlight/setup.h>
 #include <hyperlight/step.h>
 #include <hyperlight/transport.h>
 
@@ -293,6 +294,24 @@ hyperlight_dispatch_inner(void)
 	if (kind == HL_MSG_REQUEST)
 		g_call_cid = cid;
 
+	/* Check the boot stack's canary on every entry, whatever its message,
+	 * once recv has said what it is: the boot halt checked the boot, this
+	 * catches later use of the stack, and the check before a call's result
+	 * below catches the call's own (setup.c lists every check).
+	 * Only an ordinary call may make host calls.  A snapshot checkpoint
+	 * runs restricted: the host refuses a host call, the console's
+	 * HostWriteErr and HostWrite included, and ends the run before the
+	 * report reaches it; a message that could not be read may be one.
+	 * For those, give up on the transport first, so the report goes out
+	 * through DebugPrint.  On an ordinary call's entry, it goes the
+	 * console's usual way, to the output the host collects.
+	 */
+	if (unlikely(!hyperlight_boot_stack_intact())) {
+		if (kind != HL_MSG_REQUEST)
+			hl_transport_abandon();
+		hyperlight_boot_stack_crash();
+	}
+
 	if (kind == HL_MSG_SNAPSHOT_CHECKPOINT) {
 		/* It carries nothing to copy, so it runs whatever recv said.
 		 * The host refuses a host call during a checkpoint; a failure
@@ -356,6 +375,14 @@ hyperlight_dispatch_inner(void)
 		   (unsigned long)fc_len);
 #endif /* !CONFIG_HYPERLIGHT_STEP */
 
+	/* The call's work ran on guest threads, the init thread's included:
+	 * check the canary again before its result, so a call that ran the
+	 * boot stack down fails rather than returning.  Host calls are still
+	 * taken here, so the report goes the console's usual way.  The
+	 * refused paths above ran no guest code since the check at entry.
+	 */
+	if (unlikely(!hyperlight_boot_stack_intact()))
+		hyperlight_boot_stack_crash();
 	hyperlight_dispatch_push_void_result();
 }
 

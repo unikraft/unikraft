@@ -94,7 +94,7 @@ static volatile __u64 *mbx;	/* snapshot checkpoint mailbox */
 
 static __u32 next_cid = 1;
 static int transport_ready;	/* init succeeded */
-static int transport_broken;	/* rings unusable: transport_lost() */
+static int transport_broken;	/* rings unusable: hl_transport_abandon() */
 static int result_id = -1;	/* G2H ID of a queued result, -1 if none */
 
 /* ── Packed ring, driver side ──────────────────────────────────── */
@@ -373,6 +373,11 @@ int hl_transport_ready(void)
 	return transport_ready && !transport_broken;
 }
 
+void hl_transport_abandon(void)
+{
+	transport_broken = 1;
+}
+
 /* ── G2H: host calls and results ───────────────────────────────── */
 
 /*
@@ -387,7 +392,7 @@ int hl_transport_ready(void)
  */
 static void __noreturn transport_lost(const char *what)
 {
-	transport_broken = 1;
+	hl_transport_abandon();
 	UK_CRASH("transport: %s\n", what);
 }
 
@@ -696,6 +701,6 @@ int hl_transport_checkpoint(void)
 	*mbx = HL_MBX_CHECKPOINT_COMPLETE;
 	return 0;
 lost:
-	transport_broken = 1;
+	hl_transport_abandon();
 	return -1;
 }

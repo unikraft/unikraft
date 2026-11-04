@@ -8,6 +8,7 @@
 #define __HYPERLIGHT_SETUP_H__
 
 #include <uk/arch/types.h>
+#include <uk/essentials.h>
 
 /**
  * Entry arguments passed from the Hyperlight host.
@@ -26,5 +27,18 @@ struct hyperlight_entry_args {
 	__u64 page_size;
 	__u64 max_log_level;
 };
+
+/* Whether the boot stack's canary is intact.  0 means the stack was run
+ * down to its last word, and perhaps on into the .bss below, or the word
+ * was overwritten; the caller then calls hyperlight_boot_stack_crash().
+ * Defined in setup.c.
+ */
+int hyperlight_boot_stack_intact(void);
+
+/* Report the overwritten canary and abort the guest, without UK_CRASH,
+ * whose reboot action would re-enter the shutdown's canary check.
+ * Defined in shutdown.c.
+ */
+void __noreturn hyperlight_boot_stack_crash(void);
 
 #endif /* __HYPERLIGHT_SETUP_H__ */
