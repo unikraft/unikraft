@@ -1,0 +1,31 @@
+{
+  "name": "Unikraft Core Development",
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
+  "remoteUser": "vscode",
+  "hostRequirements": {
+    "cpus": 4,
+    "memory": "8gb",
+    "storage": "32gb"
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-vscode.cpptools",
+        "ms-vscode.hexeditor",
+        "shardulm94.trailing-spaces"
+      ],
+      "settings": {
+        "files.eol": "\n",
+        "files.insertFinalNewline": true,
+        "editor.tabSize": 8,
+        "editor.detectIndentation": false,
+        "editor.insertSpaces": false,
+        "C_Cpp.default.compilerPath": "/usr/bin/gcc",
+        "C_Cpp.default.cStandard": "c11"
+      }
+    }
+  },
+  "postCreateCommand": "git config --global --add safe.directory ${containerWorkspaceFolder}"
+}
