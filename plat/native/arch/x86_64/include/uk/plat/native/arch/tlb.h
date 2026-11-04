@@ -45,6 +45,16 @@ void uk_plat_native_tlb_flush(void)
 	uk_plat_native_pt_write_base(uk_plat_native_pt_read_base());
 }
 
+/**
+ * Flushes the entire TLB of the calling CPU only
+ */
+static inline
+void uk_plat_native_tlb_flush_local(void)
+{
+	/* TLB flushes are never broadcast on x86 */
+	uk_plat_native_tlb_flush();
+}
+
 #endif /* CONFIG_LIBUKPLAT_NATIVE_PAGING */
 
 #endif /* !__ASSEMBLY__ */

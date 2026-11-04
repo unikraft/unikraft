@@ -51,6 +51,19 @@ void uk_plat_native_tlb_flush(void)
 			     ::: "memory");
 }
 
+/**
+ * Flushes the entire TLB of the calling CPU only
+ */
+static inline
+void uk_plat_native_tlb_flush_local(void)
+{
+	__asm__ __volatile__("	dsb	nshst\n"   /* wait for write complete */
+			     "	tlbi	vmalle1\n" /* invalidate all, local */
+			     "	dsb	nsh\n"     /* invalidate complete */
+			     "	isb\n"         /* sync context */
+			     ::: "memory");
+}
+
 #endif /* CONFIG_LIBUKPLAT_NATIVE_TLB */
 
 #endif /* !__ASSEMBLY__ */
