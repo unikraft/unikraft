@@ -69,7 +69,7 @@ static int uk_boot_early_init_parse_cmdl(struct ukplat_bootinfo *bi)
 	 */
 	rc = uk_libparam_parse(boot_argc - 1, &boot_argv[1],
 			       UK_LIBPARAM_F_SCAN);
-	if (rc > 0 && rc < (boot_argc - 1)) {
+	if (rc >= 0 && rc < (boot_argc - 1)) {
 		/* In this case, we did successfully scan for uklibparam
 		 * arguments and stop sequence is at rc < (argc - 1).
 		 */
