@@ -1,6 +1,6 @@
 menuconfig LIBUKVMEM
 	bool "ukvmem: Virtual address space management"
-	default n
+	depends on HAVE_PAGING && HAVE_FALLOC
 	select LIBUKDEBUG
 	select LIBUKALLOC
 	select LIBISRLIB

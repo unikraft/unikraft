@@ -166,6 +166,7 @@ config ARM64_FEAT_BTI
 
 menuconfig ARM64_FEAT_MTE
 	bool "Armv8.5 Memory Tagging Extensions"
+	depends on HAVE_PAGING && HAVE_FALLOC
 	select HAVE_MEMTAG
 	select LIBUKRANDOM
 	select LIBUKPAGING

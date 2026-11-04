@@ -2,7 +2,6 @@ menuconfig PLAT_XEN
 	bool "Xen guest image"
 	default n
 	depends on (ARCH_X86_64 || ARCH_ARM_64)
-	select PLAT_XEN_X86_64 if ARCH_X86_64
 	select PLAT_XEN_ARM64 if ARCH_ARM_64
 	select HAVE_XENBUS
 	imply XEN_PV_BUILD_P2M
@@ -33,27 +32,22 @@ menuconfig PLAT_XEN
 		Create a Unikraft image that runs as a Xen guest
 
 if (PLAT_XEN)
-# Hidden options for pulling platform dependencies depending on arch
-config PLAT_XEN_X86_64
-	bool
-	select LIBUKPLAT_NATIVE
-	select LIBUKPLAT_NATIVE_ADDR
-	select LIBUKPLAT_NATIVE_ECTX
-	select LIBUKPLAT_NATIVE_PAGE
-	select LIBUKPLAT_NATIVE_PT
-	select LIBUKPLAT_NATIVE_SYSCTX
-
+# Hidden option for pulling arm64 platform dependencies
 config PLAT_XEN_ARM64
 	bool
-	select LIBUKPLAT_NATIVE
-	select LIBUKPLAT_NATIVE_ADDR
+	select HAVE_PAGING
+	select LIBXENPLAT_PAGING
 	select LIBUKPLAT_NATIVE_AUXSP
-	select LIBUKPLAT_NATIVE_ECTX
 	select LIBUKPLAT_NATIVE_EXCEPT
-	select LIBUKPLAT_NATIVE_PAGE
-	select LIBUKPLAT_NATIVE_PT
-	select LIBUKPLAT_NATIVE_SYSCTX
+	select LIBUKPLAT_NATIVE_PAGING
+	select LIBUKPLAT_NATIVE_TLB
 	select LIBUKSMCCC
+
+# Hidden option: this platform implements the paging PAL
+config LIBXENPLAT_PAGING
+	bool
+	depends on HAVE_PAGING
+	depends on LIBUKPLAT_NATIVE_PAGING
 
 # Invisible option to switch between PV and PVH mode
 config XEN_HVMLITE
