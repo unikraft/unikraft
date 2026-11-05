@@ -90,4 +90,9 @@ config LIBUKVMEM_TEST
 	select LIBUKTEST
 	select LIBUKNOFAULT
 
+config LIBUKVMEM_SYNC_TEST
+	bool "Test backing-store synchronization contracts"
+	default n
+	select LIBUKTEST
+
 endif

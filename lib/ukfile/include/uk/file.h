@@ -53,6 +53,7 @@ enum uk_file_mem_op {
 	UKFILE_MEM_BORROW,
 	UKFILE_MEM_RETRIEVE,
 	UKFILE_MEM_ACQUIRE,
+	UKFILE_MEM_ACQUIRE_PINNED,
 	UKFILE_MEM_RELEASE,
 	UKFILE_MEM_BUFCOUNT,
 	UKFILE_MEM_GIFT
@@ -68,6 +69,12 @@ enum uk_file_mem_op {
  *   - `off` and `len` must be page-aligned
  *   - `iov` and `iovcnt` are ignored
  *   - may not be supported by all files
+ *
+ * - UKFILE_MEM_ACQUIRE_PINNED: Like ACQUIRE, additionally guarantees that
+ *   backing pages remain resident at unchanged physical addresses until
+ *   RELEASE. Required for MMU aliases. Drivers without a pinning mechanism
+ *   must reject this operation. Uses the same locking and return contract
+ *   as ACQUIRE, and the same RELEASE operation.
  *
  * - UKFILE_MEM_RELEASE: Release previously acquired memory region(s)
  *   starting at `off` going for `len` bytes.
@@ -124,7 +131,7 @@ enum uk_file_mem_op {
  *
  * No synchronization is performed by the file driver, callers should ensure
  * mutual exclusion during the call (using e.g., file iolocks) as such:
- * - ACQUIRE/RELEASE/GIFT: exclusive access
+ * - ACQUIRE/ACQUIRE_PINNED/RELEASE/GIFT: exclusive access
  * - RETRIEVE/BORROW/BUFCOUNT: lock out the above + file state change ops
  *   (e.g., write)
  *

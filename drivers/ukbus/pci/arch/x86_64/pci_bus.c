@@ -54,24 +54,70 @@
 #include <string.h>
 
 #include <uk/arch/util.h>
+#include <uk/spinlock.h>
 #include <uk/print.h>
 #include <uk/bus/pci.h>
+#include "../../pci_internal.h"
+#include "pci_scan.h"
 
-#define PCI_CONF_READ(type, ret, a, s)					\
-	do {								\
-		__u32 _conf_data;					\
-		uk_arch_x86_64_outl(PCI_CONFIG_ADDR, (a) | PCI_CONF_##s);\
-		_conf_data = ((uk_arch_x86_64_inl(PCI_CONFIG_DATA) >>	\
-			       PCI_CONF_##s##_SHFT) & PCI_CONF_##s##_MASK);\
-		*(ret) = (type) _conf_data;				\
-	} while (0)
+static struct uk_spinlock pci_cfg_lock = UK_SPINLOCK_INITIALIZER();
+
+static __u32 pci_cfg_read_raw(__u32 address)
+{
+	unsigned long flags;
+	__u32 value;
+
+	uk_spin_lock_irqsave(&pci_cfg_lock, flags);
+	uk_arch_x86_64_outl(PCI_CONFIG_ADDR, address);
+	value = uk_arch_x86_64_inl(PCI_CONFIG_DATA);
+	uk_spin_unlock_irqrestore(&pci_cfg_lock, flags);
+	return value;
+}
+
+static __u32 pci_cfg_address(const struct pci_address *addr, __u16 offset)
+{
+	return PCI_CONFIG_ADDRESS_ENABLE |
+		   ((__u32)addr->bus << PCI_BUS_OFFSET) |
+		   ((__u32)addr->devid << PCI_SLOT_OFFSET) |
+		   ((__u32)addr->function << PCI_FUNC_OFFSET) |
+		   (offset & ~3U);
+}
+
+int arch_pci_cfg_read(const struct pci_address *addr, __u16 offset, __u8 width,
+		      __u32 *value)
+{
+	__u32 data = pci_cfg_read_raw(pci_cfg_address(addr, offset));
+
+	data >>= (offset & 3) * 8;
+	*value = width == 4 ? data : data & ((1U << (width * 8)) - 1);
+	return 0;
+}
+
+int arch_pci_cfg_write(const struct pci_address *addr, __u16 offset, __u8 width,
+		       __u32 value)
+{
+	unsigned long flags;
+	__u16 port = PCI_CONFIG_DATA + (offset & 3);
+
+	uk_spin_lock_irqsave(&pci_cfg_lock, flags);
+	uk_arch_x86_64_outl(PCI_CONFIG_ADDR, pci_cfg_address(addr, offset));
+	if (width == 1)
+		uk_arch_x86_64_outb(port, (__u8)value);
+	else if (width == 2)
+		uk_arch_x86_64_outw(port, (__u16)value);
+	else
+		uk_arch_x86_64_outl(port, value);
+	uk_spin_unlock_irqrestore(&pci_cfg_lock, flags);
+	return 0;
+}
 
 static inline int pci_driver_add_device(struct pci_driver *drv,
-					struct pci_address *addr,
-					struct pci_device_id *devid)
+					const struct pci_address *addr,
+					const struct pci_device_id *devid,
+					struct uk_alloc *allocator)
 {
 	struct pci_device *dev;
-	__u32 config_addr;
+	__u32 value;
 	int ret;
 
 	UK_ASSERT(drv != NULL);
@@ -79,7 +125,7 @@ static inline int pci_driver_add_device(struct pci_driver *drv,
 	UK_ASSERT(addr != NULL);
 	UK_ASSERT(devid != NULL);
 
-	dev = (struct pci_device *) uk_calloc(ph.a, 1, sizeof(*dev));
+	dev = uk_calloc(allocator, 1, sizeof(*dev));
 	if (!dev) {
 		uk_pr_err("PCI %02x:%02x.%02x: Failed to initialize: Out of memory!\n",
 			  (int) addr->bus,
@@ -92,11 +138,14 @@ static inline int pci_driver_add_device(struct pci_driver *drv,
 	memcpy(&dev->addr, addr,  sizeof(dev->addr));
 	dev->drv = drv;
 
-	config_addr = (PCI_ENABLE_BIT)
-			| (addr->bus << PCI_BUS_SHIFT)
-			| (addr->devid << PCI_DEVICE_SHIFT);
-	PCI_CONF_READ(__u16, &dev->base, config_addr, IOBAR);
-	PCI_CONF_READ(__u8, &dev->irq, config_addr, IRQ);
+	ret = pci_cfg_read(addr, PCI_BASE_ADDRESS_0, 4, &value);
+	if (ret)
+		goto err_free;
+	dev->base = value & ~0x3U;
+	ret = pci_cfg_read(addr, PCI_INTERRUPT_LINE, 1, &value);
+	if (ret)
+		goto err_free;
+	dev->irq = value;
 
 	ret = drv->add_dev(dev);
 	if (ret < 0) {
@@ -104,139 +153,43 @@ static inline int pci_driver_add_device(struct pci_driver *drv,
 			  (int) addr->bus,
 			  (int) addr->devid,
 			  (int) addr->function);
-		uk_free(ph.a, dev);
+		uk_free(allocator, dev);
 	}
 	return 0;
+err_free:
+	uk_free(allocator, dev);
+	return ret;
 }
 
-static void probe_bus(__u32);
-
-/* Probe a function. Return 1 if the function does not exist in the device, 0
- * otherwise.
- */
-static int probe_function(__u32 bus, __u32 device, __u32 function)
+static int scan_read(void *ctx __unused, const struct pci_address *addr,
+		     __u16 offset, __u8 width, __u32 *value)
 {
-	__u32 config_addr, config_data, secondary_bus;
-	struct pci_address addr;
-	struct pci_device_id devid;
-	struct pci_driver *drv;
+	return pci_cfg_read(addr, offset, width, value);
+}
 
-	config_addr = (PCI_ENABLE_BIT)
-			| (bus << PCI_BUS_SHIFT)
-			| (device << PCI_DEVICE_SHIFT)
-			| (function << PCI_FUNCTION_SHIFT);
-
-	uk_arch_x86_64_outl(PCI_CONFIG_ADDR, config_addr);
-	config_data = uk_arch_x86_64_inl(PCI_CONFIG_DATA);
-
-	devid.vendor_id = config_data & PCI_DEVICE_ID_MASK;
-	if (devid.vendor_id == PCI_INVALID_ID) {
-		/* Device doesn't exist */
-		return 1;
-	}
-
-	addr.domain   = 0x0;
-	addr.bus      = bus;
-	addr.devid    = device;
-	addr.function = function;
-
-	/* These I/O reads could be batched, but it practice this does not
-	 * appear to make the code more performant.
-	 */
-	PCI_CONF_READ(__u32, &devid.class_id,
-			config_addr, CLASS_ID);
-	PCI_CONF_READ(__u32, &devid.sub_class_id,
-			config_addr, SUBCLASS_ID);
-	PCI_CONF_READ(__u16, &devid.vendor_id,
-			config_addr, VENDOR_ID);
-	PCI_CONF_READ(__u16, &devid.device_id,
-			config_addr, DEVICE_ID);
-	PCI_CONF_READ(__u16, &devid.subsystem_device_id,
-			config_addr, SUBSYS_ID);
-	PCI_CONF_READ(__u16, &devid.subsystem_vendor_id,
-			config_addr, SUBSYSVEN_ID);
+static int scan_visit(void *ctx, const struct pci_address *addr,
+		      const struct pci_device_id *id)
+{
+	struct pci_driver *driver = pci_find_driver(id);
 
 	uk_pr_info("PCI %02x:%02x.%02x (%04x %04x:%04x): ",
-		   (int) addr.bus,
-		   (int) addr.devid,
-		   (int) addr.function,
-		   (int) devid.class_id,
-		   (int) devid.vendor_id,
-		   (int) devid.device_id);
-
-	drv = pci_find_driver(&devid);
-	if (!drv) {
+		   (int)addr->bus, (int)addr->devid, (int)addr->function,
+		   (int)id->class_id, (int)id->vendor_id, (int)id->device_id);
+	if (!driver) {
 		uk_pr_info("<no driver>\n");
-	} else {
-		uk_pr_info("driver %p\n", drv);
-		pci_driver_add_device(drv, &addr, &devid);
+		return 0;
 	}
-
-	/* 0x06 = Bridge Device, 0x04 = PCI-to-PCI bridge */
-	if ((devid.class_id == 0x06) && (devid.sub_class_id == 0x04)) {
-		PCI_CONF_READ(__u32, &secondary_bus,
-				config_addr, SECONDARY_BUS);
-		probe_bus(secondary_bus);
-	}
-
-	return 0;
+	uk_pr_info("driver %p\n", driver);
+	return pci_driver_add_device(driver, addr,
+				     id, ctx);
 }
 
-/* Recursive PCI enumeration: this function is called recursively by
- * probe_function upon discovering PCI-to-PCI bridges.
- */
-static void probe_bus(__u32 bus)
+int arch_pci_probe(struct uk_alloc *allocator)
 {
-	__u32 config_addr, device, header_type, function = 0;
+	const struct pci_scan_ops ops = {
+		.read = scan_read,
+		.visit = scan_visit
+	};
 
-	for (device = 0; device < PCI_MAX_DEVICES; ++device) {
-		if (!probe_function(bus, device, function))
-			continue;
-
-		config_addr = (PCI_ENABLE_BIT);
-		PCI_CONF_READ(__u32, &header_type,
-				config_addr, HEADER_TYPE);
-
-		/* Is this a multi-function device? */
-		if ((header_type & PCI_HEADER_TYPE_MSB_MASK) == 0)
-			continue;
-
-		/* Check remaining functions */
-		for (function = 1; function < PCI_MAX_FUNCTIONS; function++)
-			probe_function(bus, device, function);
-	}
-}
-
-int arch_pci_probe(struct uk_alloc *pha)
-{
-	__u32 config_addr, function, header_type, vendor_id;
-
-	uk_pr_debug("Probe PCI\n");
-
-	ph.a = pha;
-
-	config_addr = (PCI_ENABLE_BIT);
-	PCI_CONF_READ(__u32, &header_type,
-			config_addr, HEADER_TYPE);
-
-	if ((header_type & PCI_HEADER_TYPE_MSB_MASK) == 0) {
-		/* Single PCI host controller */
-		probe_bus(0);
-	} else {
-		/* Multiple PCI host controllers */
-		for (function = 0; function < PCI_MAX_FUNCTIONS; function++) {
-			config_addr = (PCI_ENABLE_BIT) |
-					(function << PCI_FUNCTION_SHIFT);
-
-			PCI_CONF_READ(__u32, &vendor_id,
-					config_addr, VENDOR_ID);
-
-			if (vendor_id == PCI_INVALID_ID)
-				break;
-
-			probe_bus(function);
-		}
-	}
-
-	return 0;
+	return pci_enumerate(&ops, allocator);
 }

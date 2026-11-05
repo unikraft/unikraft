@@ -192,7 +192,7 @@ int virtiofs_dev_vqsetup(struct uk_virtiofs_dev *dev)
 	r = virtio_config_get(dev->vdev,
 			      __offsetof(struct virtio_fs_config,
 					 num_request_queues),
-			      &nq_req, sizeof(nq_req), 1);
+			      &nq_req, sizeof(nq_req), sizeof(nq_req));
 	UK_ASSERT(r <= 0);
 	if (unlikely(r))
 		return r;
@@ -238,9 +238,25 @@ __u16 virtiofs_maxsegs(const struct uk_virtiofs_iovec *iov,
 {
 	__sz segs = 0;
 
-	for (int i = 0; i < iovlen; i++)
-		segs += iov[i].iov_len / UK_PAGING_PAGE_SIZE + 1;
-	return (segs > max) ? max : (__u16)segs;
+	for (int i = 0; i < iovlen; i++) {
+		const __sz len = iov[i].iov_len;
+		const __sz offset = (__uptr)iov[i].iov_base &
+				    (UK_PAGING_PAGE_SIZE - 1);
+		__sz pages;
+
+		if (!len)
+			continue;
+		/* Count every page touched, including an unaligned first and
+		 * last page. Divide before adding to avoid len+offset overflow.
+		 */
+		pages = len / UK_PAGING_PAGE_SIZE;
+		pages += (offset + len % UK_PAGING_PAGE_SIZE +
+			  UK_PAGING_PAGE_SIZE - 1) / UK_PAGING_PAGE_SIZE;
+		if (pages >= (__sz)max - segs)
+			return max;
+		segs += pages;
+	}
+	return (__u16)segs;
 }
 
 /**
@@ -469,3 +485,34 @@ __ssz uk_virtiofs_request(struct uk_virtiofs_dev *dev,
 	vq = virtiofs_getvq(dev, iov[0].iov_base);
 	return virtiofs_do_request(vq.vq, vq.vqlen, iov, in_iovcnt, out_iovcnt);
 }
+
+#if CONFIG_LIBVIRTIO_FS_TEST
+#include <uk/test.h>
+
+UK_TESTCASE(virtiofs_transport, scatter_gather_page_budget)
+{
+	struct uk_virtiofs_iovec iov[2] = {
+		{ .iov_base = (void *)0x1000, .iov_len = 16 },
+		{ .iov_base = (void *)0x1ce0, .iov_len = 8191 }
+	};
+
+	/* Regression: header plus an unaligned buffer crossing three pages. */
+	UK_TEST_EXPECT_SNUM_EQ(virtiofs_maxsegs(iov, 2, 128), 4);
+	UK_TEST_EXPECT_SNUM_EQ(virtiofs_maxsegs(iov, 2, 3), 3);
+	UK_TEST_EXPECT_SNUM_EQ(virtiofs_maxsegs(iov, 2, 0), 0);
+	iov[0].iov_len = 0;
+	iov[1].iov_len = 0;
+	UK_TEST_EXPECT_ZERO(virtiofs_maxsegs(iov, 2, 128));
+	iov[0].iov_base = (void *)0x1fff;
+	iov[0].iov_len = 2;
+	UK_TEST_EXPECT_SNUM_EQ(virtiofs_maxsegs(iov, 1, 128), 2);
+	iov[0].iov_base = (void *)0x1000;
+	iov[0].iov_len = UK_PAGING_PAGE_SIZE;
+	UK_TEST_EXPECT_SNUM_EQ(virtiofs_maxsegs(iov, 1, 128), 1);
+	iov[0].iov_len = ~(__sz)0;
+	UK_TEST_EXPECT_SNUM_EQ(virtiofs_maxsegs(iov, 1, 256), 256);
+}
+
+/* Run before the global statistics initcall at late priority nine. */
+uk_testsuite_late_prio(virtiofs_transport, NULL, 8);
+#endif /* CONFIG_LIBVIRTIO_FS_TEST */

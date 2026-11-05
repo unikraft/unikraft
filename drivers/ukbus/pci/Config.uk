@@ -6,6 +6,7 @@ config LIBUKBUS_PCI
 	depends on HAVE_PCI
 	depends on (ARCH_X86_64 || ARCH_ARM_64)
 	select LIBUKBUS
+	select LIBUKLOCK
 	help
 		PCI bus driver for probing and operating PCI devices
 
@@ -13,3 +14,9 @@ config LIBUKBUS_PCI_ECAM
 	select LIBUKBUS_PLATFORM
 	default y if (LIBUKBUS_PCI && LIBFDT && LIBUKOFW)
 	bool
+
+config LIBUKBUS_PCI_TEST
+	bool "Test PCI discovery contracts"
+	depends on LIBUKBUS_PCI && ARCH_X86_64
+	select LIBUKTEST
+	default n

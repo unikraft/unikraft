@@ -34,6 +34,8 @@
 #define __UK_BUS__
 
 #include <stddef.h>
+#include <uk/config.h>
+#include <uk/arch/types.h>
 #include <uk/list.h>
 #include <uk/alloc.h>
 #include <uk/ctors.h>
@@ -60,6 +62,11 @@ struct uk_bus {
 
 /* Returns the number of registered buses */
 unsigned int uk_bus_count(void);
+
+/* Identity-map a device region, or return an encoded negative errno. */
+#if CONFIG_LIBUKPAGING
+__vaddr_t uk_bus_devmap(__paddr_t base, __sz size);
+#endif
 
 /* Do not use this function directly: */
 void _uk_bus_register(struct uk_bus *b);

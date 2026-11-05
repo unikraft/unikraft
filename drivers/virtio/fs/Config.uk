@@ -5,3 +5,9 @@ config LIBVIRTIO_FS
 	select LIBUKSCHED
 	help
 		Driver for Virtio Filesystem devices.
+
+config LIBVIRTIO_FS_TEST
+	bool "Test VirtioFS transport contracts"
+	depends on LIBVIRTIO_FS
+	select LIBUKTEST
+	default n

@@ -5,3 +5,12 @@ config LIBVIRTIO_PCI
 	select LIBUKBUS_PCI
 	help
 		Support virtio devices on PCI bus
+
+config LIBVIRTIO_PCI_MODERN
+	bool "Modern Virtio PCI capabilities and MMIO transport"
+	depends on LIBVIRTIO_PCI && ARCH_X86_64
+	select LIBUKPAGING
+	help
+	  Discover generic Virtio PCI capabilities, negotiate 64-bit features,
+	  and operate split queues through modern MMIO registers. Legacy
+	  devices retain their existing transport. Currently validated on x86.

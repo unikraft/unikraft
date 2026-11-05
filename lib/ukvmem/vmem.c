@@ -760,6 +760,12 @@ int uk_vma_map(struct uk_vas *vas, __vaddr_t *vaddr, __sz len,
 			 * have an unrecoverable error and the address range
 			 * will be empty!
 			 */
+			/* A partial mapx can leave PTEs. Remove them through
+			 * the owner before dropping its backing references;
+			 * private and borrowed frames have different
+			 * ownership rules.
+			 */
+			vmem_vma_unmap(vma, vma->start, uk_vma_len(vma));
 			vmem_vma_destroy(vma);
 
 			return rc;
@@ -780,59 +786,43 @@ int uk_vma_op_set_attr(struct uk_vma *vma, unsigned long attr)
 	return uk_paging_page_set_attr(vma->vas->pt, vma->start, pgs, attr, 0);
 }
 
-static void vmem_vma_set_attr(struct uk_vma *vma, unsigned long attr)
+static int vmem_vma_set_attr(struct uk_vma *vma, unsigned long attr)
 {
 	int rc;
 
-	UK_ASSERT(vma);
-
-	if (vma->attr == attr)
-		return;
-
-	/* Do not change attributes if there is no VMA handler for this */
-	if (!vma->ops->set_attr)
-		return;
-
+	if (vma->attr == attr || !vma->ops->set_attr)
+		return 0;
 	rc = VMA_SETATTR(vma, attr);
-	if (unlikely(rc)) {
-		/* We consider a failure to set attributes in an address range
-		 * as fatal to simplify error handling. In contrast to unmap(),
-		 * this can be changed if necessary.
-		 */
-		UK_CRASH("Failed to set attributes in address range "
-			 "0x%" __PRIvaddr "-0x%" __PRIvaddr " to 0x%lx: %d",
-			 vma->start, vma->end, attr, rc);
-	}
-
+	if (unlikely(rc))
+		return rc;
 	vma->attr = attr;
+	return 0;
 }
 
-static void vmem_vma_set_attr_vmas(struct uk_vma *start, struct uk_vma *end,
-				   unsigned long attr)
+static int vmem_vma_set_attr_vmas(struct uk_vma *start, struct uk_vma *end,
+				  unsigned long attr)
 {
 	struct uk_vma *vma = start;
+	int rc;
 
-	UK_ASSERT(start);
-	UK_ASSERT(end);
-
-	while (vma != end) {
-		vmem_vma_set_attr(vma, attr);
+	for (;;) {
+		rc = vmem_vma_set_attr(vma, attr);
+		if (unlikely(rc))
+			return rc;
+		if (vma == end)
+			break;
 		vma = uk_list_next_entry(vma, vma_list);
 	}
 
-	vmem_vma_set_attr(end, attr);
-
-	/* Do a second pass and try to merge VMAs */
-	vma = vmem_vma_try_merge_with_next(end);
-	UK_ASSERT(vma == end);
-
+	/* Merge only after every VMA accepted its new permissions. */
+	vmem_vma_try_merge_with_next(end);
 	vma = start;
 	while (vma != end) {
 		vma = vmem_vma_try_merge_with_prev(vma);
 		vma = uk_list_next_entry(vma, vma_list);
 	}
-
 	vmem_vma_try_merge_with_prev(end);
+	return 0;
 }
 
 int uk_vma_set_attr(struct uk_vas *vas, __vaddr_t vaddr, __sz len,
@@ -854,9 +844,7 @@ int uk_vma_set_attr(struct uk_vas *vas, __vaddr_t vaddr, __sz len,
 		return rc;
 	}
 
-	vmem_vma_set_attr_vmas(vma_start, vma_end, attr);
-
-	return 0;
+	return vmem_vma_set_attr_vmas(vma_start, vma_end, attr);
 }
 
 static int vmem_mapx_advise(struct uk_pagetable *pt,
@@ -968,6 +956,39 @@ int uk_vma_advise(struct uk_vas *vas, __vaddr_t vaddr, __sz len,
 	}
 
 	return vmem_vma_advise(vma, vaddr, vend - vaddr, advice);
+}
+
+int uk_vma_sync(struct uk_vas *vas, __vaddr_t vaddr, __sz len)
+{
+	struct uk_vma *first = __NULL, *last, *vma;
+	__vaddr_t end;
+	int rc;
+
+	if (!UK_PAGING_PAGE_ALIGNED(vaddr) || !UK_PAGING_PAGE_ALIGNED(len))
+		return -EINVAL;
+	if (vaddr > __VADDR_MAX - len)
+		return -ENOMEM;
+	if (!len)
+		return 0;
+	rc = vmem_vma_find_range(vas, &vaddr, &len, &first, &last, 1);
+	if (unlikely(rc))
+		return rc;
+	end = vaddr + len;
+	vma = first;
+	for (;;) {
+		__sz part = MIN(vma->end, end) - vaddr;
+
+		if (vma->ops->sync) {
+			rc = vma->ops->sync(vma, vaddr, part);
+			if (unlikely(rc))
+				return rc;
+		}
+		if (vma == last)
+			break;
+		vma = uk_list_next_entry(vma, vma_list);
+		vaddr = vma->start;
+	}
+	return 0;
 }
 
 #ifdef CONFIG_LIBUKPAGING

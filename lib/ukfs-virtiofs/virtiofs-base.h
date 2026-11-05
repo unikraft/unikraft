@@ -82,6 +82,7 @@ void virtiofs_init_dev(struct viofs_dev *d, struct uk_virtiofs_dev *vd)
 {
 	d->fdev.dev = vd;
 	d->fdev.unique = 0;
+	d->fdev.max_write = 0;
 	UK_RB_INIT(&d->nodemap);
 	uk_mutex_init(&d->maplk);
 }
@@ -105,7 +106,7 @@ ssize_t virtiofs_file_read(struct viofs_node *n, size_t off, size_t len,
 	const struct fuse_read_in in = {
 		.fh = n->fh,
 		.offset = off,
-		.size = len,
+		.size = MIN(len, (size_t)UINT32_MAX),
 		.flags = flags
 	};
 
@@ -120,7 +121,7 @@ ssize_t virtiofs_file_write(struct viofs_node *n, size_t off, size_t len,
 	const struct fuse_write_in in = {
 		.fh = n->fh,
 		.offset = off,
-		.size = len,
+		.size = MIN(len, (size_t)UINT32_MAX),
 		.flags = flags
 	};
 
