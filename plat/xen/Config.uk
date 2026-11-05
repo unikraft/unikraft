@@ -102,4 +102,16 @@ config XEN_SHM_REGION_SIZE_MB
 		in BSS (size_MB / 2).
 endif # XEN_STATIC_SHM
 
+config XEN_TESTS
+	bool "Enable Xen tests"
+	depends on LIBUKTEST
+	default y if LIBUKTEST_ALL
+
+if XEN_TESTS
+config XEN_STATIC_SHM_TEST
+	bool "Enable static shared memory tests"
+	default y
+	depends on XEN_STATIC_SHM
+endif # XEN_TESTS
+
 endif # PLAT_XEN
