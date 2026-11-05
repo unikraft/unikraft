@@ -73,7 +73,7 @@ struct timespec uk_time_spec_sum(const struct timespec *t1,
 
 	ret.tv_sec = t1->tv_sec + t2->tv_sec;
 	ret.tv_nsec = t1->tv_nsec + t2->tv_nsec;
-	if (ret.tv_nsec > (long)UKARCH_NSEC_PER_SEC) {
+	if (ret.tv_nsec >= (long)UKARCH_NSEC_PER_SEC) {
 		ret.tv_sec += 1;
 		ret.tv_nsec -= UKARCH_NSEC_PER_SEC;
 	}
