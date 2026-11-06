@@ -4,6 +4,7 @@
  * You may not use this file except in compliance with the License.
  */
 
+#include <uk/arch/ctx.h>
 #include <uk/arch/types.h>
 #include <uk/event.h>
 #include <uk/lcpu.h>
