@@ -2,7 +2,6 @@ menuconfig PLAT_XEN
 	bool "Xen guest image"
 	default n
 	depends on (ARCH_X86_64 || ARCH_ARM_64)
-	select PLAT_XEN_X86_64 if ARCH_X86_64
 	select PLAT_XEN_ARM64 if ARCH_ARM_64
 	select HAVE_XENBUS
 	imply XEN_PV_BUILD_P2M
@@ -33,27 +32,25 @@ menuconfig PLAT_XEN
 		Create a Unikraft image that runs as a Xen guest
 
 if (PLAT_XEN)
-# Hidden options for pulling platform dependencies depending on arch
-config PLAT_XEN_X86_64
-	bool
-	select LIBUKPLAT_NATIVE
-	select LIBUKPLAT_NATIVE_ADDR
-	select LIBUKPLAT_NATIVE_ECTX
-	select LIBUKPLAT_NATIVE_PAGE
-	select LIBUKPLAT_NATIVE_PT
-	select LIBUKPLAT_NATIVE_SYSCTX
-
+# Hidden option for pulling arm64 platform dependencies
 config PLAT_XEN_ARM64
 	bool
-	select LIBUKPLAT_NATIVE
-	select LIBUKPLAT_NATIVE_ADDR
+	select HAVE_FIXMAP
+	select HAVE_PAGING
+	select LIBXENPLAT_PAGING
 	select LIBUKPLAT_NATIVE_AUXSP
-	select LIBUKPLAT_NATIVE_ECTX
 	select LIBUKPLAT_NATIVE_EXCEPT
-	select LIBUKPLAT_NATIVE_PAGE
-	select LIBUKPLAT_NATIVE_PT
-	select LIBUKPLAT_NATIVE_SYSCTX
+	select LIBUKPLAT_NATIVE_PAGING
+	select LIBUKPLAT_NATIVE_TLB
+	select LIBUKFIXMAP
+	select LIBUKPT
 	select LIBUKSMCCC
+
+# Hidden option: this platform implements the paging PAL
+config LIBXENPLAT_PAGING
+	bool
+	depends on HAVE_PAGING
+	depends on LIBUKPLAT_NATIVE_PAGING
 
 # Invisible option to switch between PV and PVH mode
 config XEN_HVMLITE
@@ -74,4 +71,47 @@ config XEN_PV_BUILD_P2M
 		Create and initialize physical to machine (p2m) table on a PV
 		xen host
 
-endif
+config XEN_STATIC_SHM
+	bool "Xen static shared memory"
+	depends on PLAT_XEN_ARM64
+	select LIBUKPT
+	help
+		Enable Xen static shared memory regions.
+		When enabled, shared memory regions declared in the device tree
+		(compatible = "xen,shared-memory-v1") are mapped at boot time
+		and accessible via the uk_shm_map() API.
+
+		See https://xenbits.xen.org/docs/unstable/misc/arm/device-tree/booting.txt
+
+if XEN_STATIC_SHM
+config XEN_SHM_MAX_ENTRIES
+	int "Maximum number of shared memory entries"
+	default 32
+	help
+		Maximum number of Xen static shared memory regions that
+		can be registered.
+
+config XEN_SHM_REGION_SIZE_MB
+	int "Shared memory region size in MB (multiple of 2)"
+	default 64
+	range 2 1024
+	help
+		Size of the virtual address space reserved for Xen static
+		shared memory mappings, in megabytes. Must be a multiple of 2.
+		This determines the number of L3 page tables pre-allocated
+		in BSS (size_MB / 2).
+endif # XEN_STATIC_SHM
+
+config XEN_TESTS
+	bool "Enable Xen tests"
+	depends on LIBUKTEST
+	default y if LIBUKTEST_ALL
+
+if XEN_TESTS
+config XEN_STATIC_SHM_TEST
+	bool "Enable static shared memory tests"
+	default y
+	depends on XEN_STATIC_SHM
+endif # XEN_TESTS
+
+endif # PLAT_XEN
