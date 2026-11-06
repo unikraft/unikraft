@@ -349,8 +349,11 @@ int uk_sys_prlimit64(int pid, unsigned int resource,
 		return 0;
 	switch (resource) {
 	case RLIMIT_STACK:
-		old_limit->rlim_cur = __STACK_SIZE;
-		old_limit->rlim_max = __STACK_SIZE;
+		/* Linux's default soft limit. Not the kernel's own stack size:
+		 * libc sizes every new thread's stack from this value.
+		 */
+		old_limit->rlim_cur = 8UL << 20;
+		old_limit->rlim_max = RLIM_INFINITY;
 		break;
 	case RLIMIT_AS:
 		old_limit->rlim_cur = RLIM_INFINITY;
