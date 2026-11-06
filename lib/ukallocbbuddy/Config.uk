@@ -14,4 +14,9 @@ if LIBUKALLOCBBUDDY
 		Run sanity checks on the free page lists on every malloc and free.
 		Adds significant overhead.
 
+config LIBUKALLOCBBUDDY_TEST
+	bool "Unit tests"
+	default n
+	select LIBUKTEST
+		
 endif
