@@ -19,7 +19,7 @@ LIBVFSCORE_SRCS-y += $(LIBVFSCORE_BASE)/subr_uio.c
 LIBVFSCORE_SRCS-y += $(LIBVFSCORE_BASE)/extra.ld
 ifeq ($(CONFIG_LIBUKVMEM),y)
 LIBVFSCORE_SRCS-y += $(LIBVFSCORE_BASE)/vma_file.c|isr
-ifneq ($(filter y,$(CONFIG_LIBUKVMEM_TEST) $(CONFIG_LIBUKTEST_ALL)),)
+ifneq ($(filter y,$(CONFIG_LIBUKVMEM_TEST) $(and $(CONFIG_LIBUKTEST_ALL),$(CONFIG_LIBUKNOFAULT))),)
 LIBVFSCORE_SRCS-y += $(LIBVFSCORE_BASE)/tests/test_file_vma.c
 endif
 endif
