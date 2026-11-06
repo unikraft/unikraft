@@ -217,7 +217,7 @@ void pprocess_exit(struct posix_process *pprocess,
 	/* Unblock wait */
 	if (parent_process && !nowait) {
 		uk_pprocess_foreach_pthread(parent_process, pt, ptn) {
-			if (PTHREAD_WAITING_FOR_PID(pt, uk_sys_getpid()) ||
+			if (PTHREAD_WAITING_FOR_PID(pt, pprocess->pid) ||
 			    PTHREAD_BLOCKING_ON_SIGNAL(pt)) {
 				uk_semaphore_up(&parent_process->wait_semaphore);
 				break;
