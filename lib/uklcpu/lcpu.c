@@ -73,6 +73,7 @@ int uk_lcpu_init(struct uk_lcpu *this_lcpu)
 		UK_ASSERT(this_lcpu->state == UK_LCPU_STATE_INIT);
 	}
 
+	uk_lcpu_disable_irq();
 	UK_ASSERT(uk_lcpu_irqs_disabled());
 
 #if CONFIG_HAVE_SMP
