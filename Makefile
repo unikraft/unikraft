@@ -728,7 +728,9 @@ GOCINCLUDES           += -I$(UK_GENERATED_INCLUDES)
 ################################################################################
 # external application
 ifneq ($(CONFIG_UK_BASE),$(CONFIG_UK_APP))
+ifneq ($(wildcard $(CONFIG_UK_APP)/*file.uk),)
 $(eval $(call import_lib,$(CONFIG_UK_APP)));
+endif
 endif
 
 # internal libraries
