@@ -81,4 +81,15 @@ config LIBPOSIX_VFS_MULTICTX
 	default y if LIBPOSIX_PROCESS_MULTITHREADING
 	select LIBUKSCHED
 
+config LIBPOSIX_VFS_TEST
+	bool "Enable unit tests"
+	default n
+	depends on LIBUKFS_RAMFS
+	select LIBUKTEST
+	help
+	  Tests filesystem operations through the `uk_sys_*` API. The tests
+	  require a writable root filesystem (e.g., the built-in fstab RAMfs)
+	  and mount additional RAMfs instances under it. They are skipped if
+	  no such filesystem is available.
+
 endif
