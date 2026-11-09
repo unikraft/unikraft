@@ -93,6 +93,8 @@ struct consolefd_alloc {
 	__u32 pending_events;
 	/* Entry in consf_async_list; only linked for async-backed files. */
 	struct uk_list_head async_list;
+	/* An async read returned the data before an EOT: the next returns 0 */
+	int eot;
 	/* Mutex to synchronize file read/write event management */
 	struct uk_mutex mtx;
 };
@@ -261,6 +263,20 @@ static ssize_t serial_read(const struct uk_file *f,
 		if (*last == '\r')
 			*last = '\n';
 
+		/* EOT (^D) ends the input. Strip it from the data, as a
+		 * terminal does, and clear POLLIN so the next read returns 0,
+		 * the end of file.
+		 */
+		if (*last == SERIAL_EOT) {
+			total--;
+			uk_file_event_clear(f, UKFD_POLLIN);
+#if !CONFIG_LIBUKFILE_CONSOLE_IN_NOECHOBACK
+			if (bytes_read > 1)
+				_console_out(cons, buf, bytes_read - 1);
+#endif /* !CONFIG_LIBUKFILE_CONSOLE_IN_NOECHOBACK */
+			break;
+		}
+
 #if !CONFIG_LIBUKFILE_CONSOLE_IN_NOECHOBACK
 		/* Echo the input to the console (NOT stdout!) */
 		_console_out(cons, buf, bytes_read);
@@ -268,8 +284,6 @@ static ssize_t serial_read(const struct uk_file *f,
 
 		if (*last == '\n')
 			break;
-		if (*last == SERIAL_EOT)
-			uk_file_event_clear(f, UKFD_POLLIN);
 	}
 
 	if (total || !uk_file_poll_immediate(f, UKFD_POLLIN))
@@ -297,6 +311,7 @@ static ssize_t serial_read_async(const struct uk_file *f,
 	struct uk_console *cons = f->node;
 	struct consolefd_alloc *consf;
 	ssize_t total = 0;
+	int eot = 0;
 	__ssz rc;
 
 	UK_ASSERT(f->node);
@@ -307,6 +322,13 @@ static ssize_t serial_read_async(const struct uk_file *f,
 	consf = to_consf(f);
 
 	uk_mutex_lock(&consf->mtx);
+
+	/* The previous read ended at an EOT: this one is the end of file */
+	if (consf->eot) {
+		consf->eot = 0;
+		uk_mutex_unlock(&consf->mtx);
+		return 0;
+	}
 
 	for (size_t i = 0; i < iovcnt; i++) {
 		char *buf = iov[i].iov_base;
@@ -337,19 +359,33 @@ static ssize_t serial_read_async(const struct uk_file *f,
 		if (*last == '\r')
 			*last = '\n';
 
+		/* EOT (^D) ends the input: strip it from the data, as a
+		 * terminal does. What came before it is returned now and the
+		 * end of file by the next read; POLLIN is still set, so a
+		 * poll() does not wait for it.
+		 */
+		if (*last == SERIAL_EOT) {
+			eot = 1;
+			total--;
+			rc--;
+			if (total)
+				consf->eot = 1;
+		}
+
 #if !CONFIG_LIBUKFILE_CONSOLE_IN_NOECHOBACK
 		/* Echo only the bytes actually read, not the full iov len. */
-		_console_out(cons, buf, (__sz)rc);
+		if (rc)
+			_console_out(cons, buf, (__sz)rc);
 #endif /* !CONFIG_LIBUKFILE_CONSOLE_IN_NOECHOBACK */
 
-		if (*last == '\n' || *last == SERIAL_EOT)
+		if (eot || *last == '\n')
 			break;
 	}
 
 	uk_mutex_unlock(&consf->mtx);
 
 	/* If nothing was read (spurious wakeup), tell the caller to wait. */
-	return total ? total : -EAGAIN;
+	return (total || eot) ? total : -EAGAIN;
 }
 
 static ssize_t serial_write(const struct uk_file *f,
@@ -622,6 +658,7 @@ const struct uk_file *uk_file_console_create(struct uk_console *cons)
 
 	consf->a = uk_alloc_get_default();
 	consf->pending_events = 0;
+	consf->eot = 0;
 	UK_INIT_LIST_HEAD(&consf->async_list);
 
 	/*
