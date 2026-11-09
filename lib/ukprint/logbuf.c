@@ -184,7 +184,7 @@ void uk_print_dmesg_isr(void)
 
 	uk_logbuf_foreach(lb, lm)
 #if !__INTERRUPTSAFE__
-		uk_console_out(lm->msg.msg, lm->msg.len);
+		uk_console_err(lm->msg.msg, lm->msg.len);
 #else /* __INTERRUPTSAFE__ */
 		uk_console_emerg_out(lm->msg.msg, lm->msg.len);
 #endif /* __INTERRUPTSAFE__ */

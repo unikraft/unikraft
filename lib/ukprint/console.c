@@ -77,6 +77,10 @@ struct vprint_console {
 	int prevlvl;
 };
 
+/* Kernel messages are diagnostics: they go to the consoles' error stream
+ * (uk_console_err()), kept apart from a program's standard output where a
+ * console can.
+ */
 #if CONFIG_LIBUKCONSOLE
 #if !CONFIG_LIBUKPRINT_NOCARRIAGERETURN
 /* TODO: Some consoles require both a newline and a carriage return to
@@ -100,14 +104,14 @@ static __ssz console_out(const char *buf, __sz len)
 		next_nl = memchr(buf, '\n', l);
 		if (next_nl) {
 			off = next_nl - buf;
-			if ((rc = uk_console_out(buf, off)) < 0)
+			if ((rc = uk_console_err(buf, off)) < 0)
 				return rc;
-			if ((rc = uk_console_out("\r\n", 2)) < 0)
+			if ((rc = uk_console_err("\r\n", 2)) < 0)
 				return rc;
 			buf = next_nl + 1;
 			l -= off + 1;
 		} else {
-			if ((rc = uk_console_out(buf, l)) < 0)
+			if ((rc = uk_console_err(buf, l)) < 0)
 				return rc;
 			break;
 		}
@@ -150,7 +154,7 @@ __isr static __ssz console_out_isr(const char *buf, __sz len)
 #else /* CONFIG_LIBUKPRINT_NOCARRIAGERETURN */
 static __ssz console_out(const char *buf, __sz len)
 {
-	return uk_console_out(buf, len);
+	return uk_console_err(buf, len);
 }
 
 __isr static __ssz console_out_isr(const char *buf, __sz len)
