@@ -144,6 +144,19 @@ config LIBUKBOOT_HEAP_BASE
 	depends on LIBUKPAGING
 	depends on LIBUKBOOT_INITALLOC
 
+# Hidden: the heap backs the pages it hands out and gives their frames back
+# when they are freed (lib/ukboot/boot.c), and uk/heap.h lets the holder of
+# an allocation have part of it backed, give the frames behind part of it
+# back and take them again the same way, the pages the allocator writes to
+# excepted.
+config LIBUKBOOT_HEAP_RELEASE
+	bool
+	default y
+	depends on LIBUKBOOT_INITBBUDDY
+	depends on LIBUKBOOT_INITALLOC
+	depends on LIBUKPAGING
+	depends on LIBUKVMEM
+
 # Hidden configuration option that specifies that scheduling should be
 # initialized. The check for !LIBUKBOOT_INITNOSCHED is not sufficient, as
 # the option is also not available if !LIBUKBOOT_INITALLOC is set. The

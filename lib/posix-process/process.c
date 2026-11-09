@@ -56,26 +56,47 @@ __uk_tls struct posix_thread *pthread_self = NULL;
 /**
  * Helpers to find and reserve a `pid_t`
  */
+/* Whether @id names a process group or a session that still has members */
+static bool tid_names_group(unsigned long id)
+{
+	struct posix_process *p;
+
+	uk_pprocess_foreach(p) {
+		if ((unsigned long)p->pgid == id || (unsigned long)p->sid == id)
+			return true;
+	}
+	return false;
+}
+
 static inline pid_t find_free_tid(void)
 {
-	static pid_t prev = 0;
-	unsigned long found;
+	static pid_t prev;
+	unsigned long found = prev;
+	unsigned long tries;
 
-	/* search starting from last position */
-	found = uk_find_next_zero_bit(tid_map, TIDMAP_SIZE, prev + 1);
-	if (found == TIDMAP_SIZE) {
-		/* search again starting from the beginning */
-		found = uk_find_first_zero_bit(tid_map, TIDMAP_SIZE);
-	}
-	if (found == TIDMAP_SIZE) {
-		/* no free PID */
-		uk_pr_err("Could not allocate TID: Out of TIDs (configured max: %d)\n",
-			  CONFIG_LIBPOSIX_PROCESS_MAX_PID);
-		return -1;
+	for (tries = 0; tries < TIDMAP_SIZE; tries++) {
+		/* search starting from last position */
+		found = uk_find_next_zero_bit(tid_map, TIDMAP_SIZE, found + 1);
+		if (found == TIDMAP_SIZE) {
+			/* search again starting from the beginning */
+			found = uk_find_first_zero_bit(tid_map, TIDMAP_SIZE);
+		}
+		if (found == TIDMAP_SIZE)
+			break;
+		/* As Linux, keep a pid that still names a group or session
+		 * out of use: given out, it would join a stranger's group
+		 * (kill(-pgid)) and refuse its owner setsid()
+		 */
+		if (!tid_names_group(found)) {
+			prev = found;
+			return found;
+		}
 	}
 
-	prev = found;
-	return found;
+	/* no free PID */
+	uk_pr_err("Could not allocate TID: Out of TIDs (configured max: %d)\n",
+		  CONFIG_LIBPOSIX_PROCESS_MAX_PID);
+	return -1;
 }
 
 static pid_t find_and_reserve_tid(void)
@@ -192,6 +213,14 @@ void pprocess_release_pthread(struct posix_thread *pthread)
 	/* remove from process' thread list */
 	uk_list_del_init(&pthread->thread_list_entry);
 
+	/* The threads it created outlive it: their parent is gone, not
+	 * this memory once freed (execve() and exit read their parent)
+	 */
+	for (pid_t tid = 1; tid < TIDMAP_SIZE; tid++) {
+		if (tid_thread[tid] && tid_thread[tid]->parent == pthread)
+			tid_thread[tid]->parent = NULL;
+	}
+
 	/* release TID */
 	release_tid(pthread->tid);
 	tid_thread[pthread->tid] = NULL;
@@ -275,6 +304,7 @@ struct posix_process *pprocess_create(struct uk_alloc *a,
 
 	uk_semaphore_init(&pprocess->wait_semaphore, 0);
 	uk_semaphore_init(&pprocess->exit_semaphore, 0);
+	uk_waitq_init(&pprocess->vfork_waitq);
 
 	/* Check if we have a pthread structure already for this thread
 	 * or if we need to allocate one
@@ -329,6 +359,13 @@ struct posix_process *pprocess_create(struct uk_alloc *a,
 	if (parent_pprocess) {
 		uk_list_add_tail(&pprocess->child_list_entry,
 				 &parent_pprocess->children);
+		/* fork(2): the child is in its parent's group and session */
+		pprocess->pgid = parent_pprocess->pgid;
+		pprocess->sid = parent_pprocess->sid;
+	} else {
+		/* The first process leads its own group and session */
+		pprocess->pgid = pprocess->pid;
+		pprocess->sid = pprocess->pid;
 	}
 	pid_process[pprocess->pid] = pprocess;
 
@@ -435,7 +472,7 @@ pid_t uk_posix_process_run(uk_posix_process_mainlike_func fn,
 	ret = raise_process_clone_event(child, parent);
 	if (unlikely(ret)) {
 		uk_pr_err("clone event error (%d)\n", ret);
-		goto err_free_thread;
+		goto err_free_process;
 	}
 
 	/* Raise the execve event */
@@ -447,7 +484,7 @@ pid_t uk_posix_process_run(uk_posix_process_mainlike_func fn,
 	ret = pprocess_raise_execve_event(&execve_data);
 	if (unlikely(ret < 0)) {
 		uk_pr_err("exeve event error (%d)\n", ret);
-		goto err_free_thread;
+		goto err_free_process;
 	}
 
 	/* Schedule the process */
@@ -459,16 +496,35 @@ pid_t uk_posix_process_run(uk_posix_process_mainlike_func fn,
 	if (unlikely(ret < 0)) {
 		uk_pr_err("Unable to add tid %d to scheduler (%d)\n",
 			  ukthread2tid(child), ret);
-		goto err_free_thread;
+		goto err_free_process;
 	}
 
 	return ukthread2pid(child);
+
+err_free_process:
+	pprocess_release_unrun(child_process, child);
+	return ret;
 
 err_free_thread:
 	/* also issues exit events */
 	uk_thread_release(child);
 
 	return ret;
+}
+
+void pprocess_release_unrun(struct posix_process *pprocess,
+			    struct uk_thread *thread)
+{
+	/* No child of its caller's, as the call that made it failed: it
+	 * ends with no exit signal and leaves no zombie to wait for
+	 */
+	if (pprocess->parent) {
+		uk_list_del(&pprocess->child_list_entry);
+		pprocess->parent = NULL;
+	}
+	/* Ends the process (see posix_thread_fini()), with exit events */
+	uk_thread_release(thread);
+	pprocess_release(pprocess);
 }
 #endif /* CONFIG_LIBPOSIX_PROCESS_MULTIPROCESS */
 
@@ -574,8 +630,11 @@ UK_THREAD_INIT_PRIO(0, posix_thread_fini, UK_PRIO_EARLIEST);
 
 struct posix_process *pid2pprocess(pid_t pid)
 {
-	UK_ASSERT((__sz)pid < ARRAY_SIZE(pid_process));
-
+	/* Callers pass pids from userland (kill(2), wait4(2)): one that no
+	 * process could have is not a bug, just no process.
+	 */
+	if ((__sz)pid >= ARRAY_SIZE(pid_process) || pid < 0)
+		return NULL;
 	return pid_process[pid];
 }
 

@@ -42,6 +42,39 @@ extern "C" {
 
 struct uk_alloc *uk_allocbbuddy_init(void *base, size_t len);
 
+/**
+ * Called, once a free is done, with each free block the free made or grew
+ * (merged with its free buddies) but for its first page, which holds its free
+ * list entry: pages the allocator does not read or write until it splits the
+ * block. Over memory paged in on demand, their frames can be given back. Some
+ * may have been given back already, before the block grew.
+ */
+typedef void (*uk_allocbbuddy_release_func_t)(struct uk_alloc *a,
+					       void *base,
+					       unsigned long num_pages);
+
+/**
+ * Set the function called with the pages the allocator stops using
+ * (see uk_allocbbuddy_release_func_t), or none.
+ */
+void uk_allocbbuddy_set_release(struct uk_alloc *a,
+				uk_allocbbuddy_release_func_t release);
+
+/**
+ * The chunks a page range is freed as: from its start, the largest the
+ * address is aligned to that fits, and so on. Each goes to @fn with its
+ * first page's address and its size in pages. Freeing writes each chunk's
+ * head on its first page; splitting a free chunk later writes the heads of
+ * its halves a power of two from its start; trimming a free chunk to a
+ * smaller allocation writes the heads of the spare chunks it leaves, from
+ * the chunk's end down, where they fall.
+ */
+typedef void (*uk_allocbbuddy_chunk_func_t)(void *chunk,
+					    unsigned long num_pages,
+					    void *arg);
+void uk_allocbbuddy_foreach_chunk(void *base, unsigned long num_pages,
+				  uk_allocbbuddy_chunk_func_t fn, void *arg);
+
 #ifdef __cplusplus
 }
 #endif
