@@ -166,10 +166,23 @@ static inline uk_console_out_func consf_writer(const struct uk_file *f)
 	return to_consf(f)->err ? consf_err_direct : consf_out_direct;
 }
 
-/* Whether input read from @f is echoed to the console */
-static inline int consf_echo(const struct uk_file *f)
+/* Whether @f reaches a terminal, as its console says: on the other side
+ * of it may be a pipe or a file, which programs must not take for one.
+ */
+static inline __bool consf_is_terminal(const struct uk_file *f)
 {
-	return to_termios(f)->c_lflag & ECHO;
+	int stream = to_consf(f)->err ? UK_CONSOLE_STREAM_ERR
+				      : UK_CONSOLE_STREAM_INOUT;
+
+	return uk_console_is_terminal(f->node, stream);
+}
+
+/* Whether input read from @f is echoed to the console: what a pipe or a
+ * file feeds in is not, as no terminal shows it
+ */
+static inline int consf_echo(const struct uk_file *f, __bool terminal)
+{
+	return terminal && (to_termios(f)->c_lflag & ECHO);
 }
 
 static ssize_t serial_read(const struct uk_file *f,
@@ -178,12 +191,17 @@ static ssize_t serial_read(const struct uk_file *f,
 {
 	struct uk_console *cons = f->node;
 	ssize_t total = 0;
+	__bool terminal;
+	int echo;
 
 	UK_ASSERT(f->vol == SERIAL_VOLID);
 	UK_ASSERT(f->node);
 
 	if (unlikely(off))
 		return -ESPIPE;
+
+	terminal = consf_is_terminal(f);
+	echo = consf_echo(f, terminal);
 
 #if CONFIG_LIBUKFILE_CONSOLE_IN_EOF_FINAL
 	if (*to_eof(f))
@@ -211,7 +229,8 @@ static ssize_t serial_read(const struct uk_file *f,
 		total += bytes_read;
 
 		last = buf + bytes_read - 1;
-		if (*last == '\r')
+		/* A terminal's Enter; a pipe's bytes stay as they are */
+		if (*last == '\r' && terminal)
 			*last = '\n';
 
 		/* EOT (^D) ends the input. Strip it from the data, as a
@@ -230,7 +249,7 @@ static ssize_t serial_read(const struct uk_file *f,
 #else /* !CONFIG_LIBUKFILE_CONSOLE_IN_EOF_FINAL */
 			uk_file_event_clear(f, UKFD_POLLIN);
 #endif /* !CONFIG_LIBUKFILE_CONSOLE_IN_EOF_FINAL */
-			if (bytes_read > 1 && consf_echo(f))
+			if (bytes_read > 1 && echo)
 				consf_out_direct(cons, buf, bytes_read - 1);
 			break;
 		}
@@ -238,7 +257,7 @@ static ssize_t serial_read(const struct uk_file *f,
 		/* Echo the input to the console (NOT stdout!), unless a
 		 * program turned ECHO off to do its own
 		 */
-		if (consf_echo(f))
+		if (echo)
 			consf_out_direct(cons, buf, bytes_read);
 
 		if (*last == '\n')
@@ -276,12 +295,17 @@ static ssize_t serial_read_async(const struct uk_file *f,
 	struct consolefd_alloc *consf;
 	ssize_t total = 0;
 	int eot = 0;
+	__bool terminal;
+	int echo;
 	__ssz rc;
 
 	UK_ASSERT(f->node);
 
 	if (unlikely(off))
 		return -ESPIPE;
+
+	terminal = consf_is_terminal(f);
+	echo = consf_echo(f, terminal);
 
 	consf = to_consf(f);
 
@@ -327,7 +351,8 @@ static ssize_t serial_read_async(const struct uk_file *f,
 		total += rc;
 
 		last = buf + rc - 1;
-		if (*last == '\r')
+		/* A terminal's Enter; a pipe's bytes stay as they are */
+		if (*last == '\r' && terminal)
 			*last = '\n';
 
 		/* EOT (^D) ends the input: strip it from the data, as a
@@ -350,7 +375,7 @@ static ssize_t serial_read_async(const struct uk_file *f,
 		}
 
 		/* Echo only the bytes actually read, not the full iov len. */
-		if (rc && consf_echo(f))
+		if (rc && echo)
 			consf_out_direct(cons, buf, (__sz)rc);
 
 		if (eot || *last == '\n')
@@ -460,6 +485,11 @@ static int serial_ctl(const struct uk_file *f __maybe_unused,
 
 	switch (fam) {
 	case UKFILE_CTL_IOCTL:
+		/* Not a terminal: no terminal requests, as on a pipe; what
+		 * is queued can still be asked.
+		 */
+		if (req != TIOCINQ && req != TIOCOUTQ && !consf_is_terminal(f))
+			return -ENOTTY;
 		switch (req) {
 		/* Copy the four flag words and KNCCS control chars one field
 		 * at a time: the caller's struct termios is its libc's, and a
