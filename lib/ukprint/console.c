@@ -21,6 +21,7 @@
 
 #if CONFIG_LIBUKCONSOLE
 #include <uk/console.h>
+#include <uk/console/driver.h>
 #endif /* CONFIG_LIBUKCONSOLE */
 
 #include "print.h"
@@ -84,14 +85,18 @@ struct vprint_console {
 #if CONFIG_LIBUKCONSOLE
 #if CONFIG_LIBUKPRINT_NOCARRIAGERETURN
 #define console_out		uk_console_err
+#define console_out_unlogged	uk_console_err_unlogged
 #define console_out_isr		uk_console_emerg_out
 #else /* !CONFIG_LIBUKPRINT_NOCARRIAGERETURN */
 #define console_out		uk_console_err_onlcr
+#define console_out_unlogged	uk_console_err_unlogged_onlcr
 #define console_out_isr		uk_console_emerg_out_onlcr
 #endif /* !CONFIG_LIBUKPRINT_NOCARRIAGERETURN */
 #endif /* CONFIG_LIBUKCONSOLE */
 
-/* Console state for kernel output */
+/* Console state for kernel output; its cout follows the level of the
+ * message (see kconsole_cout())
+ */
 static struct vprint_console kconsole  = {
 #if CONFIG_LIBUKCONSOLE
 	.cout = console_out,
@@ -151,6 +156,44 @@ __isr static int msg_len(char *buf, int len, int raw)
 		buf[len++] = '\n';
 	return len;
 }
+
+#if CONFIG_LIBUKCONSOLE
+/* Where the text of a message of level @lvl goes.  A crash is for whoever
+ * reads the program's standard error, on every console.  The rest, which
+ * a program's own failure can bring on (a missing file it tries to run,
+ * say), and what is printed without a level (a syscall trace, test
+ * results), is the kernel's log: a console that keeps one took the
+ * message whole (kconsole_log()), and only the others print it.
+ */
+static cout_func kconsole_cout(int lvl)
+{
+	if (lvl == UK_PRINT_KLVL_CRIT)
+		return console_out;
+	return console_out_unlogged;
+}
+
+/* Hand the message in @text[0..@len) to the consoles that keep a log */
+static void kconsole_log(struct uk_print_msg *msg __maybe_unused, int lvl,
+			 const char *libname, const char *text, int len)
+{
+	struct uk_console_log_msg lmsg = {
+		.level = lvl,
+		.libname = libname,
+		.text = text,
+	};
+
+	if (len > 0 && text[len - 1] == '\n')
+		len--;
+	if (len <= 0)
+		return;
+	lmsg.len = (__sz)len;
+#if CONFIG_LIBUKPRINT_PRINT_SRCNAME
+	lmsg.srcname = msg->srcname;
+	lmsg.srcline = msg->srcline;
+#endif /* CONFIG_LIBUKPRINT_PRINT_SRCNAME */
+	uk_console_log(&lmsg);
+}
+#endif /* CONFIG_LIBUKCONSOLE */
 
 static inline void vprint_cout(struct vprint_console *cons,
 			       const char *buf, __sz len)
@@ -333,12 +376,20 @@ void uk_print_console_write(struct uk_print_msg *msg)
 			 */
 			vprint_cout(cons, "\n", 1);
 		}
+#if CONFIG_LIBUKCONSOLE
+		/* After the line it closes, on the stream that line is on */
+		cons->cout = kconsole_cout(lvl);
+#endif /* CONFIG_LIBUKCONSOLE */
 		cons->prevlvl = lvl;
 		cons->newline = 1; /* enforce printing the message header */
 	}
 
 	len = uk_vsnprintf(lbuf, BUFLEN, msg->fmt, msg->ap);
 	len = msg_len(lbuf, len, raw);
+#if CONFIG_LIBUKCONSOLE
+	if (lvl != UK_PRINT_KLVL_CRIT)
+		kconsole_log(msg, lvl, libname, lbuf, len);
+#endif /* CONFIG_LIBUKCONSOLE */
 	lptr = lbuf;
 	while (len > 0) {
 		if (cons->newline && !raw) {
