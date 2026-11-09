@@ -31,7 +31,6 @@
  */
 
 #include <stdlib.h>
-#include <string.h>
 #include <errno.h>
 
 #include <uk/config.h>
@@ -44,46 +43,9 @@
 #ifdef CONFIG_LIBDEVFS_DEV_STDOUT
 #define DEV_STDOUT_NAME "stdout"
 
-/* TODO: Some consoles require both a newline and a carriage return to
- * go to the start of the next line. This kind of behavior should be in
- * a single place in posix-tty. We keep this workaround until we have feature
- * in posix-tty that handles newline characters correctly.
- */
-static inline __ssz _console_out(const char *buf, __sz len)
-{
-	const char *next_nl = NULL;
-	__sz l = len;
-	__sz off = 0;
-	__ssz rc = 0;
-
-	if (unlikely(!len))
-		return 0;
-	if (unlikely(!buf))
-		return -EINVAL;
-
-	while (l > 0) {
-		next_nl = memchr(buf, '\n', l);
-		if (next_nl) {
-			off = next_nl - buf;
-			if ((rc = uk_console_out(buf, off)) < 0)
-				return rc;
-			if ((rc = uk_console_out("\r\n", 2)) < 0)
-				return rc;
-			buf = next_nl + 1;
-			l -= off + 1;
-		} else {
-			if ((rc = uk_console_out(buf, l)) < 0)
-				return rc;
-			break;
-		}
-	}
-
-	return len;
-}
-
 static int __write_fn(void *dst __unused, void *src, size_t *cnt)
 {
-	int ret = _console_out(src, *cnt);
+	__ssz ret = uk_console_out_onlcr(src, *cnt);
 
 	if (ret < 0)
 		/* TODO: remove -1 when vfscore switches to negative
@@ -95,7 +57,7 @@ static int __write_fn(void *dst __unused, void *src, size_t *cnt)
 	return 0;
 }
 
-/* One function for stderr and stdout */
+/* devfs has no /dev/stderr: posix-tty's fd 2 carries standard error */
 static int dev_stdout_write(struct device *dev __unused, struct uio *uio,
 			    int flags __unused)
 {

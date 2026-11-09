@@ -59,6 +59,95 @@ __u16 uk_console_count(void);
 __ssz uk_console_out(const char *buf, __sz len);
 
 /**
+ * Write standard-error bytes to the STDOUT default console(s).
+ *
+ * There is no STDERR console flag: write bytes to all STDOUT devices,
+ * through a device's `err` operation when it has one and through `out`
+ * otherwise, so a device that can tell standard error from standard
+ * output keeps them apart. Output is best-effort, as for uk_console_out().
+ *
+ * @param buf
+ *   Source of bytes to write
+ * @param len
+ *   Number of bytes to write starting at buf
+ * @return
+ *   - (>=0): Number of bytes written
+ *   - (<0): Error
+ */
+__ssz uk_console_err(const char *buf, __sz len);
+
+/**
+ * uk_console_err(), but only to the STDOUT devices without a `log`
+ * operation, or whose `log` declined the last message: a kernel
+ * message's text, for the devices that did not take the message itself
+ * from uk_console_log().
+ *
+ * @param buf
+ *   Source of bytes to write
+ * @param len
+ *   Number of bytes to write starting at buf
+ * @return
+ *   - (>=0): Number of bytes written
+ *   - (<0): Error
+ */
+__ssz uk_console_err_unlogged(const char *buf, __sz len);
+
+struct uk_console_log_msg;
+
+/**
+ * Hand a kernel message to the STDOUT devices with a `log` operation,
+ * which keep it apart from a program's output (in a host's log, say).
+ * The others, and those that decline it, get its text from
+ * uk_console_err_unlogged().
+ *
+ * @param msg
+ *   The message
+ */
+void uk_console_log(const struct uk_console_log_msg *msg);
+
+/**
+ * uk_console_out(), writing each newline as CR-LF if
+ * CONFIG_LIBUKCONSOLE_ONLCR is set and as written otherwise.
+ *
+ * @param buf
+ *   Source of bytes to write
+ * @param len
+ *   Number of bytes to write starting at buf
+ * @return
+ *   - (>=0): Number of bytes written, not counting added CRs
+ *   - (<0): Error
+ */
+__ssz uk_console_out_onlcr(const char *buf, __sz len);
+
+/**
+ * uk_console_err(), writing each newline as CR-LF if
+ * CONFIG_LIBUKCONSOLE_ONLCR is set and as written otherwise.
+ *
+ * @param buf
+ *   Source of bytes to write
+ * @param len
+ *   Number of bytes to write starting at buf
+ * @return
+ *   - (>=0): Number of bytes written, not counting added CRs
+ *   - (<0): Error
+ */
+__ssz uk_console_err_onlcr(const char *buf, __sz len);
+
+/**
+ * uk_console_err_unlogged(), writing each newline as CR-LF if
+ * CONFIG_LIBUKCONSOLE_ONLCR is set and as written otherwise.
+ *
+ * @param buf
+ *   Source of bytes to write
+ * @param len
+ *   Number of bytes to write starting at buf
+ * @return
+ *   - (>=0): Number of bytes written, not counting added CRs
+ *   - (<0): Error
+ */
+__ssz uk_console_err_unlogged_onlcr(const char *buf, __sz len);
+
+/**
  * Read bytes from the STDIN console device(s).
  *
  * Read bytes from all devices that have the UK_CONSOLE_FLAG_STDIN
@@ -96,6 +185,20 @@ __ssz uk_console_in(char *buf, __sz len);
 __isr __ssz uk_console_emerg_out(const char *buf, __sz len);
 
 /**
+ * uk_console_emerg_out(), writing each newline as CR-LF if
+ * CONFIG_LIBUKCONSOLE_ONLCR is set and as written otherwise.
+ *
+ * @param buf
+ *   Source of bytes to write
+ * @param len
+ *   Number of bytes to write starting at buf
+ * @return
+ *   - (>=0): Number of bytes written, not counting added CRs
+ *   - (<0): Error
+ */
+__isr __ssz uk_console_emerg_out_onlcr(const char *buf, __sz len);
+
+/**
  * Write bytes to the given console device. If it's not possible to write
  * the entire buffer, the number of bytes that were managed to be written
  * are returned, leaving it to the caller to call this again for the
@@ -112,6 +215,64 @@ __isr __ssz uk_console_emerg_out(const char *buf, __sz len);
  *   - (<0): Error
  */
 __ssz uk_console_out_direct(struct uk_console *dev, const char *buf, __sz len);
+
+/**
+ * Write standard-error bytes to the given console device: through its
+ * `err` operation, or through `out` when it has none. Partial writes are
+ * reported as for uk_console_out_direct().
+ *
+ * @param dev
+ *   Console device to write to
+ * @param buf
+ *   Source of bytes to write
+ * @param len
+ *   Number of bytes to write starting at buf
+ * @return
+ *   - (>=0): Number of bytes written
+ *   - (<0): Error
+ */
+__ssz uk_console_err_direct(struct uk_console *dev, const char *buf, __sz len);
+
+/**
+ * uk_console_out_direct(), writing each newline as CR-LF if
+ * CONFIG_LIBUKCONSOLE_ONLCR is set and as written otherwise.
+ *
+ * Partial writes are reported as for uk_console_out_direct(): the
+ * function stops at the first one and returns how many bytes of @buf
+ * were written, not counting added CRs, leaving it to the caller to call
+ * this again for the remaining bytes.  A newline counts as written once
+ * its LF is.
+ *
+ * @param dev
+ *   Console device to write to
+ * @param buf
+ *   Source of bytes to write
+ * @param len
+ *   Number of bytes to write starting at buf
+ * @return
+ *   - (>=0): Number of bytes of buf written
+ *   - (<0): Error
+ */
+__ssz uk_console_out_direct_onlcr(struct uk_console *dev,
+				  const char *buf, __sz len);
+
+/**
+ * uk_console_err_direct(), writing each newline as CR-LF if
+ * CONFIG_LIBUKCONSOLE_ONLCR is set and as written otherwise.
+ * Partial writes are reported as for uk_console_out_direct_onlcr().
+ *
+ * @param dev
+ *   Console device to write to
+ * @param buf
+ *   Source of bytes to write
+ * @param len
+ *   Number of bytes to write starting at buf
+ * @return
+ *   - (>=0): Number of bytes of buf written
+ *   - (<0): Error
+ */
+__ssz uk_console_err_direct_onlcr(struct uk_console *dev,
+				  const char *buf, __sz len);
 
 /**
  * Read bytes from the given console device. If it's not possible to read
@@ -197,6 +358,27 @@ int uk_console_in_direct_all(struct uk_console *dev, char *buf, __sz len);
  */
 __isr int uk_console_emerg_out_direct_all(struct uk_console *dev,
 					  const char *buf, __sz len);
+
+/* The streams of a console device, as uk_console_is_terminal() tells them
+ * apart
+ */
+#define UK_CONSOLE_STREAM_INOUT		0	/* input and output */
+#define UK_CONSOLE_STREAM_ERR		1	/* standard error */
+
+/**
+ * Whether a stream of the given console device reaches a terminal: unless
+ * the device's `terminal` operation says it does not.  A device whose
+ * other end is, say, a host process's standard streams may reach a pipe
+ * or a file instead, which programs must not take for a terminal.
+ *
+ * @param dev
+ *   Console device to ask
+ * @param stream
+ *   UK_CONSOLE_STREAM_INOUT or UK_CONSOLE_STREAM_ERR
+ * @return
+ *   __true or __false
+ */
+__bool uk_console_is_terminal(struct uk_console *dev, int stream);
 
 typedef void (*uk_console_async_handler_func)(struct uk_console *dev,
 					      void *cookie);

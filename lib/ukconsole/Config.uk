@@ -10,6 +10,17 @@ config LIBUKCONSOLE_DEVICES_MAXCOUNT
 	int "Maximum amount of registerable console devices"
 	default 16
 
+config LIBUKCONSOLE_ONLCR
+	bool "Translate newline to CR-LF on console output"
+	default y
+	help
+	  Write each newline as CR-LF where output goes through the
+	  uk_console_*_onlcr() functions, as standard I/O and kernel
+	  messages do, for consoles that need a carriage return to start
+	  the next line.  Turn it off where the console hands output to a
+	  host that keeps its bytes, such as one capturing a program's
+	  output: the host then sees the newlines as written.
+
 config LIBUKCONSOLE_TEST
 	bool "Enable unit tests"
 	select LIBUKTEST
