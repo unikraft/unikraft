@@ -263,4 +263,32 @@ UK_TESTCASE(uk_console_testsuite, uk_console_test_direct_onlcr)
 	UK_TEST_EXPECT_BYTES_EQ(uk_console_test_sink_err.buf, want, want_len);
 }
 
+static __bool uk_console_test_terminal(struct uk_console *dev __unused,
+				       int stream)
+{
+	return stream != UK_CONSOLE_STREAM_ERR;
+}
+
+static const struct uk_console_ops uk_console_test_terminal_ops = {
+	.out = uk_console_test_plain_out,
+	.terminal = uk_console_test_terminal,
+};
+
+UK_TESTCASE(uk_console_testsuite, uk_console_test_is_terminal)
+{
+	struct uk_console dev;
+
+	/* A device says which of its streams reach a terminal */
+	uk_console_init(&dev, "test-terminal", &uk_console_test_terminal_ops,
+			0, UK_CONSOLE_CLASS_NONE);
+	UK_TEST_EXPECT(uk_console_is_terminal(&dev, UK_CONSOLE_STREAM_INOUT));
+	UK_TEST_EXPECT(!uk_console_is_terminal(&dev, UK_CONSOLE_STREAM_ERR));
+
+	/* One without the op is a terminal */
+	uk_console_init(&dev, "test-plain", &uk_console_test_plain_ops,
+			0, UK_CONSOLE_CLASS_NONE);
+	UK_TEST_EXPECT(uk_console_is_terminal(&dev, UK_CONSOLE_STREAM_INOUT));
+	UK_TEST_EXPECT(uk_console_is_terminal(&dev, UK_CONSOLE_STREAM_ERR));
+}
+
 uk_testsuite_register(uk_console_testsuite, NULL);

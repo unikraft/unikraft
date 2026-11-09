@@ -316,6 +316,27 @@ int uk_console_in_direct_all(struct uk_console *dev, char *buf, __sz len);
 __isr int uk_console_emerg_out_direct_all(struct uk_console *dev,
 					  const char *buf, __sz len);
 
+/* The streams of a console device, as uk_console_is_terminal() tells them
+ * apart
+ */
+#define UK_CONSOLE_STREAM_INOUT		0	/* input and output */
+#define UK_CONSOLE_STREAM_ERR		1	/* standard error */
+
+/**
+ * Whether a stream of the given console device reaches a terminal: unless
+ * the device's `terminal` operation says it does not.  A device whose
+ * other end is, say, a host process's standard streams may reach a pipe
+ * or a file instead, which programs must not take for a terminal.
+ *
+ * @param dev
+ *   Console device to ask
+ * @param stream
+ *   UK_CONSOLE_STREAM_INOUT or UK_CONSOLE_STREAM_ERR
+ * @return
+ *   __true or __false
+ */
+__bool uk_console_is_terminal(struct uk_console *dev, int stream);
+
 typedef void (*uk_console_async_handler_func)(struct uk_console *dev,
 					      void *cookie);
 

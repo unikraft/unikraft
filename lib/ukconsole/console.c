@@ -454,6 +454,13 @@ __isr int uk_console_emerg_out_direct_all(struct uk_console *dev,
 	return 0;
 }
 
+__bool uk_console_is_terminal(struct uk_console *dev, int stream)
+{
+	UK_ASSERT(dev && dev->ops);
+
+	return !dev->ops->terminal || dev->ops->terminal(dev, stream);
+}
+
 void uk_console_register(struct uk_console *dev)
 {
 	struct uk_console *known_dev __maybe_unused = __NULL;
