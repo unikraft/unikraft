@@ -80,7 +80,11 @@ __ssz uk_console_out(const char *buf, __sz len)
 	return len;
 }
 
-__ssz uk_console_err(const char *buf, __sz len)
+/* Standard error to the STDOUT devices (there is no STDERR flag): all of
+ * them, or with @unlogged only those that did not take the last kernel
+ * message from uk_console_log()
+ */
+static __ssz console_err(const char *buf, __sz len, __bool unlogged)
 {
 	struct uk_console *dev = __NULL;
 
@@ -90,18 +94,43 @@ __ssz uk_console_err(const char *buf, __sz len)
 	if (unlikely(!buf))
 		return -EINVAL;
 
-	/* Output to all STDOUT devices, on their error stream if they have
-	 * one: there is no STDERR flag
-	 */
 	uk_spin_lock(&cons_dev_list_lock);
 	uk_list_for_each_entry(dev, &cons_dev_list, _list) {
-		if ((dev->flags & UK_CONSOLE_FLAG_STDOUT) &&
-		    (dev->ops->err || dev->ops->out))
-			uk_console_err_direct(dev, buf, len);
+		if (!(dev->flags & UK_CONSOLE_FLAG_STDOUT))
+			continue;
+		if (!dev->ops->err && !dev->ops->out)
+			continue;
+		if (unlogged && dev->ops->log && !dev->_log_declined)
+			continue;
+		uk_console_err_direct(dev, buf, len);
 	}
 	uk_spin_unlock(&cons_dev_list_lock);
 
 	return len;
+}
+
+__ssz uk_console_err(const char *buf, __sz len)
+{
+	return console_err(buf, len, __false);
+}
+
+__ssz uk_console_err_unlogged(const char *buf, __sz len)
+{
+	return console_err(buf, len, __true);
+}
+
+void uk_console_log(const struct uk_console_log_msg *msg)
+{
+	struct uk_console *dev = __NULL;
+
+	UK_ASSERT(msg);
+
+	uk_spin_lock(&cons_dev_list_lock);
+	uk_list_for_each_entry(dev, &cons_dev_list, _list) {
+		if ((dev->flags & UK_CONSOLE_FLAG_STDOUT) && dev->ops->log)
+			dev->_log_declined = dev->ops->log(dev, msg) != 0;
+	}
+	uk_spin_unlock(&cons_dev_list_lock);
 }
 
 #if CONFIG_LIBUKCONSOLE_ONLCR
@@ -162,6 +191,11 @@ __ssz uk_console_out_onlcr(const char *buf, __sz len)
 __ssz uk_console_err_onlcr(const char *buf, __sz len)
 {
 	return console_onlcr(uk_console_err, buf, len);
+}
+
+__ssz uk_console_err_unlogged_onlcr(const char *buf, __sz len)
+{
+	return console_onlcr(uk_console_err_unlogged, buf, len);
 }
 
 __isr __ssz uk_console_emerg_out_onlcr(const char *buf, __sz len)
