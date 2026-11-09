@@ -59,6 +59,24 @@ __u16 uk_console_count(void);
 __ssz uk_console_out(const char *buf, __sz len);
 
 /**
+ * Write standard-error bytes to the STDOUT default console(s).
+ *
+ * There is no STDERR console flag: write bytes to all STDOUT devices,
+ * through a device's `err` operation when it has one and through `out`
+ * otherwise, so a device that can tell standard error from standard
+ * output keeps them apart. Output is best-effort, as for uk_console_out().
+ *
+ * @param buf
+ *   Source of bytes to write
+ * @param len
+ *   Number of bytes to write starting at buf
+ * @return
+ *   - (>=0): Number of bytes written
+ *   - (<0): Error
+ */
+__ssz uk_console_err(const char *buf, __sz len);
+
+/**
  * Read bytes from the STDIN console device(s).
  *
  * Read bytes from all devices that have the UK_CONSOLE_FLAG_STDIN
@@ -112,6 +130,23 @@ __isr __ssz uk_console_emerg_out(const char *buf, __sz len);
  *   - (<0): Error
  */
 __ssz uk_console_out_direct(struct uk_console *dev, const char *buf, __sz len);
+
+/**
+ * Write standard-error bytes to the given console device: through its
+ * `err` operation, or through `out` when it has none. Partial writes are
+ * reported as for uk_console_out_direct().
+ *
+ * @param dev
+ *   Console device to write to
+ * @param buf
+ *   Source of bytes to write
+ * @param len
+ *   Number of bytes to write starting at buf
+ * @return
+ *   - (>=0): Number of bytes written
+ *   - (<0): Error
+ */
+__ssz uk_console_err_direct(struct uk_console *dev, const char *buf, __sz len);
 
 /**
  * Read bytes from the given console device. If it's not possible to read

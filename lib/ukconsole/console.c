@@ -80,6 +80,30 @@ __ssz uk_console_out(const char *buf, __sz len)
 	return len;
 }
 
+__ssz uk_console_err(const char *buf, __sz len)
+{
+	struct uk_console *dev = __NULL;
+
+	if (unlikely(!len))
+		return 0;
+
+	if (unlikely(!buf))
+		return -EINVAL;
+
+	/* Output to all STDOUT devices, on their error stream if they have
+	 * one: there is no STDERR flag
+	 */
+	uk_spin_lock(&cons_dev_list_lock);
+	uk_list_for_each_entry(dev, &cons_dev_list, _list) {
+		if ((dev->flags & UK_CONSOLE_FLAG_STDOUT) &&
+		    (dev->ops->err || dev->ops->out))
+			uk_console_err_direct(dev, buf, len);
+	}
+	uk_spin_unlock(&cons_dev_list_lock);
+
+	return len;
+}
+
 __ssz uk_console_in(char *buf, __sz len)
 {
 	struct uk_console *dev = __NULL;
@@ -156,6 +180,22 @@ __ssz uk_console_out_direct(struct uk_console *dev, const char *buf, __sz len)
 		return -EIO;
 
 	return dev->ops->out(dev, buf, len);
+}
+
+__ssz uk_console_err_direct(struct uk_console *dev, const char *buf, __sz len)
+{
+	UK_ASSERT(dev && dev->ops);
+
+	if (!dev->ops->err)
+		return uk_console_out_direct(dev, buf, len);
+
+	if (unlikely(!len))
+		return 0;
+
+	if (unlikely(!buf))
+		return -EINVAL;
+
+	return dev->ops->err(dev, buf, len);
 }
 
 __ssz uk_console_in_direct(struct uk_console *dev, char *buf, __sz len)
