@@ -104,7 +104,12 @@ static int virtio_device_reinit(struct virtio_dev *vdev)
 	 * time.
 	 */
 	if (vdev->cops->device_reset) {
-		vdev->cops->device_reset(vdev);
+		rc = vdev->cops->device_reset(vdev);
+		if (unlikely(rc)) {
+			uk_pr_err("Failed to reset the virtio device %p: %d\n",
+				  vdev, rc);
+			return rc;
+		}
 		/* Set the device status */
 		vdev->status = VIRTIO_DEV_RESET;
 	}
