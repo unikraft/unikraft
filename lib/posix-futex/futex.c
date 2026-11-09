@@ -82,7 +82,8 @@ static uk_spinlock futex_list_lock = UK_SPINLOCK_INITIALIZER();
  * Get the futex value atomically and compare it with the expected value. Add
  * the thread to the wait list and then block it if the value is equal to the
  * expected one. If the futex was not removed from the list when the thread was
- * unblocked, then it means that it timed out.
+ * unblocked, then it means that it timed out.  The entry is looked up by
+ * itself rather than by uaddr: a requeue may have moved it to another futex.
  *
  * @param uaddr		The futex userspace address
  * @param val		The expected value
@@ -139,7 +140,7 @@ static int futex_wait(uint32_t *uaddr, uint32_t val, const __nsec *timeout)
 	uk_list_for_each_safe(itr, tmp, &futex_list) {
 		f_tmp = uk_list_entry(itr, struct uk_futex, list_node);
 
-		if (f_tmp->uaddr == uaddr && f_tmp->thread == current) {
+		if (f_tmp == &f) {
 			/* Remove the thread from the futex list */
 			uk_list_del(&f_tmp->list_node);
 			uk_spin_unlock(&futex_list_lock);
@@ -216,53 +217,80 @@ static int futex_wake(uint32_t *uaddr, uint32_t val)
  * @param val		Number of waiters to wake
  * @param val2		Number of waiters to requeue (0-INT_MAX)
  * @param uaddr2	Target futex user address
- * @param val3		uaddr expected value
  *
  * @return
- *	>=0: on success, the number of tasks requeued or woken;
- *	<0: on error
+ *	the number of tasks requeued or woken
  */
-static int futex_cmp_requeue(uint32_t *uaddr, uint32_t val, uint32_t val2,
-			     uint32_t *uaddr2, uint32_t val3)
+static int futex_requeue(uint32_t *uaddr, uint32_t val, uint32_t val2,
+			 uint32_t *uaddr2)
 {
 	unsigned long irqf;
 	struct uk_list_head *itr, *tmp;
 	struct uk_futex *f;
-	int woken_uaddr1;
-	uint32_t waiters_uaddr2 = 0;
-
-	if (!((uint32_t)val3 == uk_load_n(uaddr)))
-		return -EAGAIN;
-
-	/* Wake up val waiters on uaddr */
-	woken_uaddr1 = futex_wake(uaddr, val);
-
-	if (!val2)
-		return woken_uaddr1;
+	uint32_t woken = 0, requeued = 0;
 
 	irqf = uk_lcpu_save_irqf();
 	uk_spin_lock(&futex_list_lock);
 
-	/* Requeue val2 waiters on uaddr2 */
+	/* Wake the first val waiters on uaddr and requeue the next val2 to
+	 * uaddr2, in one walk: val is a count here, so 0 wakes none (where
+	 * FUTEX_WAKE wakes at least one).
+	 */
 	uk_list_for_each_safe(itr, tmp, &futex_list) {
 		f = uk_list_entry(itr, struct uk_futex, list_node);
 
-		if (f->uaddr == uaddr) {
-			/* Requeue thread to uaddr2 */
+		if (f->uaddr != uaddr)
+			continue;
+
+		if (woken < val) {
+			/* Remove the thread from the futex list */
+			uk_list_del(&f->list_node);
+
+			/* TODO: Replace with uk_thread_wakeup when the new
+			 * scheduler API is ready
+			 */
+			uk_thread_wake(f->thread);
+			woken++;
+			continue;
+		}
+
+		if (requeued >= val2)
+			break;
+
+		/* Requeue thread to uaddr2.  Onto the same futex it stays
+		 * where it is: moved to the tail, the walk would find it
+		 * again, and again.
+		 */
+		if (uaddr2 != uaddr) {
 			uk_list_del(&f->list_node);
 			f->uaddr = uaddr2;
 			uk_list_add_tail(&f->list_node, &futex_list);
-
-			/* Requeue at most val2 threads */
-			if (++waiters_uaddr2 >= val2)
-				break;
 		}
+		requeued++;
 	}
 
 	uk_spin_unlock(&futex_list_lock);
 	uk_lcpu_restore_irqf(irqf);
 
-	return woken_uaddr1 + waiters_uaddr2;
+	return (int) (woken + requeued);
+}
+
+/**
+ * Requeue waiters from uaddr to uaddr2, if uaddr still contains val3.
+ *
+ * As futex_requeue(), after checking that uaddr contains val3.
+ *
+ * @return
+ *	>=0: on success, the number of tasks requeued or woken;
+ *	-EAGAIN: uaddr does not contain val3
+ */
+static int futex_cmp_requeue(uint32_t *uaddr, uint32_t val, uint32_t val2,
+			     uint32_t *uaddr2, uint32_t val3)
+{
+	if (!((uint32_t)val3 == uk_load_n(uaddr)))
+		return -EAGAIN;
+
+	return futex_requeue(uaddr, val, val2, uaddr2);
 }
 
 /**
@@ -332,8 +360,15 @@ UK_LLSYSCALL_R_DEFINE(int, futex, uint32_t *, uaddr, int, futex_op,
 		return futex_wake(uaddr, val);
 
 	case FUTEX_FD:
-	case FUTEX_REQUEUE:
 		return -ENOSYS;
+
+	case FUTEX_REQUEUE:
+		/* FUTEX_CMP_REQUEUE without the comparison: musl's condition
+		 * variables hand a woken waiter's successor to the mutex with
+		 * it, and leave that waiter asleep when it fails.
+		 */
+		return futex_requeue(uaddr, val, (unsigned long)timeout,
+				     uaddr2);
 
 	case FUTEX_CMP_REQUEUE:
 		return futex_cmp_requeue(uaddr, val, (unsigned long)timeout,
@@ -431,5 +466,35 @@ static int pthread_exit_handler(void *arg)
 }
 
 POSIX_PROCESS_PTEXIT_HANDLER_PRIO(pthread_exit_handler, UK_PRIO_EARLIEST);
+
+#if CONFIG_LIBPOSIX_PROCESS_EXECVE
+/* The reference points into the image execve() replaces, which may be
+ * unmapped with it, and a new image that never calls set_tid_address()
+ * would have it written at its exit. Clear it now, as Linux does at exec,
+ * while the old image is still mapped: a vfork() parent sharing that
+ * memory sees the write.
+ */
+static int pfutex_execve_handler(void *arg)
+{
+	struct posix_process_execve_event_data *event_data = arg;
+	pid_t **ref;
+
+	UK_ASSERT(event_data);
+
+	/* The thread that execs: uk_posix_process_run() raises the event
+	 * from the thread that starts the process
+	 */
+	ref = &uk_thread_uktls_var(event_data->thread, child_tid_clear_ref);
+	if (*ref != NULL) {
+		**ref = 0;
+		futex_wake((uint32_t *)*ref, 0);
+		*ref = NULL;
+	}
+
+	return 0;
+}
+
+POSIX_PROCESS_EXECVE_HANDLER(pfutex_execve_handler);
+#endif /* CONFIG_LIBPOSIX_PROCESS_EXECVE */
 
 #endif /* CONFIG_LIBPOSIX_PROCESS_MULTITHREADING */
