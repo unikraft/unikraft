@@ -77,6 +77,34 @@ __ssz uk_console_out(const char *buf, __sz len);
 __ssz uk_console_err(const char *buf, __sz len);
 
 /**
+ * uk_console_out(), writing each newline as CR-LF if
+ * CONFIG_LIBUKCONSOLE_ONLCR is set and as written otherwise.
+ *
+ * @param buf
+ *   Source of bytes to write
+ * @param len
+ *   Number of bytes to write starting at buf
+ * @return
+ *   - (>=0): Number of bytes written, not counting added CRs
+ *   - (<0): Error
+ */
+__ssz uk_console_out_onlcr(const char *buf, __sz len);
+
+/**
+ * uk_console_err(), writing each newline as CR-LF if
+ * CONFIG_LIBUKCONSOLE_ONLCR is set and as written otherwise.
+ *
+ * @param buf
+ *   Source of bytes to write
+ * @param len
+ *   Number of bytes to write starting at buf
+ * @return
+ *   - (>=0): Number of bytes written, not counting added CRs
+ *   - (<0): Error
+ */
+__ssz uk_console_err_onlcr(const char *buf, __sz len);
+
+/**
  * Read bytes from the STDIN console device(s).
  *
  * Read bytes from all devices that have the UK_CONSOLE_FLAG_STDIN
@@ -114,6 +142,20 @@ __ssz uk_console_in(char *buf, __sz len);
 __isr __ssz uk_console_emerg_out(const char *buf, __sz len);
 
 /**
+ * uk_console_emerg_out(), writing each newline as CR-LF if
+ * CONFIG_LIBUKCONSOLE_ONLCR is set and as written otherwise.
+ *
+ * @param buf
+ *   Source of bytes to write
+ * @param len
+ *   Number of bytes to write starting at buf
+ * @return
+ *   - (>=0): Number of bytes written, not counting added CRs
+ *   - (<0): Error
+ */
+__isr __ssz uk_console_emerg_out_onlcr(const char *buf, __sz len);
+
+/**
  * Write bytes to the given console device. If it's not possible to write
  * the entire buffer, the number of bytes that were managed to be written
  * are returned, leaving it to the caller to call this again for the
@@ -147,6 +189,47 @@ __ssz uk_console_out_direct(struct uk_console *dev, const char *buf, __sz len);
  *   - (<0): Error
  */
 __ssz uk_console_err_direct(struct uk_console *dev, const char *buf, __sz len);
+
+/**
+ * uk_console_out_direct(), writing each newline as CR-LF if
+ * CONFIG_LIBUKCONSOLE_ONLCR is set and as written otherwise.
+ *
+ * Partial writes are reported as for uk_console_out_direct(): the
+ * function stops at the first one and returns how many bytes of @buf
+ * were written, not counting added CRs, leaving it to the caller to call
+ * this again for the remaining bytes.  A newline counts as written once
+ * its LF is.
+ *
+ * @param dev
+ *   Console device to write to
+ * @param buf
+ *   Source of bytes to write
+ * @param len
+ *   Number of bytes to write starting at buf
+ * @return
+ *   - (>=0): Number of bytes of buf written
+ *   - (<0): Error
+ */
+__ssz uk_console_out_direct_onlcr(struct uk_console *dev,
+				  const char *buf, __sz len);
+
+/**
+ * uk_console_err_direct(), writing each newline as CR-LF if
+ * CONFIG_LIBUKCONSOLE_ONLCR is set and as written otherwise.
+ * Partial writes are reported as for uk_console_out_direct_onlcr().
+ *
+ * @param dev
+ *   Console device to write to
+ * @param buf
+ *   Source of bytes to write
+ * @param len
+ *   Number of bytes to write starting at buf
+ * @return
+ *   - (>=0): Number of bytes of buf written
+ *   - (<0): Error
+ */
+__ssz uk_console_err_direct_onlcr(struct uk_console *dev,
+				  const char *buf, __sz len);
 
 /**
  * Read bytes from the given console device. If it's not possible to read
