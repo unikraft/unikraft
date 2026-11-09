@@ -45,6 +45,10 @@ struct uk_console_ops {
 	uk_console_out_func out;
 	uk_console_in_func in;
 	uk_console_emerg_out_func emerg_out;
+	/* Optional: standard error.  A device without it prints standard
+	 * error through `out`, like standard output.
+	 */
+	uk_console_out_func err;
 };
 
 #define UK_CONSOLE_FLAG_STDOUT		UK_BIT(0)
