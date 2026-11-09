@@ -77,12 +77,19 @@ static int init_posix_tty_devfs_stdio(const struct uk_file *in,
 #define STDOUT_FNAME_SERIAL "stdout:serial"
 #define STDOUT_FNAME_LEN_SERIAL (sizeof(STDOUT_FNAME_SERIAL) - 1)
 
+#define STDERR_FNAME_SERIAL "stderr:serial"
+#define STDERR_FNAME_LEN_SERIAL (sizeof(STDERR_FNAME_SERIAL) - 1)
+
 extern const struct uk_file *tty_f;
+#if CONFIG_LIBPOSIX_TTY_SERIAL_STDERR
+extern const struct uk_file *tty_err_f;
+#endif /* CONFIG_LIBPOSIX_TTY_SERIAL_STDERR */
 
 static int init_posix_tty(struct uk_init_ctx *ictx __unused)
 {
 	const struct uk_file *in;
 	const struct uk_file *out;
+	const struct uk_file *err __maybe_unused;
 	const char *in_fname;
 	const char *out_fname;
 	size_t in_fnamelen;
@@ -131,14 +138,27 @@ static int init_posix_tty(struct uk_init_ctx *ictx __unused)
 		return (r < 0) ? r : -EBADF;
 	}
 
-	r = uk_sys_dup2(1, 2);
+	err = out;
+#if CONFIG_LIBPOSIX_TTY_SERIAL_STDERR
+	/* A file of its own lets a console with an err operation keep
+	 * standard error apart
+	 */
+	if (tty_err_f)
+		err = tty_err_f;
+#endif /* CONFIG_LIBPOSIX_TTY_SERIAL_STDERR */
+	if (err != out)
+		r = uk_fdtab_open_named(err, O_WRONLY | UKFD_O_NOSEEK,
+					STDERR_FNAME_SERIAL,
+					STDERR_FNAME_LEN_SERIAL);
+	else
+		r = uk_sys_dup2(1, 2);
 	if (unlikely(r != 2)) {
 		uk_pr_err("Failed to allocate fd for stderr: %d\n", r);
 		return (r < 0) ? r : -EBADF;
 	}
 
 #if CONFIG_LIBPOSIX_TTY_DEVFS
-	return init_posix_tty_devfs_stdio(in, out, out);
+	return init_posix_tty_devfs_stdio(in, out, err);
 #else /* !CONFIG_LIBPOSIX_TTY_DEVFS */
 	return 0;
 #endif /* !CONFIG_LIBPOSIX_TTY_DEVFS */

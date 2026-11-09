@@ -115,6 +115,14 @@ struct consolefd_alloc {
 #endif /* CONFIG_LIBUKFILE_CONSOLE_IN_EOF_FINAL */
 	/* Mutex to synchronize file read/write event management */
 	struct uk_mutex mtx;
+	/* Writes go to the console's standard error stream */
+	int err;
+	/*
+	 * The file whose line settings and end of input this one shares:
+	 * itself, or the console file a standard error file was made from,
+	 * which it holds a reference to.
+	 */
+	struct consolefd_alloc *tty;
 };
 
 static inline struct consolefd_alloc *to_consf(const struct uk_file *f)
@@ -125,16 +133,22 @@ static inline struct consolefd_alloc *to_consf(const struct uk_file *f)
 /* The line settings of the terminal @f is on */
 static inline struct termios *to_termios(const struct uk_file *f)
 {
-	return &to_consf(f)->termios;
+	return &to_consf(f)->tty->termios;
 }
 
 #if CONFIG_LIBUKFILE_CONSOLE_IN_EOF_FINAL
 /* Whether the console behind @f reached the end of its input */
 static inline int *to_eof(const struct uk_file *f)
 {
-	return &to_consf(f)->eof;
+	return &to_consf(f)->tty->eof;
 }
 #endif /* CONFIG_LIBUKFILE_CONSOLE_IN_EOF_FINAL */
+
+/* How a write to @f reaches its console: uk_console_[out|err]_direct */
+static inline uk_console_out_func consf_writer(const struct uk_file *f)
+{
+	return to_consf(f)->err ? uk_console_err_direct : uk_console_out_direct;
+}
 
 /* Whether input read from @f is echoed to the console */
 static inline int consf_echo(const struct uk_file *f)
@@ -143,10 +157,10 @@ static inline int consf_echo(const struct uk_file *f)
 }
 
 #if CONFIG_LIBUKFILE_CONSOLE_OUT_NOCARRIAGERETURN
-static inline __ssz _console_out(struct uk_console *cons,
+static inline __ssz _console_out(uk_console_out_func w, struct uk_console *cons,
 				 const char *buf, __sz len)
 {
-	return uk_console_out_direct(cons, buf, len);
+	return w(cons, buf, len);
 }
 #else /* !CONFIG_LIBUKFILE_CONSOLE_OUT_NOCARRIAGERETURN */
 /* TODO: Some consoles require both a newline and a carriage return to
@@ -154,7 +168,7 @@ static inline __ssz _console_out(struct uk_console *cons,
  * a single place in posix-tty. We keep this workaround until we have feature
  * in posix-tty that handles newline characters correctly.
  */
-static inline __ssz _console_out(struct uk_console *cons,
+static inline __ssz _console_out(uk_console_out_func w, struct uk_console *cons,
 				 const char *buf, __sz len)
 {
 	const char *next_nl = NULL;
@@ -172,14 +186,14 @@ static inline __ssz _console_out(struct uk_console *cons,
 		if (next_nl) {
 			off = next_nl - buf;
 
-			if ((rc = uk_console_out_direct(cons, buf, off)) < 0)
+			if ((rc = w(cons, buf, off)) < 0)
 				return rc;
-			if ((rc = uk_console_out_direct(cons, "\r\n", 2)) < 0)
+			if ((rc = w(cons, "\r\n", 2)) < 0)
 				return rc;
 			buf = next_nl + 1;
 			l -= off + 1;
 		} else {
-			if ((rc = uk_console_out_direct(cons, buf, l)) < 0)
+			if ((rc = w(cons, buf, l)) < 0)
 				return rc;
 			break;
 		}
@@ -193,7 +207,7 @@ static inline __ssz _console_out(struct uk_console *cons,
  * Non-blocking single-shot output helper for async TX paths.
  *
  * Unlike _console_out (which uses uk_console_out_direct_all and blocks until
- * every byte is delivered), this helper calls uk_console_out_direct once per
+ * every byte is delivered), this helper calls @w once per
  * segment and returns immediately if the TX queue is full (rc == 0).
  *
  * Returns the number of bytes from the original @buf that were consumed
@@ -201,13 +215,15 @@ static inline __ssz _console_out(struct uk_console *cons,
  * first attempt, or < 0 on a hard error.
  */
 #if CONFIG_LIBUKFILE_CONSOLE_OUT_NOCARRIAGERETURN
-static inline __ssz _console_out_nb(struct uk_console *cons,
+static inline __ssz _console_out_nb(uk_console_out_func w,
+				    struct uk_console *cons,
 				    const char *buf, __sz len)
 {
-	return uk_console_out_direct(cons, buf, len);
+	return w(cons, buf, len);
 }
 #else /* !CONFIG_LIBUKFILE_CONSOLE_OUT_NOCARRIAGERETURN */
-static inline __ssz _console_out_nb(struct uk_console *cons,
+static inline __ssz _console_out_nb(uk_console_out_func w,
+				    struct uk_console *cons,
 				    const char *buf, __sz len)
 {
 	const char *next_nl;
@@ -226,7 +242,7 @@ static inline __ssz _console_out_nb(struct uk_console *cons,
 			seg = (__sz)(next_nl - buf);
 
 			if (seg > 0) {
-				rc = uk_console_out_direct(cons, buf, seg);
+				rc = w(cons, buf, seg);
 				if (rc == 0)
 					return (__ssz)consumed;
 				if (unlikely(rc < 0))
@@ -240,7 +256,7 @@ static inline __ssz _console_out_nb(struct uk_console *cons,
 			 * '\n' is treated as not yet consumed so the caller
 			 * retries from it on the next writable wakeup.
 			 */
-			rc = uk_console_out_direct(cons, "\r\n", 2);
+			rc = w(cons, "\r\n", 2);
 			if (rc == 0)
 				return (__ssz)consumed;
 			if (unlikely(rc < 0))
@@ -250,7 +266,7 @@ static inline __ssz _console_out_nb(struct uk_console *cons,
 			buf = next_nl + 1;
 			l -= seg + 1;
 		} else {
-			rc = uk_console_out_direct(cons, buf, l);
+			rc = w(cons, buf, l);
 			if (rc == 0)
 				return (__ssz)consumed;
 			if (unlikely(rc < 0))
@@ -323,7 +339,8 @@ static ssize_t serial_read(const struct uk_file *f,
 			uk_file_event_clear(f, UKFD_POLLIN);
 #endif /* !CONFIG_LIBUKFILE_CONSOLE_IN_EOF_FINAL */
 			if (bytes_read > 1 && consf_echo(f))
-				_console_out(cons, buf, bytes_read - 1);
+				_console_out(uk_console_out_direct, cons, buf,
+					     bytes_read - 1);
 			break;
 		}
 
@@ -331,7 +348,8 @@ static ssize_t serial_read(const struct uk_file *f,
 		 * program turned ECHO off to do its own
 		 */
 		if (consf_echo(f))
-			_console_out(cons, buf, bytes_read);
+			_console_out(uk_console_out_direct, cons, buf,
+				     bytes_read);
 
 		if (*last == '\n')
 			break;
@@ -443,7 +461,8 @@ static ssize_t serial_read_async(const struct uk_file *f,
 
 		/* Echo only the bytes actually read, not the full iov len. */
 		if (rc && consf_echo(f))
-			_console_out(cons, buf, (__sz)rc);
+			_console_out(uk_console_out_direct, cons, buf,
+				     (__sz)rc);
 
 		if (eot || *last == '\n')
 			break;
@@ -476,7 +495,7 @@ static ssize_t serial_write(const struct uk_file *f,
 		if (unlikely(!buf && len))
 			return  -EFAULT;
 
-		bytes_written = _console_out(cons, buf, len);
+		bytes_written = _console_out(consf_writer(f), cons, buf, len);
 		if (unlikely(bytes_written < 0))
 			return bytes_written;
 
@@ -522,7 +541,7 @@ static ssize_t serial_write_async(const struct uk_file *f,
 		if (unlikely(!buf && len))
 			return -EFAULT;
 
-		rc = _console_out_nb(cons, buf, len);
+		rc = _console_out_nb(consf_writer(f), cons, buf, len);
 		if (unlikely(rc < 0))
 			return (ssize_t)rc;
 
@@ -634,7 +653,10 @@ static int serial_getstat(const struct uk_file *f __maybe_unused,
 	arg->stx_mask = SERIAL_STATX_MASK;
 	arg->stx_mode = S_IFCHR|0666;
 	arg->stx_nlink = 1;
-	arg->stx_ino = 1;
+	/* A standard error file of its own differs from the console's, so
+	 * programs comparing fd 1 and fd 2 tell them apart
+	 */
+	arg->stx_ino = to_consf(f)->err ? 2 : 1;
 	arg->stx_size = 0;
 
 	/* Following fields are always filled in, not in stx_mask */
@@ -695,6 +717,9 @@ static void consf_release(const struct uk_file *f, int what)
 
 	uk_list_del(&consf->async_list);
 
+	if (consf->tty != consf)
+		uk_file_release(&consf->tty->f);
+
 	/* Free */
 	uk_free(consf->a, consf);
 }
@@ -722,7 +747,8 @@ __isr static void consf_async_out_cb(struct uk_console *dev __unused,
 	uk_semaphore_up_isr(&consf_async_sem);
 }
 
-const struct uk_file *uk_file_console_create(struct uk_console *cons)
+static const struct uk_file *consf_create(struct uk_console *cons,
+					  struct consolefd_alloc *tty)
 {
 	struct consolefd_alloc *consf;
 	const struct uk_file_ops *ops;
@@ -739,6 +765,8 @@ const struct uk_file *uk_file_console_create(struct uk_console *cons)
 
 	consf->a = uk_alloc_get_default();
 	consf->pending_events = 0;
+	consf->err = !!tty;
+	consf->tty = tty ? tty : consf;
 	consf->eot = 0;
 #if CONFIG_LIBUKFILE_CONSOLE_IN_EOF_FINAL
 	consf->eof = 0;
@@ -837,7 +865,28 @@ const struct uk_file *uk_file_console_create(struct uk_console *cons)
 
 	uk_mutex_init(&consf->mtx);
 
+	if (tty)
+		uk_file_acquire(&tty->f);
+
 	return &consf->f;
+}
+
+const struct uk_file *uk_file_console_create(struct uk_console *cons)
+{
+	return consf_create(cons, __NULL);
+}
+
+const struct uk_file *uk_file_console_create_err(const struct uk_file *f)
+{
+	struct consolefd_alloc *tty;
+
+	UK_ASSERT(f);
+
+	if (f->vol != SERIAL_VOLID)
+		return __NULL;
+
+	tty = to_consf(f)->tty;
+	return consf_create(f->node, tty);
 }
 
 /*

@@ -58,6 +58,16 @@ config LIBPOSIX_TTY_STDOUT_NULL
 
 endchoice
 
+config LIBPOSIX_TTY_SERIAL_STDERR
+	bool "Separate standard error on the serial console"
+	depends on LIBPOSIX_TTY_STDOUT_SERIAL
+	help
+	  Open stderr (fd 2) as a console file of its own, written with
+	  uk_console_err_direct(), instead of as a duplicate of stdout.
+	  A console driver with an err operation then receives standard
+	  error apart from standard output; one without it prints both
+	  alike.
+
 endif
 
 endif
