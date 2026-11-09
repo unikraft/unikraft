@@ -131,21 +131,33 @@ void uk_plat_native_except_push_nested(void)
 	__u32 idx;
 
 	idx = uk_lcpu_get_current_idx_in_except();
+	/* The index comes from the stack pointer, which names a CPU only on
+	 * the exception stacks: called from anywhere else (a crash report
+	 * on a thread's stack), there is no level to count.
+	 */
+	if (unlikely(idx >= CONFIG_UKPLAT_CPU_MAXCOUNT))
+		return;
 
 	disable_nesting = &idt_ist_disable_nesting[idx];
 	UK_ASSERT(*disable_nesting < __U8_MAX);
 
-	if (*disable_nesting++)
+	/* Count the level; only the outermost one disables IST. */
+	if ((*disable_nesting)++)
 		return;
 
 	idt = cpu_idt[idx];
 	ist_saved = idt_ist_saved[idx];
 
-	/* Save the value of the IST field and disable IST for the exception */
+	/* Save the value of the IST field and disable IST for the exception.
+	 * The crit stack (IST3: double fault, NMI, machine check, debug)
+	 * stays: those do not share a stack with the ones nesting here, and
+	 * a double fault keeps a stack known to be good.
+	 */
 	for (i = 0; i < IDT_IST_SAVE_LEN; i++) {
 		desc = &idt[i];
 		ist_saved[i] = desc->ist;
-		desc->ist = 0;
+		if (desc->ist != 3)
+			desc->ist = 0;
 	}
 }
 
@@ -159,11 +171,14 @@ void uk_plat_native_except_pop_nested(void)
 	__u32 idx;
 
 	idx = uk_lcpu_get_current_idx_in_except();
+	if (unlikely(idx >= CONFIG_UKPLAT_CPU_MAXCOUNT))
+		return;
 
 	disable_nesting = &idt_ist_disable_nesting[idx];
-	UK_ASSERT(*disable_nesting > 1);
+	UK_ASSERT(*disable_nesting > 0);
 
-	if (--*disable_nesting != 0)
+	/* Only the outermost level restores IST. */
+	if (--(*disable_nesting) != 0)
 		return;
 
 	idt = cpu_idt[idx];
@@ -282,7 +297,22 @@ void uk_plat_native_except_err_handler(int trapnr,
 		.cr2 = uk_arch_x86_64_rdcr2(),
 	};
 
+	/* The handlers run with IST off: an exception they raise
+	 * themselves is then taken on the stack they run on, below this
+	 * one's frame.  With IST on, the CPU would restart the IST stack
+	 * from its top and overwrite that frame -- the saved RIP and RSP
+	 * of the code that faulted -- so returning from this exception
+	 * would resume a wild context.  A page fault handler takes such a
+	 * fault whenever the memory it touches faults too: a file-backed
+	 * mapping's handler reads the file through the VFS, which writes
+	 * the file's access time in a page that may be copy-on-write or
+	 * not yet present.  A handler that does not return (a signal
+	 * delivered from sys_error_handler_except) pops the level before
+	 * it leaves.
+	 */
+	uk_plat_native_except_push_nested();
 	rc = uk_raise_event_ptr(trap_event_table[trapnr], &ctx);
+	uk_plat_native_except_pop_nested();
 	if (unlikely(rc < 0))
 		uk_pr_crit("event handler returned error: %d\n", rc);
 	else if (rc != UK_EVENT_NOT_HANDLED)

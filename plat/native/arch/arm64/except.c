@@ -11,7 +11,9 @@
 #include <uk/arch/util.h>
 #include <uk/assert.h>
 #include <uk/event.h>
+#if CONFIG_HAVE_SMP
 #include <uk/intctlr/gic.h>
+#endif /* CONFIG_HAVE_SMP */
 #include <uk/pcpuvar.h>
 #include <uk/plat/config.h>
 #include <uk/print.h>
@@ -20,7 +22,12 @@
 #include <arm/arm64/mte.h>
 #endif /* CONFIG_ARM64_FEAT_MTE */
 
+#if CONFIG_HAVE_SMP
+/* Only SMP uses the GIC here (secondary CPU bring-up and IPIs): a
+ * uniprocessor platform need not have one.
+ */
 extern struct _gic_dev *gic;
+#endif /* CONFIG_HAVE_SMP */
 
 __uk_pcpuvar __u8 uk_plat_native_except_switch_stack;
 __uk_pcpuvar __uptr uk_plat_native_except_stack_base;
@@ -160,10 +167,15 @@ enum uk_plat_native_arm64_except_id esr_to_exception(__u64 esr)
 		return UK_PLAT_NATIVE_ARM64_EXCEPT_ID_BUS_ERROR;
 
 	case UK_ARCH_ARM64_ESR_EL1_EC_SVE_ASIMD_FP_ACC:
-	case UK_ARCH_ARM64_ESR_EL1_EC_SVE_ACC:
 	case UK_ARCH_ARM64_ESR_EL1_EC_FP64:
 		return UK_PLAT_NATIVE_ARM64_EXCEPT_ID_MATH;
 
+	/* SVE and SME stay disabled, so their instructions are invalid here,
+	 * as on Linux for a CPU or task without them: programs probe for them
+	 * and expect SIGILL (OpenSSL on musl does, at startup).
+	 */
+	case UK_ARCH_ARM64_ESR_EL1_EC_SVE_ACC:
+	case UK_ARCH_ARM64_ESR_EL1_EC_SME_ACC:
 	case UK_ARCH_ARM64_ESR_EL1_EC_UNKNOWN:
 	case UK_ARCH_ARM64_ESR_EL1_EC_ILL:
 		return UK_PLAT_NATIVE_ARM64_EXCEPT_ID_INVALID_OP;
@@ -264,11 +276,15 @@ int uk_plat_native_except_init(void)
 {
 	__uptr except_stack_base;
 	__u32 this_cpu_idx;
+#if CONFIG_HAVE_SMP
 	__u64 this_cpu_id;
 	__u64 boot_cpu_id;
 	int ret;
+#endif /* CONFIG_HAVE_SMP */
 
 	this_cpu_idx = uk_pcpuvar_current_get(uk_pcpuvar_cpu_idx);
+
+#if CONFIG_HAVE_SMP
 	this_cpu_id = uk_pcpuvar_current_get(uk_pcpuvar_cpu_id);
 
 	boot_cpu_id = uk_pcpuvar_lval(0, uk_pcpuvar_cpu_id);
@@ -279,6 +295,7 @@ int uk_plat_native_except_init(void)
 		if (unlikely(ret))
 			return ret;
 	}
+#endif /* CONFIG_HAVE_SMP */
 
 	/* Initialize this cpu's except stack base */
 
