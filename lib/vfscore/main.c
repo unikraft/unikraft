@@ -181,6 +181,7 @@ UK_LLSYSCALL_R_DEFINE(int, open, const char*, pathname, int, flags,
 int open(const char *pathname, int flags, ...)
 {
 	mode_t mode = 0;
+	int fd;
 
 	if (flags & O_CREAT) {
 		va_list ap;
@@ -190,7 +191,13 @@ int open(const char *pathname, int flags, ...)
 		va_end(ap);
 	}
 
-	return uk_syscall_do_open((long)pathname, flags, mode);
+	/* The raw call returns -errno; this is the libc function */
+	fd = uk_syscall_do_open((long)pathname, flags, mode);
+	if (fd < 0) {
+		errno = -fd;
+		return -1;
+	}
+	return fd;
 }
 
 #ifdef open64
@@ -253,6 +260,24 @@ int __xmknod(int ver, const char *pathname,
 UK_SYSCALL_R_DEFINE(int, mknod, const char*, pathname, mode_t, mode, dev_t, dev)
 {
 	return __xmknod_helper(0, pathname, mode, &dev);
+}
+
+/* The *at forms of the calls below have no legacy form on arm64 (mknodat,
+ * linkat, symlinkat, fchmodat, fchownat): each resolves its path against
+ * the directory fd, then does what the legacy call does.
+ */
+UK_SYSCALL_R_DEFINE(int, mknodat, int, dirfd, const char*, pathname,
+		    mode_t, mode, dev_t, dev)
+{
+	char path[PATH_MAX];
+	int error;
+
+	if (pathname == NULL)
+		return -ENOENT;
+	error = taskat_conv(main_task, dirfd, pathname, path);
+	if (error)
+		return -error;
+	return uk_syscall_do_mknod((long)path, (long)mode, (long)dev);
 }
 
 /**
@@ -1361,6 +1386,43 @@ UK_SYSCALL_R_DEFINE(int, symlink, const char*, oldpath, const char*, newpath)
 	return 0;
 }
 
+UK_SYSCALL_R_DEFINE(int, linkat, int, olddirfd, const char*, oldpath,
+		    int, newdirfd, const char*, newpath, int, flags)
+{
+	char path1[PATH_MAX];
+	char path2[PATH_MAX];
+	int error;
+
+	/* link() resolves oldpath as it always does; AT_EMPTY_PATH (a link
+	 * to an open file) is not supported.
+	 */
+	if (flags & ~AT_SYMLINK_FOLLOW)
+		return -EINVAL;
+	if (oldpath == NULL || newpath == NULL)
+		return -ENOENT;
+	error = taskat_conv(main_task, olddirfd, oldpath, path1);
+	if (!error)
+		error = taskat_conv(main_task, newdirfd, newpath, path2);
+	if (error)
+		return -error;
+	return uk_syscall_do_link((long)path1, (long)path2);
+}
+
+UK_SYSCALL_R_DEFINE(int, symlinkat, const char*, target, int, newdirfd,
+		    const char*, linkpath)
+{
+	char path[PATH_MAX];
+	int error;
+
+	if (target == NULL || linkpath == NULL)
+		return -ENOENT;
+	error = taskat_conv(main_task, newdirfd, linkpath, path);
+	if (error)
+		return -error;
+	/* The target is stored as given, not resolved */
+	return uk_syscall_do_symlink((long)target, (long)path);
+}
+
 UK_TRACEPOINT(trace_vfs_unlink, "\"%s\"", const char*);
 UK_TRACEPOINT(trace_vfs_unlink_ret, "");
 UK_TRACEPOINT(trace_vfs_unlink_err, "%d", int);
@@ -1916,7 +1978,15 @@ out_error:
 
 int euidaccess(const char *pathname, int mode)
 {
-	return uk_syscall_do_access((long) pathname, (long) mode);
+	int ret;
+
+	/* The raw call returns -errno; this is the libc function */
+	ret = uk_syscall_do_access((long) pathname, (long) mode);
+	if (ret < 0) {
+		errno = -ret;
+		return -1;
+	}
+	return ret;
 }
 
 __weak_alias(euidaccess,eaccess);
@@ -2219,6 +2289,54 @@ UK_SYSCALL_R_DEFINE(int, lchown, const char*, path, uid_t, owner, gid_t, group)
 {
 	UK_WARN_STUBBED();
 	return 0;
+}
+
+/* The system call has no flags (libc handles AT_SYMLINK_NOFOLLOW), unlike
+ * libc's fchmodat(), so only the system call is defined.
+ */
+UK_LLSYSCALL_R_DEFINE(int, fchmodat, int, dirfd, const char*, pathname,
+		      mode_t, mode)
+{
+	char path[PATH_MAX];
+	int error;
+
+	if (pathname == NULL)
+		return -ENOENT;
+	error = taskat_conv(main_task, dirfd, pathname, path);
+	if (error)
+		return -error;
+	return uk_syscall_do_chmod((long)path, (long)mode);
+}
+
+UK_SYSCALL_R_DEFINE(int, fchownat, int, dirfd, const char*, pathname,
+		    uid_t, owner, gid_t, group, int, flags)
+{
+	struct vfscore_file *fp;
+	char path[PATH_MAX];
+	int error;
+
+	if (flags & ~(AT_SYMLINK_NOFOLLOW | AT_EMPTY_PATH))
+		return -EINVAL;
+	if (pathname == NULL)
+		return -ENOENT;
+	/* chown() and lchown() are stubs that never look the file up, so
+	 * only resolving dirfd and the path can fail here
+	 */
+	if (pathname[0] == '\0' && (flags & AT_EMPTY_PATH)) {
+		error = fget(dirfd, &fp);
+		if (error)
+			return -error;
+		fdrop(fp);
+		UK_WARN_STUBBED();
+		return 0;
+	}
+	error = taskat_conv(main_task, dirfd, pathname, path);
+	if (error)
+		return -error;
+	if (flags & AT_SYMLINK_NOFOLLOW)
+		return uk_syscall_do_lchown((long)path, (long)owner,
+					    (long)group);
+	return uk_syscall_do_chown((long)path, (long)owner, (long)group);
 }
 
 #if UK_LIBC_SYSCALLS
