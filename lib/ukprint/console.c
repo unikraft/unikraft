@@ -21,7 +21,6 @@
 
 #if CONFIG_LIBUKCONSOLE
 #include <uk/console.h>
-#include <errno.h>
 #endif /* CONFIG_LIBUKCONSOLE */
 
 #include "print.h"
@@ -79,89 +78,17 @@ struct vprint_console {
 
 /* Kernel messages are diagnostics: they go to the consoles' error stream
  * (uk_console_err()), kept apart from a program's standard output where a
- * console can.
+ * console can.  Newlines become CR-LF where CONFIG_LIBUKCONSOLE_ONLCR asks
+ * for it, unless this library is set to write them as they are.
  */
 #if CONFIG_LIBUKCONSOLE
-#if !CONFIG_LIBUKPRINT_NOCARRIAGERETURN
-/* TODO: Some consoles require both a newline and a carriage return to
- * go to the start of the next line. This kind of behavior should be in
- * a single place in posix-tty. We keep this workaround until we have feature
- * in posix-tty that handles newline characters correctly.
- */
-static __ssz console_out(const char *buf, __sz len)
-{
-	const char *next_nl = __NULL;
-	__sz l = len;
-	__sz off = 0;
-	__ssz rc = 0;
-
-	if (unlikely(!len))
-		return 0;
-	if (unlikely(!buf))
-		return -EINVAL;
-
-	while (l > 0) {
-		next_nl = memchr(buf, '\n', l);
-		if (next_nl) {
-			off = next_nl - buf;
-			if ((rc = uk_console_err(buf, off)) < 0)
-				return rc;
-			if ((rc = uk_console_err("\r\n", 2)) < 0)
-				return rc;
-			buf = next_nl + 1;
-			l -= off + 1;
-		} else {
-			if ((rc = uk_console_err(buf, l)) < 0)
-				return rc;
-			break;
-		}
-	}
-
-	return len;
-}
-
-__isr static __ssz console_out_isr(const char *buf, __sz len)
-{
-	const char *next_nl = __NULL;
-	__sz l = len;
-	__sz off = 0;
-	__ssz rc = 0;
-
-	if (unlikely(!len))
-		return 0;
-	if (unlikely(!buf))
-		return -EINVAL;
-
-	while (l > 0) {
-		next_nl = memchr_isr(buf, '\n', l);
-		if (next_nl) {
-			off = next_nl - buf;
-			if ((rc = uk_console_emerg_out(buf, off)) < 0)
-				return rc;
-			if ((rc = uk_console_emerg_out("\r\n", 2)) < 0)
-				return rc;
-			buf = next_nl + 1;
-			l -= off + 1;
-		} else {
-			if ((rc = uk_console_emerg_out(buf, l)) < 0)
-				return rc;
-			break;
-		}
-	}
-
-	return len;
-}
-#else /* CONFIG_LIBUKPRINT_NOCARRIAGERETURN */
-static __ssz console_out(const char *buf, __sz len)
-{
-	return uk_console_err(buf, len);
-}
-
-__isr static __ssz console_out_isr(const char *buf, __sz len)
-{
-	return uk_console_emerg_out(buf, len);
-}
-#endif /* CONFIG_LIBUKPRINT_NOCARRIAGERETURN */
+#if CONFIG_LIBUKPRINT_NOCARRIAGERETURN
+#define console_out		uk_console_err
+#define console_out_isr		uk_console_emerg_out
+#else /* !CONFIG_LIBUKPRINT_NOCARRIAGERETURN */
+#define console_out		uk_console_err_onlcr
+#define console_out_isr		uk_console_emerg_out_onlcr
+#endif /* !CONFIG_LIBUKPRINT_NOCARRIAGERETURN */
 #endif /* CONFIG_LIBUKCONSOLE */
 
 /* Console state for kernel output */
@@ -185,6 +112,45 @@ static struct vprint_console kconsole_isr  = {
 	.newline = 1,
 	.prevlvl = INT_MIN
 };
+
+/* How much of @buf[0..@len) to send so its end does not cut a UTF-8
+ * sequence: a cut message then ends in whole characters, not in a broken
+ * one that the console shows as garbage or rejects.
+ */
+__isr static __sz utf8_whole(const char *buf, __sz len)
+{
+	__sz i = len;
+	unsigned char lead;
+	__sz n;
+
+	/* A sequence is at most 4 bytes: its lead is at most 3 back */
+	while (i > 0 && len - i < 3 &&
+	       ((unsigned char)buf[i - 1] & 0xC0) == 0x80)
+		i--;
+	if (i == 0)
+		return len;
+	lead = (unsigned char)buf[i - 1];
+	if (lead < 0xC0)
+		return len;
+	n = (lead >= 0xF0) ? 4 : (lead >= 0xE0) ? 3 : 2;
+	return (len - (i - 1) < n) ? i - 1 : len;
+}
+
+/* The uk_vsnprintf() of a message returned @len, the length it wanted, into
+ * a buffer of BUFLEN: how much of @buf to print.  A cut message ends at a
+ * whole character, and its line ends, or the next message joins it; a raw
+ * piece's caller ends its own.
+ */
+__isr static int msg_len(char *buf, int len, int raw)
+{
+	if (len < BUFLEN)
+		return len;
+
+	len = (int)utf8_whole(buf, raw ? BUFLEN - 1 : BUFLEN - 2);
+	if (!raw && (!len || buf[len - 1] != '\n'))
+		buf[len++] = '\n';
+	return len;
+}
 
 static inline void vprint_cout(struct vprint_console *cons,
 			       const char *buf, __sz len)
@@ -245,8 +211,13 @@ static void print_thread(struct vprint_console *cons)
 
 	if (t) {
 		if (t->name) {
+			/* A long name is cut, at a whole character, so the
+			 * tag still closes and only the buffer is printed
+			 */
+			len = (int)utf8_whole(t->name,
+					      strnlen(t->name, BUFLEN / 2));
 			len = uk_snprintf(buf, BUFLEN, LVLC_RESET LVLC_THREAD
-					  "<%s> ", t->name);
+					  "<%.*s> ", len, t->name);
 		} else {
 			len = uk_snprintf(buf, BUFLEN, LVLC_RESET LVLC_THREAD
 					  "<%p> ", (void *)t);
@@ -269,9 +240,13 @@ __isr static void print_thread_isr(struct vprint_console *cons)
 
 	if (t) {
 		if (t->name) {
+			/* A long name is cut (see print_thread()) */
+			len = (int)utf8_whole(t->name,
+					      strnlen_isr(t->name,
+							  BUFLEN / 2));
 			len = uk_snprintf_isr(buf,
 					      BUFLEN, LVLC_RESET LVLC_THREAD
-					      "<%s> ", t->name);
+					      "<%.*s> ", len, t->name);
 		} else {
 			len = uk_snprintf_isr(buf,
 					      BUFLEN, LVLC_RESET LVLC_THREAD
@@ -363,6 +338,7 @@ void uk_print_console_write(struct uk_print_msg *msg)
 	}
 
 	len = uk_vsnprintf(lbuf, BUFLEN, msg->fmt, msg->ap);
+	len = msg_len(lbuf, len, raw);
 	lptr = lbuf;
 	while (len > 0) {
 		if (cons->newline && !raw) {
@@ -496,6 +472,7 @@ __isr void uk_print_console_write_isr(struct uk_print_msg *msg)
 
 	len = uk_vsnprintf_isr(lbuf, BUFLEN, msg->fmt,
 			       msg->ap);
+	len = msg_len(lbuf, len, raw);
 	lptr = lbuf;
 	while (len > 0) {
 		if (cons->newline && !raw) {
