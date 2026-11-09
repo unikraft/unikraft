@@ -144,10 +144,26 @@ static inline int *to_eof(const struct uk_file *f)
 }
 #endif /* CONFIG_LIBUKFILE_CONSOLE_IN_EOF_FINAL */
 
-/* How a write to @f reaches its console: uk_console_[out|err]_direct */
+/*
+ * Writes to a console device, each newline as CR-LF where
+ * CONFIG_LIBUKCONSOLE_ONLCR asks for it, unless this library is set to
+ * write them as they are.  Either way a write stops at the first partial
+ * one and returns how much of the buffer went out (see
+ * uk_console_out_direct_onlcr()), so an async TX path resumes where the
+ * queue filled.
+ */
+#if CONFIG_LIBUKFILE_CONSOLE_OUT_NOCARRIAGERETURN
+#define consf_out_direct uk_console_out_direct
+#define consf_err_direct uk_console_err_direct
+#else /* !CONFIG_LIBUKFILE_CONSOLE_OUT_NOCARRIAGERETURN */
+#define consf_out_direct uk_console_out_direct_onlcr
+#define consf_err_direct uk_console_err_direct_onlcr
+#endif /* !CONFIG_LIBUKFILE_CONSOLE_OUT_NOCARRIAGERETURN */
+
+/* How a write to @f reaches its console */
 static inline uk_console_out_func consf_writer(const struct uk_file *f)
 {
-	return to_consf(f)->err ? uk_console_err_direct : uk_console_out_direct;
+	return to_consf(f)->err ? consf_err_direct : consf_out_direct;
 }
 
 /* Whether input read from @f is echoed to the console */
@@ -155,130 +171,6 @@ static inline int consf_echo(const struct uk_file *f)
 {
 	return to_termios(f)->c_lflag & ECHO;
 }
-
-#if CONFIG_LIBUKFILE_CONSOLE_OUT_NOCARRIAGERETURN
-static inline __ssz _console_out(uk_console_out_func w, struct uk_console *cons,
-				 const char *buf, __sz len)
-{
-	return w(cons, buf, len);
-}
-#else /* !CONFIG_LIBUKFILE_CONSOLE_OUT_NOCARRIAGERETURN */
-/* TODO: Some consoles require both a newline and a carriage return to
- * go to the start of the next line. This kind of behavior should be in
- * a single place in posix-tty. We keep this workaround until we have feature
- * in posix-tty that handles newline characters correctly.
- */
-static inline __ssz _console_out(uk_console_out_func w, struct uk_console *cons,
-				 const char *buf, __sz len)
-{
-	const char *next_nl = NULL;
-	__sz l = len;
-	__sz off = 0;
-	__ssz rc = 0;
-
-	if (unlikely(!len))
-		return 0;
-	if (unlikely(!buf))
-		return -EINVAL;
-
-	while (l > 0) {
-		next_nl = memchr(buf, '\n', l);
-		if (next_nl) {
-			off = next_nl - buf;
-
-			if ((rc = w(cons, buf, off)) < 0)
-				return rc;
-			if ((rc = w(cons, "\r\n", 2)) < 0)
-				return rc;
-			buf = next_nl + 1;
-			l -= off + 1;
-		} else {
-			if ((rc = w(cons, buf, l)) < 0)
-				return rc;
-			break;
-		}
-	}
-
-	return len;
-}
-#endif /* !CONFIG_LIBUKFILE_CONSOLE_OUT_NOCARRIAGERETURN */
-
-/*
- * Non-blocking single-shot output helper for async TX paths.
- *
- * Unlike _console_out (which uses uk_console_out_direct_all and blocks until
- * every byte is delivered), this helper calls @w once per
- * segment and returns immediately if the TX queue is full (rc == 0).
- *
- * Returns the number of bytes from the original @buf that were consumed
- * (not counting injected CR bytes), 0 if the queue is full at the very
- * first attempt, or < 0 on a hard error.
- */
-#if CONFIG_LIBUKFILE_CONSOLE_OUT_NOCARRIAGERETURN
-static inline __ssz _console_out_nb(uk_console_out_func w,
-				    struct uk_console *cons,
-				    const char *buf, __sz len)
-{
-	return w(cons, buf, len);
-}
-#else /* !CONFIG_LIBUKFILE_CONSOLE_OUT_NOCARRIAGERETURN */
-static inline __ssz _console_out_nb(uk_console_out_func w,
-				    struct uk_console *cons,
-				    const char *buf, __sz len)
-{
-	const char *next_nl;
-	__sz consumed = 0;
-	__sz l = len, seg;
-	__ssz rc;
-
-	if (unlikely(!len))
-		return 0;
-	if (unlikely(!buf))
-		return -EINVAL;
-
-	while (l > 0) {
-		next_nl = memchr(buf, '\n', l);
-		if (next_nl) {
-			seg = (__sz)(next_nl - buf);
-
-			if (seg > 0) {
-				rc = w(cons, buf, seg);
-				if (rc == 0)
-					return (__ssz)consumed;
-				if (unlikely(rc < 0))
-					return rc;
-				consumed += (__sz)rc;
-				if ((__sz)rc < seg)
-					return (__ssz)consumed;
-			}
-
-			/* Inject \r\n; if the queue is full here the original
-			 * '\n' is treated as not yet consumed so the caller
-			 * retries from it on the next writable wakeup.
-			 */
-			rc = w(cons, "\r\n", 2);
-			if (rc == 0)
-				return (__ssz)consumed;
-			if (unlikely(rc < 0))
-				return rc;
-
-			consumed++;   /* advance past the original '\n' */
-			buf = next_nl + 1;
-			l -= seg + 1;
-		} else {
-			rc = w(cons, buf, l);
-			if (rc == 0)
-				return (__ssz)consumed;
-			if (unlikely(rc < 0))
-				return rc;
-			consumed += (__sz)rc;
-			break;
-		}
-	}
-
-	return (__ssz)consumed;
-}
-#endif /* !CONFIG_LIBUKFILE_CONSOLE_OUT_NOCARRIAGERETURN */
 
 static ssize_t serial_read(const struct uk_file *f,
 			   const struct iovec *iov, size_t iovcnt,
@@ -339,8 +231,7 @@ static ssize_t serial_read(const struct uk_file *f,
 			uk_file_event_clear(f, UKFD_POLLIN);
 #endif /* !CONFIG_LIBUKFILE_CONSOLE_IN_EOF_FINAL */
 			if (bytes_read > 1 && consf_echo(f))
-				_console_out(uk_console_out_direct, cons, buf,
-					     bytes_read - 1);
+				consf_out_direct(cons, buf, bytes_read - 1);
 			break;
 		}
 
@@ -348,8 +239,7 @@ static ssize_t serial_read(const struct uk_file *f,
 		 * program turned ECHO off to do its own
 		 */
 		if (consf_echo(f))
-			_console_out(uk_console_out_direct, cons, buf,
-				     bytes_read);
+			consf_out_direct(cons, buf, bytes_read);
 
 		if (*last == '\n')
 			break;
@@ -461,8 +351,7 @@ static ssize_t serial_read_async(const struct uk_file *f,
 
 		/* Echo only the bytes actually read, not the full iov len. */
 		if (rc && consf_echo(f))
-			_console_out(uk_console_out_direct, cons, buf,
-				     (__sz)rc);
+			consf_out_direct(cons, buf, (__sz)rc);
 
 		if (eot || *last == '\n')
 			break;
@@ -490,16 +379,19 @@ static ssize_t serial_write(const struct uk_file *f,
 	for (size_t i = 0; i < iovcnt; i++) {
 		char *buf = iov[i].iov_base;
 		size_t len = iov[i].iov_len;
-		int bytes_written;
+		__ssz bytes_written;
 
 		if (unlikely(!buf && len))
 			return  -EFAULT;
 
-		bytes_written = _console_out(consf_writer(f), cons, buf, len);
+		bytes_written = consf_writer(f)(cons, buf, len);
 		if (unlikely(bytes_written < 0))
 			return bytes_written;
 
 		total += bytes_written;
+		/* A partial write: the caller writes the rest */
+		if ((__sz)bytes_written < len)
+			break;
 	}
 
 	return total;
@@ -512,7 +404,7 @@ static ssize_t serial_write(const struct uk_file *f,
  * ready.  UKFD_POLLOUT is not pre-set at file creation time; instead the
  * evmon thread sets it when the driver's TX completion interrupt fires.
  *
- * If the TX queue becomes full mid-write (_console_out_nb returns 0),
+ * If the TX queue becomes full mid-write (a partial write),
  * UKFD_POLLOUT is cleared so the caller blocks until the next TX completion
  * interrupt re-sets it via the async callback.
  */
@@ -541,7 +433,7 @@ static ssize_t serial_write_async(const struct uk_file *f,
 		if (unlikely(!buf && len))
 			return -EFAULT;
 
-		rc = _console_out_nb(consf_writer(f), cons, buf, len);
+		rc = consf_writer(f)(cons, buf, len);
 		if (unlikely(rc < 0))
 			return (ssize_t)rc;
 
