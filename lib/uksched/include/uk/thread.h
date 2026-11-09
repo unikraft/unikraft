@@ -173,6 +173,13 @@ bool uk_thread_in_waitq(struct uk_thread *thread)
  *  present in the run queue.
  */
 #define UK_THREADF_QUEUEABLE  (0x020)
+/*
+ *  A flag asking a thread to end its waits: blocking calls that check it
+ *  return early (EINTR), so the thread leaves its system call the way it
+ *  would on its own.  Set and cleared by whoever ends threads early (a
+ *  signal that terminates the process).
+ */
+#define UK_THREADF_INTERRUPT  (0x040)
 
 #define uk_thread_is_exited(t)   ((t)->flags & UK_THREADF_EXITED)
 #define uk_thread_is_runnable(t) (!uk_thread_is_exited(t) \
@@ -190,6 +197,11 @@ bool uk_thread_in_waitq(struct uk_thread *thread)
 	do { (t)->flags |= UK_THREADF_QUEUEABLE; } while (0)
 #define uk_thread_clear_queueable(t) \
 	do { (t)->flags &= ~UK_THREADF_QUEUEABLE; } while (0)
+#define uk_thread_is_interrupted(t) ((t)->flags & UK_THREADF_INTERRUPT)
+#define uk_thread_set_interrupted(t) \
+	do { (t)->flags |= UK_THREADF_INTERRUPT; } while (0)
+#define uk_thread_clear_interrupted(t) \
+	do { (t)->flags &= ~UK_THREADF_INTERRUPT; } while (0)
 /* NOTE: Setting a thread as EXITED cannot be undone. */
 /* NOTE: Never change the EXIT flag manually. Trnasition to exit state reqiures
  * the terminate funcrtiomns to be called.

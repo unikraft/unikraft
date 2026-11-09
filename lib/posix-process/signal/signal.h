@@ -199,6 +199,11 @@ struct uk_signal_pdesc {
  */
 struct uk_signal_tdesc {
 	uk_sigset_t mask;
+	/* The mask sigsuspend() replaced, put back once the signals it
+	 * waited for are delivered (see uk_signal_deliver())
+	 */
+	uk_sigset_t sigsuspend_saved;
+	__bool sigsuspend_restore;
 	uk_sigset_t sigwait_set;
 	struct uk_signal_queue sigqueue;
 	struct uk_semaphore deliver_semaphore;
@@ -209,7 +214,12 @@ struct uk_signal_tdesc {
 struct sys_error_desc {
 	int signum;
 	__uptr auxsp;
-	__vaddr_t vaddr;
+	__vaddr_t vaddr;	/* The fault address of a memory access */
+	__vaddr_t pc;		/* The faulting instruction */
+	__vaddr_t sp;		/* The stack pointer at the fault */
+#if CONFIG_ARCH_ARM_64
+	__u64 esr;		/* What faulted, for the siginfo code */
+#endif /* CONFIG_ARCH_ARM_64 */
 };
 
 /* Allocate signal descriptor of a posix process */
@@ -280,8 +290,24 @@ struct uk_signal *pprocess_signal_next_pending_t(struct posix_thread *pthread);
 /* Signal a process (abstraction for kill / sigqueueinfo) */
 int pprocess_signal_process_do(pid_t pid, int signum, siginfo_t *siginfo);
 
+/* Make the other threads of @pproc, which a signal ends, leave the system
+ * calls they are blocked in (UK_THREADF_INTERRUPT)
+ */
+void pprocess_signal_interrupt(struct posix_process *pproc);
+
 /* Signal a thread (abstraction for kill / sigqueueinfo) */
 int pprocess_signal_thread_do(int tid, int signum, siginfo_t *siginfo);
+
+/* pause() and sigsuspend(): sleep until a signal @pthread takes is
+ * queued, unless one already is
+ */
+void pthread_signal_pause(struct posix_thread *pthread);
+
+/* Signal @parent that a child exits, with @signum, the child's exit
+ * signal: as kill() would (dropped if ignored and blocked by no thread,
+ * init spared, a signal that ends @parent ends it)
+ */
+int pprocess_signal_notify_parent(struct posix_process *parent, int signum);
 
 /* Signal a process */
 int pprocess_signal_send(struct posix_process *proc, int signum,

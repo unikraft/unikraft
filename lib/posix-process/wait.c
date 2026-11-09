@@ -32,16 +32,31 @@ struct posix_process *pprocess_state_changed(struct posix_process *pproc,
 	return (PPROCESS_STATE_CHANGED(pproc, state)) ? pproc : NULL;
 }
 
+/* A child of @pgid (any child for 0) whose state changed */
 static inline
-struct posix_process *pprocess_child_state_changed(int state)
+struct posix_process *pprocess_child_state_changed(pid_t pgid, int state)
 {
 	struct posix_process *pchild, *pchildn;
 	struct posix_process *pproc;
 
-	uk_pprocess_foreach_child(uk_pprocess_current(), pchild, pchildn)
+	uk_pprocess_foreach_child(uk_pprocess_current(), pchild, pchildn) {
+		if (pgid && pchild->pgid != pgid)
+			continue;
 		if ((pproc = pprocess_state_changed(pchild, state)))
 			return pproc;
+	}
 	return NULL;
+}
+
+static bool pprocess_has_child_in(struct posix_process *pproc, pid_t pgid)
+{
+	struct posix_process *pchild, *pchildn;
+
+	uk_pprocess_foreach_child(pproc, pchild, pchildn) {
+		if (pchild->pgid == pgid)
+			return true;
+	}
+	return false;
 }
 
 static int pprocess_reap(struct posix_process *pprocess, siginfo_t *si)
@@ -66,7 +81,10 @@ static int pprocess_reap(struct posix_process *pprocess, siginfo_t *si)
  * @param opt: same as waitid()
  * @return child pid, zero if no waitable, negative value on error
  */
-static int pprocess_wait(pid_t pid, siginfo_t *si, int opt)
+/* Wait for the child @pid, or with @pid -1 for any child of the
+ * process group @pgid (any child at all for 0).
+ */
+static int pprocess_wait(pid_t pid, pid_t pgid, siginfo_t *si, int opt)
 {
 	struct posix_process *this_process;
 	struct posix_thread *this_thread;
@@ -84,6 +102,9 @@ static int pprocess_wait(pid_t pid, siginfo_t *si, int opt)
 	UK_ASSERT(this_process);
 
 	if (uk_list_empty(&this_process->children))
+		return -ECHILD;
+
+	if (pid == -1 && pgid && !pprocess_has_child_in(this_process, pgid))
 		return -ECHILD;
 
 	this_thread->state = POSIX_THREAD_BLOCKED_WAIT;
@@ -107,8 +128,10 @@ static int pprocess_wait(pid_t pid, siginfo_t *si, int opt)
 		}
 
 		this_thread->wait_pid = pid;
-	} else { /* any */
+		this_thread->wait_pgid = 0;
+	} else { /* any, of pgid if set */
 		this_thread->wait_pid = -1;
+		this_thread->wait_pgid = pgid;
 	}
 
 	for (;;) {
@@ -116,10 +139,19 @@ static int pprocess_wait(pid_t pid, siginfo_t *si, int opt)
 		 * the state change happened to a different child, so we
 		 * loop back to the semaphore.
 		 */
-		if (pid > 0)
+		if (pid > 0) {
+			/* Again each time: another thread of this process
+			 * may have reaped (and freed) it while this one slept
+			 */
+			child = pid2pprocess(pid);
+			if (!child || child->parent != this_process) {
+				ret = -ECHILD;
+				break;
+			}
 			waitable = pprocess_state_changed(child, opt);
+		}
 		else /* any */
-			waitable = pprocess_child_state_changed(opt);
+			waitable = pprocess_child_state_changed(pgid, opt);
 
 		if (waitable) {
 			ret = waitable->pid;
@@ -135,6 +167,22 @@ static int pprocess_wait(pid_t pid, siginfo_t *si, int opt)
 
 		/* Wait for a state change on one of our children */
 		uk_semaphore_down(&this_thread->process->wait_semaphore);
+
+		/* Asked to end its waits (a signal ends the process) */
+		if (uk_thread_is_interrupted(uk_thread_current())) {
+			ret = -EINTR;
+			break;
+		}
+
+		/* The last child may be gone (reaped by another thread), or
+		 * the group's last child may have left it (setpgid(2))
+		 */
+		if (pid == -1 &&
+		    (uk_list_empty(&this_process->children) ||
+		     (pgid && !pprocess_has_child_in(this_process, pgid)))) {
+			ret = -ECHILD;
+			break;
+		}
 	}
 
 out:
@@ -153,10 +201,13 @@ UK_SYSCALL_R_DEFINE(pid_t, wait4, pid_t, pid,
 		if (unlikely(!(options & (WNOHANG | WUNTRACED | WCONTINUED))))
 			return -EINVAL;
 
-	if (pid < -1 || pid == 0) /* process groups */
-		return -ENOTSUP;
-
-	ret = pprocess_wait(pid, &si, options | WEXITED);
+	if (pid == 0) /* the caller's process group */
+		ret = pprocess_wait(-1, uk_pprocess_current()->pgid, &si,
+				    options | WEXITED);
+	else if (pid < -1) /* process group -pid */
+		ret = pprocess_wait(-1, -pid, &si, options | WEXITED);
+	else
+		ret = pprocess_wait(pid, 0, &si, options | WEXITED);
 
 	if (ret > 0 && wstatus) {
 		if (si.si_status == CLD_KILLED)
@@ -181,13 +232,22 @@ UK_LLSYSCALL_R_DEFINE(int, waitid, idtype_t, idtype, id_t, id,
 
 	switch (idtype) {
 	case P_PID:
-		ret = pprocess_wait(id, infop, options);
+		if ((pid_t)id <= 0)
+			return -EINVAL;
+		ret = pprocess_wait(id, 0, infop, options);
+		break;
+	case P_PGID:
+		/* Since Linux 5.4, 0 means the caller's process group */
+		if ((pid_t)id < 0)
+			return -EINVAL;
+		ret = pprocess_wait(-1, id ? (pid_t)id
+					   : uk_pprocess_current()->pgid,
+				    infop, options);
 		break;
 	case P_PIDFD:
-	case P_PGID:
 		return -ENOTSUP;
 	case P_ALL:
-		ret = pprocess_wait(-1, infop, options);
+		ret = pprocess_wait(-1, 0, infop, options);
 		break;
 	default:
 		return -EINVAL;

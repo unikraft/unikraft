@@ -351,6 +351,10 @@ const struct uk_file *uk_socket_accept(const struct uk_file *sock, int blocking,
 		if (!blocking ||
 		    !PTRISERR(new_data) || !_ERR_BLOCK(PTR2ERR(new_data)))
 			break;
+		if (uk_thread_is_interrupted(uk_thread_current())) {
+			new_data = ERR2PTR(-EINTR);
+			break;
+		}
 		(void)uk_file_poll(sock, UKFD_POLLIN);
 	}
 	if (unlikely(PTRISERR(new_data))) {
@@ -686,11 +690,19 @@ UK_SYSCALL_R_DEFINE(int, connect, int, sock, const struct sockaddr *, addr,
 		socklen_t _opsz = sizeof(ret);
 
 		(void)uk_file_poll(of->file, UKFD_POLLOUT | UKFD_POLL_ALWAYS);
-		/* Get err status from getsockopt */
-		uk_file_rlock(of->file);
-		posix_socket_getsockopt(of->file, SOL_SOCKET, SO_ERROR,
-					&ret, &_opsz);
-		uk_file_runlock(of->file);
+		if (uk_thread_is_interrupted(uk_thread_current())) {
+			/* Still connecting: no status to read yet */
+			ret = -EINTR;
+		} else {
+			/* Get err status from getsockopt */
+			uk_file_rlock(of->file);
+			posix_socket_getsockopt(of->file, SOL_SOCKET,
+						SO_ERROR, &ret, &_opsz);
+			uk_file_runlock(of->file);
+			/* SO_ERROR is an errno; connect() returns -errno */
+			if (ret > 0)
+				ret = -ret;
+		}
 	}
 	uk_ofile_release(of);
 
@@ -777,6 +789,10 @@ UK_SYSCALL_R_DEFINE(ssize_t, recvfrom, int, sock, void *, buf, size_t, len,
 		    (flags & MSG_DONTWAIT) ||
 		    !_ERR_BLOCK(ret))
 			break;
+		if (uk_thread_is_interrupted(uk_thread_current())) {
+			ret = -EINTR;
+			break;
+		}
 		(void)uk_file_poll(of->file, UKFD_POLLIN);
 	}
 	uk_ofile_release(of);
@@ -828,6 +844,10 @@ UK_SYSCALL_R_DEFINE(ssize_t, recvmsg, int, sock, struct msghdr *, msg,
 		    (flags & MSG_DONTWAIT) ||
 		    !_ERR_BLOCK(ret))
 			break;
+		if (uk_thread_is_interrupted(uk_thread_current())) {
+			ret = -EINTR;
+			break;
+		}
 		(void)uk_file_poll(of->file, UKFD_POLLIN);
 	}
 	uk_ofile_release(of);
@@ -872,6 +892,10 @@ UK_SYSCALL_R_DEFINE(ssize_t, sendmsg, int, sock, const struct msghdr *, msg,
 		    (flags & MSG_DONTWAIT) ||
 		    !_ERR_BLOCK(ret))
 			break;
+		if (uk_thread_is_interrupted(uk_thread_current())) {
+			ret = -EINTR;
+			break;
+		}
 		(void)uk_file_poll(of->file, UKFD_POLLOUT);
 	}
 	uk_ofile_release(of);
@@ -919,6 +943,10 @@ UK_SYSCALL_R_DEFINE(ssize_t, sendto, int, sock, const void *, buf, size_t, len,
 		    (flags & MSG_DONTWAIT) ||
 		    !_ERR_BLOCK(ret))
 			break;
+		if (uk_thread_is_interrupted(uk_thread_current())) {
+			ret = -EINTR;
+			break;
+		}
 		(void)uk_file_poll(of->file, UKFD_POLLOUT);
 	}
 	uk_ofile_release(of);
