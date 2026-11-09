@@ -109,6 +109,10 @@ struct consolefd_alloc {
 	 * an interactive shell's line editor, say.
 	 */
 	struct termios termios;
+#if CONFIG_LIBUKFILE_CONSOLE_IN_EOF_FINAL
+	/* The console reached the end of its input, for good */
+	int eof;
+#endif /* CONFIG_LIBUKFILE_CONSOLE_IN_EOF_FINAL */
 	/* Mutex to synchronize file read/write event management */
 	struct uk_mutex mtx;
 };
@@ -123,6 +127,14 @@ static inline struct termios *to_termios(const struct uk_file *f)
 {
 	return &to_consf(f)->termios;
 }
+
+#if CONFIG_LIBUKFILE_CONSOLE_IN_EOF_FINAL
+/* Whether the console behind @f reached the end of its input */
+static inline int *to_eof(const struct uk_file *f)
+{
+	return &to_consf(f)->eof;
+}
+#endif /* CONFIG_LIBUKFILE_CONSOLE_IN_EOF_FINAL */
 
 /* Whether input read from @f is echoed to the console */
 static inline int consf_echo(const struct uk_file *f)
@@ -265,6 +277,11 @@ static ssize_t serial_read(const struct uk_file *f,
 	if (unlikely(off))
 		return -ESPIPE;
 
+#if CONFIG_LIBUKFILE_CONSOLE_IN_EOF_FINAL
+	if (*to_eof(f))
+		return 0;
+#endif /* CONFIG_LIBUKFILE_CONSOLE_IN_EOF_FINAL */
+
 	if (!uk_file_poll_immediate(f, UKFD_POLLIN))
 		return 0;
 
@@ -290,12 +307,21 @@ static ssize_t serial_read(const struct uk_file *f,
 			*last = '\n';
 
 		/* EOT (^D) ends the input. Strip it from the data, as a
-		 * terminal does, and clear POLLIN so the next read returns 0,
-		 * the end of file.
+		 * terminal does, and have the next read return 0, the end of
+		 * file: by clearing POLLIN or, with
+		 * CONFIG_LIBUKFILE_CONSOLE_IN_EOF_FINAL, by remembering it.
 		 */
 		if (*last == SERIAL_EOT) {
 			total--;
+#if CONFIG_LIBUKFILE_CONSOLE_IN_EOF_FINAL
+			/* No more input will come: the file stays readable,
+			 * as a file or a pipe at its end does, so poll() and
+			 * select() report the end of file a read returns.
+			 */
+			*to_eof(f) = 1;
+#else /* !CONFIG_LIBUKFILE_CONSOLE_IN_EOF_FINAL */
 			uk_file_event_clear(f, UKFD_POLLIN);
+#endif /* !CONFIG_LIBUKFILE_CONSOLE_IN_EOF_FINAL */
 			if (bytes_read > 1 && consf_echo(f))
 				_console_out(cons, buf, bytes_read - 1);
 			break;
@@ -311,6 +337,11 @@ static ssize_t serial_read(const struct uk_file *f,
 			break;
 	}
 
+#if CONFIG_LIBUKFILE_CONSOLE_IN_EOF_FINAL
+	/* POLLIN stays set at the end, so it cannot mean "try again" */
+	if (*to_eof(f))
+		return total;
+#endif /* CONFIG_LIBUKFILE_CONSOLE_IN_EOF_FINAL */
 	if (total || !uk_file_poll_immediate(f, UKFD_POLLIN))
 		return total;
 	else
@@ -347,6 +378,13 @@ static ssize_t serial_read_async(const struct uk_file *f,
 	consf = to_consf(f);
 
 	uk_mutex_lock(&consf->mtx);
+
+#if CONFIG_LIBUKFILE_CONSOLE_IN_EOF_FINAL
+	if (*to_eof(f)) {
+		uk_mutex_unlock(&consf->mtx);
+		return 0;
+	}
+#endif /* CONFIG_LIBUKFILE_CONSOLE_IN_EOF_FINAL */
 
 	/* The previous read ended at an EOT: this one is the end of file */
 	if (consf->eot) {
@@ -393,8 +431,14 @@ static ssize_t serial_read_async(const struct uk_file *f,
 			eot = 1;
 			total--;
 			rc--;
+#if CONFIG_LIBUKFILE_CONSOLE_IN_EOF_FINAL
+			/* For good: readable from now on, at its end */
+			*to_eof(f) = 1;
+			uk_file_event_set(f, UKFD_POLLIN);
+#else /* !CONFIG_LIBUKFILE_CONSOLE_IN_EOF_FINAL */
 			if (total)
 				consf->eot = 1;
+#endif /* !CONFIG_LIBUKFILE_CONSOLE_IN_EOF_FINAL */
 		}
 
 		/* Echo only the bytes actually read, not the full iov len. */
@@ -696,6 +740,9 @@ const struct uk_file *uk_file_console_create(struct uk_console *cons)
 	consf->a = uk_alloc_get_default();
 	consf->pending_events = 0;
 	consf->eot = 0;
+#if CONFIG_LIBUKFILE_CONSOLE_IN_EOF_FINAL
+	consf->eof = 0;
+#endif /* CONFIG_LIBUKFILE_CONSOLE_IN_EOF_FINAL */
 	consf->termios = (struct termios){
 		.c_iflag = SERIAL_TERMIOS_IFLAGS,
 		.c_oflag = SERIAL_TERMIOS_OFLAGS,

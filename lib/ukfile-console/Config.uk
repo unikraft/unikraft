@@ -12,4 +12,16 @@ config LIBUKFILE_CONSOLE_OUT_NOCARRIAGERETURN
 config LIBUKFILE_CONSOLE_IN_NOECHOBACK
 	bool "Serial input: no echo back"
 
+config LIBUKFILE_CONSOLE_IN_EOF_FINAL
+	bool "Serial input: end of input is final"
+	help
+	  Treat an end of input (EOT, ^D) from a console as the end of its
+	  input for good, as it is where console input is a host buffer
+	  drained once: the console file then stays readable to poll() and
+	  select(), and every read() returns 0 at once, as for the end of a
+	  file or a pipe.  Without it an EOT ends one read, as on an
+	  interactive terminal, and the file reports no input until more
+	  arrives: a program that polls it after the end then waits for
+	  input that may never come.
+
 endif
