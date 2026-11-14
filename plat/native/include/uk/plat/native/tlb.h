@@ -30,6 +30,11 @@ void uk_plat_native_tlb_flush_entry(__vaddr_t vaddr);
  */
 void uk_plat_native_tlb_flush(void);
 
+/**
+ * Flushes the entire TLB of the calling CPU only
+ */
+void uk_plat_native_tlb_flush_local(void);
+
 #endif /* CONFIG_LIBUKPLAT_NATIVE_TLB */
 
 #endif /* !__ASSEMBLY__ */

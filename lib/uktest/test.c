@@ -61,12 +61,12 @@ static struct uk_test_stats testassert_stats = {0};
 #define UK_TEST_STATS_INIT_CLASS UK_INIT_CLASS_LATE
 #define UK_TEST_STATS_INIT_PRIO  9 /* As late as possible. */
 
-#if CONFIG_LIBUKDEBUG_ANSI_COLOR
+#if CONFIG_LIBUKPRINT_ANSI_COLOR
 #define UK_TEST_STAT_FAILED	UK_ANSI_MOD_BOLD \
 				UK_ANSI_MOD_COLORFG(UK_ANSI_COLOR_RED)
-#else /* CONFIG_LIBUKDEBUG_ANSI_COLOR */
+#else /* CONFIG_LIBUKPRINT_ANSI_COLOR */
 #define UK_TEST_STAT_FAILED
-#endif /* !CONFIG_LIBUKDEBUG_ANSI_COLOR */
+#endif /* !CONFIG_LIBUKPRINT_ANSI_COLOR */
 
 static int
 uk_test_print_stats(struct uk_init_ctx *ictx __unused)

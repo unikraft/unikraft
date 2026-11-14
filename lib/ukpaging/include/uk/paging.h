@@ -24,6 +24,8 @@
 #include <uk/plat/pal/tlb.h>
 
 #if CONFIG_LIBUKPAGING
+#include <uk/pt.h>
+
 #include <uk/pal/addr.h>
 #include <uk/pal/page.h>
 #include <uk/pal/paging.h>
@@ -314,8 +316,8 @@ extern "C" {
 struct uk_falloc;
 
 struct uk_pagetable {
-	__vaddr_t pt_vbase;
-	__paddr_t pt_pbase;
+	/** The page table hierarchy (see libukpt) */
+	struct uk_pt pt;
 
 	struct uk_falloc *fa;
 

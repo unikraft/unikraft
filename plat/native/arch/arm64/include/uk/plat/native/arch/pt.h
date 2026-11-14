@@ -45,6 +45,7 @@ extern "C" {
 #if CONFIG_LIBUKPLAT_NATIVE_PAGING
 
 #include <uk/assert.h>
+#include <uk/plat/native/tlb.h>
 
 /* The implementation for arm64 supports a 48-bit virtual address space
  * with 4KiB translation granule, as defined by VMSAv8.
@@ -181,7 +182,15 @@ int uk_plat_native_pt_write_base(__paddr_t pt_paddr)
 
 	__asm__ __volatile__("msr ttbr0_el1, %x0\n"
 			     "isb\n"
-			     :: "r" (reg));
+			     :: "r" (reg) : "memory");
+
+	/* Every hierarchy runs with ASID 0, so translations cached from
+	 * the previous one would remain valid. Invalidate the TLB once the
+	 * switch has taken effect. The switch only affects this CPU, so
+	 * there is no need to broadcast the invalidation.
+	 */
+	uk_plat_native_tlb_flush_local();
+
 	return 0;
 }
 

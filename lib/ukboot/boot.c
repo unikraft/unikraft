@@ -107,6 +107,26 @@ extern int boot_argc;
 
 int main(int argc, char *argv[]) __weak;
 
+typedef void (*_preinit_func_t)(void);
+typedef void (*_init_func_t)(int, char**);
+
+/*
+ * Function pointer arrays of constructors; provided by
+ * the platform's linker script
+ */
+extern const _preinit_func_t __preinit_array_start[];
+extern const _preinit_func_t __preinit_array_end;
+extern const _init_func_t __init_array_start[];
+extern const _init_func_t __init_array_end;
+
+/* Iterate over one of the arrays above, from ${array_name}_start[]
+ * until the end at ${array_name}_end
+ */
+#define _init_array_foreach(item, array_name)	\
+	for ((item) = array_name##_start;	\
+	     (item) < &(array_name##_end);	\
+	     (item)++)
+
 #if CONFIG_LIBUKBOOT_MAINTHREAD
 static __noreturn void main_thread(void *, void *);
 static void main_thread_dtor(struct uk_thread *m);
@@ -260,7 +280,7 @@ void uk_boot_entry(void)
 #if CONFIG_LIBUKBOOT_MAINTHREAD
 	struct uk_thread *m;
 #endif /* CONFIG_LIBUKBOOT_MAINTHREAD */
-	uk_ctor_func_t *ctorfn;
+	const uk_ctor_func_t *ctorfn;
 	struct uk_inittab_entry *init_entry;
 
 	/* Make sure uk_early_init has been called to process
@@ -455,7 +475,8 @@ exit:
 int do_main(int argc, char *argv[])
 {
 	char **envp __maybe_unused;
-	uk_ctor_func_t *ctorfn;
+	const _preinit_func_t *preinit_func;
+	const _init_func_t *init_func;
 	int ret;
 
 	/*
@@ -469,24 +490,24 @@ int do_main(int argc, char *argv[])
 	 */
 	uk_pr_info("Pre-init table at %p - %p\n",
 		   &__preinit_array_start[0], &__preinit_array_end);
-	uk_ctortab_foreach(ctorfn,
-			   __preinit_array_start, __preinit_array_end) {
-		if (!*ctorfn)
+	_init_array_foreach(preinit_func, __preinit_array) {
+		if (!*preinit_func)
 			continue;
 
-		uk_pr_debug("Call pre-init constructor: %p()...\n", *ctorfn);
-		(*ctorfn)();
+		uk_pr_debug("Call pre-init constructor: %p()...\n",
+			    *preinit_func);
+		(*preinit_func)();
 	}
 
 	uk_pr_info("Constructor table at %p - %p\n",
 		   &__init_array_start[0], &__init_array_end);
-	uk_ctortab_foreach(ctorfn, __init_array_start, __init_array_end) {
-		if (!*ctorfn)
+	_init_array_foreach(init_func, __init_array) {
+		if (!*init_func)
 			continue;
 
-		uk_pr_debug("Call constructor: %p(%d, %p)...\n", *ctorfn,
+		uk_pr_debug("Call constructor: %p(%d, %p)...\n", *init_func,
 			    argc, argv);
-		(*ctorfn)(argc, argv);
+		(*init_func)(argc, argv);
 	}
 
 #if CONFIG_LIBUKPRINT_KLVL_INFO
