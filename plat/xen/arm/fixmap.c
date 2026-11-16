@@ -19,10 +19,13 @@ UK_CTASSERT(UK_PLAT_XEN_FIXMAP_TOP == PAGE_OFFSET);
 
 unsigned long uk_plat_xen_fixmap_slot_attr(unsigned int slot)
 {
-	if (slot == UK_PLAT_XEN_FIXMAP_IDX_GIC)
+	switch (slot) {
+	case UK_PLAT_XEN_FIXMAP_IDX_GIC:
+	case UK_PLAT_XEN_FIXMAP_IDX_PL011:
 		return PT_ATTR_DEV;
-
-	return PT_ATTR_MEM;
+	default:
+		return PT_ATTR_MEM;
+	}
 }
 
 unsigned int uk_plat_xen_fixmap_window_slots(unsigned int slot)
@@ -34,6 +37,7 @@ unsigned int uk_plat_xen_fixmap_window_slots(unsigned int slot)
 	case UK_PLAT_XEN_FIXMAP_IDX_XS:
 	case UK_PLAT_XEN_FIXMAP_IDX_GIC:
 	case UK_PLAT_XEN_FIXMAP_IDX_GNT:
+	case UK_PLAT_XEN_FIXMAP_IDX_PL011:
 		return 1;
 	default:
 		return 0;
