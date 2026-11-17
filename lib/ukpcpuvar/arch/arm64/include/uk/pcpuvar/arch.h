@@ -18,16 +18,16 @@ extern "C" {
 /**
  * Read per-CPU variable into register.
  *
- * @dst: Destination register (will contain the value)
- * @sym: Symbol name
- * @tmp: Scratch register
+ * @param dst
+ *   Destination register (will contain the value)
+ * @param sym
+ *   Symbol name
+ * @param tmp
+ *   Scratch register (will hold &sym)
  */
 .macro uk_pcpuvar_arm64_ldr dst:req, sym:req, tmp:req
 	adrp	\tmp, \sym
 	add	\tmp, \tmp, #:lo12:\sym
-	adrp	\dst, _uk_pcpuvar_base
-	add	\dst, \dst, #:lo12:_uk_pcpuvar_base
-	sub	\tmp, \tmp, \dst
 	mrs	\dst, tpidr_el1
 	ldr	\dst, [\dst, \tmp]
 .endm
@@ -35,9 +35,6 @@ extern "C" {
 #define uk_pcpuvar_arm64_ldr(_dst, _sym, _tmp)				\
 	"adrp	" _tmp ", " STRINGIFY(_sym) "\n\t"			\
 	"add	" _tmp ", " _tmp ", #:lo12:" STRINGIFY(_sym) "\n\t"	\
-	"adrp	" _dst ", _uk_pcpuvar_base\n\t"				\
-	"add	" _dst ", " _dst ", #:lo12:_uk_pcpuvar_base\n\t"	\
-	"sub	" _tmp ", " _tmp ", " _dst "\n\t"			\
 	"mrs	" _dst ", tpidr_el1\n\t"				\
 	"ldr	" _dst ", [" _dst ", " _tmp "]"
 #endif /* !__ASSEMBLY__ */
@@ -46,17 +43,18 @@ extern "C" {
 /**
  * Write register value to per-CPU variable.
  *
- * @src: Source register (value to write)
- * @sym: Symbol name
- * @tmp1: First scratch register
- * @tmp2: Second scratch register
+ * @param src
+ *   Source register (value to write)
+ * @param sym
+ *   Symbol name
+ * @param tmp1
+ *   Scratch register (will hold &sym)
+ * @param tmp2
+ *   Scratch register (will hold TPIDR_EL1 bias)
  */
 .macro uk_pcpuvar_arm64_str src:req, sym:req, tmp1:req, tmp2:req
 	adrp	\tmp1, \sym
 	add	\tmp1, \tmp1, #:lo12:\sym
-	adrp	\tmp2, _uk_pcpuvar_base
-	add	\tmp2, \tmp2, #:lo12:_uk_pcpuvar_base
-	sub	\tmp1, \tmp1, \tmp2
 	mrs	\tmp2, tpidr_el1
 	str	\src, [\tmp2, \tmp1]
 .endm
@@ -64,9 +62,6 @@ extern "C" {
 #define uk_pcpuvar_arm64_str(_src, _sym, _tmp1, _tmp2)			\
 	"adrp	" _tmp1 ", " STRINGIFY(_sym) "\n\t"			\
 	"add	" _tmp1 ", " _tmp1 ", #:lo12:" STRINGIFY(_sym) "\n\t"	\
-	"adrp	" _tmp2 ", _uk_pcpuvar_base\n\t"			\
-	"add	" _tmp2 ", " _tmp2 ", #:lo12:_uk_pcpuvar_base\n\t"	\
-	"sub	" _tmp1 ", " _tmp1 ", " _tmp2 "\n\t"			\
 	"mrs	" _tmp2 ", tpidr_el1\n\t"				\
 	"str	" _src ", [" _tmp2 ", " _tmp1 "]"
 #endif /* !__ASSEMBLY__ */
@@ -108,7 +103,7 @@ extern "C" {
  */
 #define __uk_pcpuvar_arch_current_get(_sym)				\
 	({								\
-		__u64 _offset = (__u64)&(_sym) - (__u64)_uk_pcpuvar_base; \
+		__u64 _offset = (__u64)&(_sym);				\
 		__typeof__(_sym) _val;					\
 									\
 		asm volatile (						\
@@ -131,7 +126,7 @@ extern "C" {
  */
 #define __uk_pcpuvar_arch_current_set(_sym, _val)			\
 	do {								\
-		__u64 _offset = (__u64)&(_sym) - (__u64)_uk_pcpuvar_base; \
+		__u64 _offset = (__u64)&(_sym);				\
 		__typeof__(_sym) _tmp = (_val);				\
 		__u64 _tpidr;						\
 									\
@@ -156,7 +151,7 @@ extern "C" {
  */
 #define __uk_pcpuvar_arch_current_member_get(_sym, _member)		\
 	({								\
-		__u64 _offset = (__u64)&(_sym) - (__u64)_uk_pcpuvar_base + \
+		__u64 _offset = (__u64)&(_sym) +			\
 				__offsetof(__typeof__(_sym), _member);	\
 		__typeof__(((__typeof__(_sym) *)0)->_member) _val;	\
 									\
@@ -183,7 +178,7 @@ extern "C" {
 #define __uk_pcpuvar_arch_current_member_set(_sym, _member, _val)	\
 	do {								\
 		__typeof__(((__typeof__(_sym) *)0)->_member) _tmp = (_val); \
-		__u64 _offset = (__u64)&(_sym) - (__u64)_uk_pcpuvar_base + \
+		__u64 _offset = (__u64)&(_sym) +			\
 				__offsetof(__typeof__(_sym), _member);	\
 		__u64 _tpidr;						\
 									\
@@ -207,7 +202,7 @@ extern "C" {
 #define __uk_pcpuvar_arch_current_ptr_get(_sym)				\
 	({								\
 		__typeof__(_sym) *_ptr;					\
-		__u64 _offset = (__u64)&(_sym) - (__u64)_uk_pcpuvar_base; \
+		__u64 _offset = (__u64)&(_sym);				\
 									\
 		asm volatile (						\
 			"mrs	%0, tpidr_el1\n\t"			\
