@@ -16,7 +16,7 @@ LIBUKVMEM_SRCS-$(CONFIG_ARCH_ARM_64) += \
 	$(LIBUKVMEM_BASE)/arch/arm/pagefault64.c|isr
 endif
 
-ifneq ($(filter y,$(CONFIG_LIBUKVMEM_TEST) $(CONFIG_LIBUKTEST_ALL)),)
+ifneq ($(filter y,$(CONFIG_LIBUKVMEM_TEST) $(and $(CONFIG_LIBUKTEST_ALL),$(CONFIG_LIBUKNOFAULT))),)
 CINCLUDES-y   += -I$(LIBUKVMEM_BASE)/tests/include
 CXXINCLUDES-y += -I$(LIBUKVMEM_BASE)/tests/include
 
