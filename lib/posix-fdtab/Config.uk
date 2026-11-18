@@ -21,4 +21,8 @@ if LIBPOSIX_FDTAB
 	config LIBPOSIX_FDTAB_LEGACY_SHIM
 	bool
 
+	config LIBPOSIX_FDTAB_TEST
+		bool "Enable tests"
+		select LIBUKTEST
+
 endif
