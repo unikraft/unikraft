@@ -6,7 +6,9 @@
  */
 
 #include <libfdt.h>
+#include <string.h>
 #include <uk/assert.h>
+#include <uk/arch/types.h>
 #include <uk/arch/util.h>
 #include <uk/bitops.h>
 #include <uk/init.h>
@@ -25,6 +27,10 @@
 #include <uk/bus/platform.h>
 #include <uk/errptr.h>
 #endif /* CONFIG_LIBUKPAGING */
+
+#if CONFIG_LIBUKFIXMAP
+#include <uk/fixmap.h>
+#endif /* CONFIG_LIBUKFIXMAP */
 
 #if CONFIG_LIBPL011_EARLY_CONSOLE
 #include <uk/boot/earlytab.h>
@@ -70,18 +76,21 @@
 #define REG_UARTICR_OFFSET	0x44
 
 static const char * const fdt_compatible[] = {
-	"arm,pl011", NULL
+	"arm,pl011", "arm,sbsa-uart", NULL
 };
 
 struct pl011_device {
 	struct uk_console dev;
-	__u64 base, size;
+	__paddr_t pbase;
+	__vaddr_t vbase;
+	__sz size;
+	__bool is_sbsa;
 };
 
 #if CONFIG_LIBPL011_EARLY_CONSOLE
 static struct pl011_device earlycon;
 
-UK_LIBPARAM_PARAM_ALIAS(base, &earlycon.base, __u64, "pl011 base");
+UK_LIBPARAM_PARAM_ALIAS(base, &earlycon.pbase, __u64, "pl011 base");
 #endif /* CONFIG_LIBPL011_EARLY_CONSOLE */
 
 /* Macros to access PL011 Registers with base address */
@@ -92,6 +101,10 @@ UK_LIBPARAM_PARAM_ALIAS(base, &earlycon.base, __u64, "pl011 base");
 
 #define PL011_REG_WRITE(base, r, v)	\
 	uk_arch_arm64_ioreg_write16(PL011_REG(base, r), v)
+
+#define PL011_REG_UPDATE(base, r, v, m) \
+	PL011_REG_WRITE(base, r,	\
+			(PL011_REG_READ(base, r) & (~(m))) | ((v) & (m)))
 
 __isr static void pl011_putc(__u64 base, char a)
 {
@@ -123,7 +136,7 @@ __isr static __ssz pl011_out(struct uk_console *dev, const char *buf, __sz len)
 	pl011_dev = __containerof(dev, struct pl011_device, dev);
 
 	while (l--)
-		pl011_putc(pl011_dev->base, *buf++);
+		pl011_putc(pl011_dev->vbase, *buf++);
 
 	return len;
 }
@@ -139,7 +152,7 @@ static __ssz pl011_in(struct uk_console *dev, char *buf, __sz len)
 	pl011_dev = __containerof(dev, struct pl011_device, dev);
 
 	for (__sz i = 0; i < len; i++) {
-		if ((rc = pl011_getc(pl011_dev->base)) < 0)
+		if ((rc = pl011_getc(pl011_dev->vbase)) < 0)
 			return i;
 		buf[i] = (char)rc;
 	}
@@ -153,25 +166,56 @@ static const struct uk_console_ops pl011_ops = {
 	.emerg_out = pl011_out,
 };
 
-static int pl011_setup(__u64 base)
+#if CONFIG_LIBUKFIXMAP
+UK_FIXMAP_IMPORT(pl011_fixmap, PL011);
+#endif /* CONFIG_LIBUKFIXMAP */
+
+static inline int pl011_map(struct pl011_device *dev,
+			    __bool __maybe_unused early)
 {
+	__vaddr_t vaddr = dev->pbase;
+
+#if CONFIG_LIBUKFIXMAP
+	vaddr = uk_fixmap_map(pl011_fixmap, dev->pbase, dev->size);
+#elif CONFIG_LIBUKPAGING
+	if (!early)
+		vaddr = uk_bus_pf_devmap(dev->pbase, dev->size);
+#endif /* CONFIG_LIBUKPAGING */
+	if (unlikely(PTRISERR(vaddr)))
+		return PTR2ERR(vaddr);
+
+	dev->vbase = vaddr;
+
+	return 0;
+}
+
+static int pl011_setup(struct pl011_device *dev, __bool early)
+{
+	int rc = pl011_map(dev, early);
+
+	if (unlikely(rc)) {
+		uk_pr_err("Could not map pl011 (%d)\n", rc);
+		return rc;
+	}
+
 	/* Mask all interrupts */
-	PL011_REG_WRITE(base, REG_UARTIMSC_OFFSET,
-			PL011_REG_READ(base, REG_UARTIMSC_OFFSET) & 0xf800);
+	PL011_REG_UPDATE(dev->vbase, REG_UARTIMSC_OFFSET, 0, 0x07ff);
 
 	/* Clear all interrupts */
-	PL011_REG_WRITE(base, REG_UARTICR_OFFSET, 0x07ff);
+	PL011_REG_WRITE(dev->vbase, REG_UARTICR_OFFSET, 0x07ff);
+
+	/* The SBSA UART has no line/control registers to program */
+	if (dev->is_sbsa)
+		return 0;
 
 	/* Disable UART for configuration */
-	PL011_REG_WRITE(base, REG_UARTCR_OFFSET, 0);
+	PL011_REG_WRITE(dev->vbase, REG_UARTCR_OFFSET, 0);
 
 	/* Select 8-bits data transmit and receive */
-	PL011_REG_WRITE(base, REG_UARTLCR_H_OFFSET,
-			(PL011_REG_READ(base, REG_UARTLCR_H_OFFSET) & 0xff00) |
-			 LCR_H_WLEN8);
+	PL011_REG_UPDATE(dev->vbase, REG_UARTLCR_H_OFFSET, LCR_H_WLEN8, 0x00ff);
 
 	/* Just enable UART and data transmit/receive */
-	PL011_REG_WRITE(base, REG_UARTCR_OFFSET, CR_TXE | CR_UARTEN);
+	PL011_REG_WRITE(dev->vbase, REG_UARTCR_OFFSET, CR_TXE | CR_UARTEN);
 
 	return 0;
 }
@@ -199,15 +243,17 @@ static inline int config_fdt_chosen_stdout(const void *dtb)
 	if (unlikely(rc)) /* could not parse node */
 		return rc;
 
-	earlycon.base = base;
+	earlycon.pbase = base;
 	earlycon.size = size;
+	earlycon.is_sbsa = !fdt_node_check_compatible(dtb, offs,
+						      "arm,sbsa-uart");
 
 	return 0;
 }
 
 static int early_init(struct ukplat_bootinfo *bi)
 {
-	struct ukplat_memregion_desc mrd = {0};
+	struct ukplat_memregion_desc mrd __maybe_unused = {0};
 	int rc;
 
 	UK_ASSERT(bi);
@@ -215,7 +261,7 @@ static int early_init(struct ukplat_bootinfo *bi)
 	/* If the base is not set by the cmdline, try
 	 * the dtb chosen/stdout-path.
 	 */
-	if (!earlycon.base) {
+	if (!earlycon.pbase) {
 		rc = config_fdt_chosen_stdout((void *)bi->dtb);
 		if (unlikely(rc < 0 && rc != -FDT_ERR_NOTFOUND))  {
 			uk_pr_err("Could not parse fdt (%d)", rc);
@@ -226,11 +272,15 @@ static int early_init(struct ukplat_bootinfo *bi)
 	/* Do not return an error if no config is detected, as
 	 * another console driver may be enabled in Kconfig.
 	 */
-	if (!earlycon.base)
+	if (!earlycon.pbase)
 		return 0;
 
+	/* The base may come from the cmdline, which does not give a size */
+	if (!earlycon.size)
+		earlycon.size = __PAGE_SIZE;
+
 	/* Configure the port */
-	rc = pl011_setup(earlycon.base);
+	rc = pl011_setup(&earlycon, true);
 	if (unlikely(rc))
 		return rc;
 
@@ -239,12 +289,15 @@ static int early_init(struct ukplat_bootinfo *bi)
 			UK_CONSOLE_CLASS_UART);
 	uk_console_register(&earlycon.dev);
 
-	/* Add an mrd to keep the device mapped past init */
-	mrd.pbase = earlycon.base;
-	mrd.vbase = earlycon.base;
+#if !CONFIG_LIBUKFIXMAP
+	/* Add an mrd to keep the device mapped past paging init. Fixmap
+	 * slots stay mapped, so they do not need one.
+	 */
+	mrd.pbase = earlycon.pbase;
+	mrd.vbase = earlycon.vbase;
 	mrd.pg_off = 0;
-	mrd.pg_count = 1;
-	mrd.len = __PAGE_SIZE;
+	mrd.pg_count = DIV_ROUND_UP(earlycon.size, __PAGE_SIZE);
+	mrd.len = earlycon.size;
 	mrd.type = UKPLAT_MEMRT_DEVICE;
 	mrd.flags = UKPLAT_MEMRF_READ | UKPLAT_MEMRF_WRITE;
 
@@ -253,6 +306,7 @@ static int early_init(struct ukplat_bootinfo *bi)
 		uk_pr_err("Could not insert mrd (%d)\n", rc);
 		return rc;
 	}
+#endif /* !CONFIG_LIBUKFIXMAP */
 
 	return 0;
 }
@@ -284,8 +338,10 @@ static int fdt_get_device(struct pl011_device *dev, const void *dtb,
 
 	uk_console_init(&dev->dev, "PL011", &pl011_ops, 0,
 			UK_CONSOLE_CLASS_UART);
-	dev->base = reg_base;
+	dev->pbase = reg_base;
 	dev->size = reg_size;
+	dev->is_sbsa = !fdt_node_check_compatible(dtb, *offset,
+						  "arm,sbsa-uart");
 
 	return 0;
 }
@@ -303,13 +359,10 @@ static int register_device(struct pl011_device *dev, struct uk_alloc *a)
 		return -ENOMEM;
 	}
 
-	console_dev->dev = dev->dev;
-	console_dev->base = dev->base;
-	console_dev->size = dev->size;
-
+	memcpy(console_dev, dev, sizeof(*console_dev));
 	uk_console_register(&console_dev->dev);
 	uk_pr_info("con%"__PRIu16": pl011 @ %p\n", console_dev->dev.id,
-		   &console_dev->base);
+		   (void *)console_dev->pbase);
 
 	return 0;
 }
@@ -322,7 +375,7 @@ static int init(struct uk_init_ctx *ictx __unused)
 	const void *dtb;
 	int offset = -1;
 	int rc;
-	struct pl011_device dev;
+	struct pl011_device dev = {0};
 	struct uk_alloc *a;
 
 	bi = ukplat_bootinfo_get();
@@ -346,29 +399,21 @@ static int init(struct uk_init_ctx *ictx __unused)
 			return rc;
 		}
 
-#if CONFIG_LIBUKPAGING
-		/* Map device region */
-		dev.base = uk_bus_pf_devmap(dev.base, dev.size);
-		if (unlikely(PTRISERR(dev.base))) {
-			uk_pr_err("Could not map pl011\n");
-			return PTR2ERR(dev.base);
-		}
-#endif /* CONFIG_LIBUKPAGING */
-
 #if CONFIG_LIBPL011_EARLY_CONSOLE
 		/* `ukconsole` mandates that there is only a single
 		 * `struct uk_console` registered per device.
 		 */
-		if (dev.base == earlycon.base) {
-			uk_pr_info("Skipping pl011 device\n");
+		if (dev.pbase == earlycon.pbase) {
+			uk_pr_info("Skipping earlycon pl011 device\n");
 			continue;
 		}
 #endif /* CONFIG_LIBPL011_EARLY_CONSOLE */
 
-		rc = pl011_setup(dev.base);
+		rc = pl011_setup(&dev, false);
 		if (unlikely(rc)) {
-			uk_pr_err("Could not initialize pl011\n");
-			return rc;
+			uk_pr_err("Could not initialize pl011 @ %p; skipping\n",
+				  (void *)dev.pbase);
+			continue;
 		}
 
 		rc = register_device(&dev, a);
