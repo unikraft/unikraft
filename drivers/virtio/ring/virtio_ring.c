@@ -463,8 +463,10 @@ static void *virtqueue_vring_alloc(struct uk_alloc *a __unused, __sz size)
 	rc = uk_vma_map_dma(uk_vas_get_active(), &vaddr, size,
 			    UK_PAGING_PAGE_ATTR_PROT_RW, UK_VMA_MAP_POPULATE,
 			    "virtqueue", paddr);
-	if (unlikely(rc))
+	if (unlikely(rc)) {
+		pt->fa->ffree(pt->fa, paddr, size >> UK_PAGING_PAGE_SHIFT);
 		return NULL;
+	}
 
 	return (void *)vaddr;
 }
@@ -472,12 +474,20 @@ static void *virtqueue_vring_alloc(struct uk_alloc *a __unused, __sz size)
 static void virtqueue_vring_free(struct uk_alloc *a __unused, void *mem,
 				 __sz size)
 {
+	struct uk_pagetable *pt = uk_paging_pt_get_active();
+	__paddr_t paddr = uk_paging_virt_to_phys((__vaddr_t)mem);
 	int rc;
 
-	rc = uk_vma_unmap(uk_vas_get_active(), (__vaddr_t)mem,
-			  UK_PAGING_PAGE_ALIGN_UP(size), 0);
-	if (unlikely(rc < 0))
+	size = UK_PAGING_PAGE_ALIGN_UP(size);
+
+	rc = uk_vma_unmap(uk_vas_get_active(), (__vaddr_t)mem, size, 0);
+	if (unlikely(rc < 0)) {
 		uk_pr_err("Failed to unmap virtio ring %p: %d\n", mem, rc);
+		return;
+	}
+
+	/* DMA mappings do not own their frames */
+	pt->fa->ffree(pt->fa, paddr, size >> UK_PAGING_PAGE_SHIFT);
 }
 #else /* !CONFIG_LIBUKVMEM */
 /* The device uses only the physical base, so find a contiguous ring.
