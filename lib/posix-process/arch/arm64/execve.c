@@ -4,6 +4,7 @@
  * You may not use this file except in compliance with the License.
  */
 
+#include <string.h>
 #include <uk/arch/ctx.h>
 #include <uk/essentials.h>
 #include <uk/lcpu.h>
@@ -18,7 +19,17 @@ void execve_arch_execenv_init(struct ukarch_execenv *execenv_new,
 	UK_ASSERT(sp);
 	UK_ASSERT(IS_ALIGNED(sp, UKARCH_SP_ALIGN));
 
-	uk_lcpu_regs_set(execenv_new->regs, LR, ip);
+	/* The new program starts with its registers zeroed but for those set
+	 * below, as on Linux: the execenv sits on a stack fresh from the
+	 * allocator, whose contents are stale.  x0 must be 0 (no exit handler
+	 * for libc to register), and a stale FPCR would carry trap enables
+	 * and rounding modes into the program.
+	 */
+	memset(execenv_new->regs, 0, sizeof(execenv_new->regs));
+	memset(execenv_new->ectx, 0, sizeof(execenv_new->ectx));
+
+	/* The new program starts where the eret returns to: ELR_EL1 */
+	uk_lcpu_regs_set(execenv_new->regs, PC, ip);
 	uk_lcpu_regs_set(execenv_new->regs, SP, sp);
 
 	/* Copy SPSR to preserve the application's state at
@@ -30,10 +41,6 @@ void execve_arch_execenv_init(struct ukarch_execenv *execenv_new,
 	/* Copy ESR to make sure we restore a sane value */
 	uk_lcpu_regs_set(execenv_new->regs, ESR_EL1,
 			 uk_lcpu_regs_get(execenv->regs, ESR_EL1));
-
-	/* Leave gpregs and ectx uninitialized for the new
-	 * execution context.
-	 */
 
 	/* Also copy the current sysctx to avoid ending up with undefined
 	 * values that trigger alignment errors.

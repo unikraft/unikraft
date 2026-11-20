@@ -82,10 +82,17 @@ typedef union epoll_data {
 	uint64_t u64;
 } epoll_data_t;
 
+/* Packed on x86_64 only, as in Linux: elsewhere (arm64) data is 8-byte
+ * aligned and the structure 16 bytes long.
+ */
 struct epoll_event {
 	uint32_t events;	/* Epoll events */
 	epoll_data_t data;	/* User data variable */
-} __packed;
+}
+#if defined(__x86_64__)
+__packed
+#endif
+;
 
 int epoll_create(int size);
 int epoll_create1(int flags);
