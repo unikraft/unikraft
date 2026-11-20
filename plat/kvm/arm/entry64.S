@@ -53,6 +53,15 @@ ENTRY(_libkvmplat_entry)
 	mov x25, x0 /* preserve dtb addr */
 #endif
 
+#if __ARM_FEATURE_ATOMICS
+	/* Built w/ LSE atomics: stop here if the CPU lacks FEAT_LSE */
+	mrs	x0, ID_AA64ISAR0_EL1
+	lsr	x0, x0, #UK_ARCH_ARM64_ID_AA64ISAR0_EL1_ATOMIC_SHIFT
+	and	x0, x0, #UK_ARCH_ARM64_ID_AA64ISAR0_EL1_ATOMIC_MASK
+	cmp	x0, #2	/* 0b0010: FEAT_LSE */
+	b.lo	lse_unsupported
+#endif /* __ARM_FEATURE_ATOMICS */
+
 #ifdef CONFIG_FPSIMD
 	/* Enable fp/simd support */
 	ldr        x0, =(3 << 20)
@@ -142,3 +151,9 @@ ENTRY(_libkvmplat_entry)
 	bl	ukplat_bootinfo_fdt_setup
 	b	_ukplat_entry
 END(_libkvmplat_entry)
+
+#if __ARM_FEATURE_ATOMICS
+lse_unsupported:
+	wfi
+	b	lse_unsupported
+#endif /* __ARM_FEATURE_ATOMICS */
