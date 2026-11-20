@@ -71,7 +71,7 @@ static struct irq_handler irq_handlers[MAX_IRQ][MAX_HANDLERS_PER_IRQ];
 
 static inline struct irq_handler *allocate_handler(unsigned long irq)
 {
-	UK_ASSERT(irq <= MAX_IRQ);
+	UK_ASSERT(irq < MAX_IRQ);
 
 	for (int i = 0; i < MAX_HANDLERS_PER_IRQ; i++)
 		if (irq_handlers[irq][i].func == NULL)
@@ -85,8 +85,8 @@ int uk_intctlr_irq_register(unsigned int irq,
 	struct irq_handler *h;
 	unsigned long flags;
 
-	UK_ASSERT(func);
-	UK_ASSERT(irq <= MAX_IRQ);
+	if (!func || irq >= MAX_IRQ)
+		return -EINVAL;
 
 	flags = uk_lcpu_save_irqf();
 	h = allocate_handler(irq);
@@ -105,42 +105,41 @@ int uk_intctlr_irq_register(unsigned int irq,
 	return 0;
 }
 
+static int irq_unregister(unsigned int irq, uk_intctlr_irq_handler_func_t func,
+			  void *arg, int match_arg)
+{
+	unsigned long flags;
+	unsigned int read, write = 0;
+	int found = 0;
+
+	if (!func || irq >= MAX_IRQ)
+		return -EINVAL;
+	flags = uk_lcpu_save_irqf();
+	for (read = 0; read < MAX_HANDLERS_PER_IRQ; ++read) {
+		struct irq_handler h = irq_handlers[irq][read];
+
+		if (h.func == func && (!match_arg || h.arg == arg)) {
+			found = 1;
+			continue;
+		}
+		irq_handlers[irq][write++] = h;
+	}
+	while (write < MAX_HANDLERS_PER_IRQ)
+		irq_handlers[irq][write++] = (struct irq_handler){ 0 };
+	uk_lcpu_restore_irqf(flags);
+	return found ? 0 : -ENOENT;
+}
+
 int uk_intctlr_irq_unregister(unsigned int irq,
 			      uk_intctlr_irq_handler_func_t func)
 {
-	struct irq_handler *h = NULL;
-	unsigned long flags;
-	int count;
-	int i;
+	return irq_unregister(irq, func, NULL, 0);
+}
 
-	UK_ASSERT(func);
-	UK_ASSERT(irq <= MAX_IRQ);
-
-	flags = uk_lcpu_save_irqf();
-
-	count = MAX_HANDLERS_PER_IRQ;
-	for (i = 0; i < count; i++) {
-recheck:
-		if (irq_handlers[irq][i].func == func) {
-			h = &irq_handlers[irq][i];
-			h->func = NULL;
-			h->arg = NULL;
-
-			/* Copy all following handlers forward */
-			memmove(h, h + 1, sizeof(*h) * (count - i - 1));
-			goto recheck;
-		}
-	}
-
-	uk_lcpu_restore_irqf(flags);
-
-	/* If `h` is set, then there was at least one instance found */
-	if (unlikely(!h)) {
-		uk_pr_crit("Invalid irq handler %p for irq %u ", func, irq);
-		return -ENOENT;
-	}
-
-	return 0;
+int uk_intctlr_irq_unregister_arg(unsigned int irq,
+				  uk_intctlr_irq_handler_func_t func, void *arg)
+{
+	return irq_unregister(irq, func, arg, 1);
 }
 
 /*
@@ -156,7 +155,7 @@ void uk_intctlr_irq_handle(struct uk_lcpu_except_irq_ctx *ctx)
 	int i;
 
 	irq = uk_lcpu_except_irq_ctx_get_irq(ctx);
-	UK_ASSERT(irq <= MAX_IRQ);
+	UK_ASSERT(irq < MAX_IRQ);
 
 	for (i = 0; i < MAX_HANDLERS_PER_IRQ; i++) {
 		if (irq_handlers[irq][i].func == NULL)
