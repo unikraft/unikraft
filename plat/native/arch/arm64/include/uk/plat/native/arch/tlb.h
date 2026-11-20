@@ -29,7 +29,14 @@ extern "C" {
 static inline
 void uk_plat_native_tlb_flush_entry(__vaddr_t vaddr)
 {
-	__u64 page_number = vaddr >> UK_PLAT_NATIVE_PAGE_SHIFT;
+	__u64 page_number;
+
+	/* The operand takes VA[55:12] in bits [43:0]. Mask the rest so that
+	 * the upper bits of TTBR1 addresses don't spill into the TTL field
+	 * [47:44], where a bogus hint may cause the invalidation to be
+	 * skipped on CPUs that implement FEAT_TTL.
+	 */
+	page_number = (vaddr >> UK_PLAT_NATIVE_PAGE_SHIFT) & 0xfffffffffffUL;
 
 	__asm__ __volatile__("	dsb	ishst\n"        /* wait for write complete */
 			     "	tlbi	vaae1is, %x0\n" /* invalidate by vaddr */

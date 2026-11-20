@@ -29,6 +29,9 @@ config HAVE_VFS
 config HAVE_X86PKU
 	bool
 
+config HAVE_DYNAMIC_MAPPINGS
+	bool
+
 ##
 # Compatibility entries for legacy libraries
 ##
