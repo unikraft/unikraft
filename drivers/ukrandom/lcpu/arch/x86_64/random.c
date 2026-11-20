@@ -30,11 +30,11 @@ static inline int rdrand(__u64 *val)
 			"	setc	%1\n" /* get result */
 			: "=r" (*val), "=qm" (res)
 		);
-		if (unlikely(!res))
-			return -EIO;
+		if (likely(res))
+			return 0;
 	}
 
-	return 0;
+	return -EIO;
 }
 
 static inline int rdseed(__u64 *val)
