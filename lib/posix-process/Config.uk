@@ -91,6 +91,17 @@ config LIBPOSIX_PROCESS_SIGNALFD
 	depends on LIBPOSIX_PROCESS_SIGNAL
 	select LIBUKFILE_POLLED
 
+config LIBPOSIX_PROCESS_EXECVE_STACK_SIZE_PAGES
+	int "execve() program stack size (pages; 0 = default STACK_SIZE)"
+	default 0
+	depends on LIBPOSIX_PROCESS_EXECVE
+	help
+	  Stack size, in 4 KiB pages, for a program loaded by execve().
+	  0 uses the default thread stack size (STACK_SIZE).  A larger
+	  value gives a deeply-recursive program (for example a CPython
+	  interpreter) the C-stack room it needs without enlarging every
+	  thread's stack.
+
 config LIBPOSIX_PROCESS_DEBUG
 	bool "Enable debug messages"
 
