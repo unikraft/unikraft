@@ -580,6 +580,21 @@ sys_telldir(struct vfscore_file *fp, long *loc)
 	return 0;
 }
 
+/*
+ * Drop the slashes at the end of a directory's path: "a/b/" names the
+ * directory "a/b", as `mkdir -p` asks for each one it makes.  lookup()
+ * splits a path at its last slash, so it would otherwise look for "a/b"
+ * as the parent of an empty name.  "/" stays as it is.
+ */
+static void
+strip_trailing_slashes(char *path)
+{
+	size_t len = strlen(path);
+
+	while (len > 1 && path[len - 1] == '/')
+		path[--len] = '\0';
+}
+
 int
 sys_mkdir(char *path, mode_t mode)
 {
@@ -587,6 +602,7 @@ sys_mkdir(char *path, mode_t mode)
 	struct dentry *dp, *ddp;
 	int error;
 
+	strip_trailing_slashes(path);
 	DPRINTF(VFSDB_SYSCALL, ("sys_mkdir: path=%s mode=%d\n",	path, mode));
 
 	error = namei(path, &dp);
@@ -622,6 +638,7 @@ sys_rmdir(char *path)
 	int error;
 	char *name;
 
+	strip_trailing_slashes(path);
 	DPRINTF(VFSDB_SYSCALL, ("sys_rmdir: path=%s\n", path));
 
 	if ((error = check_dir_empty(path)) != 0)
@@ -942,7 +959,7 @@ out:
 int
 sys_link(char *oldpath, char *newpath)
 {
-	struct dentry *olddp, *newdp, *newdirdp;
+	struct dentry *olddp, *newdp = NULL, *newdirdp;
 	struct vnode *vp;
 	char *name;
 	int error;
@@ -997,7 +1014,9 @@ sys_link(char *oldpath, char *newpath)
  out:
 	vn_unlock(vp);
 	drele(olddp);
-	drele(newdp);
+	/* Taken only when newpath exists or its dentry was made */
+	if (newdp)
+		drele(newdp);
 	return error;
 }
 
@@ -1210,7 +1229,7 @@ vfscore_ftruncate(struct vfscore_file *fp, off_t length)
 int
 sys_fchdir(struct vfscore_file *fp, char *cwd)
 {
-	const char *mountpath;
+	const char *mountpath, *dpath;
 	size_t mountpath_len;
 	struct vnode *dvp;
 
@@ -1224,14 +1243,21 @@ sys_fchdir(struct vfscore_file *fp, char *cwd)
 		return EBADF;
 	}
 
-	/* Cut off the last trailing slash if there is one */
+	/* The mount's path, but none for the root mount's ("/"), then the
+	 * directory's path in the mount.  That is "/" at the mount's root,
+	 * which is the whole of the root mount's but would only add a
+	 * trailing slash to another's: "/mnt/data", as on Linux.
+	 */
 	mountpath = fp->f_dentry->d_mount->m_path;
 	mountpath_len = strlen(mountpath);
-	if (mountpath_len == 0 || mountpath[mountpath_len - 1] != '/')
-		mountpath_len = PATH_MAX;
+	if (mountpath_len == 1 && mountpath[0] == '/')
+		mountpath_len = 0;
+	dpath = fp->f_dentry->d_path;
 
-	strlcpy(cwd, mountpath, mountpath_len);
-	strlcat(cwd, fp->f_dentry->d_path, PATH_MAX);
+	/* mount() keeps m_path within PATH_MAX - 1 bytes */
+	strlcpy(cwd, mountpath, mountpath_len + 1);
+	if (mountpath_len == 0 || strcmp(dpath, "/"))
+		strlcat(cwd, dpath, PATH_MAX);
 	vn_unlock(dvp);
 	return 0;
 }
