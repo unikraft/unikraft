@@ -13,6 +13,11 @@
 #include <uk/arch/limits.h>
 #ifdef CONFIG_LIBUKPAGING
 #include <uk/paging.h>
+#include <uk/falloc.h>
+#include <uk/arch/ctx.h>
+#include <uk/lcpu.h>
+#include <uk/pal/except.h>
+#include <uk/plat/config.h>
 #endif /* CONFIG_LIBUKPAGING */
 #include <uk/alloc.h>
 #include <uk/assert.h>
@@ -262,7 +267,8 @@ static inline int vmem_vma_can_merge(struct uk_vma *vma, struct uk_vma *next)
 		(vma->attr == next->attr) &&
 		(vma->flags == next->flags) &&
 		(vma->page_lvl == next->page_lvl) &&
-		(vma->name == next->name));
+		(vma->name == next->name) &&
+		(vma->owner == next->owner));
 }
 
 static int vmem_vma_do_try_merge_with_next(struct uk_vma *vma)
@@ -353,6 +359,7 @@ static int vmem_vma_split(struct uk_vma *vma, __vaddr_t vaddr,
 	v->flags	= vma->flags;
 	v->page_lvl	= vma->page_lvl;
 	v->name		= vma->name;
+	v->owner	= vma->owner;
 
 	vma->end	= vaddr;
 
@@ -565,6 +572,54 @@ static __vaddr_t vmem_first_fit(struct uk_vas *vas, __vaddr_t base, __sz align,
 	return ALIGN_UP(vaddr, align);
 }
 
+#if CONFIG_LIBUKVMEM_RESERVE_PAGES
+/* Whether a fault with @regs was taken by the kernel: on the auxiliary stack
+ * system calls run on (copying to a program's buffer, say), or on an
+ * exception stack. As posix-process tells them apart (system_error.c).
+ */
+static int vmem_fault_in_kernel(struct uk_lcpu_regs *regs)
+{
+	__u64 idx = uk_lcpu_get_current_idx_in_except();
+	__uptr auxsp, sp;
+
+	/* Not on an exception stack (the handler took the fault on another
+	 * stack): no telling, so taken as the kernel's, which may not fail
+	 */
+	if (idx >= CONFIG_UKPLAT_CPU_MAXCOUNT)
+		return 1;
+	auxsp = uk_pcpuvar_lval(idx, UK_LCPU_AUXSP_SYM);
+	sp = uk_lcpu_regs_get(regs, SP);
+	if (!auxsp || SP_IN_AUXSP(sp, auxsp))
+		return 1;
+	return sp >= uk_pal_except_get_except_stack_base() &&
+	       sp < uk_pal_except_get_except_stack_base() +
+		    CONFIG_UKPLAT_CPU_MAXCOUNT * 3 * CPU_EXCEPT_STACK_SIZE;
+}
+#endif /* CONFIG_LIBUKVMEM_RESERVE_PAGES */
+
+/* A program's fault in its own mapping (one with an owner) may not take the
+ * frames kept for the kernel: a fault the kernel takes, on its own stack or
+ * on a program's buffer a system call fills, has no way to fail. The
+ * program's fails instead, which ends it; a populate request (no @regs)
+ * leaves the page to be faulted in when touched.
+ */
+static int vmem_vma_reserved(struct uk_vma *vma, struct uk_vm_fault *fault)
+{
+#if CONFIG_LIBUKVMEM_RESERVE_PAGES
+	struct uk_falloc *fa = vma->vas->pt->fa;
+
+	return vma->owner &&
+	       fa->free_memory < fault->len +
+	       ((__sz)CONFIG_LIBUKVMEM_RESERVE_PAGES << UK_PAGING_PAGE_SHIFT) &&
+	       (!fault->regs || !vmem_fault_in_kernel(fault->regs));
+#else /* !CONFIG_LIBUKVMEM_RESERVE_PAGES */
+	return 0;
+#endif /* !CONFIG_LIBUKVMEM_RESERVE_PAGES */
+}
+
+/* vmem_mapx_populate() stopped a best-effort populate: not an error */
+#define VMEM_POPULATE_STOP	(-ECANCELED)
+
 static int vmem_mapx_populate(struct uk_pagetable *pt __unused,
 			      __vaddr_t vaddr, __vaddr_t pt_vaddr __unused,
 			      unsigned int level, __pte_t *pte, void *user)
@@ -585,6 +640,21 @@ static int vmem_mapx_populate(struct uk_pagetable *pt __unused,
 	UK_ASSERT(vma->ops);
 	UK_ASSERT(vma->ops->fault);
 
+	/* For a mapping of anonymous memory with MAP_POPULATE, best effort,
+	 * as on Linux: what the reserve refuses is faulted in when touched,
+	 * and refused then. A smaller page may fit first; past that the
+	 * populate stops, rather than go on taking frames for the page tables
+	 * of pages it leaves out (an advise request then fails, see
+	 * uk_vma_op_advise()). Not for a VMA whose pages must be loaded now (a
+	 * file's, which its fault handler cannot read): the mapping fails.
+	 */
+	if (vmem_vma_reserved(vma, &fault)) {
+		if ((level > UK_PAGING_PAGE_LEVEL && vma->page_lvl < 0) ||
+		    vma->ops != &uk_vma_anon_ops)
+			return UK_PAGING_PAGE_MAPX_ETOOBIG;
+		return VMEM_POPULATE_STOP;
+	}
+
 	rc = vma->ops->fault(vma, &fault);
 	if (unlikely(rc)) {
 		if (rc == -ENOMEM)
@@ -601,9 +671,10 @@ static int vmem_mapx_populate(struct uk_pagetable *pt __unused,
 	return 0;
 }
 
-int uk_vma_map(struct uk_vas *vas, __vaddr_t *vaddr, __sz len,
-	       unsigned long attr, unsigned long flags, const char *name,
-	       const struct uk_vma_ops *ops, void *args)
+int uk_vma_map_owned(struct uk_vas *vas, __vaddr_t *vaddr, __sz len,
+		     unsigned long attr, unsigned long flags, const char *name,
+		     const struct uk_vma_ops *ops, void *args,
+		     const void *owner)
 {
 	unsigned int order = UK_VMA_MAP_SIZE_TO_ORDER(flags);
 	int rc, to_lvl, algn_lvl, strict;
@@ -731,6 +802,7 @@ int uk_vma_map(struct uk_vas *vas, __vaddr_t *vaddr, __sz len,
 	vma->attr	= attr;
 	vma->flags	= extf;
 	vma->page_lvl	= to_lvl;
+	vma->owner	= owner;
 	if (name)
 		vma->name = name;
 
@@ -755,11 +827,17 @@ int uk_vma_map(struct uk_vas *vas, __vaddr_t *vaddr, __sz len,
 						.map = vmem_mapx_populate,
 						.ctx = vma,
 					 });
+		if (rc == VMEM_POPULATE_STOP)
+			rc = 0;
 		if (unlikely(rc)) {
 			/* If the address range replaces existing mappings, we
 			 * have an unrecoverable error and the address range
-			 * will be empty!
+			 * will be empty!  What was populated before the
+			 * failure (the reserve fails a file's populate
+			 * partway, see vmem_mapx_populate()) goes with it, or
+			 * its frames stay mapped with no VMA.
 			 */
+			VMA_UNMAP(vma, vma->start, uk_vma_len(vma));
 			vmem_vma_destroy(vma);
 
 			return rc;
@@ -771,6 +849,40 @@ int uk_vma_map(struct uk_vas *vas, __vaddr_t *vaddr, __sz len,
 
 	*vaddr = va;
 	return 0;
+}
+
+int uk_vma_map(struct uk_vas *vas, __vaddr_t *vaddr, __sz len,
+	       unsigned long attr, unsigned long flags, const char *name,
+	       const struct uk_vma_ops *ops, void *args)
+{
+	return uk_vma_map_owned(vas, vaddr, len, attr, flags, name, ops,
+				args, __NULL);
+}
+
+void uk_vma_unmap_owner(struct uk_vas *vas, const void *owner)
+{
+	struct uk_vma *vma, *found;
+
+	UK_ASSERT(owner);
+
+	/* Whole VMAs only, so there is nothing to split. Unmapping a VMA can
+	 * sleep (a file's), and the list may change meanwhile: unlink each
+	 * one before unmapping it, as uk_vma_unmap() does, and look again
+	 * from the start for the next one.
+	 */
+	do {
+		found = __NULL;
+		uk_list_for_each_entry(vma, &vas->vma_list, vma_list) {
+			if (vma->owner == owner) {
+				found = vma;
+				break;
+			}
+		}
+		if (found) {
+			uk_list_del(&found->vma_list);
+			vmem_vma_unmap_and_free(found);
+		}
+	} while (found);
 }
 
 int uk_vma_op_set_attr(struct uk_vma *vma, unsigned long attr)
@@ -905,6 +1017,11 @@ int uk_vma_op_advise(struct uk_vma *vma, __vaddr_t vaddr, __sz len,
 						.map = vmem_mapx_advise,
 						.ctx = vma,
 					 });
+		/* Not best effort here: a caller asking for the pages (a
+		 * scatter-gather list for a device) needs them backed
+		 */
+		if (rc == VMEM_POPULATE_STOP)
+			rc = -ENOMEM;
 		if (unlikely(rc))
 			return rc;
 	} else if (advice & UK_VMA_ADV_DONTNEED) {
@@ -1033,6 +1150,10 @@ static int vmem_mapx_pagefault(struct uk_pagetable *pt __unused,
 
 	UK_ASSERT(ctx->vma->ops);
 	UK_ASSERT(ctx->vma->ops->fault);
+
+	/* A smaller page may fit; with none, the fault fails with -ENOMEM */
+	if (vmem_vma_reserved(ctx->vma, &fault))
+		return UK_PAGING_PAGE_MAPX_ETOOBIG;
 
 	rc = ctx->vma->ops->fault(ctx->vma, &fault);
 	if (unlikely(rc)) {

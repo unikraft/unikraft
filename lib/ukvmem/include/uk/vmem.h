@@ -126,6 +126,9 @@ struct uk_vma {
 
 	/** Optional name of the VMA */
 	const char *name;
+
+	/** Lifetime owner; NULL for mappings managed by the kernel. */
+	const void *owner;
 };
 
 /**
@@ -571,6 +574,30 @@ static inline const struct uk_vma *uk_vma_next(const struct uk_vma *vma)
 int uk_vma_map(struct uk_vas *vas, __vaddr_t *vaddr, __sz len,
 	       unsigned long attr, unsigned long flags, const char *name,
 	       const struct uk_vma_ops *ops, void *args);
+
+/**
+ * Like uk_vma_map(), but tags the new VMA with an owner. Splits keep the tag
+ * and merges only join VMAs of the same owner, so every page mapped this way
+ * can later be released with uk_vma_unmap_owner().
+ *
+ * @param owner
+ *   An opaque owner, or NULL for a mapping that lives as long as the kernel
+ *   (what uk_vma_map() creates).
+ */
+int uk_vma_map_owned(struct uk_vas *vas, __vaddr_t *vaddr, __sz len,
+		     unsigned long attr, unsigned long flags, const char *name,
+		     const struct uk_vma_ops *ops, void *args,
+		     const void *owner);
+
+/**
+ * Removes every VMA tagged with the given owner.
+ *
+ * @param vas
+ *   The virtual address space to release the mappings from.
+ * @param owner
+ *   The owner passed to uk_vma_map_owned(). Must not be NULL.
+ */
+void uk_vma_unmap_owner(struct uk_vas *vas, const void *owner);
 
 /**
  * Removes any mapping in the specified virtual address range.

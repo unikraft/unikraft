@@ -51,6 +51,9 @@
 #include <uk/arch/limits.h>
 #include <unistd.h>
 #include <utime.h>
+#if CONFIG_LIBVFSCORE
+#include <vfscore/borrow.h>
+#endif /* CONFIG_LIBVFSCORE */
 
 /* Raw filesystem syscalls; not provided by headers */
 int uk_syscall_do_open(const char *, int, mode_t);
@@ -64,6 +67,7 @@ int uk_syscall_do_link(const char *, const char *);
 int uk_syscall_do_stat(const char *, struct stat *);
 int uk_syscall_do_unlinkat(int, const char *, int);
 int uk_syscall_do_rename(const char *, const char *);
+int uk_syscall_do_ioctl(int, unsigned int, void *);
 
 struct cpio_ilist_elm {
 	uint32_t ino;
@@ -72,6 +76,10 @@ struct cpio_ilist_elm {
 };
 
 struct cpio_ilist {
+	/* Files reference the archive instead of copying it (see
+	 * ukcpio_extract_borrowed()).
+	 */
+	int borrow;
 	struct uk_allocregion *ar;
 	UK_SLIST_HEAD(ilist_head, struct cpio_ilist_elm) elms;
 };
@@ -184,7 +192,7 @@ write_file(int fd, const char *contents, size_t len)
 
 static enum ukcpio_error
 extract_file(const char *path, const char *contents, size_t len,
-	     mode_t mode, uint32_t mtime)
+	     mode_t mode, uint32_t mtime, int borrow)
 {
 	int ret = UKCPIO_SUCCESS;
 	int fd;
@@ -210,6 +218,19 @@ extract_file(const char *path, const char *contents, size_t len,
 		goto out;
 	}
 
+#if CONFIG_LIBVFSCORE
+	if (borrow && len) {
+		struct vfscore_borrow b = { .data = contents, .len = len };
+
+		/* A file system that cannot reference the archive fails the
+		 * ioctl; the contents are copied then.
+		 */
+		if (uk_syscall_do_ioctl(fd, VFSCORE_IOC_BORROW, &b) == 0)
+			len = 0;
+	}
+#else /* !CONFIG_LIBVFSCORE */
+	(void)borrow;
+#endif /* !CONFIG_LIBVFSCORE */
 	err = write_file(fd, contents, len);
 	if (unlikely(err)) {
 		uk_pr_err("%s: Failed to load content: %s (%d)\n",
@@ -406,7 +427,7 @@ extract_section(struct cpio_ilist *ilist,
 		err = extract_dir(fullpath, mode & 0777);
 	else if (UKCPIO_IS_FILE(mode))
 		err = extract_file(fullpath, data, filesize,
-				   mode & 0777, mtime);
+				   mode & 0777, mtime, ilist->borrow);
 	else if (UKCPIO_IS_SYMLINK(mode))
 		err = extract_symlink(fullpath, data, filesize);
 	else
@@ -453,10 +474,11 @@ process_section(struct cpio_ilist *ilist,
 	return extract_section(ilist, headerp, fullpath, eof, prefixlen);
 }
 
-enum ukcpio_error
-ukcpio_extract(const char *dest, const void *buf, size_t buflen)
+static enum ukcpio_error
+extract(const char *dest, const void *buf, size_t buflen, int borrow)
 {
 	struct cpio_ilist ilist = {
+		.borrow = borrow,
 		.elms = UK_SLIST_HEAD_INITIALIZER(&ilist.elms),
 	};
 	enum ukcpio_error error = UKCPIO_SUCCESS;
@@ -520,4 +542,16 @@ ukcpio_extract(const char *dest, const void *buf, size_t buflen)
 	uk_free(a, region_base);
 
 	return error;
+}
+
+enum ukcpio_error
+ukcpio_extract(const char *dest, const void *buf, size_t buflen)
+{
+	return extract(dest, buf, buflen, 0);
+}
+
+enum ukcpio_error
+ukcpio_extract_borrowed(const char *dest, const void *buf, size_t buflen)
+{
+	return extract(dest, buf, buflen, 1);
 }

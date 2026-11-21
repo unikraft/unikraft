@@ -101,6 +101,7 @@ struct uk_sched {
 	bool is_started;
 	struct uk_thread_list thread_list;
 	struct uk_thread_list exited_threads;
+	bool collecting; /**< in uk_sched_thread_gc() */
 	struct uk_alloc *a;       /**< default allocator for struct uk_thread */
 	struct uk_alloc *a_stack; /**< default allocator for stacks */
 	struct uk_alloc *a_auxstack; /**< default allocator for aux stacks */
@@ -112,7 +113,17 @@ struct uk_sched {
 #endif /* CONFIG_LIBUKSCHED_STATS */
 };
 
+/**
+ * Release the current scheduler's threads that exited since it last
+ * idled, as its idle thread would: until then they keep their stacks. A
+ * thread made after another one exits without the CPU idling in between
+ * (a shell running one command after another) would otherwise take new
+ * stacks while the old ones pile up, and run the memory out with them.
+ */
+void uk_sched_thread_gc_current(void);
+
 /* wrapper functions over scheduler callbacks */
+
 static inline void uk_sched_yield(void)
 {
 	struct uk_sched *s;

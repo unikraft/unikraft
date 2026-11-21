@@ -3,3 +3,7 @@ uk_version
 uk_boot_shutdown_req
 uk_boot_early_init
 uk_boot_entry
+uk_heap_release_range
+uk_heap_back_range
+uk_heap_palloc_backed
+uk_heap_pfree
