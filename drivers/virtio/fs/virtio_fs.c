@@ -34,7 +34,7 @@ struct uk_virtiofs_dev {
 	__u16 vq_len[2];
 	struct virtqueue *vq_prio;
 	struct virtqueue *vq_req;
-	struct uk_waitq wq;
+	struct uk_waitq space_waitq;
 };
 
 static struct uk_virtiofs_dev *devlist;
@@ -89,7 +89,7 @@ static int virtio_fs_add_dev(struct virtio_dev *dev)
 		return -ENOMEM;
 
 	vfsdev->vdev = dev;
-	uk_waitq_init(&vfsdev->wq);
+	uk_waitq_init(&vfsdev->space_waitq);
 	/* Read in filesystem tag from device config space */
 	r = virtio_config_get(dev, __offsetof(struct virtio_fs_config, tag),
 			      vfsdev->tag, sizeof(vfsdev->tag), 1);
@@ -131,11 +131,36 @@ struct uk_virtiofs_dev *uk_virtiofs_dev_lookup(const char *tag)
 }
 
 struct virtiofs_thread_cookie {
+	__spinlock lock;
+	struct uk_thread *waiter;
 	__u32 rlen;
 	int done;
 };
 
-/* Called when replies are received; drain all completed cookies and wake wq */
+/*
+ * Pair blocking with completion under the cookie lock. Taking the lock
+ * before returning also keeps the stack cookie alive until the ISR is
+ * finished using it.
+ */
+static __ssz virtiofs_wait_reply(struct virtiofs_thread_cookie *cookie)
+{
+	unsigned long flags;
+	__u32 len;
+
+	ukplat_spin_lock_irqsave(&cookie->lock, flags);
+	while (!cookie->done) {
+		cookie->waiter = uk_thread_current();
+		uk_thread_block(cookie->waiter);
+		ukplat_spin_unlock_irqrestore(&cookie->lock, flags);
+		uk_sched_yield();
+		ukplat_spin_lock_irqsave(&cookie->lock, flags);
+	}
+	len = cookie->rlen;
+	ukplat_spin_unlock_irqrestore(&cookie->lock, flags);
+	return len;
+}
+
+/* Drain replies and notify waiters for newly available descriptors. */
 static
 int virtiofs_recv(struct virtqueue *vq, void *priv)
 {
@@ -145,12 +170,18 @@ int virtiofs_recv(struct virtqueue *vq, void *priv)
 	int dequeued = 0;
 
 	while (virtqueue_buffer_dequeue(vq, (void **)&cookie, &len) >= 0) {
+		unsigned long flags;
+
+		ukplat_spin_lock_irqsave(&cookie->lock, flags);
 		cookie->rlen = len;
-		__atomic_store_n(&cookie->done, 1, __ATOMIC_RELEASE);
+		cookie->done = 1;
+		if (cookie->waiter)
+			uk_thread_wake_isr(cookie->waiter);
+		ukplat_spin_unlock_irqrestore(&cookie->lock, flags);
 		dequeued = 1;
 	}
 	if (dequeued && dev)
-		uk_waitq_wake_up_isr(&dev->wq);
+		uk_waitq_wake_up_isr(&dev->space_waitq);
 	return 1;
 }
 
@@ -316,7 +347,9 @@ __ssz virtiofs_submit_and_wait(struct uk_virtiofs_dev *dev,
 			       struct virtqueue *vq, struct uk_sglist *sg,
 			       __u16 in_segs, __u16 out_segs)
 {
-	struct virtiofs_thread_cookie cookie = { .rlen = 0, .done = 0 };
+	struct virtiofs_thread_cookie cookie = {
+		.lock = UKARCH_SPINLOCK_INITIALIZER(),
+	};
 	const unsigned int total_segs = (unsigned int)in_segs + out_segs;
 	int r;
 
@@ -328,13 +361,11 @@ __ssz virtiofs_submit_and_wait(struct uk_virtiofs_dev *dev,
 		if (r != -ENOSPC)
 			return r;
 		virtqueue_host_notify(vq);
-		uk_waitq_wait_event(&dev->wq,
+		uk_waitq_wait_event(&dev->space_waitq,
 				    virtqueue_desc_avail(vq) >= total_segs);
 	}
 	virtqueue_host_notify(vq);
-	uk_waitq_wait_event(&dev->wq,
-			    __atomic_load_n(&cookie.done, __ATOMIC_ACQUIRE));
-	return cookie.rlen;
+	return virtiofs_wait_reply(&cookie);
 }
 
 /**
