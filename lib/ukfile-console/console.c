@@ -50,13 +50,19 @@ static const char SERIAL_VOLID[] = "serial_vol";
 #define SERIAL_TERMIOS_IFLAGS (IUTF8|ICRNL)
 #define SERIAL_TERMIOS_OFLAGS (0)
 #define SERIAL_TERMIOS_CFLAGS (CREAD|CS8|B38400)
+#if CONFIG_LIBUKFILE_CONSOLE_IN_NOECHOBACK
+#define SERIAL_TERMIOS_LFLAGS (ICANON)
+#else /* !CONFIG_LIBUKFILE_CONSOLE_IN_NOECHOBACK */
 #define SERIAL_TERMIOS_LFLAGS (ICANON|ECHO)
+#endif /* !CONFIG_LIBUKFILE_CONSOLE_IN_NOECHOBACK */
 
-/* Linux only fills in 19 chars; bincompat might expect this */
+/* Linux fills in 19 control chars; copy exactly that many to and from the
+ * caller's buffer, which the program sizes to its own libc's struct termios.
+ */
 #define KNCCS 19
 
 /* Values taken from termios(3) from Linux man-pages 6.05 */
-static const char SERIAL_TERMIOS_CONTROL_CHARS[KNCCS] = {
+static const cc_t SERIAL_TERMIOS_CONTROL_CHARS[KNCCS] = {
 	[VDISCARD] = 017,
 	[VEOF] = SERIAL_EOT,
 	[VEOL] = 0,
@@ -93,8 +99,30 @@ struct consolefd_alloc {
 	__u32 pending_events;
 	/* Entry in consf_async_list; only linked for async-backed files. */
 	struct uk_list_head async_list;
+	/* An async read returned the data before an EOT: the next returns 0 */
+	int eot;
+	/*
+	 * Line settings, mutable: a program switches the terminal to raw
+	 * mode (ICANON/ECHO off) to take over echo and line editing, then
+	 * reads them back with TCGETS.  Echoing input regardless of ECHO
+	 * shows every character twice for a program that does its own echo,
+	 * an interactive shell's line editor, say.
+	 */
+	struct termios termios;
+#if CONFIG_LIBUKFILE_CONSOLE_IN_EOF_FINAL
+	/* The console reached the end of its input, for good */
+	int eof;
+#endif /* CONFIG_LIBUKFILE_CONSOLE_IN_EOF_FINAL */
 	/* Mutex to synchronize file read/write event management */
 	struct uk_mutex mtx;
+	/* Writes go to the console's standard error stream */
+	int err;
+	/*
+	 * The file whose line settings and end of input this one shares:
+	 * itself, or the console file a standard error file was made from,
+	 * which it holds a reference to.
+	 */
+	struct consolefd_alloc *tty;
 };
 
 static inline struct consolefd_alloc *to_consf(const struct uk_file *f)
@@ -102,127 +130,60 @@ static inline struct consolefd_alloc *to_consf(const struct uk_file *f)
 	return __containerof(f, struct consolefd_alloc, f);
 }
 
-#if CONFIG_LIBUKFILE_CONSOLE_OUT_NOCARRIAGERETURN
-static inline __ssz _console_out(struct uk_console *cons,
-				 const char *buf, __sz len)
+/* The line settings of the terminal @f is on */
+static inline struct termios *to_termios(const struct uk_file *f)
 {
-	return uk_console_out_direct(cons, buf, len);
+	return &to_consf(f)->tty->termios;
 }
-#else /* !CONFIG_LIBUKFILE_CONSOLE_OUT_NOCARRIAGERETURN */
-/* TODO: Some consoles require both a newline and a carriage return to
- * go to the start of the next line. This kind of behavior should be in
- * a single place in posix-tty. We keep this workaround until we have feature
- * in posix-tty that handles newline characters correctly.
- */
-static inline __ssz _console_out(struct uk_console *cons,
-				 const char *buf, __sz len)
+
+#if CONFIG_LIBUKFILE_CONSOLE_IN_EOF_FINAL
+/* Whether the console behind @f reached the end of its input */
+static inline int *to_eof(const struct uk_file *f)
 {
-	const char *next_nl = NULL;
-	__sz l = len;
-	__sz off = 0;
-	__ssz rc = 0;
-
-	if (unlikely(!len))
-		return 0;
-	if (unlikely(!buf))
-		return -EINVAL;
-
-	while (l > 0) {
-		next_nl = memchr(buf, '\n', l);
-		if (next_nl) {
-			off = next_nl - buf;
-
-			if ((rc = uk_console_out_direct(cons, buf, off)) < 0)
-				return rc;
-			if ((rc = uk_console_out_direct(cons, "\r\n", 2)) < 0)
-				return rc;
-			buf = next_nl + 1;
-			l -= off + 1;
-		} else {
-			if ((rc = uk_console_out_direct(cons, buf, l)) < 0)
-				return rc;
-			break;
-		}
-	}
-
-	return len;
+	return &to_consf(f)->tty->eof;
 }
-#endif /* !CONFIG_LIBUKFILE_CONSOLE_OUT_NOCARRIAGERETURN */
+#endif /* CONFIG_LIBUKFILE_CONSOLE_IN_EOF_FINAL */
 
 /*
- * Non-blocking single-shot output helper for async TX paths.
- *
- * Unlike _console_out (which uses uk_console_out_direct_all and blocks until
- * every byte is delivered), this helper calls uk_console_out_direct once per
- * segment and returns immediately if the TX queue is full (rc == 0).
- *
- * Returns the number of bytes from the original @buf that were consumed
- * (not counting injected CR bytes), 0 if the queue is full at the very
- * first attempt, or < 0 on a hard error.
+ * Writes to a console device, each newline as CR-LF where
+ * CONFIG_LIBUKCONSOLE_ONLCR asks for it, unless this library is set to
+ * write them as they are.  Either way a write stops at the first partial
+ * one and returns how much of the buffer went out (see
+ * uk_console_out_direct_onlcr()), so an async TX path resumes where the
+ * queue filled.
  */
 #if CONFIG_LIBUKFILE_CONSOLE_OUT_NOCARRIAGERETURN
-static inline __ssz _console_out_nb(struct uk_console *cons,
-				    const char *buf, __sz len)
-{
-	return uk_console_out_direct(cons, buf, len);
-}
+#define consf_out_direct uk_console_out_direct
+#define consf_err_direct uk_console_err_direct
 #else /* !CONFIG_LIBUKFILE_CONSOLE_OUT_NOCARRIAGERETURN */
-static inline __ssz _console_out_nb(struct uk_console *cons,
-				    const char *buf, __sz len)
-{
-	const char *next_nl;
-	__sz consumed = 0;
-	__sz l = len, seg;
-	__ssz rc;
-
-	if (unlikely(!len))
-		return 0;
-	if (unlikely(!buf))
-		return -EINVAL;
-
-	while (l > 0) {
-		next_nl = memchr(buf, '\n', l);
-		if (next_nl) {
-			seg = (__sz)(next_nl - buf);
-
-			if (seg > 0) {
-				rc = uk_console_out_direct(cons, buf, seg);
-				if (rc == 0)
-					return (__ssz)consumed;
-				if (unlikely(rc < 0))
-					return rc;
-				consumed += (__sz)rc;
-				if ((__sz)rc < seg)
-					return (__ssz)consumed;
-			}
-
-			/* Inject \r\n; if the queue is full here the original
-			 * '\n' is treated as not yet consumed so the caller
-			 * retries from it on the next writable wakeup.
-			 */
-			rc = uk_console_out_direct(cons, "\r\n", 2);
-			if (rc == 0)
-				return (__ssz)consumed;
-			if (unlikely(rc < 0))
-				return rc;
-
-			consumed++;   /* advance past the original '\n' */
-			buf = next_nl + 1;
-			l -= seg + 1;
-		} else {
-			rc = uk_console_out_direct(cons, buf, l);
-			if (rc == 0)
-				return (__ssz)consumed;
-			if (unlikely(rc < 0))
-				return rc;
-			consumed += (__sz)rc;
-			break;
-		}
-	}
-
-	return (__ssz)consumed;
-}
+#define consf_out_direct uk_console_out_direct_onlcr
+#define consf_err_direct uk_console_err_direct_onlcr
 #endif /* !CONFIG_LIBUKFILE_CONSOLE_OUT_NOCARRIAGERETURN */
+
+/* How a write to @f reaches its console */
+static inline uk_console_out_func consf_writer(const struct uk_file *f)
+{
+	return to_consf(f)->err ? consf_err_direct : consf_out_direct;
+}
+
+/* Whether @f reaches a terminal, as its console says: on the other side
+ * of it may be a pipe or a file, which programs must not take for one.
+ */
+static inline __bool consf_is_terminal(const struct uk_file *f)
+{
+	int stream = to_consf(f)->err ? UK_CONSOLE_STREAM_ERR
+				      : UK_CONSOLE_STREAM_INOUT;
+
+	return uk_console_is_terminal(f->node, stream);
+}
+
+/* Whether input read from @f is echoed to the console: what a pipe or a
+ * file feeds in is not, as no terminal shows it
+ */
+static inline int consf_echo(const struct uk_file *f, __bool terminal)
+{
+	return terminal && (to_termios(f)->c_lflag & ECHO);
+}
 
 static ssize_t serial_read(const struct uk_file *f,
 			   const struct iovec *iov, size_t iovcnt,
@@ -230,12 +191,22 @@ static ssize_t serial_read(const struct uk_file *f,
 {
 	struct uk_console *cons = f->node;
 	ssize_t total = 0;
+	__bool terminal;
+	int echo;
 
 	UK_ASSERT(f->vol == SERIAL_VOLID);
 	UK_ASSERT(f->node);
 
 	if (unlikely(off))
 		return -ESPIPE;
+
+	terminal = consf_is_terminal(f);
+	echo = consf_echo(f, terminal);
+
+#if CONFIG_LIBUKFILE_CONSOLE_IN_EOF_FINAL
+	if (*to_eof(f))
+		return 0;
+#endif /* CONFIG_LIBUKFILE_CONSOLE_IN_EOF_FINAL */
 
 	if (!uk_file_poll_immediate(f, UKFD_POLLIN))
 		return 0;
@@ -258,20 +229,46 @@ static ssize_t serial_read(const struct uk_file *f,
 		total += bytes_read;
 
 		last = buf + bytes_read - 1;
-		if (*last == '\r')
+		/* A terminal's Enter; a pipe's bytes stay as they are */
+		if (*last == '\r' && terminal)
 			*last = '\n';
 
-#if !CONFIG_LIBUKFILE_CONSOLE_IN_NOECHOBACK
-		/* Echo the input to the console (NOT stdout!) */
-		_console_out(cons, buf, bytes_read);
-#endif /* !CONFIG_LIBUKFILE_CONSOLE_IN_NOECHOBACK */
+		/* EOT (^D) ends the input. Strip it from the data, as a
+		 * terminal does, and have the next read return 0, the end of
+		 * file: by clearing POLLIN or, with
+		 * CONFIG_LIBUKFILE_CONSOLE_IN_EOF_FINAL, by remembering it.
+		 */
+		if (*last == SERIAL_EOT) {
+			total--;
+#if CONFIG_LIBUKFILE_CONSOLE_IN_EOF_FINAL
+			/* No more input will come: the file stays readable,
+			 * as a file or a pipe at its end does, so poll() and
+			 * select() report the end of file a read returns.
+			 */
+			*to_eof(f) = 1;
+#else /* !CONFIG_LIBUKFILE_CONSOLE_IN_EOF_FINAL */
+			uk_file_event_clear(f, UKFD_POLLIN);
+#endif /* !CONFIG_LIBUKFILE_CONSOLE_IN_EOF_FINAL */
+			if (bytes_read > 1 && echo)
+				consf_out_direct(cons, buf, bytes_read - 1);
+			break;
+		}
+
+		/* Echo the input to the console (NOT stdout!), unless a
+		 * program turned ECHO off to do its own
+		 */
+		if (echo)
+			consf_out_direct(cons, buf, bytes_read);
 
 		if (*last == '\n')
 			break;
-		if (*last == SERIAL_EOT)
-			uk_file_event_clear(f, UKFD_POLLIN);
 	}
 
+#if CONFIG_LIBUKFILE_CONSOLE_IN_EOF_FINAL
+	/* POLLIN stays set at the end, so it cannot mean "try again" */
+	if (*to_eof(f))
+		return total;
+#endif /* CONFIG_LIBUKFILE_CONSOLE_IN_EOF_FINAL */
 	if (total || !uk_file_poll_immediate(f, UKFD_POLLIN))
 		return total;
 	else
@@ -297,6 +294,9 @@ static ssize_t serial_read_async(const struct uk_file *f,
 	struct uk_console *cons = f->node;
 	struct consolefd_alloc *consf;
 	ssize_t total = 0;
+	int eot = 0;
+	__bool terminal;
+	int echo;
 	__ssz rc;
 
 	UK_ASSERT(f->node);
@@ -304,9 +304,26 @@ static ssize_t serial_read_async(const struct uk_file *f,
 	if (unlikely(off))
 		return -ESPIPE;
 
+	terminal = consf_is_terminal(f);
+	echo = consf_echo(f, terminal);
+
 	consf = to_consf(f);
 
 	uk_mutex_lock(&consf->mtx);
+
+#if CONFIG_LIBUKFILE_CONSOLE_IN_EOF_FINAL
+	if (*to_eof(f)) {
+		uk_mutex_unlock(&consf->mtx);
+		return 0;
+	}
+#endif /* CONFIG_LIBUKFILE_CONSOLE_IN_EOF_FINAL */
+
+	/* The previous read ended at an EOT: this one is the end of file */
+	if (consf->eot) {
+		consf->eot = 0;
+		uk_mutex_unlock(&consf->mtx);
+		return 0;
+	}
 
 	for (size_t i = 0; i < iovcnt; i++) {
 		char *buf = iov[i].iov_base;
@@ -334,22 +351,41 @@ static ssize_t serial_read_async(const struct uk_file *f,
 		total += rc;
 
 		last = buf + rc - 1;
-		if (*last == '\r')
+		/* A terminal's Enter; a pipe's bytes stay as they are */
+		if (*last == '\r' && terminal)
 			*last = '\n';
 
-#if !CONFIG_LIBUKFILE_CONSOLE_IN_NOECHOBACK
-		/* Echo only the bytes actually read, not the full iov len. */
-		_console_out(cons, buf, (__sz)rc);
-#endif /* !CONFIG_LIBUKFILE_CONSOLE_IN_NOECHOBACK */
+		/* EOT (^D) ends the input: strip it from the data, as a
+		 * terminal does. What came before it is returned now and the
+		 * end of file by the next read; POLLIN is still set, so a
+		 * poll() does not wait for it.
+		 */
+		if (*last == SERIAL_EOT) {
+			eot = 1;
+			total--;
+			rc--;
+#if CONFIG_LIBUKFILE_CONSOLE_IN_EOF_FINAL
+			/* For good: readable from now on, at its end */
+			*to_eof(f) = 1;
+			uk_file_event_set(f, UKFD_POLLIN);
+#else /* !CONFIG_LIBUKFILE_CONSOLE_IN_EOF_FINAL */
+			if (total)
+				consf->eot = 1;
+#endif /* !CONFIG_LIBUKFILE_CONSOLE_IN_EOF_FINAL */
+		}
 
-		if (*last == '\n' || *last == SERIAL_EOT)
+		/* Echo only the bytes actually read, not the full iov len. */
+		if (rc && echo)
+			consf_out_direct(cons, buf, (__sz)rc);
+
+		if (eot || *last == '\n')
 			break;
 	}
 
 	uk_mutex_unlock(&consf->mtx);
 
 	/* If nothing was read (spurious wakeup), tell the caller to wait. */
-	return total ? total : -EAGAIN;
+	return (total || eot) ? total : -EAGAIN;
 }
 
 static ssize_t serial_write(const struct uk_file *f,
@@ -368,16 +404,19 @@ static ssize_t serial_write(const struct uk_file *f,
 	for (size_t i = 0; i < iovcnt; i++) {
 		char *buf = iov[i].iov_base;
 		size_t len = iov[i].iov_len;
-		int bytes_written;
+		__ssz bytes_written;
 
 		if (unlikely(!buf && len))
 			return  -EFAULT;
 
-		bytes_written = _console_out(cons, buf, len);
+		bytes_written = consf_writer(f)(cons, buf, len);
 		if (unlikely(bytes_written < 0))
 			return bytes_written;
 
 		total += bytes_written;
+		/* A partial write: the caller writes the rest */
+		if ((__sz)bytes_written < len)
+			break;
 	}
 
 	return total;
@@ -390,7 +429,7 @@ static ssize_t serial_write(const struct uk_file *f,
  * ready.  UKFD_POLLOUT is not pre-set at file creation time; instead the
  * evmon thread sets it when the driver's TX completion interrupt fires.
  *
- * If the TX queue becomes full mid-write (_console_out_nb returns 0),
+ * If the TX queue becomes full mid-write (a partial write),
  * UKFD_POLLOUT is cleared so the caller blocks until the next TX completion
  * interrupt re-sets it via the async callback.
  */
@@ -419,7 +458,7 @@ static ssize_t serial_write_async(const struct uk_file *f,
 		if (unlikely(!buf && len))
 			return -EFAULT;
 
-		rc = _console_out_nb(cons, buf, len);
+		rc = consf_writer(f)(cons, buf, len);
 		if (unlikely(rc < 0))
 			return (ssize_t)rc;
 
@@ -446,23 +485,42 @@ static int serial_ctl(const struct uk_file *f __maybe_unused,
 
 	switch (fam) {
 	case UKFILE_CTL_IOCTL:
+		/* Not a terminal: no terminal requests, as on a pipe; what
+		 * is queued can still be asked.
+		 */
+		if (req != TIOCINQ && req != TIOCOUTQ && !consf_is_terminal(f))
+			return -ENOTTY;
 		switch (req) {
+		/* Copy the four flag words and KNCCS control chars one field
+		 * at a time: the caller's struct termios is its libc's, and a
+		 * whole-struct copy could overrun a smaller one.
+		 */
 		case TCGETS:
 		{
+			const struct termios *t = to_termios(f);
 			struct termios *tc = (struct termios *)arg1;
 
-			tc->c_iflag = SERIAL_TERMIOS_IFLAGS;
-			tc->c_oflag = SERIAL_TERMIOS_OFLAGS;
-			tc->c_cflag = SERIAL_TERMIOS_CFLAGS;
-			tc->c_lflag = SERIAL_TERMIOS_LFLAGS;
-			memcpy(tc->c_cc, SERIAL_TERMIOS_CONTROL_CHARS, KNCCS);
+			tc->c_iflag = t->c_iflag;
+			tc->c_oflag = t->c_oflag;
+			tc->c_cflag = t->c_cflag;
+			tc->c_lflag = t->c_lflag;
+			memcpy(tc->c_cc, t->c_cc, KNCCS);
 			return 0;
 		}
 		case TCSETS:
 		case TCSETSW:
 		case TCSETSF:
-			uk_pr_warn_once("Serial file settings stubbed\n");
+		{
+			const struct termios *tc = (const struct termios *)arg1;
+			struct termios *t = to_termios(f);
+
+			t->c_iflag = tc->c_iflag;
+			t->c_oflag = tc->c_oflag;
+			t->c_cflag = tc->c_cflag;
+			t->c_lflag = tc->c_lflag;
+			memcpy(t->c_cc, tc->c_cc, KNCCS);
 			return 0;
+		}
 		case TIOCGWINSZ:
 		{
 			struct winsize *winsz = (struct winsize *)arg1;
@@ -517,7 +575,10 @@ static int serial_getstat(const struct uk_file *f __maybe_unused,
 	arg->stx_mask = SERIAL_STATX_MASK;
 	arg->stx_mode = S_IFCHR|0666;
 	arg->stx_nlink = 1;
-	arg->stx_ino = 1;
+	/* A standard error file of its own differs from the console's, so
+	 * programs comparing fd 1 and fd 2 tell them apart
+	 */
+	arg->stx_ino = to_consf(f)->err ? 2 : 1;
 	arg->stx_size = 0;
 
 	/* Following fields are always filled in, not in stx_mask */
@@ -578,6 +639,9 @@ static void consf_release(const struct uk_file *f, int what)
 
 	uk_list_del(&consf->async_list);
 
+	if (consf->tty != consf)
+		uk_file_release(&consf->tty->f);
+
 	/* Free */
 	uk_free(consf->a, consf);
 }
@@ -605,7 +669,8 @@ __isr static void consf_async_out_cb(struct uk_console *dev __unused,
 	uk_semaphore_up_isr(&consf_async_sem);
 }
 
-const struct uk_file *uk_file_console_create(struct uk_console *cons)
+static const struct uk_file *consf_create(struct uk_console *cons,
+					  struct consolefd_alloc *tty)
 {
 	struct consolefd_alloc *consf;
 	const struct uk_file_ops *ops;
@@ -622,6 +687,19 @@ const struct uk_file *uk_file_console_create(struct uk_console *cons)
 
 	consf->a = uk_alloc_get_default();
 	consf->pending_events = 0;
+	consf->err = !!tty;
+	consf->tty = tty ? tty : consf;
+	consf->eot = 0;
+#if CONFIG_LIBUKFILE_CONSOLE_IN_EOF_FINAL
+	consf->eof = 0;
+#endif /* CONFIG_LIBUKFILE_CONSOLE_IN_EOF_FINAL */
+	consf->termios = (struct termios){
+		.c_iflag = SERIAL_TERMIOS_IFLAGS,
+		.c_oflag = SERIAL_TERMIOS_OFLAGS,
+		.c_cflag = SERIAL_TERMIOS_CFLAGS,
+		.c_lflag = SERIAL_TERMIOS_LFLAGS,
+	};
+	memcpy(consf->termios.c_cc, SERIAL_TERMIOS_CONTROL_CHARS, KNCCS);
 	UK_INIT_LIST_HEAD(&consf->async_list);
 
 	/*
@@ -709,7 +787,28 @@ const struct uk_file *uk_file_console_create(struct uk_console *cons)
 
 	uk_mutex_init(&consf->mtx);
 
+	if (tty)
+		uk_file_acquire(&tty->f);
+
 	return &consf->f;
+}
+
+const struct uk_file *uk_file_console_create(struct uk_console *cons)
+{
+	return consf_create(cons, __NULL);
+}
+
+const struct uk_file *uk_file_console_create_err(const struct uk_file *f)
+{
+	struct consolefd_alloc *tty;
+
+	UK_ASSERT(f);
+
+	if (f->vol != SERIAL_VOLID)
+		return __NULL;
+
+	tty = to_consf(f)->tty;
+	return consf_create(f->node, tty);
 }
 
 /*
