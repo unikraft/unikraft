@@ -271,11 +271,49 @@ int uk_sys_clock_nanosleep(clockid_t clockid, int flags,
 			   const struct timespec *request,
 			   struct timespec *remain)
 {
-	if ((clockid == CLOCK_REALTIME) && !(flags & TIMER_ABSTIME))
+	struct timespec rel;
+	__nsec now, target;
+
+	if (!request || request->tv_nsec < 0 || request->tv_nsec > 999999999)
+		return -EINVAL;
+
+	/* The clocks one can sleep on, as uk_sys_clock_gettime reads them.
+	 * They all advance in lockstep with the monotonic clock, so a
+	 * relative request is the same sleep on any of them.
+	 */
+	switch (clockid) {
+	case CLOCK_MONOTONIC:
+	case CLOCK_MONOTONIC_RAW:
+	case CLOCK_MONOTONIC_COARSE:
+	case CLOCK_BOOTTIME:
+		now = ukplat_monotonic_clock();
+		break;
+	case CLOCK_REALTIME:
+	case CLOCK_REALTIME_COARSE:
+		now = ukplat_wall_clock();
+		break;
+	default:
+		/* CPU-time clocks cannot be slept on (POSIX: EINVAL), nor can
+		 * an unknown clock id.
+		 */
+		return -EINVAL;
+	}
+
+	if (!(flags & TIMER_ABSTIME))
 		return uk_sys_nanosleep(request, remain);
 
-	UK_WARN_STUBBED();
-	return 0;
+	/* An absolute deadline on the requested clock: what glibc's and
+	 * CPython's sleep loops issue (CLOCK_MONOTONIC + TIMER_ABSTIME), and
+	 * what they retry with after -EINTR.  A deadline already reached
+	 * returns at once; `remain` is not written with TIMER_ABSTIME.
+	 */
+	target = ukarch_time_sec_to_nsec((__nsec)request->tv_sec)
+		 + (__nsec)request->tv_nsec;
+	if (target <= now)
+		return 0;
+	rel.tv_sec = ukarch_time_nsec_to_sec(target - now);
+	rel.tv_nsec = ukarch_time_subsec(target - now);
+	return uk_sys_nanosleep(&rel, NULL);
 }
 
 UK_SYSCALL_R_DEFINE(int, clock_nanosleep, clockid_t, clockid, int, flags,
