@@ -810,6 +810,181 @@ out:
 			       family.metadata_freed);
 }
 
+UK_TESTCASE(cow_vmas, bounded_mapping_preserves_on_rejection)
+{
+	struct cow_test_family family;
+	struct cow_test_space *space = NULL;
+	struct uk_vma *original;
+	const __vaddr_t start =
+		UK_PAL_PAGE_Lx_SIZE(UK_PAL_PT_LEVELS - 1) + UK_PAGING_PAGE_SIZE;
+	const __vaddr_t end = start + 4 * UK_PAGING_PAGE_SIZE;
+	__vaddr_t address;
+	__u32 value = 0;
+	int rc;
+
+	rc = cow_test_family_init(&family);
+	UK_TEST_EXPECT_ZERO(rc);
+	if (rc)
+		return;
+	space = cow_test_space_new(&family);
+	UK_TEST_EXPECT_NOT_NULL(space);
+	if (!space)
+		goto out;
+	rc = uk_vas_set_bounds(&space->vas, start + 1, end);
+	UK_TEST_EXPECT_SNUM_EQ(rc, -EINVAL);
+	rc = uk_vas_set_bounds(&space->vas, end, start);
+	UK_TEST_EXPECT_SNUM_EQ(rc, -EINVAL);
+	uk_vas_get(&space->vas);
+	rc = uk_vas_set_bounds(&space->vas, start, end);
+	UK_TEST_EXPECT_SNUM_EQ(rc, -EBUSY);
+	uk_vas_put(&space->vas);
+	rc = uk_vas_set_bounds(&space->vas, start, end);
+	UK_TEST_EXPECT_ZERO(rc);
+	if (rc)
+		goto out;
+	UK_TEST_EXPECT_SNUM_EQ(space->vas.vma_base, start);
+	rc = uk_vas_enable_cow(&space->vas, family.resident);
+	UK_TEST_EXPECT_ZERO(rc);
+	if (rc)
+		goto out;
+	address = UK_PAGING_VADDR_ANY;
+	rc = uk_vma_map_anon(&space->vas, &address, 2 * UK_PAGING_PAGE_SIZE,
+			     UK_PAGING_PAGE_ATTR_PROT_RW, 0, NULL);
+	UK_TEST_EXPECT_ZERO(rc);
+	UK_TEST_EXPECT_SNUM_EQ(address, start);
+	if (rc)
+		goto out;
+	UK_TEST_EXPECT_ZERO(uk_vas_store_u32(&space->vas, start, 0x11223344U));
+	original = uk_vma_find(&space->vas, start);
+	address = start - UK_PAGING_PAGE_SIZE;
+	rc = uk_vma_map_anon(&space->vas, &address, 2 * UK_PAGING_PAGE_SIZE,
+			     UK_PAGING_PAGE_ATTR_PROT_RW,
+			     UK_VMA_MAP_REPLACE, NULL);
+	UK_TEST_EXPECT_SNUM_EQ(rc, -ENOMEM);
+	UK_TEST_EXPECT_PTR_EQ(uk_vma_find(&space->vas, start), original);
+	UK_TEST_EXPECT_ZERO(cow_test_read(space, start, &value));
+	UK_TEST_EXPECT_SNUM_EQ(value, 0x11223344U);
+	address = end - UK_PAGING_PAGE_SIZE;
+	rc = uk_vma_map_anon(&space->vas, &address, 2 * UK_PAGING_PAGE_SIZE,
+			     UK_PAGING_PAGE_ATTR_PROT_RW,
+			     UK_VMA_MAP_REPLACE, NULL);
+	UK_TEST_EXPECT_SNUM_EQ(rc, -ENOMEM);
+	UK_TEST_EXPECT_NULL(uk_vma_find(&space->vas, address));
+	rc = uk_vas_set_bounds(&space->vas, start, end + UK_PAGING_PAGE_SIZE);
+	UK_TEST_EXPECT_SNUM_EQ(rc, -EBUSY);
+	UK_TEST_EXPECT_SNUM_EQ(space->vas.range_end, end);
+	address = UK_PAGING_VADDR_ANY;
+	rc = uk_vma_map_anon(&space->vas, &address, 3 * UK_PAGING_PAGE_SIZE,
+			     UK_PAGING_PAGE_ATTR_PROT_RW, 0, NULL);
+	UK_TEST_EXPECT_SNUM_EQ(rc, -ENOMEM);
+	address = UK_PAGING_VADDR_ANY;
+	rc = uk_vma_map_anon(&space->vas, &address, 2 * UK_PAGING_PAGE_SIZE,
+			     UK_PAGING_PAGE_ATTR_PROT_RW, 0, NULL);
+	UK_TEST_EXPECT_ZERO(rc);
+	UK_TEST_EXPECT_SNUM_EQ(address, start + 2 * UK_PAGING_PAGE_SIZE);
+	if (rc)
+		goto out;
+	rc = uk_vas_store_u32(&space->vas, end - UK_PAGING_PAGE_SIZE, 77);
+	UK_TEST_EXPECT_ZERO(rc);
+	address = UK_PAGING_VADDR_ANY;
+	rc = uk_vma_map_anon(&space->vas, &address, UK_PAGING_PAGE_SIZE,
+			     UK_PAGING_PAGE_ATTR_PROT_RW, 0, NULL);
+	UK_TEST_EXPECT_SNUM_EQ(rc, -ENOMEM);
+	UK_TEST_EXPECT_ZERO(cow_test_read(space, start, &value));
+	UK_TEST_EXPECT_SNUM_EQ(value, 0x11223344U);
+	uk_pr_info("COW_VMA_BOUNDS_PASS mapping\n");
+out:
+	cow_test_space_put(&space);
+	cow_test_family_close(&family);
+	UK_TEST_EXPECT_ZERO(family.cleanup_errors);
+	UK_TEST_EXPECT_ZERO(family.frames.errors);
+	UK_TEST_EXPECT_ZERO(family.frames.live);
+	UK_TEST_EXPECT_SNUM_EQ(family.frames.allocated, family.frames.freed);
+	UK_TEST_EXPECT_SNUM_EQ(family.metadata_allocated,
+			       family.metadata_freed);
+}
+
+UK_TESTCASE(cow_vmas, clone_respects_destination_bounds)
+{
+	struct cow_test_family family;
+	struct cow_test_space *parent = NULL, *child = NULL;
+	const __vaddr_t start =
+		UK_PAL_PAGE_Lx_SIZE(UK_PAL_PT_LEVELS - 1) + UK_PAGING_PAGE_SIZE;
+	const __vaddr_t end = start + 4 * UK_PAGING_PAGE_SIZE;
+	__vaddr_t address = UK_PAGING_VADDR_ANY;
+	__paddr_t original = 0, after = 0;
+	unsigned long attr = 0;
+	__u32 value = 0;
+	int rc;
+
+	rc = cow_test_family_init(&family);
+	UK_TEST_EXPECT_ZERO(rc);
+	if (rc)
+		return;
+	parent = cow_test_space_new(&family);
+	child = cow_test_space_new(&family);
+	UK_TEST_EXPECT_NOT_NULL(parent);
+	UK_TEST_EXPECT_NOT_NULL(child);
+	if (!parent || !child)
+		goto out;
+	UK_TEST_EXPECT_ZERO(uk_vas_set_bounds(&parent->vas, start, end));
+	rc = uk_vas_set_bounds(&child->vas, start + UK_PAGING_PAGE_SIZE, end);
+	UK_TEST_EXPECT_ZERO(rc);
+	rc = uk_vas_enable_cow(&parent->vas, family.resident);
+	UK_TEST_EXPECT_ZERO(rc);
+	if (rc)
+		goto out;
+	rc = uk_vma_map_anon(&parent->vas, &address, UK_PAGING_PAGE_SIZE,
+			     UK_PAGING_PAGE_ATTR_PROT_RW, 0, NULL);
+	UK_TEST_EXPECT_ZERO(rc);
+	UK_TEST_EXPECT_SNUM_EQ(address, start);
+	if (rc)
+		goto out;
+	UK_TEST_EXPECT_ZERO(uk_vas_store_u32(&parent->vas, start, 0x1234U));
+	UK_TEST_EXPECT_ZERO(cow_test_mapping(parent, start, &original, NULL));
+	rc = uk_vas_clone_cow(&child->vas, &parent->vas);
+	UK_TEST_EXPECT_SNUM_EQ(rc, -ENOTSUP);
+	UK_TEST_EXPECT_NULL(child->vas.cow);
+	UK_TEST_EXPECT(uk_list_empty(&child->vas.vma_list));
+	UK_TEST_EXPECT_NULL(parent->vas.transition);
+	UK_TEST_EXPECT_ZERO(cow_test_mapping(parent, start, &after, &attr));
+	UK_TEST_EXPECT_SNUM_EQ(after, original);
+	UK_TEST_EXPECT(attr & UK_PAGING_PAGE_ATTR_PROT_WRITE);
+	UK_TEST_EXPECT_SNUM_EQ(child->vas.range_start,
+			       start + UK_PAGING_PAGE_SIZE);
+	rc = uk_vas_set_bounds(&child->vas, start, end);
+	UK_TEST_EXPECT_ZERO(rc);
+	if (rc)
+		goto out;
+	rc = uk_vas_clone_cow(&child->vas, &parent->vas);
+	UK_TEST_EXPECT_ZERO(rc);
+	if (rc)
+		goto out;
+	UK_TEST_EXPECT_ZERO(cow_test_mapping(parent, start, NULL, &attr));
+	UK_TEST_EXPECT_ZERO(attr & UK_PAGING_PAGE_ATTR_PROT_WRITE);
+	UK_TEST_EXPECT_ZERO(uk_vas_store_u32(&child->vas, start, 0xabcdU));
+	UK_TEST_EXPECT_ZERO(cow_test_read(parent, start, &value));
+	UK_TEST_EXPECT_SNUM_EQ(value, 0x1234U);
+	UK_TEST_EXPECT_ZERO(cow_test_read(child, start, &value));
+	UK_TEST_EXPECT_SNUM_EQ(value, 0xabcdU);
+	address = UK_PAGING_VADDR_ANY;
+	rc = uk_vma_map_anon(&child->vas, &address, UK_PAGING_PAGE_SIZE,
+			     UK_PAGING_PAGE_ATTR_PROT_RW, 0, NULL);
+	UK_TEST_EXPECT_ZERO(rc);
+	UK_TEST_EXPECT_SNUM_EQ(address, start + UK_PAGING_PAGE_SIZE);
+	uk_pr_info("COW_VMA_BOUNDS_PASS clone\n");
+out:
+	cow_test_space_put(&parent);
+	cow_test_space_put(&child);
+	cow_test_family_close(&family);
+	UK_TEST_EXPECT_ZERO(family.cleanup_errors);
+	UK_TEST_EXPECT_ZERO(family.frames.errors);
+	UK_TEST_EXPECT_ZERO(family.frames.live);
+	UK_TEST_EXPECT_SNUM_EQ(family.frames.allocated, family.frames.freed);
+	UK_TEST_EXPECT_SNUM_EQ(family.metadata_allocated,
+			       family.metadata_freed);
+}
+
 UK_TESTCASE(cow_vmas, private_clone_and_parent_exit)
 {
 	struct cow_test_family family;
