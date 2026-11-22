@@ -281,64 +281,111 @@ void pprocess_signal_wait(struct posix_thread *thread)
 	}
 }
 
+/* The selected process pin covers allocation, enqueue and FD notification. */
+static int signal_process_pinned(struct posix_process *process, int signum,
+				 siginfo_t *siginfo)
+{
+	struct uk_signal *signal;
+	unsigned long flags;
+	bool queued = false;
+	int result = 0;
+
+	if (signum == SIGSTOP || signum == SIGCONT)
+		return 0;
+	signal = uk_signal_alloc(process->_a);
+	if (!signal)
+		return -EAGAIN;
+	if (siginfo)
+		set_siginfo_sigqueue(signum, &signal->siginfo, siginfo);
+	else
+		set_siginfo_kill(signum, &signal->siginfo);
+	flags = pprocess_lock_acquire();
+	if (process->exiting || process->state != POSIX_PROCESS_RUNNING ||
+	    pprocess_signal_should_drop(process, signum)) {
+		pprocess_lock_release(flags);
+		uk_signal_free(signal->alloc, signal);
+		return 0;
+	}
+	result = pprocess_signal_queue_locked(process, NULL, signal, &queued);
+	pprocess_lock_release(flags);
+	if (!queued)
+		uk_signal_free(signal->alloc, signal);
+#if CONFIG_LIBPOSIX_PROCESS_SIGNALFD
+	if (!result)
+		pprocess_signal_files_notify(process, signum);
+#endif
+	return result;
+}
+
 int pprocess_signal_process_do(pid_t pid, int signum, siginfo_t *siginfo)
 {
-	struct posix_process *pproc = NULL;
-	int rc;
+	struct posix_process *self = uk_pthread_current()->process;
+	struct posix_process *process, *target = NULL, *single;
+	struct posix_process **targets = &single;
+	struct uk_alloc *alloc = uk_alloc_get_default();
+	unsigned long flags;
+	unsigned int count = 0, index;
+	pid_t pgid = 0;
+	bool many = pid <= 0 && signum;
+	int result = -ESRCH, rc;
 
-	if (unlikely(signum != 0 && !IS_VALID(signum)))
+	if (signum && !IS_VALID(signum))
 		return -EINVAL;
-
-	if (unlikely(signum == SIGSTOP || signum == SIGCONT)) {
-		uk_pr_warn("Process stop / resume not supported. Ignoring\n");
-		return 0;
-	}
-
-	/* pid == 0 -> Send the signal to every process in the process group
-	 *             of the calling process.
-	 * pid < -1 -> Send the signal to every process in the process group
-	 *             with ID equal to -pid.
-	 */
-	if (!pid || pid < -1) {
-		uk_pr_warn("pgroups not supported, delivering to every process\n");
-		pid = -1;
-	}
-
-	/* pid == -1 -> Send the signal to every process for which the
-	 *              calling process has permissions to signal.
-	 */
-	if (pid == -1) {
-		uk_pprocess_foreach(pproc) {
-			if (!signal_check_perm(pproc))
-				continue;
-
-			if (pprocess_signal_should_drop(pproc, signum))
-				continue;
-
-			rc = pprocess_signal_send(pproc, signum, siginfo);
-			if (unlikely(rc))
-				return rc;
-		}
-		return 0;
-	}
-
-	/* Default: Send to process with pid */
-	pproc = pid2pprocess(pid);
-	if (unlikely(!pproc))
+	if (pid < -CONFIG_LIBPOSIX_PROCESS_MAX_PID)
 		return -ESRCH;
-
-	if (unlikely(signal_check_perm(pproc) == false))
-		return -EPERM;
-
-	/* If signum == 0 do only pid exist & permissions check */
-	if (!signum)
-		return 0;
-
-	/* If this signal is currently ignored, don't even try */
-	if (pprocess_signal_should_drop(pproc, signum))
-		return 0;
-
-	return pprocess_signal_send(pproc, signum, siginfo);
+	if (many) {
+		targets = uk_calloc(alloc, TIDMAP_SIZE, sizeof(*targets));
+		if (!targets)
+			return -ENOMEM;
+	}
+	flags = pprocess_lock_acquire();
+	if (pid > 0) {
+		target = pid2pprocess(pid);
+		if (!target)
+			target = tid2pprocess(pid);
+	} else if (pid != -1) {
+		pgid = pid ? -pid : self->pgid;
+	}
+	/* Snapshot and pin recipients while membership is stable. Signal zero
+	 * only checks existence and permissions; it never queues an entry.
+	 */
+	uk_pprocess_foreach(process) {
+		if (pid > 0 && process != target)
+			continue;
+		if (pgid && process->pgid != pgid)
+			continue;
+		if (pid == -1 &&
+		    (process == self || process->pid == UK_PID_INIT))
+			continue;
+		if (!signal_check_perm(process)) {
+			result = -EPERM;
+			continue;
+		}
+		if (signum) {
+			pprocess_get(process);
+			targets[count] = process;
+		}
+		count++;
+	}
+	pprocess_lock_release(flags);
+	if (!count)
+		goto out;
+	if (!signum) {
+		result = 0;
+		goto out;
+	}
+	if (signum == SIGSTOP || signum == SIGCONT)
+		uk_pr_warn("Process stop / resume not supported. Ignoring\n");
+	for (index = 0; index < count; index++) {
+		rc = signal_process_pinned(targets[index], signum, siginfo);
+		pprocess_put(targets[index]);
+		if (!rc || result)
+			result = rc;
+	}
+out:
+	if (many)
+		uk_free(alloc, targets);
+	return result;
 }
 
 int pprocess_signal_thread_do(int tid, int signum, siginfo_t *siginfo)
