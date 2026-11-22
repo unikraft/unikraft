@@ -183,8 +183,6 @@ struct posix_thread *pprocess_create_pthread(struct posix_process *pprocess,
 	pthread->tid = tid;
 	pthread->thread = th;
 
-	uk_thread_uktls_var(th, pthread_self) = pthread;
-
 #if CONFIG_LIBPOSIX_PROCESS_SIGNAL
 	err = pprocess_signal_tdesc_alloc(pthread);
 	if (unlikely(err)) {
@@ -214,6 +212,7 @@ struct posix_thread *pprocess_create_pthread(struct posix_process *pprocess,
 #if CONFIG_LIBUKVMEM_THREAD_VAS
 		th->vas = pprocess->vas;
 #endif
+		uk_thread_uktls_var(th, pthread_self) = pthread;
 		__atomic_store_n(&tid_thread[tid], pthread, __ATOMIC_RELEASE);
 		uk_list_add_tail(&pthread->thread_list_entry,
 				 &pprocess->threads);
