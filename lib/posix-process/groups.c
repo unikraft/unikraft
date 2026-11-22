@@ -2,6 +2,7 @@
 /* Copyright (c) 2026, The Unikraft Authors. All rights reserved. */
 
 #include <errno.h>
+#include <uk/process/sigowner.h>
 #include <uk/syscall.h>
 
 #include "process.h"
@@ -28,6 +29,39 @@ static struct posix_process *group_member_locked(pid_t pgid)
 			return member;
 	return NULL;
 }
+
+#if CONFIG_LIBPOSIX_PROCESS_SIGNAL
+int uk_sigowner_acquire(pid_t owner)
+{
+	struct posix_process *process;
+	unsigned long flags;
+	pid_t id;
+
+	if (!owner)
+		return 0;
+	if (owner > CONFIG_LIBPOSIX_PROCESS_MAX_PID ||
+	    owner < -CONFIG_LIBPOSIX_PROCESS_MAX_PID)
+		return -ESRCH;
+	id = owner < 0 ? -owner : owner;
+	flags = pprocess_lock_acquire();
+	process = owner < 0 ? group_member_locked(id) : pid2pprocess(id);
+	if (process)
+		pprocess_id_get_locked(id);
+	pprocess_lock_release(flags);
+	return process ? 0 : -ESRCH;
+}
+
+void uk_sigowner_release(pid_t owner)
+{
+	unsigned long flags;
+
+	if (!owner)
+		return;
+	flags = pprocess_lock_acquire();
+	pprocess_id_put_locked(owner < 0 ? -owner : owner);
+	pprocess_lock_release(flags);
+}
+#endif /* CONFIG_LIBPOSIX_PROCESS_SIGNAL */
 
 static void group_change_locked(struct posix_process *process, pid_t pgid)
 {

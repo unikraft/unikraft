@@ -2,6 +2,8 @@ alarm
 uk_process_setitimer
 uk_process_getitimer
 uk_process_alarm
+uk_sigowner_acquire
+uk_sigowner_release
 brk
 sbrk
 execl
