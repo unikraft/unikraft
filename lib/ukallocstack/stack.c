@@ -93,10 +93,6 @@ static void *stack_malloc(struct uk_alloc *a, __sz size)
 
 static void stack_free(struct uk_alloc *a, void *ptr)
 {
-#if CONFIG_LIBUKALLOCSTACK_PAGE_GUARDS
-	const struct uk_vma *vma __maybe_unused;
-#endif /* CONFIG_LIBUKALLOCSTACK_PAGE_GUARDS */
-	__vaddr_t vaddr __maybe_unused;
 	struct uk_allocstack *sa;
 	int rc __maybe_unused;
 
@@ -108,17 +104,10 @@ static void stack_free(struct uk_alloc *a, void *ptr)
 	sa = to_allocstack(a);
 
 #if CONFIG_LIBUKALLOCSTACK_PAGE_GUARDS
-	vma = uk_vma_find(sa->vas, (__vaddr_t)ptr);
-	vaddr = vma->start;
+	rc = uk_vma_unmap_at(sa->vas, (__vaddr_t)ptr);
 	/* Crash if pointer given to free is not part of any VMA. This would
 	 * normally lead to a heap corruption.
 	 */
-	UK_BUGON(!vma);
-
-	rc = uk_vma_unmap(sa->vas,
-			  vaddr,
-			  vma->end - vma->start,
-			  0);
 	UK_BUGON(rc);
 #else /* !CONFIG_LIBUKALLOCSTACK_PAGE_GUARDS */
 	uk_free(sa->parent_a, ptr);

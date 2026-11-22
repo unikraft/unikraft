@@ -18,17 +18,41 @@
 #include <uk/assert.h>
 #include <uk/list.h>
 #include <uk/pcpuvar.h>
+#include <uk/plat/spinlock.h>
 #include <uk/config.h>
 
 static __uk_pcpuvar struct uk_vas *vmem_active_vas;
+static __uk_pcpuvar struct uk_vas *vmem_no_paging_vas;
 
 /* Forward declarations */
 static void vmem_vma_unmap(struct uk_vma *vma, __vaddr_t vaddr, __sz len);
-static void vmem_vma_unlink_and_free(struct uk_vma *vma);
+
+static void vmem_vma_destroy_list(struct uk_list_head *head);
 
 struct uk_vas *uk_vas_get_active(void)
 {
 	return uk_pcpuvar_current_get(vmem_active_vas);
+}
+
+unsigned long uk_vas_paging_savef(struct uk_vas *vas)
+{
+	struct uk_vas *saved = uk_pcpuvar_current_get(vmem_no_paging_vas);
+
+	uk_pcpuvar_current_set(vmem_no_paging_vas, vas);
+	return (unsigned long)saved;
+}
+
+void uk_vas_paging_restoref(struct uk_vas *vas __maybe_unused,
+			   unsigned long state)
+{
+	UK_ASSERT(uk_pcpuvar_current_get(vmem_no_paging_vas) == vas);
+	uk_pcpuvar_current_set(vmem_no_paging_vas, (struct uk_vas *)state);
+}
+
+int uk_vas_paging_enabled(struct uk_vas *vas)
+{
+	return vas && !(UK_READ_ONCE(vas->flags) & UK_VAS_FLAG_NO_PAGING) &&
+	       uk_pcpuvar_current_get(vmem_no_paging_vas) != vas;
 }
 
 int uk_vas_set_active(struct uk_vas *vas)
@@ -62,6 +86,7 @@ int uk_vas_init(struct uk_vas *vas, struct uk_pagetable *pt __maybe_unused,
 #endif /* CONFIG_LIBUKPAGING */
 
 	vas->flags = 0;
+	ukarch_spin_init(&vas->lock);
 
 	UK_INIT_LIST_HEAD(&vas->vma_list);
 
@@ -70,22 +95,38 @@ int uk_vas_init(struct uk_vas *vas, struct uk_pagetable *pt __maybe_unused,
 
 void uk_vas_destroy(struct uk_vas *vas)
 {
+	struct uk_paging_free_batch batch;
+	UK_LIST_HEAD(dead_vmas);
 	struct uk_vma *vma, *next;
+	unsigned long irqf;
+
+	ukplat_spin_lock_irqsave(&vas->lock, irqf);
+	uk_paging_batch_begin(&batch, vas->pt);
 
 	uk_list_for_each_entry_safe(vma, next, &vas->vma_list, vma_list) {
 		vmem_vma_unmap(vma, vma->start, uk_vma_len(vma));
-		vmem_vma_unlink_and_free(vma);
+		uk_list_del_init(&vma->vma_list);
+		uk_list_add_tail(&vma->vma_list, &dead_vmas);
 	}
 
 	UK_ASSERT(uk_list_empty(&vas->vma_list));
 
 	if (uk_vas_get_active() == vas)
 		uk_pcpuvar_current_set(vmem_active_vas, __NULL);
+
+	uk_paging_batch_end(&batch);
+	ukplat_spin_unlock_irqrestore(&vas->lock, irqf);
+
+	uk_paging_free_batch_finish(&batch);
+	vmem_vma_destroy_list(&dead_vmas);
 }
 
 static void vmem_vma_destroy(struct uk_vma *vma)
 {
 	UK_ASSERT(vma);
+
+	while (__atomic_load_n(&vma->sync_inflight, __ATOMIC_ACQUIRE) != 0)
+		uk_arch_spinwait();
 
 	if (vma->ops->destroy)
 		vma->ops->destroy(vma);
@@ -93,13 +134,23 @@ static void vmem_vma_destroy(struct uk_vma *vma)
 	uk_free(vma->vas->a, vma);
 }
 
-static void vmem_vma_unlink_and_free(struct uk_vma *vma)
+static void vmem_vma_destroy_list(struct uk_list_head *head)
+{
+	struct uk_vma *vma, *next;
+
+	uk_list_for_each_entry_safe(vma, next, head, vma_list) {
+		uk_list_del_init(&vma->vma_list);
+		vmem_vma_destroy(vma);
+	}
+}
+
+static inline void vmem_vma_defer_destroy(struct uk_vma *vma,
+					  struct uk_list_head *dead_vmas)
 {
 	UK_ASSERT(vma);
-	UK_ASSERT(!uk_list_empty(&vma->vma_list));
+	UK_ASSERT(uk_list_empty(&vma->vma_list));
 
-	uk_list_del(&vma->vma_list);
-	vmem_vma_destroy(vma);
+	uk_list_add_tail(&vma->vma_list, dead_vmas);
 }
 
 static struct uk_vma *vmem_vma_find(struct uk_vas *vas, __vaddr_t vaddr,
@@ -122,7 +173,13 @@ static struct uk_vma *vmem_vma_find(struct uk_vas *vas, __vaddr_t vaddr,
 
 const struct uk_vma *uk_vma_find(struct uk_vas *vas, __vaddr_t vaddr)
 {
-	return vmem_vma_find(vas, vaddr, 0);
+	const struct uk_vma *vma;
+	unsigned long irqf;
+
+	ukplat_spin_lock_irqsave(&vas->lock, irqf);
+	vma = vmem_vma_find(vas, vaddr, 0);
+	ukplat_spin_unlock_irqrestore(&vas->lock, irqf);
+	return vma;
 }
 
 static int vmem_vma_find_range(struct uk_vas *vas, __vaddr_t *vaddr, __sz *len,
@@ -262,7 +319,8 @@ static inline int vmem_vma_can_merge(struct uk_vma *vma, struct uk_vma *next)
 		(vma->name == next->name));
 }
 
-static int vmem_vma_do_try_merge_with_next(struct uk_vma *vma)
+static int vmem_vma_do_try_merge_with_next(struct uk_vma *vma,
+					   struct uk_list_head *dead_vmas)
 {
 	struct uk_vma *next;
 	int rc;
@@ -284,19 +342,22 @@ static int vmem_vma_do_try_merge_with_next(struct uk_vma *vma)
 	/* Expand the VMA to include the next VMA */
 	vma->end = next->end;
 
-	/* Remove and destroy the next VMA. However, we keep the mapping! */
-	vmem_vma_unlink_and_free(next);
+	/* Unlink the merged next VMA; its destructor runs outside vas->lock */
+	uk_list_del_init(&next->vma_list);
+	vmem_vma_defer_destroy(next, dead_vmas);
 
 	return 0;
 }
 
-static struct uk_vma *vmem_vma_try_merge_with_next(struct uk_vma *vma)
+static struct uk_vma *
+vmem_vma_try_merge_with_next(struct uk_vma *vma, struct uk_list_head *dead_vmas)
 {
-	vmem_vma_do_try_merge_with_next(vma);
+	vmem_vma_do_try_merge_with_next(vma, dead_vmas);
 	return vma;
 }
 
-static struct uk_vma *vmem_vma_try_merge_with_prev(struct uk_vma *vma)
+static struct uk_vma *
+vmem_vma_try_merge_with_prev(struct uk_vma *vma, struct uk_list_head *dead_vmas)
 {
 	struct uk_vma *prev;
 
@@ -304,13 +365,15 @@ static struct uk_vma *vmem_vma_try_merge_with_prev(struct uk_vma *vma)
 		return vma;
 
 	prev = uk_list_prev_entry(vma, vma_list);
-	return (vmem_vma_do_try_merge_with_next(prev) == 0) ? prev : vma;
+	return (vmem_vma_do_try_merge_with_next(prev, dead_vmas) == 0) ?
+	       prev : vma;
 }
 
-static struct uk_vma *vmem_vma_try_merge(struct uk_vma *vma)
+static struct uk_vma *vmem_vma_try_merge(struct uk_vma *vma,
+					 struct uk_list_head *dead_vmas)
 {
-	vmem_vma_try_merge_with_next(vma);
-	return vmem_vma_try_merge_with_prev(vma);
+	vmem_vma_try_merge_with_next(vma, dead_vmas);
+	return vmem_vma_try_merge_with_prev(vma, dead_vmas);
 }
 
 static int vmem_vma_split(struct uk_vma *vma, __vaddr_t vaddr,
@@ -349,6 +412,7 @@ static int vmem_vma_split(struct uk_vma *vma, __vaddr_t vaddr,
 	v->attr		= vma->attr;
 	v->flags	= vma->flags;
 	v->page_lvl	= vma->page_lvl;
+	v->sync_inflight = 0;
 	v->name		= vma->name;
 
 	vma->end	= vaddr;
@@ -369,7 +433,8 @@ static inline int vmem_vma_need_split(struct uk_vma *vma, __sz len,
 
 static int vmem_vma_split_vmas(struct uk_vas *vas, __vaddr_t vaddr, __sz len,
 			       unsigned long *attr, struct uk_vma **start,
-			       struct uk_vma **end, int strict)
+			       struct uk_vma **end, int strict,
+			       struct uk_list_head *dead_vmas)
 {
 	struct uk_vma *vma_start = __NULL, *vma_end, *vma;
 	__vaddr_t vend;
@@ -415,7 +480,7 @@ static int vmem_vma_split_vmas(struct uk_vas *vas, __vaddr_t vaddr, __sz len,
 		if (vmem_vma_need_split(vma_end, right, attr)) {
 			rc = vmem_vma_split(vma_end, vend, &vma);
 			if (unlikely(rc)) {
-				vmem_vma_try_merge(vma_start);
+				vmem_vma_try_merge(vma_start, dead_vmas);
 				return rc;
 			}
 
@@ -476,43 +541,39 @@ static void vmem_vma_unmap(struct uk_vma *vma, __vaddr_t vaddr, __sz len)
 	}
 }
 
-static void vmem_vma_unmap_and_free(struct uk_vma *vma)
-{
-	vmem_vma_unmap(vma, vma->start, uk_vma_len(vma));
-	vmem_vma_destroy(vma);
-}
-
-static void vmem_vma_unmap_and_free_vmas(struct uk_vma *start,
-					 struct uk_vma *end)
+static void vmem_vma_unmap_and_defer_vmas(struct uk_vma *start,
+					  struct uk_vma *end,
+					  struct uk_list_head *dead_vmas)
 {
 	struct uk_vma *vma = start, *next;
 
 	UK_ASSERT(start);
 	UK_ASSERT(end);
 
-	/* It is safe now to unmap and free the VMAs */
-	while (vma != end) {
-		next = uk_list_next_entry(vma, vma_list);
-		vmem_vma_unmap_and_free(vma);
+	/* Unmap PTEs under vas->lock; defer VMA destruction outside lock */
+	while (1) {
+		int is_end = (vma == end);
 
+		next = is_end ? __NULL : uk_list_next_entry(vma, vma_list);
+		vmem_vma_unmap(vma, vma->start, uk_vma_len(vma));
+		UK_INIT_LIST_HEAD(&vma->vma_list);
+		vmem_vma_defer_destroy(vma, dead_vmas);
+		if (is_end)
+			break;
 		vma = next;
 	}
-
-	vmem_vma_unmap_and_free(end);
 }
 
-int uk_vma_unmap(struct uk_vas *vas, __vaddr_t vaddr, __sz len,
-		 unsigned long flags)
+static int vmem_do_unmap_locked(struct uk_vas *vas, __vaddr_t vaddr, __sz len,
+				unsigned long flags,
+				struct uk_list_head *dead_vmas)
 {
 	struct uk_vma *vma_start = __NULL, *vma_end;
 	int strict = (flags & UK_VMA_FLAG_STRICT_VMA_CHECK);
 	int rc;
 
-	if (unlikely(len == 0))
-		return 0;
-
 	rc = vmem_vma_split_vmas(vas, vaddr, len, __NULL,
-				 &vma_start, &vma_end, strict);
+				 &vma_start, &vma_end, strict, dead_vmas);
 	if (unlikely(rc)) {
 		if (rc == -ENOENT && !strict)
 			return 0;
@@ -524,9 +585,58 @@ int uk_vma_unmap(struct uk_vas *vas, __vaddr_t vaddr, __sz len,
 	vma_start->vma_list.prev->next = vma_end->vma_list.next;
 	vma_end->vma_list.next->prev   = vma_start->vma_list.prev;
 
-	vmem_vma_unmap_and_free_vmas(vma_start, vma_end);
+	vmem_vma_unmap_and_defer_vmas(vma_start, vma_end, dead_vmas);
 
 	return 0;
+}
+
+int uk_vma_unmap(struct uk_vas *vas, __vaddr_t vaddr, __sz len,
+		 unsigned long flags)
+{
+	struct uk_paging_free_batch batch;
+	UK_LIST_HEAD(dead_vmas);
+	unsigned long irqf;
+	int rc;
+
+	if (unlikely(len == 0))
+		return 0;
+
+	ukplat_spin_lock_irqsave(&vas->lock, irqf);
+	uk_paging_batch_begin(&batch, vas->pt);
+	rc = vmem_do_unmap_locked(vas, vaddr, len, flags, &dead_vmas);
+	uk_paging_batch_end(&batch);
+	ukplat_spin_unlock_irqrestore(&vas->lock, irqf);
+
+	uk_paging_free_batch_finish(&batch);
+	vmem_vma_destroy_list(&dead_vmas);
+
+	return rc;
+}
+
+int uk_vma_unmap_at(struct uk_vas *vas, __vaddr_t vaddr)
+{
+	struct uk_paging_free_batch batch;
+	UK_LIST_HEAD(dead_vmas);
+	struct uk_vma *vma;
+	unsigned long irqf;
+	int rc;
+
+	ukplat_spin_lock_irqsave(&vas->lock, irqf);
+	uk_paging_batch_begin(&batch, vas->pt);
+	vma = vmem_vma_find(vas, vaddr, 0);
+	if (unlikely(!vma))
+		rc = -ENOENT;
+	else
+		rc = vmem_do_unmap_locked(vas, vma->start,
+					  vma->end - vma->start, 0,
+					  &dead_vmas);
+	uk_paging_batch_end(&batch);
+	ukplat_spin_unlock_irqrestore(&vas->lock, irqf);
+
+	uk_paging_free_batch_finish(&batch);
+	vmem_vma_destroy_list(&dead_vmas);
+
+	return rc;
 }
 
 static __vaddr_t vmem_first_fit(struct uk_vas *vas, __vaddr_t base, __sz align,
@@ -603,10 +713,13 @@ int uk_vma_map(struct uk_vas *vas, __vaddr_t *vaddr, __sz len,
 	       const struct uk_vma_ops *ops, void *args)
 {
 	unsigned int order = UK_VMA_MAP_SIZE_TO_ORDER(flags);
+	struct uk_paging_free_batch batch;
+	UK_LIST_HEAD(dead_vmas);
 	int rc, to_lvl, algn_lvl, strict;
 	struct uk_vma *vma_start = __NULL;
 	struct uk_vma *vma_end = __NULL;
 	struct uk_vma *vma = __NULL;
+	unsigned long irqf;
 	unsigned long extf;
 	unsigned long flgs;
 	__vaddr_t va, base;
@@ -632,65 +745,34 @@ int uk_vma_map(struct uk_vas *vas, __vaddr_t *vaddr, __sz len,
 		return -EINVAL;
 
 	va = *vaddr;
-	if (va == UK_PAGING_VADDR_ANY) {
-		/* Select the first virtual address range starting at the
-		 * mapping base that can accommodate the requested VMA.
-		 */
-		base = (ops->get_base) ? ops->get_base(vas, args, flags) :
-					 vas->vma_base;
-
-		va = vmem_first_fit(vas, base, UK_PAGING_PAGE_Lx_SIZE(algn_lvl),
-				    len);
-		if (unlikely(va == UK_PAGING_VADDR_INV))
-			return -ENOMEM;
-	} else {
-		if (unlikely(!UK_PAGING_PAGE_Lx_ALIGNED(va, algn_lvl)))
+	if (va != UK_PAGING_VADDR_ANY) {
+		if (unlikely(!UK_PAGING_PAGE_Lx_ALIGNED(va, algn_lvl))) {
+#if CONFIG_LIBUKDEBUG_ENABLE_ASSERT
+			uk_pr_err("Unaligned VMA address %#lx for level %d\n",
+				  (unsigned long)va, algn_lvl);
+#endif
 			return -EINVAL;
-
-		/* The caller specified an exact address to map to. We only
-		 * allow this if the mapping does not collide with other
-		 * mappings. However, we enforce the new mapping if the replace
-		 * flag is provided by unmapping everything in the range first.
-		 */
-		if ((vma_start = vmem_vma_find(vas, va, len))) {
-			if (unlikely(!(flags & UK_VMA_MAP_REPLACE)))
-				return -EEXIST;
-
-			strict = (flags & UK_VMA_FLAG_STRICT_VMA_CHECK);
-			rc = vmem_vma_split_vmas(vas, va, len, __NULL,
-						 &vma_start, &vma_end, strict);
-			if (unlikely(rc))
-				return rc;
-
-			/* It could be that during the split operation we
-			 * recognized that len must be aligned to a larger
-			 * page size to allow the split.
-			 */
-			UK_ASSERT(vma_end->end > vma_start->start);
-			len = vma_end->end - vma_start->start;
 		}
+		if (unlikely(va > __VADDR_MAX - len ||
+			     !uk_paging_vaddr_range_isvalid(va, len)))
+			return -ENOMEM;
 	}
 
-	UK_ASSERT(UK_PAGING_PAGE_Lx_ALIGNED(va, algn_lvl));
-	UK_ASSERT(va <= __VADDR_MAX - len);
-
-	/* Applications can request invalid memory ranges in mmap. In case the
-	 * address is not valid, then ENOMEM is the specfied error code.
-	 * This should only happen rarely in practice, for example when JS
-	 * engines (mozjs) do weird stuff to figure out the available address
-	 * bits.
+	/* Create a new VMA in sleepable thread context before taking vas->lock
+	 * so file-backed ops->new never blocks with interrupts disabled.
 	 */
-	if (unlikely(!uk_paging_vaddr_range_isvalid(va, len)))
-		return -ENOMEM;
-
-	/* Create a new VMA for the requested range. */
 	if (ops->new) {
 		/* Split also needs to allocate a new VMA */
 		UK_ASSERT(ops->split);
 
 		rc = ops->new(vas, va, len, args, attr, &flags, &vma);
-		if (unlikely(rc))
+		if (unlikely(rc)) {
+#if CONFIG_LIBUKDEBUG_ENABLE_ASSERT
+			uk_pr_err("Cannot create VMA: %d (va %#lx, len %#lx, flags %#lx)\n",
+				  rc, (unsigned long)va, (unsigned long)len, flags);
+#endif
 			return rc;
+		}
 	} else {
 		vma = uk_malloc(vas->a, sizeof(struct uk_vma));
 		if (unlikely(!vma))
@@ -700,6 +782,67 @@ int uk_vma_map(struct uk_vas *vas, __vaddr_t *vaddr, __sz len,
 	}
 
 	UK_ASSERT(vma);
+	UK_INIT_LIST_HEAD(&vma->vma_list);
+	vma->vas = vas;
+	vma->ops = ops;
+	vma->sync_inflight = 0;
+
+	ukplat_spin_lock_irqsave(&vas->lock, irqf);
+	uk_paging_batch_begin(&batch, vas->pt);
+
+	if (va == UK_PAGING_VADDR_ANY) {
+		/* Select the first virtual address range starting at the
+		 * mapping base that can accommodate the requested VMA.
+		 */
+		base = (ops->get_base) ? ops->get_base(vas, args, flags) :
+					 vas->vma_base;
+
+		va = vmem_first_fit(vas, base, UK_PAGING_PAGE_Lx_SIZE(algn_lvl),
+				    len);
+		if (unlikely(va == UK_PAGING_VADDR_INV ||
+			     va > __VADDR_MAX - len ||
+			     !uk_paging_vaddr_range_isvalid(va, len))) {
+			rc = -ENOMEM;
+			goto err_unlock_destroy;
+		}
+	} else {
+		/* The caller specified an exact address to map to. We only
+		 * allow this if the mapping does not collide with other
+		 * mappings. However, we enforce the new mapping if the replace
+		 * flag is provided by unmapping everything in the range first.
+		 */
+		if ((vma_start = vmem_vma_find(vas, va, len))) {
+			if (unlikely(!(flags & UK_VMA_MAP_REPLACE))) {
+				rc = -EEXIST;
+				goto err_unlock_destroy;
+			}
+
+			strict = (flags & UK_VMA_FLAG_STRICT_VMA_CHECK);
+			rc = vmem_vma_split_vmas(vas, va, len, __NULL,
+						 &vma_start, &vma_end, strict,
+						 &dead_vmas);
+			if (unlikely(rc))
+				goto err_unlock_destroy;
+
+			/* It could be that during the split operation we
+			 * recognized that len must be aligned to a larger
+			 * page size to allow the split.
+			 */
+			UK_ASSERT(vma_end->end > vma_start->start);
+			if (!ops->new &&
+			    vma_end->end - vma_start->start > len)
+				len = vma_end->end - vma_start->start;
+		}
+	}
+
+	UK_ASSERT(UK_PAGING_PAGE_Lx_ALIGNED(va, algn_lvl));
+	UK_ASSERT(va <= __VADDR_MAX - len);
+
+	/* Preserve mmap's ENOMEM contract for invalid address ranges. */
+	if (unlikely(!uk_paging_vaddr_range_isvalid(va, len))) {
+		rc = -ENOMEM;
+		goto err_unlock_destroy;
+	}
 
 	/* If this mapping replaces existing VMAs we now have to unmap them
 	 * before we attempt to map the new VMA because this entail changes to
@@ -712,7 +855,7 @@ int uk_vma_map(struct uk_vas *vas, __vaddr_t *vaddr, __sz len,
 		vma_start->vma_list.prev->next = vma_end->vma_list.next;
 		vma_end->vma_list.next->prev   = vma_start->vma_list.prev;
 
-		vmem_vma_unmap_and_free_vmas(vma_start, vma_end);
+		vmem_vma_unmap_and_defer_vmas(vma_start, vma_end, &dead_vmas);
 	}
 
 	UK_ASSERT(vmem_vma_find(vas, va, len) == __NULL);
@@ -720,11 +863,8 @@ int uk_vma_map(struct uk_vas *vas, __vaddr_t *vaddr, __sz len,
 	/* Extract extended flags */
 	extf = flags & (UK_VMA_MAP_EXTF_MASK << UK_VMA_MAP_EXTF_SHIFT);
 
-	UK_INIT_LIST_HEAD(&vma->vma_list);
 	vma->start	= va;
 	vma->end	= va + len;
-	vma->vas	= vas;
-	vma->ops	= ops;
 	vma->attr	= attr;
 	vma->flags	= extf;
 	vma->page_lvl	= to_lvl;
@@ -753,27 +893,36 @@ int uk_vma_map(struct uk_vas *vas, __vaddr_t *vaddr, __sz len,
 						.ctx = vma,
 					 });
 		if (unlikely(rc)) {
-			/* If the address range replaces existing mappings, we
-			 * have an unrecoverable error and the address range
-			 * will be empty!
-			 */
 			/* A partial mapx can leave PTEs. Remove them through
 			 * the owner before dropping its backing references;
 			 * private and borrowed frames have different
 			 * ownership rules.
 			 */
 			vmem_vma_unmap(vma, vma->start, uk_vma_len(vma));
-			vmem_vma_destroy(vma);
-
-			return rc;
+			goto err_unlock_destroy;
 		}
 	}
 
 	vmem_vma_insert(vas, vma);
-	vmem_vma_try_merge(vma);
+	vmem_vma_try_merge(vma, &dead_vmas);
+
+	uk_paging_batch_end(&batch);
+	ukplat_spin_unlock_irqrestore(&vas->lock, irqf);
+
+	uk_paging_free_batch_finish(&batch);
+	vmem_vma_destroy_list(&dead_vmas);
 
 	*vaddr = va;
 	return 0;
+
+err_unlock_destroy:
+	vmem_vma_defer_destroy(vma, &dead_vmas);
+	uk_paging_batch_end(&batch);
+	ukplat_spin_unlock_irqrestore(&vas->lock, irqf);
+
+	uk_paging_free_batch_finish(&batch);
+	vmem_vma_destroy_list(&dead_vmas);
+	return rc;
 }
 
 int uk_vma_op_set_attr(struct uk_vma *vma, unsigned long attr)
@@ -797,7 +946,8 @@ static int vmem_vma_set_attr(struct uk_vma *vma, unsigned long attr)
 }
 
 static int vmem_vma_set_attr_vmas(struct uk_vma *start, struct uk_vma *end,
-				  unsigned long attr)
+				  unsigned long attr,
+				  struct uk_list_head *dead_vmas)
 {
 	struct uk_vma *vma = start;
 	int rc;
@@ -812,36 +962,49 @@ static int vmem_vma_set_attr_vmas(struct uk_vma *start, struct uk_vma *end,
 	}
 
 	/* Merge only after every VMA accepted its new permissions. */
-	vmem_vma_try_merge_with_next(end);
+	vmem_vma_try_merge_with_next(end, dead_vmas);
 	vma = start;
 	while (vma != end) {
-		vma = vmem_vma_try_merge_with_prev(vma);
+		vma = vmem_vma_try_merge_with_prev(vma, dead_vmas);
 		vma = uk_list_next_entry(vma, vma_list);
 	}
-	vmem_vma_try_merge_with_prev(end);
+	vmem_vma_try_merge_with_prev(end, dead_vmas);
 	return 0;
 }
 
 int uk_vma_set_attr(struct uk_vas *vas, __vaddr_t vaddr, __sz len,
 		    unsigned long attr, unsigned long flags)
 {
+	struct uk_paging_free_batch batch;
+	UK_LIST_HEAD(dead_vmas);
 	struct uk_vma *vma_start = __NULL, *vma_end;
 	int strict = (flags & UK_VMA_FLAG_STRICT_VMA_CHECK);
+	unsigned long irqf;
 	int rc;
 
 	if (unlikely(len == 0))
 		return 0;
 
+	ukplat_spin_lock_irqsave(&vas->lock, irqf);
+	uk_paging_batch_begin(&batch, vas->pt);
+
 	rc = vmem_vma_split_vmas(vas, vaddr, len, &attr,
-				 &vma_start, &vma_end, strict);
+				 &vma_start, &vma_end, strict, &dead_vmas);
 	if (unlikely(rc)) {
 		if (rc == -ENOENT && !strict)
-			return 0;
-
-		return rc;
+			rc = 0;
+		goto out;
 	}
 
-	return vmem_vma_set_attr_vmas(vma_start, vma_end, attr);
+	rc = vmem_vma_set_attr_vmas(vma_start, vma_end, attr, &dead_vmas);
+
+out:
+	uk_paging_batch_end(&batch);
+	ukplat_spin_unlock_irqrestore(&vas->lock, irqf);
+
+	uk_paging_free_batch_finish(&batch);
+	vmem_vma_destroy_list(&dead_vmas);
+	return rc;
 }
 
 static int vmem_mapx_advise(struct uk_pagetable *pt,
@@ -924,21 +1087,25 @@ static int vmem_vma_advise(struct uk_vma *vma, __vaddr_t vaddr, __sz len,
 int uk_vma_advise(struct uk_vas *vas, __vaddr_t vaddr, __sz len,
 		  unsigned long advice, unsigned long flags)
 {
+	struct uk_paging_free_batch batch;
 	struct uk_vma *vma_start = __NULL, *vma_end, *vma;
 	int strict = (flags & UK_VMA_FLAG_STRICT_VMA_CHECK);
+	unsigned long irqf;
 	__vaddr_t vend;
 	int rc;
 
 	if (unlikely(len == 0))
 		return 0;
 
+	ukplat_spin_lock_irqsave(&vas->lock, irqf);
+	uk_paging_batch_begin(&batch, vas->pt);
+
 	rc = vmem_vma_find_range(vas, &vaddr, &len,
 				 &vma_start, &vma_end, strict);
 	if (unlikely(rc)) {
 		if (rc == -ENOENT && !strict)
-			return 0;
-
-		return rc;
+			rc = 0;
+		goto out;
 	}
 
 	vend = vaddr + len;
@@ -946,20 +1113,39 @@ int uk_vma_advise(struct uk_vas *vas, __vaddr_t vaddr, __sz len,
 	while (vma != vma_end) {
 		rc = vmem_vma_advise(vma, vaddr, vma->end - vaddr, advice);
 		if (unlikely(rc))
-			return rc;
+			goto out;
 
 		vma   = uk_list_next_entry(vma, vma_list);
 		vaddr = vma->start;
 	}
 
-	return vmem_vma_advise(vma, vaddr, vend - vaddr, advice);
+	rc = vmem_vma_advise(vma, vaddr, vend - vaddr, advice);
+
+out:
+	uk_paging_batch_end(&batch);
+	ukplat_spin_unlock_irqrestore(&vas->lock, irqf);
+
+	uk_paging_free_batch_finish(&batch);
+	return rc;
 }
+
+#define VMEM_SYNC_INLINE_SEGS 16
+
+struct vmem_sync_seg {
+	struct uk_vma *vma;
+	__vaddr_t vaddr;
+	__sz len;
+};
 
 int uk_vma_sync(struct uk_vas *vas, __vaddr_t vaddr, __sz len)
 {
+	struct vmem_sync_seg inline_segs[VMEM_SYNC_INLINE_SEGS];
+	struct vmem_sync_seg *segs = inline_segs;
 	struct uk_vma *first = __NULL, *last, *vma;
-	__vaddr_t end;
-	int rc;
+	__sz count = 0, idx = 0, i;
+	unsigned long irqf;
+	__vaddr_t cur, end;
+	int rc = 0;
 
 	if (!UK_PAGING_PAGE_ALIGNED(vaddr) || !UK_PAGING_PAGE_ALIGNED(len))
 		return -EINVAL;
@@ -967,25 +1153,73 @@ int uk_vma_sync(struct uk_vas *vas, __vaddr_t vaddr, __sz len)
 		return -ENOMEM;
 	if (!len)
 		return 0;
+
+	ukplat_spin_lock_irqsave(&vas->lock, irqf);
 	rc = vmem_vma_find_range(vas, &vaddr, &len, &first, &last, 1);
-	if (unlikely(rc))
+	if (unlikely(rc)) {
+		ukplat_spin_unlock_irqrestore(&vas->lock, irqf);
 		return rc;
+	}
+
 	end = vaddr + len;
 	vma = first;
 	for (;;) {
-		__sz part = MIN(vma->end, end) - vaddr;
+		if (vma->ops->sync)
+			count++;
+		if (vma == last)
+			break;
+		vma = uk_list_next_entry(vma, vma_list);
+	}
+
+	if (!count) {
+		ukplat_spin_unlock_irqrestore(&vas->lock, irqf);
+		return 0;
+	}
+
+	if (unlikely(count > VMEM_SYNC_INLINE_SEGS)) {
+		if (!vas->a) {
+			ukplat_spin_unlock_irqrestore(&vas->lock, irqf);
+			return -ENOMEM;
+		}
+		segs = uk_malloc(vas->a, count * sizeof(*segs));
+		if (!segs) {
+			ukplat_spin_unlock_irqrestore(&vas->lock, irqf);
+			return -ENOMEM;
+		}
+	}
+
+	cur = vaddr;
+	vma = first;
+	for (;;) {
+		__sz part = MIN(vma->end, end) - cur;
 
 		if (vma->ops->sync) {
-			rc = vma->ops->sync(vma, vaddr, part);
-			if (unlikely(rc))
-				return rc;
+			segs[idx].vma = vma;
+			segs[idx].vaddr = cur;
+			segs[idx].len = part;
+			__atomic_add_fetch(&vma->sync_inflight, 1,
+					   __ATOMIC_ACQ_REL);
+			idx++;
 		}
 		if (vma == last)
 			break;
 		vma = uk_list_next_entry(vma, vma_list);
-		vaddr = vma->start;
+		cur = vma->start;
 	}
-	return 0;
+	ukplat_spin_unlock_irqrestore(&vas->lock, irqf);
+
+	for (i = 0; i < idx; i++) {
+		if (!rc)
+			rc = segs[i].vma->ops->sync(segs[i].vma, segs[i].vaddr,
+						    segs[i].len);
+		__atomic_sub_fetch(&segs[i].vma->sync_inflight, 1,
+				   __ATOMIC_RELEASE);
+	}
+
+	if (segs != inline_segs)
+		uk_free(vas->a, segs);
+
+	return rc;
 }
 
 #ifdef CONFIG_LIBUKPAGING
@@ -1033,7 +1267,7 @@ struct mapx_pagefault_ctx {
 };
 
 static int vmem_mapx_pagefault(struct uk_pagetable *pt __unused,
-			       __vaddr_t vaddr, __vaddr_t pt_vaddr __unused,
+			       __vaddr_t vaddr, __vaddr_t pt_vaddr,
 			       unsigned int level, __pte_t *pte, void *user)
 {
 	struct mapx_pagefault_ctx *ctx = (struct mapx_pagefault_ctx *)user;
@@ -1047,10 +1281,27 @@ static int vmem_mapx_pagefault(struct uk_pagetable *pt __unused,
 		.level = level,
 		.regs  = ctx->regs,
 	};
+	__pte_t opte;
 	int rc;
 
 	UK_ASSERT(ctx->vma->ops);
 	UK_ASSERT(ctx->vma->ops->fault);
+
+	/* Deduplicate concurrent page faults on SMP: if another CPU already
+	 * installed a valid PTE with sufficient permissions, refresh our local
+	 * TLB entry and skip invoking vma->ops->fault a second time.
+	 */
+	rc = uk_paging_pte_read(pt_vaddr, level,
+				UK_PAGING_PT_Lx_IDX(vaddr, level), &opte);
+	if (unlikely(rc))
+		return rc;
+
+	if (UK_PAGING_PT_Lx_PTE_PRESENT(opte, level) &&
+	    vmem_access_allowed(uk_paging_attr_from_pte(opte, level),
+				ctx->type)) {
+		uk_paging_tlb_flush_entry(vaddr);
+		return UK_PAGING_PAGE_MAPX_ESKIP;
+	}
 
 	rc = ctx->vma->ops->fault(ctx->vma, &fault);
 	if (unlikely(rc)) {
@@ -1073,6 +1324,7 @@ int vmem_pagefault(__vaddr_t vaddr, unsigned int type,
 {
 	const unsigned int demand_lvl =
 		UK_PAGING_PAGE_SHIFT_Lx(CONFIG_LIBUKVMEM_DEMAND_PAGE_IN_SIZE);
+	struct uk_paging_free_batch batch;
 	struct uk_vas *vas;
 	struct uk_pagetable *pt;
 	struct mapx_pagefault_ctx ctx = {
@@ -1086,30 +1338,43 @@ int vmem_pagefault(__vaddr_t vaddr, unsigned int type,
 	};
 	__vaddr_t vbase;
 	unsigned int lvl = UK_PAGING_PAGE_LEVEL;
+	unsigned long irqf;
 	unsigned long flags;
 	int rc;
 
 	/* Check if a virtual address space is set */
 	vas = uk_vas_get_active();
-	if (unlikely(!vas || vas->flags & UK_VAS_FLAG_NO_PAGING))
+	if (unlikely(!uk_vas_paging_enabled(vas)))
 		return -EFAULT;
+
+	ukplat_spin_lock_irqsave(&vas->lock, irqf);
+	if (unlikely(!uk_vas_paging_enabled(vas))) {
+		ukplat_spin_unlock_irqrestore(&vas->lock, irqf);
+		return -EFAULT;
+	}
 
 	/* If the page fault was caused by an access to a region not covered by
 	 * a virtual memory area, fail early.
 	 */
 	ctx.vma = vmem_vma_find(vas, vaddr, 0);
-	if (unlikely(!ctx.vma))
+	if (unlikely(!ctx.vma)) {
+		ukplat_spin_unlock_irqrestore(&vas->lock, irqf);
 		return -EFAULT;
+	}
 
 	UK_ASSERT(vaddr >= ctx.vma->start && vaddr < ctx.vma->end);
 
 	/* Fail if the access is not compatible with the VMA's settings */
-	if (unlikely(!vmem_access_allowed(ctx.vma->attr, type)))
+	if (unlikely(!vmem_access_allowed(ctx.vma->attr, type))) {
+		ukplat_spin_unlock_irqrestore(&vas->lock, irqf);
 		return -EFAULT;
+	}
 
 	/* Fail early if the VMA does not have a fault handler */
-	if (unlikely(!ctx.vma->ops->fault))
+	if (unlikely(!ctx.vma->ops->fault)) {
+		ukplat_spin_unlock_irqrestore(&vas->lock, irqf);
 		return -EFAULT;
+	}
 
 	UK_ASSERT(ctx.vma->vas);
 	UK_ASSERT(ctx.vma->vas->pt);
@@ -1123,8 +1388,10 @@ int vmem_pagefault(__vaddr_t vaddr, unsigned int type,
 	 */
 	if (ctx.vma->page_lvl < 0 && demand_lvl > UK_PAGING_PAGE_LEVEL) {
 		rc = uk_paging_pt_walk(pt, vaddr, &lvl, __NULL, __NULL);
-		if (unlikely(rc))
+		if (unlikely(rc)) {
+			ukplat_spin_unlock_irqrestore(&vas->lock, irqf);
 			return rc;
+		}
 
 		vbase = MAX(UK_PAGING_PAGE_Lx_ALIGN_DOWN(vaddr, lvl),
 			    ctx.vma->start);
@@ -1146,7 +1413,13 @@ int vmem_pagefault(__vaddr_t vaddr, unsigned int type,
 	UK_ASSERT(vbase + UK_PAGING_PAGE_Lx_SIZE(lvl) >= ctx.vma->start &&
 		  vbase + UK_PAGING_PAGE_Lx_SIZE(lvl) <= ctx.vma->end);
 
-	return uk_paging_page_mapx(pt, vbase, 0, 1, ctx.vma->attr,
-				UK_PAGING_PAGE_FLAG_SIZE(lvl) | flags, &mapx);
+	uk_paging_batch_begin(&batch, pt);
+	rc = uk_paging_page_mapx(pt, vbase, 0, 1, ctx.vma->attr,
+				 UK_PAGING_PAGE_FLAG_SIZE(lvl) | flags, &mapx);
+	uk_paging_batch_end(&batch);
+	ukplat_spin_unlock_irqrestore(&vas->lock, irqf);
+
+	uk_paging_free_batch_finish(&batch);
+	return rc;
 }
 #endif /* CONFIG_LIBUKPAGING */

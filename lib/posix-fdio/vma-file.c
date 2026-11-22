@@ -39,6 +39,9 @@ struct file_vma {
 	/** Start offset describing what position in the file is mapped */
 	__off offset;
 	struct file_backing *shared;
+	__paddr_t *priv_pages;
+	__sz priv_npages;
+	__sz priv_taken;
 };
 
 #ifdef CONFIG_LIBUKVMEM_FILE_BASE
@@ -120,6 +123,118 @@ fail:
 	return rc;
 }
 
+static inline
+__ssz file_vma_readin_locked(const struct uk_file *f, __vaddr_t buf, __sz len,
+			     __off offset)
+{
+	__ssz read = 0;
+	__ssz r;
+
+	/* Read up until done, error, or confirmed EOF */
+	do {
+		r = uk_file_read(f, &(struct iovec){ (void *)buf, len }, 1,
+				 offset, 0);
+		if (unlikely(r <= 0))
+			break;
+		buf += r;
+		len -= r;
+		offset += r;
+		read += r;
+	} while (len);
+	/* Only return success if done reading or EOF */
+	if (!len || !r)
+		return read;
+	/* We should only get here on I/O error */
+	UK_ASSERT(r < 0);
+	return r;
+}
+
+static
+void file_priv_pages_free(struct uk_vas *vas, __paddr_t *pages, __sz npages)
+{
+	struct uk_pagetable *pt = vas->pt;
+	__sz i;
+
+	if (!pages)
+		return;
+	for (i = 0; i < npages; i++) {
+		if (pages[i] != UK_PAGING_PADDR_INV)
+			pt->fa->ffree(pt->fa, pages[i], 1);
+	}
+	uk_free(vas->a, pages);
+}
+
+static
+int file_priv_pages_new(struct uk_vas *vas, const struct uk_file *f,
+			__off offset, __sz len, unsigned long flags,
+			__paddr_t **out_pages, __sz *out_npages)
+{
+	const __sz count = len / UK_PAGING_PAGE_SIZE;
+	struct uk_pagetable *pt = vas->pt;
+	__paddr_t *pages;
+	__sz i;
+	int rc = 0;
+
+	if (!count || count > __SZ_MAX / sizeof(*pages))
+		return -ENOMEM;
+	pages = uk_malloc(vas->a, count * sizeof(*pages));
+	if (!pages)
+		return -ENOMEM;
+	for (i = 0; i < count; i++)
+		pages[i] = UK_PAGING_PADDR_INV;
+
+	if (!(flags & UK_VMA_MAP_UNINITIALIZED))
+		uk_file_rlock(f);
+
+	for (i = 0; i < count; i++) {
+		__paddr_t paddr = UK_PAGING_PADDR_ANY;
+
+		rc = pt->fa->falloc(pt->fa, &paddr, 1, FALLOC_FLAG_ALIGNED);
+		if (unlikely(rc))
+			goto fail;
+
+		if (!(flags & UK_VMA_MAP_UNINITIALIZED)) {
+			__vaddr_t kvaddr;
+			__ssz nbytes;
+			__off off = offset + (__off)(i * UK_PAGING_PAGE_SIZE);
+
+			kvaddr = uk_paging_page_kmap(pt, paddr, 1, 0);
+			if (unlikely(kvaddr == UK_PAGING_VADDR_INV)) {
+				pt->fa->ffree(pt->fa, paddr, 1);
+				rc = -ENOMEM;
+				goto fail;
+			}
+			nbytes = file_vma_readin_locked(f, kvaddr,
+							UK_PAGING_PAGE_SIZE,
+							off);
+			if (unlikely(nbytes < 0)) {
+				uk_paging_page_kunmap(pt, kvaddr, 1, 0);
+				pt->fa->ffree(pt->fa, paddr, 1);
+				rc = (int)nbytes;
+				goto fail;
+			}
+			UK_ASSERT(UK_PAGING_PAGE_SIZE >= (__sz)nbytes);
+			memset((void *)(kvaddr + nbytes), 0,
+			       UK_PAGING_PAGE_SIZE - (__sz)nbytes);
+			uk_paging_page_kunmap(pt, kvaddr, 1, 0);
+		}
+		pages[i] = paddr;
+	}
+
+	if (!(flags & UK_VMA_MAP_UNINITIALIZED))
+		uk_file_runlock(f);
+
+	*out_pages = pages;
+	*out_npages = count;
+	return 0;
+
+fail:
+	if (!(flags & UK_VMA_MAP_UNINITIALIZED))
+		uk_file_runlock(f);
+	file_priv_pages_free(vas, pages, count);
+	return rc;
+}
+
 static
 int file_vma_op_new(struct uk_vas *vas, __vaddr_t vaddr __unused,
 		    __sz len, void *data, unsigned long attr,
@@ -128,6 +243,7 @@ int file_vma_op_new(struct uk_vas *vas, __vaddr_t vaddr __unused,
 	struct uk_fdio_vma_args *args = data;
 	struct file_vma *fvma;
 	unsigned int mode;
+	int rc;
 
 	UK_ASSERT(data);
 	UK_ASSERT(args->of);
@@ -136,7 +252,7 @@ int file_vma_op_new(struct uk_vas *vas, __vaddr_t vaddr __unused,
 	UK_ASSERT(vma);
 
 	/* File I/O and pin acquisition run in syscall/thread context. Only
-	 * populated, already pinned physical pages reach the fault callback.
+	 * populated, already resident physical pages reach the fault callback.
 	 */
 	*flags |= UK_VMA_MAP_POPULATE;
 	mode = args->of->mode;
@@ -150,10 +266,20 @@ int file_vma_op_new(struct uk_vas *vas, __vaddr_t vaddr __unused,
 	if (unlikely(!fvma))
 		return -ENOMEM;
 	fvma->shared = __NULL;
+	fvma->priv_pages = __NULL;
+	fvma->priv_npages = 0;
+	fvma->priv_taken = 0;
 	if (*flags & UK_VMA_FILE_SHARED) {
-		int rc = file_backing_new(vas, args->of->file,
-					 args->offset, len, &fvma->shared);
-
+		rc = file_backing_new(vas, args->of->file,
+				      args->offset, len, &fvma->shared);
+		if (rc) {
+			uk_free(vas->a, fvma);
+			return rc;
+		}
+	} else {
+		rc = file_priv_pages_new(vas, args->of->file, args->offset, len,
+					 *flags, &fvma->priv_pages,
+					 &fvma->priv_npages);
 		if (rc) {
 			uk_free(vas->a, fvma);
 			return rc;
@@ -174,6 +300,13 @@ void file_vma_op_destroy(struct uk_vma *vma)
 	struct file_vma *fvma = (struct file_vma *)vma;
 
 	UK_ASSERT(fvma->of);
+	if (fvma->priv_pages) {
+		file_priv_pages_free(vma->vas, fvma->priv_pages,
+				     fvma->priv_npages);
+		fvma->priv_pages = __NULL;
+		fvma->priv_npages = 0;
+		fvma->priv_taken = 0;
+	}
 	if (fvma->shared && uk_refcount_release(&fvma->shared->refs)) {
 		const struct uk_file *f = fvma->of->file;
 		struct file_backing *b = fvma->shared;
@@ -191,93 +324,46 @@ void file_vma_op_destroy(struct uk_vma *vma)
 	uk_ofile_release(fvma->of);
 }
 
-static inline
-__ssz file_vma_readin(const struct uk_file *f, __vaddr_t buf, __sz len,
-		      __off offset)
-{
-	__ssz read = 0;
-	__ssz r;
-
-	uk_file_rlock(f);
-	/* Read up until done, error, or confirmed EOF */
-	do {
-		r = uk_file_read(f, &(struct iovec){ (void *)buf, len }, 1,
-				 offset, 0);
-		if (unlikely(r <= 0))
-			break;
-		buf += r;
-		len -= r;
-		offset += r;
-		read += r;
-	} while (len);
-	uk_file_runlock(f);
-	/* Only return success if done reading or EOF */
-	if (!len || !r)
-		return read;
-	/* We should only get here on I/O error */
-	UK_ASSERT(r < 0);
-	return r;
-}
-
 static
 int file_vma_op_fault(struct uk_vma *vma, struct uk_vm_fault *fault)
 {
 	struct file_vma *fvma = (struct file_vma *)vma;
-	struct uk_pagetable *const pt = vma->vas->pt;
-	unsigned long pages = fault->len / UK_PAGING_PAGE_SIZE;
-	__paddr_t paddr = UK_PAGING_PADDR_ANY;
-	__vaddr_t vaddr;
-	__off off;
-	__ssz nbytes;
-	int rc;
+	__sz idx;
 
 	UK_ASSERT(UK_PAGING_PAGE_ALIGNED(fault->len));
 	UK_ASSERT(fault->len == UK_PAGING_PAGE_Lx_SIZE(fault->level));
 	UK_ASSERT(fault->type & UK_VMA_FAULT_NONPRESENT);
 
-	if (fvma->shared) {
-		__sz pos;
+	/* mapx retries at base-page granularity when a larger physical run
+	 * cannot be supplied. File-backed frames are tracked per 4 KiB page.
+	 */
+	if (fault->level != UK_PAGING_PAGE_LEVEL)
+		return -ENOMEM;
 
-		/* mapx retries at base-page granularity when a larger physical
-		 * run cannot be supplied. There is no requirement that file
-		 * backing pages be contiguous.
-		 */
-		if (fault->level != UK_PAGING_PAGE_LEVEL)
-			return -ENOMEM;
-		pos = fvma->offset - fvma->shared->offset +
-			fault->vbase - vma->start;
+	if (fvma->shared) {
+		__sz pos = fvma->offset - fvma->shared->offset +
+			   fault->vbase - vma->start;
+
 		if (pos >= fvma->shared->acquired)
 			return -ENXIO;
 		fault->paddr = fvma->shared->pages[pos / UK_PAGING_PAGE_SIZE];
 		return 0;
 	}
 
-	rc = pt->fa->falloc(pt->fa, &paddr, pages, FALLOC_FLAG_ALIGNED);
-	if (unlikely(rc))
-		return rc;
+	idx = (fault->vbase - vma->start) / UK_PAGING_PAGE_SIZE;
+	if (unlikely(!fvma->priv_pages || idx >= fvma->priv_npages ||
+		     fvma->priv_pages[idx] == UK_PAGING_PADDR_INV))
+		return -EIO;
 
-	vaddr = uk_paging_page_kmap(pt, paddr, pages, 0);
-	if (unlikely(vaddr == UK_PAGING_VADDR_INV)) {
-		pt->fa->ffree(pt->fa, paddr, pages);
-		return -ENOMEM;
+	fault->paddr = fvma->priv_pages[idx];
+	fvma->priv_pages[idx] = UK_PAGING_PADDR_INV;
+	fvma->priv_taken++;
+	if (fvma->priv_taken == fvma->priv_npages) {
+		uk_free(vma->vas->a, fvma->priv_pages);
+		fvma->priv_pages = __NULL;
+		fvma->priv_npages = 0;
+		fvma->priv_taken = 0;
 	}
-
-	off = (fault->vbase - vma->start) + fvma->offset;
-
-	nbytes = file_vma_readin(fvma->of->file, vaddr, fault->len, off);
-	if (unlikely(nbytes < 0)) {
-		uk_paging_page_kunmap(pt, vaddr, pages, 0);
-		pt->fa->ffree(pt->fa, paddr, pages);
-		return nbytes;
-	}
-
-	/* Fill the remaining space with zeros */
-	UK_ASSERT(fault->len >= (__sz)nbytes);
-
-	memset((void *)(vaddr + nbytes), 0, fault->len - nbytes);
-	uk_paging_page_kunmap(pt, vaddr, pages, 0);
-
-	fault->paddr = paddr;
 	return 0;
 }
 
@@ -292,6 +378,7 @@ int file_vma_op_split(struct uk_vma *vma, __vaddr_t vaddr,
 	UK_ASSERT(vaddr >= vma->start);
 	UK_ASSERT(fvma->offset <= __OFF_MAX - off);
 	UK_ASSERT(new_vma);
+	UK_ASSERT(!fvma->priv_pages);
 
 	v = uk_malloc(vma->vas->a, sizeof(*v));
 	if (unlikely(!v))
@@ -301,6 +388,9 @@ int file_vma_op_split(struct uk_vma *vma, __vaddr_t vaddr,
 	uk_ofile_acquire(fvma->of);
 	v->of = fvma->of;
 	v->shared = fvma->shared;
+	v->priv_pages = __NULL;
+	v->priv_npages = 0;
+	v->priv_taken = 0;
 	if (v->shared)
 		uk_refcount_acquire(&v->shared->refs);
 
@@ -318,6 +408,8 @@ int file_vma_op_merge(struct uk_vma *vma, struct uk_vma *next)
 	UK_ASSERT(next->start == vma->end);
 	UK_ASSERT(next->start > vma->start);
 
+	if (fvma->priv_pages || nvma->priv_pages)
+		return -EPERM;
 	/* Only merge if this is the same open file description ... */
 	if (fvma->of != nvma->of || fvma->shared != nvma->shared)
 		return -EPERM;
@@ -388,10 +480,10 @@ int file_vma_op_advise(struct uk_vma *vma, __vaddr_t vaddr, __sz len,
 {
 	struct file_vma *fvma = (struct file_vma *)vma;
 
-	/* Retain pinned backing and its aliases. The generic anonymous
-	 * DONTNEED path frees frames and is unsuitable for file-owned memory.
+	/* Retain pinned backing and pre-populated file pages so hardware #PF
+	 * never attempts blocking file I/O with interrupts disabled.
 	 */
-	if (fvma->shared)
+	if (fvma->shared || (advice & UK_VMA_ADV_DONTNEED))
 		return 0;
 	return uk_vma_op_advise(vma, vaddr, len, advice);
 }
