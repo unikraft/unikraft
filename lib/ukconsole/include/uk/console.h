@@ -119,6 +119,14 @@ struct uk_console_iovec {
 };
 
 /**
+ * Send one record in consecutive buffers to all STDOUT devices.
+ * Concurrent writes to each device cannot interleave with the buffers.
+ * Output is best-effort, as for uk_console_out(). Returns the sum of the
+ * buffer lengths, or a negative error for invalid arguments or overflow.
+ */
+__ssz uk_console_outv(const struct uk_console_iovec *iov, __sz count);
+
+/**
  * Send one record in consecutive buffers to a console device.
  * Concurrent writes to this device cannot interleave with the buffers.
  * Returns the number of bytes accepted or the first driver error.
