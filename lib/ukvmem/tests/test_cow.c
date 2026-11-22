@@ -305,6 +305,109 @@ out_metadata:
 	uk_free(kernel->a, metadata);
 }
 
+UK_TESTCASE(cow_frames, adopt_unpublished_frame)
+{
+	struct uk_vas *kernel = uk_vas_get_active();
+	struct vmem_cow_ref source = { 0 }, shared = { 0 };
+	struct uk_paging_free_batch first_batch, second_batch;
+	struct cow_release_probe releases = { 0 };
+	struct cow_metadata_probe *probe;
+	struct uk_alloc *metadata;
+	struct cow_allocator frames;
+	__paddr_t paddr = UK_PAGING_PADDR_ANY;
+	__vaddr_t mapped;
+	unsigned char *bytes;
+	unsigned int i;
+	bool contents = false;
+	int rc;
+
+	metadata = uk_malloc(kernel->a, sizeof(*metadata) + sizeof(*probe));
+	UK_TEST_EXPECT_NOT_NULL(metadata);
+	if (!metadata)
+		return;
+	memset_isr(metadata, 0, sizeof(*metadata) + sizeof(*probe));
+	probe = (void *)metadata->priv;
+	probe->real = kernel->a;
+	metadata->malloc = cow_metadata_alloc;
+	metadata->free = cow_metadata_free;
+	cow_test_allocator(&frames, kernel->pt->fa);
+	rc = frames.fa.falloc(&frames.fa, &paddr, 1, 0);
+	UK_TEST_EXPECT_ZERO(rc);
+	if (rc)
+		goto out_metadata;
+	mapped = uk_paging_page_kmap(kernel->pt, paddr, 1, 0);
+	UK_TEST_EXPECT(mapped != UK_PAGING_VADDR_INV);
+	if (mapped == UK_PAGING_VADDR_INV)
+		goto out_frame;
+	bytes = (unsigned char *)mapped;
+	for (i = 0; i < UK_PAGING_PAGE_SIZE; i++)
+		bytes[i] = (unsigned char)(i ^ 0x5a);
+	uk_paging_page_kunmap(kernel->pt, mapped, 1, 0);
+
+	probe->fail = true;
+	rc = vmem_cow_ref_adopt(&source, metadata, &frames.fa, paddr,
+				cow_test_released, &releases);
+	UK_TEST_EXPECT_SNUM_EQ(rc, -ENOMEM);
+	UK_TEST_EXPECT_NULL(source.page);
+	UK_TEST_EXPECT_ZERO(probe->allocated);
+	UK_TEST_EXPECT_ZERO(frames.freed);
+	UK_TEST_EXPECT_ZERO(releases.calls);
+	if (!rc) {
+		vmem_cow_ref_release(&source, NULL);
+		goto out_metadata;
+	}
+	probe->fail = false;
+	rc = vmem_cow_ref_adopt(&source, metadata, &frames.fa, paddr,
+				cow_test_released, &releases);
+	UK_TEST_EXPECT_ZERO(rc);
+	if (rc)
+		goto out_frame;
+	UK_TEST_EXPECT_SNUM_EQ(vmem_cow_ref_paddr(&source), paddr);
+	UK_TEST_EXPECT(vmem_cow_ref_exclusive(&source));
+	UK_TEST_EXPECT_SNUM_EQ(frames.allocated, 1);
+	UK_TEST_EXPECT_SNUM_EQ(probe->allocated, 1);
+	mapped = uk_paging_page_kmap(kernel->pt,
+				     vmem_cow_ref_paddr(&source), 1, 0);
+	UK_TEST_EXPECT(mapped != UK_PAGING_VADDR_INV);
+	if (mapped != UK_PAGING_VADDR_INV) {
+		bytes = (unsigned char *)mapped;
+		contents = true;
+		for (i = 0; i < UK_PAGING_PAGE_SIZE; i++)
+			if (bytes[i] != (unsigned char)(i ^ 0x5a))
+				contents = false;
+		uk_paging_page_kunmap(kernel->pt, mapped, 1, 0);
+	}
+	UK_TEST_EXPECT(contents);
+	vmem_cow_ref_clone(&shared, &source, cow_test_released, &releases);
+	UK_TEST_EXPECT(!vmem_cow_ref_exclusive(&source));
+	UK_TEST_EXPECT_SNUM_EQ(probe->allocated, 1);
+	uk_paging_free_batch_init(&first_batch, kernel->pt);
+	uk_paging_free_batch_init(&second_batch, kernel->pt);
+	vmem_cow_ref_release(&source, &first_batch);
+	vmem_cow_ref_release(&shared, &second_batch);
+	UK_TEST_EXPECT_ZERO(frames.freed);
+	UK_TEST_EXPECT_ZERO(releases.calls);
+	uk_paging_free_batch_finish(&second_batch);
+	UK_TEST_EXPECT_SNUM_EQ(releases.calls, 1);
+	UK_TEST_EXPECT_ZERO(frames.freed);
+	UK_TEST_EXPECT_ZERO(probe->freed);
+	uk_paging_free_batch_finish(&first_batch);
+	UK_TEST_EXPECT_SNUM_EQ(releases.calls, 2);
+	UK_TEST_EXPECT(releases.irqs_enabled);
+	UK_TEST_EXPECT_SNUM_EQ(frames.freed, 1);
+	UK_TEST_EXPECT_SNUM_EQ(probe->freed, 1);
+	if (contents && releases.calls == 2 && releases.irqs_enabled &&
+	    frames.allocated == 1 && frames.freed == 1 &&
+	    probe->allocated == 1 && probe->freed == 1)
+		uk_pr_info("COW_ADOPT_PASS frames=1 refs=2 metadata=1\n");
+	goto out_metadata;
+out_frame:
+	rc = frames.fa.ffree(&frames.fa, paddr, 1);
+	UK_TEST_EXPECT_ZERO(rc);
+out_metadata:
+	uk_free(kernel->a, metadata);
+}
+
 _UK_TESTSUITE(cow_frames, NULL);
 
 static void __constructor run_cow_frames(void)
