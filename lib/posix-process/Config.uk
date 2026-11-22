@@ -108,6 +108,17 @@ config LIBPOSIX_PROCESS_FORK
 	  calling thread in the child. Kernel threads and unsupported clone
 	  flags or mapping classes fail before child publication.
 
+config LIBPOSIX_PROCESS_SYSV_SHM
+	bool "System V shared memory for private ELF processes"
+	depends on ARCH_X86_64 || ARCH_ARM_64
+	depends on LIBUKVMEM_PROCESS_VAS && LIBSYSCALL_SHIM && LIBUKLOCK
+	select LIBPOSIX_USER
+	select LIBUKVMEM_VAS_ACCESS
+	default n
+	help
+	  Provide independently attachable shared memory segments and inherit
+	  their mappings across fork. Support IPC_STAT and IPC_RMID.
+
 config LIBPOSIX_PROCESS_PREPARE
 	bool
 	depends on LIBPOSIX_PROCESS_MULTIPROCESS
