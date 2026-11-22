@@ -230,11 +230,13 @@ int uk_intctlr_irq_alloc(unsigned int *irqs, __sz count)
 	unsigned long start, idx;
 
 	UK_ASSERT(irqs);
+	if (!count || count > ALLOCABLE_IRQ_COUNT)
+		return -EINVAL;
 
 	start = uk_bitmap_find_next_zero_area(irqs_allocated,
 					      ALLOCABLE_IRQ_COUNT, 0,
 					      count, 0);
-	if (start == ALLOCABLE_IRQ_COUNT)
+	if (start > ALLOCABLE_IRQ_COUNT - count)
 		return -ENOSPC;
 
 	uk_bitmap_set(irqs_allocated, start, count);

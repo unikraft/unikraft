@@ -10,11 +10,16 @@
 #include <uk/event.h>
 #include <uk/config.h>
 #include <uk/intctlr.h>
+#include <uk/intctlr/limits.h>
 #include <uk/lcpu.h>
 
 #if CONFIG_LIBUKINTCTLR_APIC
 #include <uk/arch/x86_64.h>
 #include <uk/arch/util.h>
+#include <uk/intctlr/msi.h>
+
+#define APIC_MSI_BASE			0xfee00000U
+#define APIC_MSI_DEST_SHIFT		12U
 
 static inline int x2apic_enable(void)
 {
@@ -59,6 +64,26 @@ static inline void x2apic_ack_interrupt(void)
 	uk_arch_x86_64_wrmsr(UK_ARCH_X86_64_APIC_MSR_EOI, 0, 0);
 }
 
+int uk_intctlr_xpic_msi_message(unsigned int irq, __u32 *address, __u32 *data)
+{
+	const __u32 x2apic = UK_ARCH_X86_64_APIC_BASE_EN |
+			    UK_ARCH_X86_64_APIC_BASE_EXTD;
+	__u32 local_id, base, high;
+
+	if (irq < UK_INTCTLR_FIRST_ALLOCABLE_IRQ ||
+	    irq > UK_INTCTLR_LAST_ALLOCABLE_IRQ)
+		return -EINVAL;
+	uk_arch_x86_64_rdmsr(UK_ARCH_X86_64_APIC_MSR_BASE, &base, &high);
+	if ((base & x2apic) != x2apic)
+		return -ENOTSUP;
+	uk_arch_x86_64_rdmsr(UK_ARCH_X86_64_APIC_MSR_ID, &local_id, &high);
+	if (local_id > 0xff)
+		return -ENOTSUP;
+	*address = APIC_MSI_BASE | (local_id << APIC_MSI_DEST_SHIFT);
+	*data = irq + UK_INTCTLR_XPIC_VECTOR_BASE;
+	return 0;
+}
+
 #define apic_ack_interrupt	x2apic_ack_interrupt
 #define apic_enable		x2apic_enable
 #endif /* CONFIG_LIBUKINTCTLR_APIC */
@@ -85,12 +110,8 @@ static int uk_intctlr_xpic_handle_irq(void *data)
 #if CONFIG_LIBUKINTCTLR_APIC
 	apic_ack_interrupt();
 
-	/* FIXME This is here because right now we only use
-	 * APIC for IPIs on SMP. This should be removed as
-	 * soon as we fully implement APIC and get rid of
-	 * PIC
-	 */
-	if (irq <= 16)
+	/* The 8259A only owns the legacy lines. */
+	if (irq < UK_INTCTLR_XPIC_LEGACY_IRQ_COUNT)
 		pic_ack_irq(irq);
 #else   /* !CONFIG_LIBUKINTCTLR_APIC */
 	pic_ack_irq(irq);
