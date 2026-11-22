@@ -147,22 +147,24 @@ static void pprocess_release_pid(pid_t pid)
 	pprocess_lock_release(flags);
 }
 
-bool pprocess_claim_pthread_exit(struct posix_thread *pthread,
-				 bool *became_empty)
+struct posix_thread *pprocess_claim_pthread_exit(struct uk_thread *thread,
+						 bool *became_empty)
 {
+	struct posix_thread *pthread, *claimed = NULL;
 	struct posix_process *pprocess;
 	unsigned long flags;
-	bool claimed = false;
 	bool empty = false;
 
-	UK_ASSERT(pthread);
-	pprocess = pthread->process;
-	UK_ASSERT(pprocess);
-
+	UK_ASSERT(thread);
 	flags = pprocess_lock_acquire();
-	if (!uk_list_empty(&pthread->thread_list_entry)) {
+	pthread = uk_thread_uktls_var(thread, pthread_self);
+	if (pthread && !uk_list_empty(&pthread->thread_list_entry)) {
+		pprocess = pthread->process;
+		UK_ASSERT(pprocess);
+		pprocess_get(pprocess);
+		pprocess->exiting_threads++;
 		uk_list_del_init(&pthread->thread_list_entry);
-		claimed = true;
+		claimed = pthread;
 		if (!pprocess->exiting &&
 		    pprocess->state == POSIX_PROCESS_RUNNING &&
 		    uk_list_empty(&pprocess->threads))
@@ -173,6 +175,16 @@ bool pprocess_claim_pthread_exit(struct posix_thread *pthread,
 	if (became_empty)
 		*became_empty = empty;
 	return claimed;
+}
+
+void pprocess_complete_pthread_exit(struct posix_process *process)
+{
+	unsigned long flags = pprocess_lock_acquire();
+
+	UK_ASSERT(process->exiting_threads);
+	if (!--process->exiting_threads)
+		uk_semaphore_up(&process->thread_exit_semaphore);
+	pprocess_lock_release(flags);
 }
 
 bool pprocess_claim_process_exit(struct posix_process *pprocess)
@@ -310,12 +322,11 @@ void pprocess_release_pthread(struct posix_thread *pthread)
 	pprocess_signal_tdesc_free(pthread);
 #endif /* CONFIG_LIBPOSIX_PROCESS_SIGNAL */
 
-	uk_thread_uktls_var(pthread->thread, pthread_self) = NULL;
-
 	/* remove from process' thread list and release TID atomically */
 	{
 		unsigned long flags = pprocess_lock_acquire();
 
+		uk_thread_uktls_var(pthread->thread, pthread_self) = NULL;
 		if (!uk_list_empty(&pthread->thread_list_entry))
 			uk_list_del_init(&pthread->thread_list_entry);
 		__atomic_store_n(&tid_thread[pthread->tid], NULL,
@@ -391,6 +402,7 @@ static struct posix_process *pprocess_new(struct uk_alloc *a,
 #endif /* CONFIG_LIBPOSIX_PROCESS_SIGNAL */
 
 	uk_semaphore_init(&pprocess->exit_semaphore, 0);
+	uk_semaphore_init(&pprocess->thread_exit_semaphore, 0);
 
 	return pprocess;
 
@@ -1071,14 +1083,7 @@ static void posix_thread_fini(struct uk_thread *thread)
 	bool became_empty = false;
 	bool init_process;
 
-	pthread = uk_thread_uktls_var(thread, pthread_self);
-
-	/* No pthread was ever assigned to this uk_thread,
-	 * or the pthread was already terminated as a result
-	 * to an exit syscall or a signal.
-	 *
-	 * If the pthread exists, this is its return path.
-	 */
+	pthread = pprocess_claim_pthread_exit(thread, &became_empty);
 	if (!pthread)
 		return;
 
@@ -1086,11 +1091,9 @@ static void posix_thread_fini(struct uk_thread *thread)
 	UK_ASSERT(pprocess);
 	init_process = pprocess->pid == UK_PID_INIT;
 
-	if (!pprocess_claim_pthread_exit(pthread, &became_empty))
-		return;
-
 	/* Terminate and release thread */
 	pprocess_exit_pthread(pthread, POSIX_THREAD_EXITED, 0);
+	pprocess_complete_pthread_exit(pprocess);
 
 	/* If last thread, also release the process */
 	if (became_empty &&
@@ -1099,6 +1102,7 @@ static void posix_thread_fini(struct uk_thread *thread)
 		if (init_process)
 			pprocess_release(pprocess);
 	}
+	pprocess_put(pprocess);
 }
 
 UK_THREAD_INIT_PRIO(0, posix_thread_fini, UK_PRIO_EARLIEST);

@@ -77,6 +77,8 @@ struct posix_process {
 	struct uk_signal_pdesc *signal;
 #endif /* CONFIG_LIBPOSIX_PROCESS_SIGNAL */
 	struct uk_semaphore exit_semaphore;
+	struct uk_semaphore thread_exit_semaphore;
+	unsigned int exiting_threads;
 	enum posix_process_state state;
 	bool exiting;
 	__u64 exit_signal;
@@ -167,8 +169,10 @@ struct posix_process *tid2pprocess(pid_t tid);
 pid_t ukthread2tid(struct uk_thread *thread);
 pid_t ukthread2pid(struct uk_thread *thread);
 
-bool pprocess_claim_pthread_exit(struct posix_thread *pthread,
-				 bool *became_empty);
+/* A successful claim owns the pthread cleanup and a process pin. */
+struct posix_thread *pprocess_claim_pthread_exit(struct uk_thread *thread,
+						 bool *became_empty);
+void pprocess_complete_pthread_exit(struct posix_process *process);
 /* A successful process-exit claim owns a pin until its completion. */
 bool pprocess_claim_process_exit(struct posix_process *pprocess);
 bool pprocess_try_exit(struct posix_process *process,

@@ -206,6 +206,17 @@ bool pprocess_try_exit(struct posix_process *pprocess,
 		pprocess_exit_pthread(pt, PP2PT_EXIT_STATE(state), exit_status);
 	}
 
+	/* Unlinked threads may still be completing their exit events. */
+	for (;;) {
+		unsigned long pflags = pprocess_lock_acquire();
+		bool complete = !pprocess->exiting_threads;
+
+		pprocess_lock_release(pflags);
+		if (complete)
+			break;
+		uk_semaphore_down(&pprocess->thread_exit_semaphore);
+	}
+
 	/* ---> No ops at the posix level on behalf of the current <---
 	 * ---> thread from this point                             <---
 	 */
@@ -274,17 +285,15 @@ UK_LLSYSCALL_R_DEFINE(int, exit, int, status)
 	bool became_empty = false;
 
 	this_thread = uk_thread_current();
-	this_pthread = uk_thread_uktls_var(this_thread, pthread_self);
-
-	UK_ASSERT(this_pthread);
-	pprocess = this_pthread->process;
-	UK_ASSERT(pprocess);
-
-	if (pprocess_claim_pthread_exit(this_pthread, &became_empty)) {
+	this_pthread = pprocess_claim_pthread_exit(this_thread, &became_empty);
+	if (this_pthread) {
+		pprocess = this_pthread->process;
 		pprocess_exit_pthread(this_pthread, POSIX_THREAD_EXITED,
 				      status);
+		pprocess_complete_pthread_exit(pprocess);
 		if (became_empty)
 			pprocess_exit(pprocess, POSIX_PROCESS_EXITED, status);
+		pprocess_put(pprocess);
 	}
 	uk_sched_thread_exit();
 }
