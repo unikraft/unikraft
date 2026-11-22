@@ -42,6 +42,7 @@
 #include <uk/atomic.h>
 #include <uk/list.h>
 #include <uk/paging.h>
+#include <uk/plat/spinlock.h>
 #include <uk/print.h>
 
 #include <string.h>
@@ -161,6 +162,7 @@ struct bfa_memblock {
  */
 struct buddy_framealloc {
 	struct uk_falloc fa;
+	struct __spinlock lock;
 
 	/* Circular singly-linked zone list. Head is moved to last used zone. */
 	struct bfa_zone *zones;
@@ -1201,6 +1203,18 @@ static int bfa_do_alloc_any(struct buddy_framealloc *bfa, __paddr_t *paddr,
 	return 0;
 }
 
+static int bfa_alloc_core(struct buddy_framealloc *bfa, __paddr_t *paddr,
+			  __sz len)
+{
+	/* If a physical address is given, the caller wants to allocate this
+	 * exact memory range. Otherwise, just take a free one from the list.
+	 */
+	if (*paddr == UK_PAGING_PADDR_ANY)
+		return bfa_do_alloc_any(bfa, paddr, len);
+	else
+		return bfa_do_alloc(bfa, *paddr, len);
+}
+
 static int bfa_alloc(struct uk_falloc *fa, __paddr_t *paddr,
 		     unsigned long frames, unsigned long flags __unused)
 {
@@ -1215,13 +1229,7 @@ static int bfa_alloc(struct uk_falloc *fa, __paddr_t *paddr,
 	/* There is only FALLOC_FLAG_ALIGNED which we implicitly fulfill */
 	UK_ASSERT((flags == 0) || (flags == FALLOC_FLAG_ALIGNED));
 
-	/* If a physical address is given, the caller wants to allocate this
-	 * exact memory range. Otherwise, just take a free one from the list.
-	 */
-	if (*paddr == UK_PAGING_PADDR_ANY)
-		return bfa_do_alloc_any(bfa, paddr, len);
-	else
-		return bfa_do_alloc(bfa, *paddr, len);
+	return bfa_alloc_core(bfa, paddr, len);
 }
 
 static int bfa_do_alloc_any_in_range(struct buddy_framealloc *bfa,
@@ -1490,6 +1498,7 @@ int uk_fallocbuddy_init(struct uk_falloc *fa)
 
 	rc = uk_falloc_init(fa, bfa_alloc, bfa_alloc_from_range,
 			    bfa_free, bfa_addmem);
+	ukarch_spin_init(&bfa->lock);
 
 	for (i = 0; i < BFA_LEVELS; i++)
 		UK_INIT_LIST_HEAD(&bfa->free_list[i]);

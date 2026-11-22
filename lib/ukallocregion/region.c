@@ -55,9 +55,11 @@
 #include <sys/types.h>
 #include <uk/allocregion.h>
 #include <uk/alloc_impl.h>
+#include <uk/plat/spinlock.h>
 
 struct uk_allocregion {
 	struct uk_alloc a;
+	struct __spinlock lock;
 	void *heap_pos;
 	void *heap_base;
 };
@@ -76,6 +78,11 @@ void allocregion_do_bump(struct uk_allocregion *ar, size_t size, size_t align)
 	 */
 	ar->heap_pos = (void *)ALIGN_DOWN((uintptr_t)ar->heap_pos - size,
 					  (uintptr_t)align);
+}
+
+static inline size_t allocregion_availmem_locked(const struct uk_allocregion *ar)
+{
+	return (uintptr_t)ar->heap_pos - (uintptr_t)ar->heap_base;
 }
 
 void *uk_allocregion_bump(struct uk_allocregion *ar, size_t size)
@@ -148,7 +155,7 @@ static void allocregion_free(struct uk_alloc *a __maybe_unused,
 size_t uk_allocregion_availmem(const struct uk_allocregion *ar)
 {
 	UK_ASSERT(ar);
-	return (uintptr_t)ar->heap_pos - (uintptr_t)ar->heap_base;
+	return allocregion_availmem_locked(ar);
 }
 
 static ssize_t allocregion_availmem(struct uk_alloc *a)
@@ -182,6 +189,7 @@ struct uk_allocregion *uk_allocregion_init(void *base, size_t len)
 	}
 
 	ar = (struct uk_allocregion *)base;
+	ukarch_spin_init(&ar->lock);
 
 	uk_pr_info("Initialize allocregion allocator @ %p, len %lu\n", ar, len);
 

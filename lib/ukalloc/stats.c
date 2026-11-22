@@ -37,6 +37,7 @@
 
 #if CONFIG_LIBUKALLOC_IFSTATS_GLOBAL
 struct uk_alloc_stats _uk_alloc_stats_global = { 0 };
+struct __spinlock _uk_alloc_stats_global_lock = UKARCH_SPINLOCK_INITIALIZER();
 #endif
 
 void uk_alloc_stats_get(struct uk_alloc *a,

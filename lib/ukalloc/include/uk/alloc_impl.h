@@ -81,10 +81,12 @@ long uk_alloc_pmaxalloc_compat(struct uk_alloc *a);
 
 #if CONFIG_LIBUKALLOC_IFSTATS
 #include <string.h>
+#include <uk/plat/spinlock.h>
 #include <uk/preempt.h>
 
 #if CONFIG_LIBUKALLOC_IFSTATS_GLOBAL
 extern struct uk_alloc_stats _uk_alloc_stats_global;
+extern struct __spinlock _uk_alloc_stats_global_lock;
 #endif /* CONFIG_LIBUKALLOC_IFSTATS_GLOBAL */
 
 /* NOTE: Please do not use this function directly */
@@ -109,11 +111,9 @@ static inline void _uk_alloc_stats_refresh_minmax(struct uk_alloc_stats *stats)
 }
 
 /* NOTE: Please do not use this function directly */
-static inline void _uk_alloc_stats_count_alloc(struct uk_alloc_stats *stats,
-					       void *ptr, __sz size)
+static inline void _uk_alloc_stats_count_alloc_locked(struct uk_alloc_stats *stats,
+						      void *ptr, __sz size)
 {
-	/* TODO: SMP safety */
-	uk_preempt_disable();
 	if (likely(ptr)) {
 		stats->tot_nb_allocs++;
 
@@ -124,7 +124,29 @@ static inline void _uk_alloc_stats_count_alloc(struct uk_alloc_stats *stats,
 	} else {
 		stats->nb_enomem++;
 	}
+}
+
+/* NOTE: Please do not use this function directly */
+static inline void _uk_alloc_stats_count_alloc(struct uk_alloc_stats *stats,
+					       void *ptr, __sz size)
+{
+	/* TODO: SMP safety */
+	uk_preempt_disable();
+	_uk_alloc_stats_count_alloc_locked(stats, ptr, size);
 	uk_preempt_enable();
+}
+
+/* NOTE: Please do not use this function directly */
+static inline void _uk_alloc_stats_count_free_locked(struct uk_alloc_stats *stats,
+						     void *ptr, __sz size)
+{
+	if (likely(ptr)) {
+		stats->tot_nb_frees++;
+
+		stats->cur_nb_allocs--;
+		stats->cur_mem_use -= size;
+		_uk_alloc_stats_refresh_minmax(stats);
+	}
 }
 
 /* NOTE: Please do not use this function directly */
@@ -133,13 +155,7 @@ static inline void _uk_alloc_stats_count_free(struct uk_alloc_stats *stats,
 {
 	/* TODO: SMP safety */
 	uk_preempt_disable();
-	if (likely(ptr)) {
-		stats->tot_nb_frees++;
-
-		stats->cur_nb_allocs--;
-		stats->cur_mem_use -= size;
-		_uk_alloc_stats_refresh_minmax(stats);
-	}
+	_uk_alloc_stats_count_free_locked(stats, ptr, size);
 	uk_preempt_enable();
 }
 
@@ -188,7 +204,10 @@ static inline void _uk_alloc_stats_count_free(struct uk_alloc_stats *stats,
 				  ((__sz) (num_pages)) << __PAGE_SHIFT)
 
 #define uk_alloc_stats_reset(a)						\
-	memset(&(a)->_stats, 0, sizeof((a)->_stats))
+	do {								\
+		memset(&(a)->_stats, 0, sizeof((a)->_stats));		\
+		ukarch_spin_init(&(a)->_stats_lock);			\
+	} while (0)
 
 #else /* !CONFIG_LIBUKALLOC_IFSTATS */
 #define uk_alloc_stats_count_alloc(a, ptr, size) do {} while (0)

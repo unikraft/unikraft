@@ -41,6 +41,7 @@
 #include <uk/alloc_impl.h>
 #include <uk/allocpool.h>
 #include <uk/list.h>
+#include <uk/plat/spinlock.h>
 #include <string.h>
 #include <errno.h>
 
@@ -68,6 +69,7 @@
 
 struct uk_allocpool {
 	struct uk_alloc self;
+	struct __spinlock lock;
 
 	struct uk_list_head free_obj;
 	unsigned int free_obj_count;
@@ -308,6 +310,7 @@ struct uk_allocpool *uk_allocpool_init(void *base, __sz len,
 
 	p = (struct uk_allocpool *)base;
 	memset(p, 0, sizeof(*p));
+	ukarch_spin_init(&p->lock);
 	a = allocpool2ukalloc(p);
 
 	obj_alen = ALIGN_UP(obj_len, obj_align);

@@ -42,6 +42,7 @@
 #include <uk/arch/limits.h>
 #include <uk/lcpu.h>
 #include <uk/paging.h>
+#include <uk/plat/spinlock.h>
 
 #if CONFIG_HAVE_MEMTAG
 #include <uk/arch/memtag.h>
@@ -52,6 +53,8 @@
 #define page_off(x) ((unsigned long)(x) & (__PAGE_SIZE - 1))
 
 struct uk_alloc *_uk_alloc_head;
+static struct __spinlock _uk_alloc_list_lock __maybe_unused =
+	UKARCH_SPINLOCK_INITIALIZER();
 
 int uk_alloc_register(struct uk_alloc *a)
 {

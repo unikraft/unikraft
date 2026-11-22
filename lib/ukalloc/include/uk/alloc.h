@@ -71,6 +71,8 @@ typedef long  (*uk_alloc_getpsize_func_t)
 		(struct uk_alloc *a);
 
 #if CONFIG_LIBUKALLOC_IFSTATS
+#include <uk/arch/spinlock.h>
+
 struct uk_alloc_stats {
 	__sz last_alloc_size; /* size of the last allocation */
 	__sz max_alloc_size; /* biggest satisfied allocation size */
@@ -115,6 +117,7 @@ struct uk_alloc {
 
 #if CONFIG_LIBUKALLOC_IFSTATS
 	struct uk_alloc_stats _stats;
+	struct __spinlock _stats_lock;
 #endif
 
 	/* internal */
