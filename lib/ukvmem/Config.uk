@@ -16,6 +16,7 @@ if LIBUKVMEM
 config LIBUKVMEM_THREAD_VAS
 	bool "Select the address space on thread switches"
 	depends on HAVE_SCHED
+	select LIBUKPAGING_SHARED
 	help
 		Allow threads to use an address space distinct from the kernel
 		address space. All address spaces must map the kernel and its

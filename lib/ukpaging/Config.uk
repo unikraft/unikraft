@@ -24,6 +24,13 @@ config LIBUKPAGING_DEFERRED_RELEASE
 		Release optional mapping backing references after local and
 		remote TLB invalidations have completed.
 
+config LIBUKPAGING_SHARED
+	bool
+	select LIBUKPAGING_DEFERRED_RELEASE
+	default n
+	help
+		Share pinned kernel branches between page-table hierarchies.
+
 config LIBUKPAGING_DIRECTMAP
 	bool
 	default y if ARCH_ARM_64 || ARCH_X86_64

@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 
+#include <errno.h>
 #include <uk/alloc.h>
 #include <uk/crash.h>
 #include <uk/paging.h>
@@ -72,6 +73,7 @@ UK_TESTCASE(vas_sched, deferred_backing_release)
 struct vas_switch_probe {
 	struct uk_vas *vas;
 	__vaddr_t address;
+	__vaddr_t kernel_address;
 	bool done;
 	bool first_active;
 	bool restored;
@@ -88,6 +90,8 @@ static void vas_switch_thread(void *arg)
 			      uk_paging_pt_get_active() == probe->vas->pt &&
 			      __atomic_load_n(value, __ATOMIC_RELAXED) == 0;
 	__atomic_store_n(value, 2, __ATOMIC_RELAXED);
+	/* This page is first populated while the child page table is active. */
+	__atomic_store_n((__u64 *)probe->kernel_address, 3, __ATOMIC_RELAXED);
 	uk_sched_yield();
 	probe->restored = uk_vas_get_active() == probe->vas &&
 			  __atomic_load_n(value, __ATOMIC_RELAXED) == 2;
@@ -102,42 +106,48 @@ UK_TESTCASE(vas_sched, switch_distinct_address_spaces)
 	struct uk_pagetable child_pt;
 	struct uk_vas child;
 	struct vas_switch_probe probe = { .vas = &child };
-	struct uk_thread *thread;
-	__vaddr_t address = UK_PAGING_VADDR_ANY;
-	__u64 root_value;
+	struct uk_thread *thread = NULL;
+	const __sz shared_len = UK_PAL_PAGE_Lx_SIZE(UK_PAL_PT_LEVELS - 1);
+	__vaddr_t address = shared_len;
+	__vaddr_t kernel_address = UK_PAGING_VADDR_ANY;
+	__u64 root_value, shared_value;
 	int rc;
 
 	UK_TEST_EXPECT(kernel && uk_vas_get_active() == kernel);
 	if (!kernel || uk_vas_get_active() != kernel)
 		return;
 
-	/* Reserve the test address without mapping a frame. The snapshot
-	 * must include the test thread's kernel stack, TLS, and metadata.
-	 */
+	/* Keep the private page in a different top-level branch. */
 	rc = uk_vma_map_anon(kernel, &address, UK_PAGING_PAGE_SIZE,
 			     UK_PAGING_PAGE_ATTR_PROT_RW, 0, NULL);
 	UK_TEST_EXPECT_ZERO(rc);
 	if (rc)
 		return;
 
-	thread = uk_thread_create_fn1(sched->a, vas_switch_thread, &probe,
-				      sched->a_stack, 0, sched->a_auxstack, 0,
-				      sched->a_uktls, false, "vas-switch",
-				      NULL, NULL);
-	UK_TEST_EXPECT_NOT_NULL(thread);
-	if (!thread)
-		goto unmap_kernel;
-
-	rc = uk_paging_pt_clone(&child_pt, kernel->pt, 0);
+	rc = uk_vma_map_anon(kernel, &kernel_address, UK_PAGING_PAGE_SIZE,
+			     UK_PAGING_PAGE_ATTR_PROT_RW, 0, NULL);
 	UK_TEST_EXPECT_ZERO(rc);
 	if (rc)
-		goto release_thread;
-	rc = uk_vas_init(&child, &child_pt, uk_alloc_get_default());
+		goto unmap_kernel;
+	UK_TEST_EXPECT(kernel_address < shared_len);
+
+	rc = uk_paging_pt_clone_shared(&child_pt, kernel->pt, 0, shared_len);
+	UK_TEST_EXPECT_ZERO(rc);
+	if (rc)
+		goto unmap_shared;
+	UK_TEST_EXPECT(uk_paging_pt_get_owner(&child_pt, kernel_address) ==
+		       kernel->pt);
+	UK_TEST_EXPECT(uk_paging_pt_get_owner(&child_pt, address) == &child_pt);
+	UK_TEST_EXPECT_SNUM_EQ(uk_paging_pt_free(kernel->pt, 0), -EBUSY);
+	rc = uk_paging_page_set_attr(&child_pt, kernel_address, 1, 0, 0);
+	UK_TEST_EXPECT_SNUM_EQ(rc, -EACCES);
+	rc = uk_vas_init(&child, &child_pt, kernel->a);
 	UK_TEST_EXPECT_ZERO(rc);
 	if (rc)
 		goto free_pt;
 
 	probe.address = address;
+	probe.kernel_address = kernel_address;
 	rc = uk_vma_map_anon(&child, &probe.address, UK_PAGING_PAGE_SIZE,
 			     UK_PAGING_PAGE_ATTR_PROT_RW, UK_VMA_MAP_POPULATE,
 			     NULL);
@@ -146,6 +156,15 @@ UK_TESTCASE(vas_sched, switch_distinct_address_spaces)
 		goto destroy_child;
 	UK_TEST_EXPECT(probe.address == address);
 	__atomic_store_n((__u64 *)address, 1, __ATOMIC_RELAXED);
+
+	/* Allocate the kernel stack and TLS after cloning the page table. */
+	thread = uk_thread_create_fn1(sched->a, vas_switch_thread, &probe,
+				      sched->a_stack, 0, sched->a_auxstack, 0,
+				      sched->a_uktls, false, "vas-switch",
+				      NULL, NULL);
+	UK_TEST_EXPECT_NOT_NULL(thread);
+	if (!thread)
+		goto destroy_child;
 
 	thread->vas = &child;
 	rc = uk_sched_thread_add(sched, thread);
@@ -164,15 +183,20 @@ UK_TESTCASE(vas_sched, switch_distinct_address_spaces)
 	UK_TEST_EXPECT(uk_vas_get_active() == kernel);
 	root_value = __atomic_load_n((__u64 *)address, __ATOMIC_RELAXED);
 	UK_TEST_EXPECT_SNUM_EQ(root_value, 1);
+	shared_value = __atomic_load_n((__u64 *)kernel_address,
+				       __ATOMIC_RELAXED);
+	UK_TEST_EXPECT_SNUM_EQ(shared_value, 3);
 
 destroy_child:
 	uk_vas_destroy(&child);
 free_pt:
 	UK_TEST_EXPECT_ZERO(uk_paging_pt_free(&child_pt,
 					      UK_PAGING_PAGE_FLAG_KEEP_FRAMES));
-release_thread:
 	if (thread)
 		uk_thread_release(thread);
+unmap_shared:
+	rc = uk_vma_unmap(kernel, kernel_address, UK_PAGING_PAGE_SIZE, 0);
+	UK_TEST_EXPECT_ZERO(rc);
 unmap_kernel:
 	rc = uk_vma_unmap(kernel, address, UK_PAGING_PAGE_SIZE, 0);
 	UK_TEST_EXPECT_ZERO(rc);
