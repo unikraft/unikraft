@@ -415,6 +415,23 @@ void uk_vas_set_kernel(struct uk_vas *vas);
  */
 int uk_vas_set_active(struct uk_vas *vas);
 
+#if CONFIG_LIBUKVMEM_VAS_ACCESS
+/**
+ * Resolve a read, write or execute access in an explicit VAS. The caller holds
+ * the VAS live and calls with IRQs enabled outside locks. Software faults may
+ * allocate and finish remote TLB invalidations. Returns 0 or a negative errno.
+ */
+int uk_vas_fault(struct uk_vas *vas, __vaddr_t vaddr, unsigned int access);
+
+/**
+ * Store an aligned 32-bit value in an explicit VAS, without activating it.
+ * Resolve a writable mapping with IRQs enabled, then recheck and store through
+ * the direct map under the owning VAS lock. The caller holds the VAS live and
+ * calls outside locks. Returns 0 or a negative errno; misalignment is -EINVAL.
+ */
+int uk_vas_store_u32(struct uk_vas *vas, __vaddr_t vaddr, __u32 value);
+#endif
+
 /**
  * Initializes a new virtual address space using the provided page table.
  *

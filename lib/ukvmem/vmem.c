@@ -16,6 +16,9 @@
 #endif /* CONFIG_LIBUKPAGING */
 #include <uk/alloc.h>
 #include <uk/assert.h>
+#if CONFIG_LIBUKVMEM_VAS_ACCESS
+#include <uk/atomic.h>
+#endif
 #include <uk/list.h>
 #include <uk/pcpuvar.h>
 #if CONFIG_LIBUKDEBUG_ENABLE_ASSERT
@@ -1340,16 +1343,6 @@ static int vmem_mapx_pagefault(struct uk_pagetable *pt __unused,
 			       unsigned int level, __pte_t *pte, void *user)
 {
 	struct mapx_pagefault_ctx *ctx = (struct mapx_pagefault_ctx *)user;
-	struct uk_vm_fault fault = {
-		.vaddr = ctx->vaddr,
-		.vbase = vaddr,
-		.len   = UK_PAGING_PAGE_Lx_SIZE(level),
-		.paddr = UK_PAGING_PT_Lx_PTE_PADDR(*pte, level),
-		.type  = ctx->type,
-		.pte   = *pte,
-		.level = level,
-		.regs  = ctx->regs,
-	};
 	__pte_t opte;
 	int rc;
 
@@ -1372,29 +1365,44 @@ static int vmem_mapx_pagefault(struct uk_pagetable *pt __unused,
 		return UK_PAGING_PAGE_MAPX_ESKIP;
 	}
 
-	rc = ctx->vma->ops->fault(ctx->vma, &fault);
-	if (unlikely(rc)) {
-		if (rc == -ENOMEM)
-			return UK_PAGING_PAGE_MAPX_ETOOBIG;
+	/* mapx supplies a proposed PTE; fault presence uses the current PTE. */
+	{
+		struct uk_vm_fault fault = {
+			.vaddr = ctx->vaddr,
+			.vbase = vaddr,
+			.len   = UK_PAGING_PAGE_Lx_SIZE(level),
+			.paddr = UK_PAGING_PT_Lx_PTE_PADDR(*pte, level),
+			.type  = (ctx->type & ~UK_VMA_FAULT_NONPRESENT) |
+				 (UK_PAGING_PT_Lx_PTE_PRESENT(opte, level) ? 0 :
+				  UK_VMA_FAULT_NONPRESENT),
+			.pte   = *pte,
+			.level = level,
+			.regs  = ctx->regs,
+		};
 
-		return rc;
+		rc = ctx->vma->ops->fault(ctx->vma, &fault);
+		if (unlikely(rc)) {
+			if (rc == -ENOMEM)
+				return UK_PAGING_PAGE_MAPX_ETOOBIG;
+
+			return rc;
+		}
+
+		UK_ASSERT(UK_PAGING_PAGE_Lx_ALIGNED(fault.paddr, fault.level));
+
+		*pte = UK_PAGING_PT_Lx_PTE_SET_PADDR(fault.pte, fault.level,
+						     fault.paddr);
 	}
-
-	UK_ASSERT(UK_PAGING_PAGE_Lx_ALIGNED(fault.paddr, fault.level));
-
-	*pte = UK_PAGING_PT_Lx_PTE_SET_PADDR(fault.pte, fault.level,
-					     fault.paddr);
 
 	return 0;
 }
 
-int vmem_pagefault(__vaddr_t vaddr, unsigned int type,
-		   struct uk_lcpu_regs *regs)
+static int vmem_fault(struct uk_vas *vas, __vaddr_t vaddr, unsigned int type,
+		      struct uk_lcpu_regs *regs)
 {
 	const unsigned int demand_lvl =
 		UK_PAGING_PAGE_SHIFT_Lx(CONFIG_LIBUKVMEM_DEMAND_PAGE_IN_SIZE);
 	struct uk_paging_free_batch batch;
-	struct uk_vas *vas;
 	struct uk_pagetable *pt;
 	struct mapx_pagefault_ctx ctx = {
 		.vaddr = vaddr,
@@ -1412,7 +1420,6 @@ int vmem_pagefault(__vaddr_t vaddr, unsigned int type,
 	int rc;
 
 	/* Check if a virtual address space is set */
-	vas = uk_vas_get_active();
 	if (unlikely(!uk_vas_paging_enabled(vas)))
 		return -EFAULT;
 
@@ -1497,7 +1504,85 @@ int vmem_pagefault(__vaddr_t vaddr, unsigned int type,
 	uk_paging_batch_end(&batch);
 	ukplat_spin_unlock_irqrestore(&vas->lock, irqf);
 
-	vmem_arch_pagefault_finish(&batch, regs);
+	if (type & UK_VMA_FAULT_SOFT)
+		uk_paging_free_batch_finish(&batch);
+	else
+		vmem_arch_pagefault_finish(&batch, regs);
 	return rc;
 }
+
+int vmem_pagefault(__vaddr_t vaddr, unsigned int type,
+		   struct uk_lcpu_regs *regs)
+{
+	return vmem_fault(uk_vas_get_active(), vaddr, type, regs);
+}
+
+#if CONFIG_LIBUKVMEM_VAS_ACCESS
+int uk_vas_fault(struct uk_vas *vas, __vaddr_t vaddr, unsigned int access)
+{
+	if (!vas || access > UK_VMA_FAULT_EXEC)
+		return -EINVAL;
+	if (uk_lcpu_irqs_disabled())
+		return -EWOULDBLOCK;
+	access |= UK_VMA_FAULT_SOFT | UK_VMA_FAULT_IRQS_ENABLED;
+	return vmem_fault(vas, vaddr, access, NULL);
+}
+
+int uk_vas_store_u32(struct uk_vas *vas, __vaddr_t vaddr, __u32 value)
+{
+	struct uk_vas *owner;
+	struct uk_vma *vma;
+	__vaddr_t mapped;
+	__paddr_t paddr, page;
+	__pte_t pte;
+	unsigned long irqf;
+	unsigned int level;
+	int rc;
+
+	if (!vas || !IS_ALIGNED(vaddr, sizeof(value)))
+		return -EINVAL;
+	for (;;) {
+		rc = uk_vas_fault(vas, vaddr, UK_VMA_FAULT_WRITE);
+		if (rc)
+			return rc;
+		owner = vas;
+		if (uk_vas_get_kernel() &&
+		    uk_paging_pt_get_owner(vas->pt, vaddr) ==
+		    uk_vas_get_kernel()->pt)
+			owner = uk_vas_get_kernel();
+		ukplat_spin_lock_irqsave(&owner->lock, irqf);
+		vma = vmem_vma_find(owner, vaddr, sizeof(value));
+		if (!vma || vaddr < vma->start ||
+		    vaddr > vma->end - sizeof(value) ||
+		    !vmem_access_allowed(vma->attr, UK_VMA_FAULT_WRITE)) {
+			rc = -EFAULT;
+			goto unlock;
+		}
+		level = UK_PAGING_PAGE_LEVEL;
+		rc = uk_paging_pt_walk(owner->pt, vaddr, &level, NULL, &pte);
+		if (rc)
+			goto unlock;
+		if (!UK_PAGING_PT_Lx_PTE_PRESENT(pte, level) ||
+		    !vmem_access_allowed(uk_paging_attr_from_pte(pte, level),
+					 UK_VMA_FAULT_WRITE)) {
+			ukplat_spin_unlock_irqrestore(&owner->lock, irqf);
+			continue;
+		}
+		paddr = UK_PAGING_PT_Lx_PTE_PADDR(pte, level) +
+			(vaddr & (UK_PAGING_PAGE_Lx_SIZE(level) - 1));
+		page = UK_PAGING_PAGE_ALIGN_DOWN(paddr);
+		mapped = uk_paging_page_kmap(owner->pt, page, 1, 0);
+		if (mapped == UK_PAGING_VADDR_INV) {
+			rc = -ENOMEM;
+			goto unlock;
+		}
+		uk_store_n((__u32 *)(mapped + paddr - page), value);
+		uk_paging_page_kunmap(owner->pt, mapped, 1, 0);
+		rc = 0;
+unlock:
+		ukplat_spin_unlock_irqrestore(&owner->lock, irqf);
+		return rc;
+	}
+}
+#endif
 #endif /* CONFIG_LIBUKPAGING */

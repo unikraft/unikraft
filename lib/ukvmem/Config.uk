@@ -32,6 +32,11 @@ config LIBUKVMEM_VAS_REFCOUNT
 	depends on LIBUKVMEM_THREAD_VAS
 	default n
 
+config LIBUKVMEM_VAS_ACCESS
+	bool
+	depends on LIBUKVMEM_THREAD_VAS && LIBUKPAGING_DIRECTMAP
+	default n
+
 config LIBUKVMEM_VAS_REFCOUNT_TEST
 	bool "Test owned address space lifetime"
 	depends on LIBUKVMEM_THREAD_VAS && LIBUKLOCK_SEMAPHORE
