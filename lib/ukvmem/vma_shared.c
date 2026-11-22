@@ -10,8 +10,6 @@
 #include <uk/vmem/vma_ops.h>
 #include <uk/vmem/vma_types.h>
 
-#include "cow_vma.h"
-
 /* Allocate and zero backing in mapping context. Faults only install a
  * resident page; split mappings and cloned VASes retain the same object.
  */
@@ -52,8 +50,8 @@ static void shared_ref_put(const void *object)
 	shared_anon_put((struct shared_anon *)object);
 }
 
-void vmem_shared_anon_ref(struct uk_vma *vma, __vaddr_t addr,
-			  struct uk_vma_shared_ref *out)
+static void shared_ref(struct uk_vma *vma, __vaddr_t addr,
+		       struct uk_vma_shared_ref *out)
 {
 	struct shared_vma *v = (struct shared_vma *)vma;
 
@@ -161,8 +159,8 @@ static void shared_destroy(struct uk_vma *vma)
 	shared_anon_put(((struct shared_vma *)vma)->backing);
 }
 
-int vmem_shared_anon_clone(struct uk_vma *vma, struct uk_alloc *a,
-			   struct uk_vma **out)
+static int shared_clone(struct uk_vma *vma, struct uk_alloc *a,
+			struct uk_vma **out)
 {
 	struct shared_vma *old = (struct shared_vma *)vma;
 	struct shared_vma *v = uk_malloc(a, sizeof(*v));
@@ -179,7 +177,7 @@ int vmem_shared_anon_clone(struct uk_vma *vma, struct uk_alloc *a,
 static int shared_split(struct uk_vma *vma, __vaddr_t addr,
 			struct uk_vma **out)
 {
-	int rc = vmem_shared_anon_clone(vma, vma->vas->a, out);
+	int rc = shared_clone(vma, vma->vas->a, out);
 
 	if (!rc)
 		((struct shared_vma *)*out)->first +=
@@ -208,6 +206,8 @@ static int shared_advise(struct uk_vma *vma, __vaddr_t addr, __sz len,
 const struct uk_vma_ops uk_vma_shared_anon_ops = {
 	.new = shared_new,
 	.destroy = shared_destroy,
+	.clone_cow = shared_clone,
+	.shared_ref = shared_ref,
 	.fault = shared_fault,
 	.unmap = shared_unmap,
 	.split = shared_split,

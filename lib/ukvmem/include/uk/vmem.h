@@ -54,6 +54,7 @@ struct uk_pagetable;
 
 struct uk_vma;
 struct uk_vma_ops;
+struct uk_vma_shared_ref;
 struct vmem_cow_vas;
 #if CONFIG_LIBUKVMEM_COW
 struct vmem_vas_transition;
@@ -292,6 +293,30 @@ struct uk_vma_ops {
 	 *   The virtual memory area to be destroyed
 	 */
 	void (*destroy)(struct uk_vma *vma);
+
+#if CONFIG_LIBUKVMEM_COW_VMA
+	/**
+	 * Copy backend state for a COW clone. Called with the source VAS lock
+	 * held and IRQs disabled: allocation must use the resident allocator
+	 * supplied in a, without faults, blocking or yielding. Return an
+	 * extended VMA, or NULL to request allocation of a plain VMA. The
+	 * caller initializes its generic fields and clones private frame
+	 * references from the VAS COW slots. Shared frames remain owned by
+	 * the backend. Failure must release acquired backend state; success
+	 * transfers it to the new VMA and its destroy callback.
+	 */
+	int (*clone_cow)(struct uk_vma *vma, struct uk_alloc *a,
+			 struct uk_vma **out);
+
+	/**
+	 * Pin a shared identity at addr under the VAS lock. The caller has
+	 * validated the range. This callback cannot allocate, fault, block
+	 * or yield. Equal identities must retain the same object using the
+	 * same reference operations, including for independent mappings.
+	 */
+	void (*shared_ref)(struct uk_vma *vma, __vaddr_t addr,
+			   struct uk_vma_shared_ref *out);
+#endif
 
 	/**
 	 * The fault handler is called whenever a page fault is raised for an

@@ -1799,11 +1799,11 @@ int uk_vas_get_shared_ref(struct uk_vas *vas, __vaddr_t addr, __sz len,
 		rc = -EFAULT;
 		goto out;
 	}
-	if (vma->ops != &uk_vma_shared_anon_ops) {
+	if (!vma->ops->shared_ref) {
 		rc = -ENOTSUP;
 		goto out;
 	}
-	vmem_shared_anon_ref(vma, addr, out);
+	vma->ops->shared_ref(vma, addr, out);
 	rc = 0;
 out:
 	ukplat_spin_unlock_irqrestore(&vas->lock, irqf);
@@ -1868,8 +1868,8 @@ static int vmem_load_u32_try(struct uk_vas *vas, __vaddr_t addr, __u32 *out,
 #if CONFIG_LIBUKVMEM_COW_VMA
 	if (ref) {
 		memset_isr(ref, 0, sizeof(*ref));
-		if (vma->ops == &uk_vma_shared_anon_ops)
-			vmem_shared_anon_ref(vma, addr, ref);
+		if (vma->ops->shared_ref)
+			vma->ops->shared_ref(vma, addr, ref);
 	}
 #endif
 	uk_paging_page_kunmap(vas->pt, mapped, 1, 0);

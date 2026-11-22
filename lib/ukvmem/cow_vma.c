@@ -436,8 +436,16 @@ static int cow_anon_split(struct uk_vma *vma __unused,
 	return 0;
 }
 
+static int cow_anon_clone(struct uk_vma *vma __unused,
+			  struct uk_alloc *a __unused, struct uk_vma **out)
+{
+	*out = NULL;
+	return 0;
+}
+
 const struct uk_vma_ops uk_vma_cow_anon_ops = {
 	.new = cow_anon_new,
+	.clone_cow = cow_anon_clone,
 	.fault = cow_anon_fault,
 	.unmap = cow_anon_unmap,
 	.split = cow_anon_split,
@@ -475,8 +483,7 @@ int uk_vas_clone_cow(struct uk_vas *dst, struct uk_vas *src)
 	ukplat_spin_lock_irqsave(&src->lock, irqf);
 	/* Validate every class before changing source permissions. */
 	uk_list_for_each_entry(vma, &src->vma_list, vma_list) {
-		if ((vma->ops != &uk_vma_cow_anon_ops &&
-		     vma->ops != &uk_vma_shared_anon_ops) ||
+		if (!vma->ops->clone_cow ||
 		    !vmem_vas_range_allowed(dst, vma->start,
 					vma->end - vma->start) ||
 		    vma->page_lvl > UK_PAGING_PAGE_LEVEL ||
@@ -489,11 +496,11 @@ int uk_vas_clone_cow(struct uk_vas *dst, struct uk_vas *src)
 		}
 	}
 	uk_list_for_each_entry(vma, &src->vma_list, vma_list) {
-		if (vma->ops == &uk_vma_shared_anon_ops) {
-			rc = vmem_shared_anon_clone(vma, dst->a, &v);
-			if (rc)
-				goto unlock;
-		} else {
+		v = NULL;
+		rc = vma->ops->clone_cow(vma, dst->a, &v);
+		if (rc)
+			goto unlock;
+		if (!v) {
 			v = uk_malloc(dst->a, sizeof(*v));
 			if (!v) {
 				rc = -ENOMEM;
