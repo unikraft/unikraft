@@ -12,6 +12,13 @@
 #include <uk/lcpu.h>
 #include <uk/plat/time.h>
 #include <uk/print.h>
+#include <uk/process/prepared.h>
+#if CONFIG_LIBPOSIX_FDTAB_MULTITAB && !CONFIG_LIBVFSCORE
+#include <fcntl.h>
+#include <uk/file.h>
+#include <uk/file/nops.h>
+#include <uk/posix-fdtab.h>
+#endif
 #include <uk/sched.h>
 #include <uk/semaphore.h>
 #include <uk/test.h>
@@ -276,6 +283,13 @@ struct prepare_run {
 	bool active;
 	bool remote;
 	bool after_release;
+#if CONFIG_LIBPOSIX_FDTAB_MULTITAB && !CONFIG_LIBVFSCORE
+	bool check_fds;
+	bool kept_open;
+	bool clo_closed;
+	int kept_fd;
+	int clo_fd;
+#endif
 };
 
 static void prepare_run_thread(void *arg)
@@ -294,6 +308,12 @@ static void prepare_run_thread(void *arg)
 	p->active = p->active &&
 		__atomic_load_n(value, __ATOMIC_RELAXED) == PREPARE_VALUE;
 	__atomic_store_n(value, PREPARE_VALUE + 1, __ATOMIC_RELAXED);
+#if CONFIG_LIBPOSIX_FDTAB_MULTITAB && !CONFIG_LIBVFSCORE
+	if (p->check_fds) {
+		p->kept_open = uk_fdtab_getflags(p->kept_fd) >= 0;
+		p->clo_closed = uk_fdtab_getflags(p->clo_fd) < 0;
+	}
+#endif
 	__atomic_store_n(&p->started, true, __ATOMIC_RELEASE);
 	uk_semaphore_down(&p->finish);
 	p->after_release = !uk_pthread_current() &&
@@ -521,6 +541,332 @@ release_threads:
 	UK_TEST_EXPECT_SNUM_EQ(prepare_processes(), before);
 	uk_free(uk_sched_current()->a, a);
 }
+
+#if CONFIG_LIBPOSIX_FDTAB_MULTITAB && !CONFIG_LIBVFSCORE
+static struct uk_thread *prepare_public_raw_thread(void)
+{
+	struct uk_sched *s = uk_sched_current();
+
+	/* The loader will supply a private user stack after preparation. */
+	return uk_thread_create_container(s->a, NULL, 0,
+					   s->a_auxstack, 0, s->a_uktls, false,
+					   "public-raw", NULL, NULL);
+}
+
+UK_TESTCASE(process_prepare, public_spawn_cycles)
+{
+	struct uk_vas *kernel = uk_vas_get_kernel(), *vas = NULL;
+	struct uk_alloc *a = prepare_allocator();
+	struct prepare_alloc *alloc;
+	struct uk_thread *thread = NULL;
+	struct posix_thread *pt;
+	unsigned int children = prepare_children(uk_pprocess_current());
+	unsigned int processes = prepare_processes();
+	unsigned int users = kernel->pt->shared_users;
+	unsigned int cycle;
+	unsigned long free_bytes = 0;
+	pid_t pid;
+
+	UK_TEST_EXPECT_NOT_NULL(a);
+	if (!a)
+		return;
+	alloc = (void *)a->priv;
+	UK_TEST_EXPECT_ZERO(uk_posix_process_abort_prepared(NULL));
+	UK_TEST_EXPECT_SNUM_EQ(uk_posix_process_publish_prepared(NULL),
+			       -EINVAL);
+	UK_TEST_EXPECT_SNUM_EQ(uk_posix_process_prepare_spawn(a, NULL, &vas),
+			       -EINVAL);
+	UK_TEST_EXPECT_NULL(vas);
+	for (cycle = 0; cycle < 66; cycle++) {
+		thread = prepare_public_raw_thread();
+		UK_TEST_EXPECT_NOT_NULL(thread);
+		if (!thread)
+			goto out;
+		UK_TEST_EXPECT_NULL(thread->_mem.stack);
+		pid = uk_posix_process_prepare_spawn(a, thread, &vas);
+		UK_TEST_EXPECT(pid > 0);
+		if (pid <= 0)
+			goto out;
+		pt = uk_thread_uktls_var(thread, pthread_self);
+		UK_TEST_EXPECT_NOT_NULL(pt);
+		UK_TEST_EXPECT_PTR_EQ(pt->process->vas, vas);
+		UK_TEST_EXPECT_PTR_EQ(thread->vas, vas);
+		UK_TEST_EXPECT(uk_vas_is_owned(vas));
+		UK_TEST_EXPECT_SNUM_EQ(uk_refcount_read(&vas->refs), 3);
+		UK_TEST_EXPECT_SNUM_EQ(pt->process->exit_signal, SIGCHLD);
+		UK_TEST_EXPECT_NULL(pid2pprocess(pid));
+		UK_TEST_EXPECT_NULL(tid2pthread(pid));
+#if CONFIG_LIBPOSIX_PROCESS_BRK
+		UK_TEST_EXPECT_NOT_NULL(pt->process->brk_ctx.base);
+		UK_TEST_EXPECT_ZERO(pt->process->brk_ctx.pos);
+		{
+			__vaddr_t heap = (__vaddr_t)pt->process->brk_ctx.base;
+
+			UK_TEST_EXPECT_NOT_NULL(uk_vma_find(vas, heap));
+		}
+#endif
+		UK_TEST_EXPECT_PTR_EQ(uk_vas_get_active(), kernel);
+		UK_TEST_EXPECT_ZERO(uk_posix_process_abort_prepared(thread));
+		uk_thread_release(thread);
+		thread = NULL;
+		uk_vas_put(vas);
+		vas = NULL;
+		UK_TEST_EXPECT_SNUM_EQ(prepare_children(uk_pprocess_current()),
+				       children);
+		UK_TEST_EXPECT_SNUM_EQ(prepare_processes(), processes);
+		UK_TEST_EXPECT_SNUM_EQ(kernel->pt->shared_users, users);
+		UK_TEST_EXPECT_SNUM_EQ(alloc->allocated, alloc->freed);
+		if (cycle == 1)
+			free_bytes = kernel->pt->fa->free_memory;
+		if (cycle >= 2) {
+			UK_TEST_EXPECT_SNUM_EQ(kernel->pt->fa->free_memory,
+					       free_bytes);
+			uk_pr_info("PROCESS_SPAWN_CYCLE cycle=%u free_bytes=%lu shared_users=%u\n",
+				   cycle - 1, free_bytes, users);
+		}
+	}
+	uk_pr_info("PROCESS_SPAWN_PASS cycles=64\n");
+out:
+	if (thread)
+		uk_thread_release(thread);
+	uk_vas_put(vas);
+	uk_free(uk_sched_current()->a, a);
+}
+
+static struct {
+	struct uk_thread *child;
+	bool seen;
+	bool owned;
+	bool unpublished;
+	bool heap;
+	bool clear_actions;
+} prepare_spawn_failure;
+
+static int prepare_spawn_fail_event(void *arg)
+{
+	struct posix_process_clone_event_data *data = arg;
+	struct posix_thread *pt;
+	struct posix_process *p;
+
+	if (!prepare_spawn_failure.child ||
+	    data->child != prepare_spawn_failure.child)
+		return UK_EVENT_HANDLED_CONT;
+	pt = uk_thread_uktls_var(data->child, pthread_self);
+	p = pt->process;
+	prepare_spawn_failure.seen = true;
+#if CONFIG_LIBPOSIX_PROCESS_SIGNAL
+	prepare_spawn_failure.clear_actions =
+		!!(data->cl_args->flags & CLONE_CLEAR_SIGHAND);
+#else
+	prepare_spawn_failure.clear_actions = true;
+#endif
+	prepare_spawn_failure.owned = uk_vas_is_owned(p->vas);
+	prepare_spawn_failure.unpublished = !pid2pprocess(p->pid) &&
+		!tid2pthread(pt->tid);
+#if CONFIG_LIBPOSIX_PROCESS_BRK
+	prepare_spawn_failure.heap = p->brk_ctx.base &&
+		uk_vma_find(p->vas, (__vaddr_t)p->brk_ctx.base);
+#else
+	prepare_spawn_failure.heap = true;
+#endif
+	return -ENOMEM;
+}
+
+POSIX_PROCESS_CLONE_HANDLER(0, prepare_spawn_fail_event);
+
+UK_TESTCASE(process_prepare, public_spawn_failure_cleanup)
+{
+	struct uk_vas *kernel = uk_vas_get_kernel(), *vas = NULL;
+	struct uk_alloc *a = prepare_allocator();
+	struct prepare_alloc *alloc;
+	struct uk_thread *thread;
+	unsigned int users = kernel->pt->shared_users;
+	unsigned int processes = prepare_processes(), cycle;
+	unsigned int children = prepare_children(uk_pprocess_current());
+	unsigned long free_bytes = 0;
+	pid_t result;
+
+	UK_TEST_EXPECT_NOT_NULL(a);
+	if (!a)
+		return;
+	alloc = (void *)a->priv;
+	for (cycle = 0; cycle <= 32; cycle++) {
+		thread = prepare_public_raw_thread();
+		UK_TEST_EXPECT_NOT_NULL(thread);
+		if (!thread)
+			goto out;
+		UK_TEST_EXPECT_NULL(thread->_mem.stack);
+		memset_isr(&prepare_spawn_failure, 0,
+			   sizeof(prepare_spawn_failure));
+		prepare_spawn_failure.child = thread;
+		result = uk_posix_process_prepare_spawn(a, thread, &vas);
+		prepare_spawn_failure.child = NULL;
+		UK_TEST_EXPECT_SNUM_EQ(result, -ENOMEM);
+		UK_TEST_EXPECT_NULL(vas);
+		UK_TEST_EXPECT(prepare_spawn_failure.seen);
+		UK_TEST_EXPECT(prepare_spawn_failure.owned);
+		UK_TEST_EXPECT(prepare_spawn_failure.unpublished);
+		UK_TEST_EXPECT(prepare_spawn_failure.heap);
+		UK_TEST_EXPECT(prepare_spawn_failure.clear_actions);
+		UK_TEST_EXPECT_NULL(uk_thread_uktls_var(thread, pthread_self));
+		UK_TEST_EXPECT(uk_vas_is_owned(thread->vas));
+		UK_TEST_EXPECT_PTR_EQ(uk_vas_get_active(), kernel);
+		/* Drop the last VAS pin retained for UKTLS/storage teardown. */
+		uk_thread_release(thread);
+		UK_TEST_EXPECT_SNUM_EQ(kernel->pt->shared_users, users);
+		UK_TEST_EXPECT_SNUM_EQ(prepare_processes(), processes);
+		UK_TEST_EXPECT_SNUM_EQ(prepare_children(uk_pprocess_current()),
+				       children);
+		UK_TEST_EXPECT_SNUM_EQ(alloc->allocated, alloc->freed);
+		if (!cycle)
+			free_bytes = kernel->pt->fa->free_memory;
+		else
+			UK_TEST_EXPECT_SNUM_EQ(kernel->pt->fa->free_memory,
+					       free_bytes);
+	}
+	uk_pr_info("PROCESS_SPAWN_PASS rollback cycles=32 after_heap=1\n");
+out:
+	prepare_spawn_failure.child = NULL;
+	uk_free(uk_sched_current()->a, a);
+}
+
+struct prepare_public_file {
+	struct uk_file file;
+	uk_file_refcnt refs;
+	struct uk_file_state state;
+	unsigned int released;
+};
+
+static void prepare_public_file_release(const struct uk_file *file, int what)
+{
+	struct prepare_public_file *f = file->node;
+
+	__atomic_fetch_or(&f->released, what, __ATOMIC_RELEASE);
+}
+
+UK_TESTCASE(process_prepare, public_publish_owned_vas)
+{
+	struct uk_sched *local = uk_sched_current(), *target = local;
+	struct prepare_run probe = { .caller = local };
+	struct prepare_public_file file = { 0 };
+	struct uk_vas *kernel = uk_vas_get_kernel(), *vas = NULL;
+	struct uk_thread *thread;
+	struct posix_thread *pt;
+	struct posix_process *p;
+	unsigned int cpus = uk_sched_started_count();
+	unsigned int users = kernel->pt->shared_users;
+	__vaddr_t address = UK_PAGING_VADDR_ANY;
+	__nsec limit;
+	pid_t pid;
+	int rc, kept_fd = -1, clo_fd = -1;
+
+	for (unsigned int i = 0; i < cpus && target == local; i++)
+		target = uk_sched_select_round_robin(local);
+	uk_semaphore_init(&probe.finish, 0);
+	uk_semaphore_init(&probe.reaped, 0);
+	file.refs = UK_FILE_REFCNT_INIT_VALUE(file.refs);
+	file.state = UK_FILE_STATE_INIT_VALUE(file.state);
+	file.file = (struct uk_file) {
+		.vol = &file, .node = &file, .ops = &uk_file_nops,
+		.refcnt = &file.refs, .state = &file.state,
+		._release = prepare_public_file_release
+	};
+	kept_fd = uk_fdtab_open(&file.file, O_RDONLY);
+	clo_fd = uk_fdtab_open(&file.file, O_RDONLY | O_CLOEXEC);
+	UK_TEST_EXPECT(kept_fd >= 0 && clo_fd >= 0);
+	if (kept_fd < 0 || clo_fd < 0)
+		goto close_fds;
+	probe.check_fds = true;
+	probe.kept_fd = kept_fd;
+	probe.clo_fd = clo_fd;
+	thread = uk_thread_create_fn1(target->a, prepare_run_thread, &probe,
+				      target->a_stack, 0, target->a_auxstack, 0,
+				      target->a_uktls, false, "public-spawn",
+				      &probe, prepare_run_reaped);
+	UK_TEST_EXPECT_NOT_NULL(thread);
+	if (!thread)
+		goto close_fds;
+	uk_thread_set_blocked(thread);
+	pid = uk_posix_process_prepare_spawn(local->a, thread, &vas);
+	UK_TEST_EXPECT(pid > 0);
+	if (pid <= 0)
+		goto release_thread;
+	UK_TEST_EXPECT(uk_fdtab_getflags(kept_fd) >= 0);
+	UK_TEST_EXPECT(uk_fdtab_getflags(clo_fd) >= 0);
+	pt = uk_thread_uktls_var(thread, pthread_self);
+	p = pt->process;
+	probe.process = p;
+	probe.vas = vas;
+	rc = uk_vma_map_anon(vas, &address, UK_PAGING_PAGE_SIZE,
+			     UK_PAGING_PAGE_ATTR_PROT_RW, 0, NULL);
+	if (!rc)
+		rc = uk_vas_store_u32(vas, address, PREPARE_VALUE);
+	UK_TEST_EXPECT_ZERO(rc);
+	if (rc)
+		goto abort;
+	probe.address = address;
+	rc = uk_sched_thread_add(target, thread);
+	UK_TEST_EXPECT_ZERO(rc);
+	if (rc)
+		goto abort;
+	UK_TEST_EXPECT_SNUM_EQ(uk_posix_process_abort_prepared(thread), -EBUSY);
+	UK_TEST_EXPECT_NULL(pid2pprocess(pid));
+	rc = uk_posix_process_publish_prepared(thread);
+	UK_TEST_EXPECT_ZERO(rc);
+	if (rc) {
+		UK_TEST_EXPECT_ZERO(uk_sched_thread_remove(thread));
+		goto abort;
+	}
+	rc = uk_posix_process_publish_prepared(thread);
+	UK_TEST_EXPECT_SNUM_EQ(rc, -EBUSY);
+	UK_TEST_EXPECT_SNUM_EQ(uk_posix_process_abort_prepared(thread), -EBUSY);
+	for (unsigned int i = 0; i < 4; i++)
+		uk_sched_yield();
+	UK_TEST_EXPECT(!__atomic_load_n(&probe.started, __ATOMIC_ACQUIRE));
+	uk_thread_wake(thread);
+	prepare_wait(&probe.started);
+	UK_TEST_EXPECT(probe.visible);
+	UK_TEST_EXPECT(probe.active);
+	UK_TEST_EXPECT(probe.kept_open);
+	UK_TEST_EXPECT(probe.clo_closed);
+	UK_TEST_EXPECT(probe.remote == (cpus > 1));
+	pprocess_release_pthread(pt);
+	pprocess_release(p);
+	UK_TEST_EXPECT_NULL(pid2pprocess(pid));
+	uk_semaphore_up(&probe.finish);
+	if (uk_semaphore_down_to(&probe.reaped, PREPARE_TIMEOUT) == __NSEC_MAX)
+		UK_CRASH("Public spawn thread was not reaped\n");
+	thread = NULL;
+	limit = ukplat_monotonic_clock() + PREPARE_TIMEOUT;
+	while (uk_refcount_read(&vas->refs) != 1) {
+		if (ukplat_monotonic_clock() >= limit)
+			UK_CRASH("Public spawn thread retained its VAS\n");
+		uk_sched_yield();
+	}
+	UK_TEST_EXPECT(probe.after_release);
+	uk_pr_info("PROCESS_SPAWN_PASS published remote=%u cloexec=1\n",
+		   probe.remote);
+	goto put_vas;
+abort:
+	UK_TEST_EXPECT_ZERO(uk_posix_process_abort_prepared(thread));
+release_thread:
+	uk_thread_release(thread);
+put_vas:
+	uk_vas_put(vas);
+	UK_TEST_EXPECT_SNUM_EQ(kernel->pt->shared_users, users);
+close_fds:
+	if (kept_fd >= 0)
+		UK_TEST_EXPECT_ZERO(uk_sys_close(kept_fd));
+	if (clo_fd >= 0)
+		UK_TEST_EXPECT_ZERO(uk_sys_close(clo_fd));
+	uk_file_release(&file.file);
+	UK_TEST_EXPECT_SNUM_EQ(file.released,
+			       UK_FILE_RELEASE_RES | UK_FILE_RELEASE_OBJ);
+	if (file.released != (UK_FILE_RELEASE_RES | UK_FILE_RELEASE_OBJ))
+		UK_CRASH("Prepared spawn retained a test file reference\n");
+}
+
+#endif /* CONFIG_LIBPOSIX_FDTAB_MULTITAB && !CONFIG_LIBVFSCORE */
 
 _UK_TESTSUITE(process_prepare, NULL);
 
