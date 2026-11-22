@@ -20,6 +20,8 @@ extern "C" {
 #define UK_BINFMT_HANDLED	1  /* Handled. Stop passing to loaders. */
 #define UK_BINFMT_HANDLED_CONT	2  /* Handled. Pass to next loader. */
 
+#define UK_BINFMT_HAS_RELEASE_METADATA 1
+
 /** Loader type */
 enum uk_binfmt_type {
 	UK_BINFMT_LOADER_TYPE_NONE,
@@ -62,6 +64,9 @@ typedef	int (*uk_binfmt_load_fn)(struct uk_binfmt_loader_args *args);
  */
 typedef	int (*uk_binfmt_unload_fn)(struct uk_binfmt_loader_args *args);
 
+/* Release non-NULL private metadata without destroying the loaded image. */
+typedef void (*uk_binfmt_release_metadata_fn)(struct uk_binfmt_loader_args *);
+
 struct uk_binfmt_loader {
 	/** loader name */
 	const char *name;
@@ -71,6 +76,7 @@ struct uk_binfmt_loader {
 	struct {
 		uk_binfmt_load_fn load;
 		uk_binfmt_load_fn unload;
+		uk_binfmt_release_metadata_fn release_metadata;
 	} ops;
 	struct uk_list_head list_head;
 };
@@ -98,6 +104,18 @@ int uk_binfmt_load(struct uk_binfmt_loader_args *args);
  * @return zero on success, negative value on error
  */
 int uk_binfmt_unload(struct uk_binfmt_loader_args *args);
+
+/**
+ * Release private loader metadata while preserving the image and its context.
+ *
+ * The caller retains ownership of the loaded image, for example through its
+ * containing VAS, and calls outside locks with IRQs enabled. The optional
+ * callback consumes non-NULL args->user and must not destroy image mappings.
+ * Success clears args->user and args->loader. If metadata exists but the
+ * loader has no release callback, return -ENOTSUP without changing either
+ * handle, so the caller can still unload. Invalid handles return -EINVAL.
+ */
+int uk_binfmt_release_metadata(struct uk_binfmt_loader_args *args);
 
 #ifdef __cplusplus
 }
