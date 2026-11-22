@@ -270,7 +270,7 @@ int pprocess_signal_send(struct posix_process *proc, int signum,
 	return 0;
 }
 
-static bool signal_unmasked_pending_locked(struct posix_thread *thread)
+static int signal_unmasked_pending_locked(struct posix_thread *thread)
 {
 	struct posix_process *proc = thread->process;
 	uk_sigset_t pending = (thread->signal->sigqueue.pending |
@@ -281,10 +281,10 @@ static bool signal_unmasked_pending_locked(struct posix_thread *thread)
 	while (pending) {
 		signum = __builtin_ctzl(pending) + 1;
 		if (!IS_IGNORED(proc, signum))
-			return true;
+			return signum;
 		uk_sigdelset(&pending, signum);
 	}
-	return false;
+	return 0;
 }
 
 void pprocess_signal_wait(struct posix_thread *thread)
@@ -303,6 +303,38 @@ void pprocess_signal_wait(struct posix_thread *thread)
 		pprocess_lock_release(pflags);
 		uk_semaphore_down(&thread->signal->deliver_semaphore);
 	}
+}
+
+void pprocess_signal_suspend(struct posix_thread *thread, uk_sigset_t mask)
+{
+	struct uk_signal_tdesc *tdesc = thread->signal;
+	unsigned long flags = pprocess_lock_acquire();
+	uk_sigset_t selected = 0;
+	int signum;
+
+	UK_ASSERT(!tdesc->suspend_signal);
+	tdesc->suspend_saved_mask = tdesc->mask;
+	tdesc->mask = mask;
+
+	for (;;) {
+		signum = signal_unmasked_pending_locked(thread);
+		if (signum)
+			break;
+		thread->state = POSIX_THREAD_BLOCKED_SIGNAL;
+		pprocess_lock_release(flags);
+		uk_semaphore_down(&tdesc->deliver_semaphore);
+		flags = pprocess_lock_acquire();
+	}
+
+	/* Reserve the signal before another thread can consume it. The exit
+	 * hook runs the handler with the temporary mask and restores the old
+	 * mask only after the handler has returned.
+	 */
+	uk_sigaddset(&selected, signum);
+	tdesc->suspend_signal = signal_dequeue_set_locked(thread, selected);
+	UK_ASSERT(tdesc->suspend_signal);
+	thread->state = POSIX_THREAD_RUNNING;
+	pprocess_lock_release(flags);
 }
 
 int pprocess_signal_wait_set(struct posix_thread *thread, uk_sigset_t set,
@@ -571,6 +603,7 @@ int pprocess_signal_tdesc_init(struct posix_thread *thread)
 
 	uk_sigemptyset(&td->mask);
 	uk_sigemptyset(&td->sigqueue.pending);
+	td->suspend_signal = NULL;
 
 	pprocess_signal_foreach(signum)
 		UK_INIT_LIST_HEAD(&td->sigqueue.list_head[signum]);
@@ -616,5 +649,8 @@ void pprocess_signal_tdesc_free(struct posix_thread *thread)
 		while ((sig = pprocess_signal_dequeue(pproc, thread, signum)))
 			uk_signal_free(thread->_a, sig);
 
+	sig = thread->signal->suspend_signal;
+	if (sig)
+		uk_signal_free(sig->alloc, sig);
 	uk_signal_free(thread->process->_a, thread->signal);
 }

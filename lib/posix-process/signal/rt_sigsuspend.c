@@ -19,12 +19,11 @@ UK_LLSYSCALL_R_DEFINE(int, rt_sigsuspend,
 {
 	struct posix_thread *pthread;
 	uk_sigset_t suspend_mask;
-	uk_sigset_t saved_mask;
 
 	pthread = uk_pthread_current();
 	UK_ASSERT(pthread);
 
-	if (unlikely(sigsetsize != sizeof(uk_sigset_t)))
+	if (unlikely(!mask || sigsetsize != sizeof(*mask)))
 		return -EINVAL;
 
 	/* It is not possible to block SIGKILL & SIGSTOP */
@@ -32,17 +31,7 @@ UK_LLSYSCALL_R_DEFINE(int, rt_sigsuspend,
 	uk_sigdelset(&suspend_mask, SIGKILL);
 	uk_sigdelset(&suspend_mask, SIGSTOP);
 
-	/* Temporarily replace mask */
-	saved_mask = pthread->signal->mask;
-	pthread->signal->mask = suspend_mask;
-
-	/* Wait for signal */
-	pthread->state = POSIX_THREAD_BLOCKED_SIGNAL;
-	uk_semaphore_down(&pthread->signal->deliver_semaphore);
-
-	/* Restore mask */
-	pthread->signal->mask = saved_mask;
-
+	pprocess_signal_suspend(pthread, suspend_mask);
 	return -EINTR;
 }
 #else /* !CONFIG_LIBPOSIX_PROCESS_SIGNAL */

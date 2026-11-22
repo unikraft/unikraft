@@ -303,6 +303,27 @@ static int deliver_pending_thread(struct posix_thread *thread,
 	return handled;
 }
 
+static void deliver_suspend_signal(struct posix_thread *thread,
+				   struct ukarch_execenv *execenv)
+{
+	struct uk_signal_tdesc *tdesc = thread->signal;
+	struct uk_signal *pending = tdesc->suspend_signal;
+	struct uk_signal sig;
+	uk_sigset_t saved_mask;
+	unsigned long flags;
+
+	/* A handler can enter another wait, so detach the signal first. */
+	tdesc->suspend_signal = NULL;
+	saved_mask = tdesc->suspend_saved_mask;
+	sig.siginfo = pending->siginfo;
+	uk_signal_free(pending->alloc, pending);
+	do_deliver(thread, &sig, execenv);
+
+	flags = pprocess_lock_acquire();
+	tdesc->mask = saved_mask;
+	pprocess_lock_release(flags);
+}
+
 static void uk_signal_deliver(struct uk_syscall_exit_ctx *exit_ctx)
 {
 	struct ukarch_execenv *execenv;
@@ -343,6 +364,9 @@ static void uk_signal_deliver(struct uk_syscall_exit_ctx *exit_ctx)
 	/* SIGSTOP / SIGCONT should have been already ignored by rt_sigaction */
 	UK_ASSERT(!IS_PENDING(pproc->signal->sigqueue, SIGSTOP));
 	UK_ASSERT(!IS_PENDING(pproc->signal->sigqueue, SIGCONT));
+
+	if (pthread->signal && pthread->signal->suspend_signal)
+		deliver_suspend_signal(pthread, execenv);
 
 	/* Deliver all pending signals of this process & thread */
 	deliver_pending_proc(pproc, execenv);
