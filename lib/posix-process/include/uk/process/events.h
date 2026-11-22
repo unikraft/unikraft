@@ -15,6 +15,7 @@
 #endif
 #include <sched.h>       /* CLONE_* constants */
 #include <linux/sched.h> /* struct clone_args */
+#include <sys/types.h>
 
 #include <uk/event.h>
 #endif /* CONFIG_LIBPOSIX_PROCESS_MULTITHREADING */
