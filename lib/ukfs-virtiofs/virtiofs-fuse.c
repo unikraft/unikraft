@@ -746,24 +746,42 @@ ssize_t virtiofs_fuse_read(struct virtiofs_fuse_dev *fdev, uint64_t node,
 	struct fuse_in_header hdr = {
 		.nodeid = node
 	};
+	struct fuse_read_in limited = *in;
 	struct fuse_out_header ohdr;
+	struct iovec tail;
+	size_t count = 0;
+	size_t plen;
+	ssize_t rlen;
+	int err;
+
+	if (!in->size)
+		return 0;
+	if (!fdev->max_write)
+		return -EPROTO;
+	err = virtiofs_limit_iov(read_iov, iovcnt, in->size, fdev->max_write,
+				 VIRTIOFS_MAX_DATA_SEGS, false,
+				 &count, &tail, &limited.size);
+	if (unlikely(err))
+		return err;
 	const struct uk_virtiofs_iovec hdr_iov[] = {
 		{ &hdr, sizeof(hdr) },
-		{ (void *)in, sizeof(*in) },
+		{ &limited, sizeof(limited) },
 		{ &ohdr, sizeof(ohdr) }
 	};
 	const struct uk_virtiofs_iovecs iovecs[] = {
 		{ hdr_iov, 3 },
-		{ (const struct uk_virtiofs_iovec *)read_iov, iovcnt }
+		{ (const struct uk_virtiofs_iovec *)read_iov, count },
+		{ (const struct uk_virtiofs_iovec *)&tail,
+		  tail.iov_len ? 1 : 0 }
 	};
-	ssize_t rlen;
-	int err;
 
-	init_hdr(fdev, &hdr, FUSE_READ, sizeof(*in));
-	rlen = uk_virtiofs_request_vec(fdev->dev, iovecs, 2, 2, iovcnt + 1);
+	init_hdr(fdev, &hdr, FUSE_READ, sizeof(limited));
+	rlen = uk_virtiofs_request_vec(fdev->dev, iovecs, 3, 2,
+				       1 + count + (tail.iov_len ? 1 : 0));
 	if (unlikely((err = check_reply(rlen, &ohdr))))
 		return err;
-	return payload_len(rlen);
+	plen = payload_len(rlen);
+	return plen <= limited.size ? (ssize_t)plen : -EIO;
 }
 
 ssize_t virtiofs_fuse_write(struct virtiofs_fuse_dev *fdev, uint64_t node,
@@ -785,7 +803,8 @@ ssize_t virtiofs_fuse_write(struct virtiofs_fuse_dev *fdev, uint64_t node,
 	if (!fdev->max_write)
 		return -EPROTO;
 	err = virtiofs_limit_iov(write_iov, iovcnt, in->size, fdev->max_write,
-				 SIZE_MAX, true, &count, &tail, &limited.size);
+				 VIRTIOFS_MAX_DATA_SEGS, true,
+				 &count, &tail, &limited.size);
 	if (unlikely(err))
 		return err;
 	const struct uk_virtiofs_iovec ihdr_iov[] = {

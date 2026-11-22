@@ -130,26 +130,28 @@ struct uk_virtiofs_dev *uk_virtiofs_dev_lookup(const char *tag)
 	return p;
 }
 
-/* TODO: replace with a waitq-based approach */
 struct virtiofs_thread_cookie {
-	struct uk_thread *thread;
 	__u32 rlen;
+	int done;
 };
 
-/* Called when a reply is received; dequeue and wake the target thread */
+/* Called when replies are received; drain all completed cookies and wake wq */
 static
-int virtiofs_recv(struct virtqueue *vq, void *priv __unused)
+int virtiofs_recv(struct virtqueue *vq, void *priv)
 {
+	struct uk_virtiofs_dev *dev = priv;
 	struct virtiofs_thread_cookie *cookie;
 	__u32 len;
-	int r;
+	int dequeued = 0;
 
-	r = virtqueue_buffer_dequeue(vq, (void **)&cookie, &len);
-	if (unlikely(r < 0))
-		return r;
-	cookie->rlen = len;
-	uk_thread_wake(cookie->thread);
-	return 0;
+	while (virtqueue_buffer_dequeue(vq, (void **)&cookie, &len) >= 0) {
+		cookie->rlen = len;
+		__atomic_store_n(&cookie->done, 1, __ATOMIC_RELEASE);
+		dequeued = 1;
+	}
+	if (dequeued && dev)
+		uk_waitq_wake_up_isr(&dev->wq);
+	return 1;
 }
 
 static
@@ -282,24 +284,28 @@ int virtiofs_prep_sglist(struct uk_sglist *sg,
 }
 
 static
-__ssz virtiofs_submit_and_wait(struct uk_virtiofs_dev *dev __unused,
+__ssz virtiofs_submit_and_wait(struct uk_virtiofs_dev *dev,
 			       struct virtqueue *vq, struct uk_sglist *sg,
 			       __u16 in_segs, __u16 out_segs)
 {
-	struct uk_thread *const current = uk_thread_current();
-	struct virtiofs_thread_cookie cookie = { .thread = current };
+	struct virtiofs_thread_cookie cookie = { .rlen = 0, .done = 0 };
+	const unsigned int total_segs = (unsigned int)in_segs + out_segs;
 	int r;
 
-	/* Enqueue request */
-	r = virtqueue_buffer_enqueue(vq, &cookie, sg, in_segs, out_segs);
-	if (unlikely(r < 0))
-		return r;
-	/* Notify the host & block until awoken by request completion */
-	uk_thread_block_until(current, 0);
+	for (;;) {
+		r = virtqueue_buffer_enqueue(vq, &cookie, sg,
+					     in_segs, out_segs);
+		if (likely(r >= 0))
+			break;
+		if (r != -ENOSPC)
+			return r;
+		virtqueue_host_notify(vq);
+		uk_waitq_wait_event(&dev->wq,
+				    virtqueue_desc_avail(vq) >= total_segs);
+	}
 	virtqueue_host_notify(vq);
-	uk_sched_yield();
-
-	/* Awoken, request complete; cookie has length of reply from device */
+	uk_waitq_wait_event(&dev->wq,
+			    __atomic_load_n(&cookie.done, __ATOMIC_ACQUIRE));
 	return cookie.rlen;
 }
 

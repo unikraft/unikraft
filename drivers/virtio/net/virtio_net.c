@@ -271,14 +271,17 @@ static inline __u16 virtio_net_hdr_size(struct virtio_net_device *vndev)
 static int virtio_netdev_recv_done(struct virtqueue *vq, void *priv)
 {
 	struct uk_netdev_rx_queue *rxq = NULL;
+	unsigned long irqf;
 
 	UK_ASSERT(vq && priv);
 
 	rxq = (struct uk_netdev_rx_queue *) priv;
 
 	/* Disable the interrupt for the ring */
+	ukplat_spin_lock_irqsave(&rxq->lock, irqf);
 	virtqueue_intr_disable(vq);
 	rxq->intr_enabled &= ~(VTNET_INTR_EN);
+	ukplat_spin_unlock_irqrestore(&rxq->lock, irqf);
 
 	/* Indicate to the network stack about an event */
 	uk_netdev_drv_rx_event(rxq->ndev, rxq->lqueue_id);
@@ -389,6 +392,9 @@ static int virtio_netdev_xmit(struct uk_netdev *dev,
 {
 	struct virtio_net_device *vndev;
 	struct virtio_net_hdr *vhdr;
+	struct uk_sglist sg;
+	struct uk_sglist_seg sgsegs[NET_MAX_FRAGMENTS];
+	unsigned long irqf;
 	int rc = 0;
 	int status = 0x0;
 	__sz total_len = 0;
@@ -450,7 +456,7 @@ static int virtio_netdev_xmit(struct uk_netdev *dev,
 	/**
 	 * Prepare the sglist and enqueue the buffer to the virtio-ring.
 	 */
-	uk_sglist_reset(&queue->sg);
+	uk_sglist_init(&sg, NET_MAX_FRAGMENTS, sgsegs);
 
 	/**
 	 * According the specification 5.1.6.6, we need to explicitly use
@@ -460,18 +466,18 @@ static int virtio_netdev_xmit(struct uk_netdev *dev,
 	 * 1 for the virtio header and the other for the actual network packet.
 	 */
 	/* Appending the data to the list. */
-	rc = uk_sglist_append(&queue->sg, vhdr, virtio_net_hdr_size(vndev));
+	rc = uk_sglist_append(&sg, vhdr, virtio_net_hdr_size(vndev));
 	if (unlikely(rc != 0)) {
 		uk_pr_err("Failed to append to the sg list\n");
 		goto err_remove_vhdr;
 	}
-	rc = uk_sglist_append(&queue->sg, buf_start, buf_len);
+	rc = uk_sglist_append(&sg, buf_start, buf_len);
 	if (unlikely(rc != 0)) {
 		uk_pr_err("Failed to append to the sg list\n");
 		goto err_remove_vhdr;
 	}
 	if (pkt->next) {
-		rc = uk_netbuf_sglist_append(&queue->sg, pkt->next);
+		rc = uk_netbuf_sglist_append(&sg, pkt->next);
 		if (unlikely(rc != 0)) {
 			uk_pr_err("Failed to append to the sg list: %d\n", rc);
 			goto err_remove_vhdr;
@@ -479,7 +485,7 @@ static int virtio_netdev_xmit(struct uk_netdev *dev,
 	}
 
 	if (!(pkt->flags & UK_NETBUF_F_GSO_TCPV4)) {
-		total_len = uk_sglist_length(&queue->sg);
+		total_len = uk_sglist_length(&sg);
 		if (unlikely(total_len > VIRTIO_PKT_BUFFER_LEN(vndev))) {
 			uk_pr_err("Packet size too big: %lu, max:%lu\n",
 				  total_len, VIRTIO_PKT_BUFFER_LEN(vndev));
@@ -491,8 +497,10 @@ static int virtio_netdev_xmit(struct uk_netdev *dev,
 	/**
 	 * Adding the descriptors to the virtqueue.
 	 */
-	rc = virtqueue_buffer_enqueue(queue->vq, pkt, &queue->sg,
-				      queue->sg.sg_nseg, 0);
+	ukplat_spin_lock_irqsave(&queue->lock, irqf);
+	rc = virtqueue_buffer_enqueue(queue->vq, pkt, &sg,
+				      sg.sg_nseg, 0);
+	ukplat_spin_unlock_irqrestore(&queue->lock, irqf);
 	if (likely(rc >= 0)) {
 		status |= UK_NETDEV_STATUS_SUCCESS;
 		/**
@@ -532,16 +540,15 @@ static int virtio_netdev_rxq_enqueue(struct virtio_net_device *vndev,
 	struct virtio_net_hdr *rxhdr;
 	__u8 *buf_start;
 	__sz buf_len = 0;
-	struct uk_sglist *sg;
+	struct uk_sglist sg;
+	struct uk_sglist_seg sgsegs[NET_MAX_FRAGMENTS];
 
 	if (virtqueue_is_full(rxq->vq)) {
 		uk_pr_debug("The virtqueue is full\n");
 		return -ENOSPC;
 	}
 
-	/* Reset the scatter gather list */
-	sg = &rxq->sg;
-	uk_sglist_reset(sg);
+	uk_sglist_init(&sg, NET_MAX_FRAGMENTS, sgsegs);
 
 	if (vndev->buf_descr_count == VIRTIO_NET_BUF_DESCR_COUNT_INLINE) {
 		rc = uk_netbuf_header(netbuf, virtio_net_hdr_size(vndev));
@@ -549,7 +556,12 @@ static int virtio_netdev_rxq_enqueue(struct virtio_net_device *vndev,
 			uk_pr_err("Failed to allocate space to prepend virtio header\n");
 			return -EINVAL;
 		}
-		uk_sglist_append(sg, netbuf->data, netbuf->len);
+		rc = uk_sglist_append(&sg, netbuf->data, netbuf->len);
+		if (unlikely(rc != 0)) {
+			uk_netbuf_header(netbuf,
+					 -((__s16)virtio_net_hdr_size(vndev)));
+			return rc;
+		}
 	} else {
 		/**
 		 * Saving the buffer information before reserving the header
@@ -569,14 +581,32 @@ static int virtio_netdev_rxq_enqueue(struct virtio_net_device *vndev,
 		rxhdr = netbuf->data;
 
 		/* Appending the header buffer to the sglist */
-		uk_sglist_append(sg, rxhdr, virtio_net_hdr_size(vndev));
+		rc = uk_sglist_append(&sg, rxhdr, virtio_net_hdr_size(vndev));
+		if (unlikely(rc != 0)) {
+			uk_netbuf_header(netbuf,
+					 -((__s16)VTNET_HDR_SIZE_PADDED(vndev)));
+			return rc;
+		}
 
 		/* Appending the data buffer to the sglist */
-		uk_sglist_append(sg, buf_start, buf_len);
+		rc = uk_sglist_append(&sg, buf_start, buf_len);
+		if (unlikely(rc != 0)) {
+			uk_netbuf_header(netbuf,
+					 -((__s16)VTNET_HDR_SIZE_PADDED(vndev)));
+			return rc;
+		}
 	}
 
-	rc = virtqueue_buffer_enqueue(rxq->vq, netbuf, sg, 0,
-				      sg->sg_nseg);
+	rc = virtqueue_buffer_enqueue(rxq->vq, netbuf, &sg, 0,
+				      sg.sg_nseg);
+	if (unlikely(rc < 0)) {
+		if (vndev->buf_descr_count == VIRTIO_NET_BUF_DESCR_COUNT_INLINE)
+			uk_netbuf_header(netbuf,
+					 -((__s16)virtio_net_hdr_size(vndev)));
+		else
+			uk_netbuf_header(netbuf,
+					 -((__s16)VTNET_HDR_SIZE_PADDED(vndev)));
+	}
 	return rc;
 }
 
@@ -674,6 +704,7 @@ static int virtio_netdev_recv(struct uk_netdev *dev,
 			      struct uk_netbuf **pkt)
 {
 	struct virtio_net_device *vndev;
+	unsigned long irqf;
 	int status = 0x0;
 	int rc = 0;
 
@@ -682,10 +713,13 @@ static int virtio_netdev_recv(struct uk_netdev *dev,
 
 	vndev = to_virtionetdev(dev);
 
-	/* Queue interrupts have to be off when calling receive */
-	UK_ASSERT(!(queue->intr_enabled & VTNET_INTR_EN));
-
+	ukplat_spin_lock_irqsave(&queue->lock, irqf);
+	if (queue->intr_enabled & VTNET_INTR_EN) {
+		virtqueue_intr_disable(queue->vq);
+		queue->intr_enabled &= ~VTNET_INTR_EN;
+	}
 	rc = virtio_netdev_rxq_dequeue(vndev, queue, pkt);
+	ukplat_spin_unlock_irqrestore(&queue->lock, irqf);
 	if (unlikely(rc < 0)) {
 		uk_pr_err("Failed to dequeue the packet: %d\n", rc);
 		goto err_exit;
@@ -695,21 +729,26 @@ static int virtio_netdev_recv(struct uk_netdev *dev,
 					  1);
 
 	/* Enable interrupt only when user had previously enabled it */
+	ukplat_spin_lock_irqsave(&queue->lock, irqf);
 	if (queue->intr_enabled & VTNET_INTR_USR_EN_MASK) {
 		/* Need to enable the interrupt on the last packet */
 		rc = virtqueue_intr_enable(queue->vq);
-		if (rc == 1 && !(*pkt)) {
+		if (rc == 0) {
+			queue->intr_enabled |= VTNET_INTR_EN;
+		} else if (rc == 1 && !(*pkt)) {
 			/**
 			 * Packet arrive after reading the queue and before
 			 * enabling the interrupt
 			 */
 			rc = virtio_netdev_rxq_dequeue(vndev, queue, pkt);
+			ukplat_spin_unlock_irqrestore(&queue->lock, irqf);
 			if (unlikely(rc < 0)) {
 				uk_pr_err("Failed to dequeue the packet: %d\n",
 					  rc);
 				goto err_exit;
 			}
-			status |= UK_NETDEV_STATUS_SUCCESS;
+			if (*pkt)
+				status |= UK_NETDEV_STATUS_SUCCESS;
 
 			/*
 			 * Since we received something, we need to fillup
@@ -719,9 +758,14 @@ static int virtio_netdev_recv(struct uk_netdev *dev,
 							  (queue->nb_desc - rc),
 							  1);
 
-			/* Need to enable the interrupt on the last packet */
-			rc = virtqueue_intr_enable(queue->vq);
-			status |= (rc == 1) ? UK_NETDEV_STATUS_MORE : 0x0;
+			ukplat_spin_lock_irqsave(&queue->lock, irqf);
+			if (queue->intr_enabled & VTNET_INTR_USR_EN_MASK) {
+				rc = virtqueue_intr_enable(queue->vq);
+				if (rc == 0)
+					queue->intr_enabled |= VTNET_INTR_EN;
+				else
+					status |= UK_NETDEV_STATUS_MORE;
+			}
 		} else if (*pkt) {
 			/* When we originally got a packet and there is more */
 			status |= (rc == 1) ? UK_NETDEV_STATUS_MORE : 0x0;
@@ -733,6 +777,7 @@ static int virtio_netdev_recv(struct uk_netdev *dev,
 		 */
 		status |= UK_NETDEV_STATUS_MORE;
 	}
+	ukplat_spin_unlock_irqrestore(&queue->lock, irqf);
 	return status;
 
 err_exit:
@@ -1300,13 +1345,17 @@ static int virtio_net_rx_intr_enable(struct uk_netdev *n,
 				     struct uk_netdev_rx_queue *queue)
 {
 	struct virtio_net_device *d __unused;
+	unsigned long irqf;
 	int rc = 0;
 
 	UK_ASSERT(n);
 	d = to_virtionetdev(n);
+	ukplat_spin_lock_irqsave(&queue->lock, irqf);
 	/* If the interrupt is enabled */
-	if (queue->intr_enabled & VTNET_INTR_EN)
+	if (queue->intr_enabled & VTNET_INTR_EN) {
+		ukplat_spin_unlock_irqrestore(&queue->lock, irqf);
 		return 0;
+	}
 
 	/**
 	 * Enable the user configuration bit. This would cause the interrupt to
@@ -1317,6 +1366,7 @@ static int virtio_net_rx_intr_enable(struct uk_netdev *n,
 	rc = virtqueue_intr_enable(queue->vq);
 	if (!rc)
 		queue->intr_enabled |= VTNET_INTR_EN;
+	ukplat_spin_unlock_irqrestore(&queue->lock, irqf);
 
 	return rc;
 }
@@ -1325,11 +1375,14 @@ static int virtio_net_rx_intr_disable(struct uk_netdev *n,
 				      struct uk_netdev_rx_queue *queue)
 {
 	struct virtio_net_device *vndev __unused;
+	unsigned long irqf;
 
 	UK_ASSERT(n);
 	vndev = to_virtionetdev(n);
+	ukplat_spin_lock_irqsave(&queue->lock, irqf);
 	virtqueue_intr_disable(queue->vq);
 	queue->intr_enabled &= ~(VTNET_INTR_USR_EN | VTNET_INTR_EN);
+	ukplat_spin_unlock_irqrestore(&queue->lock, irqf);
 	return 0;
 }
 

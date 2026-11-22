@@ -121,11 +121,14 @@ static inline void virtqueue_intr_disable_locked(struct virtqueue_vring *vrq)
 void virtqueue_intr_disable(struct virtqueue *vq)
 {
 	struct virtqueue_vring *vrq;
+	unsigned long irqf;
 
 	UK_ASSERT(vq);
 
 	vrq = to_virtqueue_vring(vq);
+	ukplat_spin_lock_irqsave(&vrq->lock, irqf);
 	virtqueue_intr_disable_locked(vrq);
+	ukplat_spin_unlock_irqrestore(&vrq->lock, irqf);
 }
 
 static inline int virtqueue_intr_enable_locked(struct virtqueue_vring *vrq)
@@ -175,11 +178,16 @@ static inline int virtqueue_intr_enable_locked(struct virtqueue_vring *vrq)
 int virtqueue_intr_enable(struct virtqueue *vq)
 {
 	struct virtqueue_vring *vrq;
+	unsigned long irqf;
+	int rc;
 
 	UK_ASSERT(vq);
 
 	vrq = to_virtqueue_vring(vq);
-	return virtqueue_intr_enable_locked(vrq);
+	ukplat_spin_lock_irqsave(&vrq->lock, irqf);
+	rc = virtqueue_intr_enable_locked(vrq);
+	ukplat_spin_unlock_irqrestore(&vrq->lock, irqf);
+	return rc;
 }
 
 static inline void virtqueue_ring_update_avail(struct virtqueue_vring *vrq,
@@ -240,6 +248,8 @@ static inline int virtqueue_notify_enabled_locked(struct virtqueue_vring *vrq)
 void virtqueue_host_notify(struct virtqueue *vq)
 {
 	struct virtqueue_vring *vrq;
+	unsigned long irqf;
+	int do_notify = 0;
 
 	UK_ASSERT(vq);
 
@@ -252,9 +262,15 @@ void virtqueue_host_notify(struct virtqueue *vq)
 	 */
 	uk_arch_mb();
 
+	ukplat_spin_lock_irqsave(&vrq->lock, irqf);
 	if (vq->vq_notify_host && virtqueue_notify_enabled_locked(vrq)) {
-		uk_pr_debug_isr("notify queue %d\n", vq->queue_id);
 		vrq->last_notified_idx = vrq->vring.avail->idx;
+		do_notify = 1;
+	}
+	ukplat_spin_unlock_irqrestore(&vrq->lock, irqf);
+
+	if (do_notify) {
+		uk_pr_debug_isr("notify queue %d\n", vq->queue_id);
 		vq->vq_notify_host(vq->vdev, vq->queue_id);
 	}
 }
@@ -288,11 +304,16 @@ static inline int virtqueue_buffer_enqueue_segments(
 int virtqueue_hasdata(struct virtqueue *vq)
 {
 	struct virtqueue_vring *vring;
+	unsigned long irqf;
+	int rc;
 
 	UK_ASSERT(vq);
 
 	vring = to_virtqueue_vring(vq);
-	return virtqueue_hasdata_locked(vring);
+	ukplat_spin_lock_irqsave(&vring->lock, irqf);
+	rc = virtqueue_hasdata_locked(vring);
+	ukplat_spin_unlock_irqrestore(&vring->lock, irqf);
+	return rc;
 }
 
 __u64 virtqueue_feature_negotiate(__u64 feature_set)
@@ -395,11 +416,16 @@ static int virtqueue_buffer_dequeue_locked(struct virtqueue_vring *vrq,
 int virtqueue_buffer_dequeue(struct virtqueue *vq, void **cookie, __u32 *len)
 {
 	struct virtqueue_vring *vrq = NULL;
+	unsigned long irqf;
+	int rc;
 
 	UK_ASSERT(vq);
 	UK_ASSERT(cookie);
 	vrq = to_virtqueue_vring(vq);
-	return virtqueue_buffer_dequeue_locked(vrq, cookie, len);
+	ukplat_spin_lock_irqsave(&vrq->lock, irqf);
+	rc = virtqueue_buffer_dequeue_locked(vrq, cookie, len);
+	ukplat_spin_unlock_irqrestore(&vrq->lock, irqf);
+	return rc;
 }
 
 static int virtqueue_buffer_enqueue_locked(struct virtqueue_vring *vrq,
@@ -447,12 +473,17 @@ int virtqueue_buffer_enqueue(struct virtqueue *vq, void *cookie,
 			     __u16 write_bufs)
 {
 	struct virtqueue_vring *vrq = NULL;
+	unsigned long irqf;
+	int rc;
 
 	UK_ASSERT(vq);
 
 	vrq = to_virtqueue_vring(vq);
-	return virtqueue_buffer_enqueue_locked(vrq, cookie, sg,
-					       read_bufs, write_bufs);
+	ukplat_spin_lock_irqsave(&vrq->lock, irqf);
+	rc = virtqueue_buffer_enqueue_locked(vrq, cookie, sg,
+					     read_bufs, write_bufs);
+	ukplat_spin_unlock_irqrestore(&vrq->lock, irqf);
+	return rc;
 }
 
 static void virtqueue_vring_init(struct virtqueue_vring *vrq, __u16 nr_desc,
@@ -621,19 +652,29 @@ void virtqueue_destroy(__u16 align, struct virtqueue *vq, struct uk_alloc *a)
 int virtqueue_is_full(struct virtqueue *vq)
 {
 	struct virtqueue_vring *vrq;
+	unsigned long irqf;
+	int full;
 
 	UK_ASSERT(vq);
 
 	vrq = to_virtqueue_vring(vq);
-	return (vrq->desc_avail == 0);
+	ukplat_spin_lock_irqsave(&vrq->lock, irqf);
+	full = (vrq->desc_avail == 0);
+	ukplat_spin_unlock_irqrestore(&vrq->lock, irqf);
+	return full;
 }
 
 unsigned int virtqueue_desc_avail(struct virtqueue *vq)
 {
 	struct virtqueue_vring *vrq;
+	unsigned long irqf;
+	unsigned int avail;
 
 	UK_ASSERT(vq);
 
 	vrq = to_virtqueue_vring(vq);
-	return vrq->desc_avail;
+	ukplat_spin_lock_irqsave(&vrq->lock, irqf);
+	avail = vrq->desc_avail;
+	ukplat_spin_unlock_irqrestore(&vrq->lock, irqf);
+	return avail;
 }

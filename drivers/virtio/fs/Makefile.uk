@@ -12,4 +12,4 @@ LIBVIRTIO_FS_CINCLUDES-y  += -I$(UK_DRIV_LIBVIRTIO_BASE)/include
 # TODO Remove as soon as plat dependencies go away
 LIBVIRTIO_FS_CINCLUDES-y  += -I$(UK_PLAT_COMMON_BASE)/include
 
-LIBVIRTIO_FS_SRCS-y += $(LIBVIRTIO_FS_BASE)/virtio_fs.c
+LIBVIRTIO_FS_SRCS-y += $(LIBVIRTIO_FS_BASE)/virtio_fs.c|isr

@@ -342,8 +342,8 @@ void virtiofs_live_release(struct viofs_node *n)
 static inline
 void virtiofs_commit_open(struct viofs_node *n, struct fuse_open_out *out)
 {
-	uk_store_n(&n->fh, out->fh);
-	uk_or(&n->flags, VIRTIOFS_NODE_OPEN);
+	__atomic_store_n(&n->fh, out->fh, __ATOMIC_RELAXED);
+	__atomic_or_fetch(&n->flags, VIRTIOFS_NODE_OPEN, __ATOMIC_RELEASE);
 }
 
 static inline
@@ -374,10 +374,12 @@ int virtiofs_ensure_open(struct viofs_node *n)
 {
 	int r = 0;
 
-	if (!(n->flags & VIRTIOFS_NODE_OPEN)) {
+	if (!(__atomic_load_n(&n->flags, __ATOMIC_ACQUIRE) &
+	      VIRTIOFS_NODE_OPEN)) {
 		uk_mutex_lock(&n->openlk);
 		/* Re-check flag after acquiring lock */
-		if (!(uk_load_n(&n->flags) & VIRTIOFS_NODE_OPEN))
+		if (!(__atomic_load_n(&n->flags, __ATOMIC_ACQUIRE) &
+		      VIRTIOFS_NODE_OPEN))
 			r = virtiofs_try_open(n);
 		uk_mutex_unlock(&n->openlk);
 	}
@@ -459,8 +461,35 @@ static inline
 ssize_t _do_read(struct viofs_node *n, const struct iovec *iov, size_t iovcnt,
 		 size_t off, long flags)
 {
-	return virtiofs_file_read(n, off, uk_iov_len(iov, iovcnt),
-				  iov, iovcnt, flags);
+	size_t bytes_read = 0;
+	size_t iov_i = 0;
+	size_t iov_off = 0;
+	size_t rem = uk_iov_len(iov, iovcnt);
+	ssize_t r = 0;
+
+	while (rem) {
+		if (iov_off) {
+			const size_t iolen = MIN(iov[iov_i].iov_len - iov_off,
+						 rem);
+			const struct iovec tmp = {
+				.iov_base = ((char *)iov[iov_i].iov_base) +
+					    iov_off,
+				.iov_len = iolen
+			};
+
+			r = virtiofs_file_read(n, off, iolen, &tmp, 1, flags);
+		} else {
+			r = virtiofs_file_read(n, off, rem, &iov[iov_i],
+					       iovcnt - iov_i, flags);
+		}
+		if (unlikely(r <= 0))
+			break;
+		uk_iov_ff(iov, iovcnt, r, &iov_i, &iov_off);
+		bytes_read += r;
+		off += r;
+		rem -= r;
+	}
+	return bytes_read ? (ssize_t)bytes_read : r;
 }
 #endif /* !CONFIG_LIBUKFS_VIRTIOFS_IOMEM */
 
@@ -553,8 +582,35 @@ static inline
 ssize_t _do_write(struct viofs_node *n, const struct iovec *iov, size_t iovcnt,
 		  size_t off, long flags)
 {
-	return virtiofs_file_write(n, off, uk_iov_len(iov, iovcnt),
-				   iov, iovcnt, flags);
+	size_t bytes_written = 0;
+	size_t iov_i = 0;
+	size_t iov_off = 0;
+	size_t rem = uk_iov_len(iov, iovcnt);
+	ssize_t r = 0;
+
+	while (rem) {
+		if (iov_off) {
+			const size_t iolen = MIN(iov[iov_i].iov_len - iov_off,
+						 rem);
+			const struct iovec tmp = {
+				.iov_base = ((char *)iov[iov_i].iov_base) +
+					    iov_off,
+				.iov_len = iolen
+			};
+
+			r = virtiofs_file_write(n, off, iolen, &tmp, 1, flags);
+		} else {
+			r = virtiofs_file_write(n, off, rem, &iov[iov_i],
+						iovcnt - iov_i, flags);
+		}
+		if (unlikely(r <= 0))
+			break;
+		uk_iov_ff(iov, iovcnt, r, &iov_i, &iov_off);
+		bytes_written += r;
+		off += r;
+		rem -= r;
+	}
+	return bytes_written ? (ssize_t)bytes_written : r;
 }
 #endif /* !CONFIG_LIBUKFS_VIRTIOFS_IOMEM */
 
