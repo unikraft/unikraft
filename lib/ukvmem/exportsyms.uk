@@ -32,3 +32,5 @@ uk_vmem_test_check_vas
 uk_vas_init_owned
 uk_vas_get
 uk_vas_put
+uk_vas_fault
+uk_vas_store_u32
