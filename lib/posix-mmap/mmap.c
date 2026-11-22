@@ -109,11 +109,12 @@ static int do_mmap(void **addr, size_t len, int prot, int flags, int fd,
 	if (flags & MAP_ANONYMOUS) {
 		if ((flags & MAP_SHARED) ||
 		    (flags & MAP_SHARED_VALIDATE) == MAP_SHARED_VALIDATE) {
-			/* MAP_SHARED(_VALIDATE): Note, we ignore it for
-			 * anonymous memory since we only have a single
-			 * process. There is no one to share the mapping with.
-			 * It is thus fine to create a private mapping.
-			 */
+#if CONFIG_LIBUKVMEM_COW_VMA
+			/* Separate COW VASes need a shared backing object. */
+			if (vas->cow)
+				return -ENOTSUP;
+#endif
+			/* Retain the legacy shared-address-space behavior. */
 		} else if (unlikely(!(flags & MAP_PRIVATE)))
 			return -EINVAL;
 
@@ -142,7 +143,11 @@ static int do_mmap(void **addr, size_t len, int prot, int flags, int fd,
 		}
 
 		vargs = NULL;
+#if CONFIG_LIBUKVMEM_COW_VMA
+		vops = vas->cow ? &uk_vma_cow_anon_ops : &uk_vma_anon_ops;
+#else
 		vops  = &uk_vma_anon_ops;
+#endif
 	} else {
 #if CONFIG_LIBPOSIX_FDTAB
 		union uk_shim_file sf;
