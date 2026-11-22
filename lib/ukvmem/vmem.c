@@ -729,11 +729,58 @@ static __vaddr_t vmem_first_fit(struct uk_vas *vas, __vaddr_t base, __sz align,
 	return ALIGN_UP(vaddr, align);
 }
 
+struct vmem_mapx_ctx {
+	/** Faulting virtual address */
+	__vaddr_t vaddr;
+	/** Type of the fault */
+	unsigned int type;
+	/** Trap frame */
+	struct uk_lcpu_regs *regs;
+	/** VMA in which the fault happens */
+	struct uk_vma *vma;
+#if CONFIG_LIBUKVMEM_COW
+	struct uk_vm_fault_op *operation;
+#endif
+};
+
+#if CONFIG_LIBUKVMEM_COW
+static void vmem_mapx_result(struct uk_pagetable *pt,
+			     __vaddr_t vaddr __unused,
+			     __vaddr_t pt_vaddr __unused,
+			     unsigned int level __unused,
+			     int result, void *user)
+{
+	struct vmem_mapx_ctx *ctx = user;
+	struct uk_vm_fault_op *op = ctx->operation;
+
+	ctx->operation = NULL;
+	if (op) {
+		UK_ASSERT(op->result);
+		UK_ASSERT(pt->defer_batch);
+		op->result(op, result, pt->defer_batch);
+	}
+}
+#endif
+
+static inline int vmem_page_mapx(struct uk_pagetable *pt, __vaddr_t vaddr,
+				 __paddr_t paddr, unsigned long pages,
+				 unsigned long attr, unsigned long flags,
+				 struct uk_paging_page_mapx *mapx)
+{
+#if CONFIG_LIBUKVMEM_COW
+	return uk_paging_page_mapx_with_result(pt, vaddr, paddr, pages, attr,
+					     flags, mapx, vmem_mapx_result);
+#else
+	return uk_paging_page_mapx(pt, vaddr, paddr, pages, attr, flags, mapx);
+#endif
+}
+
 static int vmem_mapx_populate(struct uk_pagetable *pt __unused,
 			      __vaddr_t vaddr, __vaddr_t pt_vaddr __unused,
 			      unsigned int level, __pte_t *pte, void *user)
 {
-	struct uk_vma *vma = (struct uk_vma *)user;
+	struct vmem_mapx_ctx *ctx = user;
+	struct uk_vma *vma = ctx->vma;
 	struct uk_vm_fault fault = {
 		.vaddr = vaddr,
 		.vbase = vaddr,
@@ -743,6 +790,9 @@ static int vmem_mapx_populate(struct uk_pagetable *pt __unused,
 		.pte   = *pte,
 		.level = level,
 		.regs  = __NULL,
+#if CONFIG_LIBUKVMEM_COW
+		.operation = &ctx->operation,
+#endif
 	};
 	int rc;
 
@@ -952,13 +1002,15 @@ int uk_vma_map(struct uk_vas *vas, __vaddr_t *vaddr, __sz len,
 			flgs = 0;
 		}
 
-		rc = uk_paging_page_mapx(vas->pt, vma->start, 0,
-					 len >> UK_PAGING_PAGE_Lx_SHIFT(algn_lvl),
-					 vma->attr, flgs,
-					 &(struct uk_paging_page_mapx){
-						.map = vmem_mapx_populate,
-						.ctx = vma,
-					 });
+		rc = vmem_page_mapx(vas->pt, vma->start, 0,
+				    len >> UK_PAGING_PAGE_Lx_SHIFT(algn_lvl),
+				    vma->attr, flgs,
+				    &(struct uk_paging_page_mapx){
+					   .map = vmem_mapx_populate,
+					   .ctx = &(struct vmem_mapx_ctx){
+						   .vma = vma
+					   },
+				    });
 		if (unlikely(rc)) {
 #if CONFIG_LIBUKDEBUG_ENABLE_ASSERT
 			uk_pr_err_isr("Cannot map VMA at %#lx, length %#lx: %d\n",
@@ -1118,13 +1170,15 @@ int uk_vma_op_advise(struct uk_vma *vma, __vaddr_t vaddr, __sz len,
 			lvl  = UK_PAGING_PAGE_LEVEL;
 		}
 
-		rc = uk_paging_page_mapx(vma->vas->pt, vaddr, 0,
-					 len >> UK_PAGING_PAGE_Lx_SHIFT(lvl),
-					 vma->attr, flgs,
-					 &(struct uk_paging_page_mapx){
-						.map = vmem_mapx_advise,
-						.ctx = vma,
-					 });
+		rc = vmem_page_mapx(vma->vas->pt, vaddr, 0,
+				    len >> UK_PAGING_PAGE_Lx_SHIFT(lvl),
+				    vma->attr, flgs,
+				    &(struct uk_paging_page_mapx){
+					   .map = vmem_mapx_advise,
+					   .ctx = &(struct vmem_mapx_ctx){
+						   .vma = vma
+					   },
+				    });
 		if (unlikely(rc))
 			return rc;
 	} else if (advice & UK_VMA_ADV_DONTNEED) {
@@ -1327,22 +1381,12 @@ static inline int vmem_access_allowed(unsigned long attr,
 	return 0;
 }
 
-struct mapx_pagefault_ctx {
-	/** Faulting virtual address */
-	__vaddr_t vaddr;
-	/** Type of the fault */
-	unsigned int type;
-	/** Trap frame */
-	struct uk_lcpu_regs *regs;
-	/** VMA in which the fault happens */
-	struct uk_vma *vma;
-};
 
 static int vmem_mapx_pagefault(struct uk_pagetable *pt __unused,
 			       __vaddr_t vaddr, __vaddr_t pt_vaddr,
 			       unsigned int level, __pte_t *pte, void *user)
 {
-	struct mapx_pagefault_ctx *ctx = (struct mapx_pagefault_ctx *)user;
+	struct vmem_mapx_ctx *ctx = (struct vmem_mapx_ctx *)user;
 	__pte_t opte;
 	int rc;
 
@@ -1378,6 +1422,9 @@ static int vmem_mapx_pagefault(struct uk_pagetable *pt __unused,
 			.pte   = *pte,
 			.level = level,
 			.regs  = ctx->regs,
+#if CONFIG_LIBUKVMEM_COW
+			.operation = &ctx->operation,
+#endif
 		};
 
 		rc = ctx->vma->ops->fault(ctx->vma, &fault);
@@ -1404,7 +1451,7 @@ static int vmem_fault(struct uk_vas *vas, __vaddr_t vaddr, unsigned int type,
 		UK_PAGING_PAGE_SHIFT_Lx(CONFIG_LIBUKVMEM_DEMAND_PAGE_IN_SIZE);
 	struct uk_paging_free_batch batch;
 	struct uk_pagetable *pt;
-	struct mapx_pagefault_ctx ctx = {
+	struct vmem_mapx_ctx ctx = {
 		.vaddr = vaddr,
 		.type  = type,
 		.regs  = regs,
@@ -1499,8 +1546,8 @@ static int vmem_fault(struct uk_vas *vas, __vaddr_t vaddr, unsigned int type,
 		  vbase + UK_PAGING_PAGE_Lx_SIZE(lvl) <= ctx.vma->end);
 
 	uk_paging_batch_begin(&batch, pt);
-	rc = uk_paging_page_mapx(pt, vbase, 0, 1, ctx.vma->attr,
-				 UK_PAGING_PAGE_FLAG_SIZE(lvl) | flags, &mapx);
+	rc = vmem_page_mapx(pt, vbase, 0, 1, ctx.vma->attr,
+			    UK_PAGING_PAGE_FLAG_SIZE(lvl) | flags, &mapx);
 	uk_paging_batch_end(&batch);
 	ukplat_spin_unlock_irqrestore(&vas->lock, irqf);
 
