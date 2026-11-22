@@ -241,6 +241,8 @@ struct posix_process *pprocess_create(struct uk_alloc *a,
 				      struct uk_thread *parent);
 
 #if CONFIG_LIBPOSIX_PROCESS_BRK
+/* Map a fresh brk region; leave mutex initialization to its owner. */
+int pprocess_brk_map_space(struct posix_process *process);
 int pprocess_brk_init_space(struct posix_process *process);
 #endif
 
