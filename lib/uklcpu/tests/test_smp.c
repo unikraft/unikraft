@@ -7,6 +7,8 @@
 #include <uk/arch/x86_64.h>
 #include <uk/asm.h>
 #include <uk/lcpu.h>
+#include <uk/paging.h>
+#include <uk/vmem.h>
 #include <uk/plat/time.h>
 #include <uk/print.h>
 #include <uk/test.h>
@@ -23,6 +25,7 @@ struct cpu_probe_slot {
 	__uptr expected_auxsp;
 	__uptr observed_tlsp;
 	__uptr observed_auxsp;
+	__paddr_t observed_page_table_root;
 	unsigned long tls_marker;
 	unsigned int context_ready;
 	unsigned int startup_stack_checked;
@@ -37,6 +40,7 @@ static unsigned char stacks[CONFIG_UKPLAT_CPU_MAXCOUNT][PROBE_STACK_BYTES]
 static unsigned char auxstacks[CONFIG_UKPLAT_CPU_MAXCOUNT][PROBE_STACK_BYTES]
 	__align(UKARCH_AUXSP_ALIGN);
 static __thread unsigned long probe_tls_marker;
+static struct uk_vas *probe_vas;
 static unsigned int release_probe;
 static int callback_error;
 
@@ -69,15 +73,20 @@ static __u64 observed_hardware_id(void)
 static __noinline int record_context(__u64 index, unsigned long marker)
 {
 	const __uptr tlsp = uk_lcpu_tlsp_get();
+	const __paddr_t root = uk_pal_pt_read_base();
 	const __uptr auxsp = uk_pcpuvar_current_get(UK_LCPU_AUXSP_SYM);
 	struct ukarch_auxspcb *cb;
 
-	if (!tlsp || !auxsp || tlsp != slots[index].expected_tlsp ||
+	if (!probe_vas || uk_vas_get_active() != probe_vas ||
+	    uk_paging_pt_get_active() != probe_vas->pt ||
+	    root != probe_vas->pt->pt_pbase ||
+	    !tlsp || !auxsp || tlsp != slots[index].expected_tlsp ||
 	    auxsp != slots[index].expected_auxsp)
 		return -EIO;
 	cb = ukarch_auxsp_get_cb(auxsp);
 	if (ukarch_auxspcb_get_uktlsp(cb) != tlsp || probe_tls_marker != marker)
 		return -EIO;
+	slots[index].observed_page_table_root = root;
 	slots[index].observed_tlsp = tlsp;
 	slots[index].observed_auxsp = auxsp;
 	slots[index].tls_marker = probe_tls_marker;
@@ -119,15 +128,22 @@ static void __noreturn secondary_probe_entry(struct uk_lcpu *this_lcpu)
 	if (rc)
 		goto failed;
 	probe_stage(index, 2);
-	uk_lcpu_tlsp_set(slots[index].expected_tlsp);
+	/* The trampoline still uses its boot page tables. Activate the
+	 * captured runtime address space before touching allocated TLS.
+	 */
+	rc = uk_vas_set_active(probe_vas);
+	if (rc)
+		goto failed;
 	probe_stage(index, 3);
+	uk_lcpu_tlsp_set(slots[index].expected_tlsp);
+	probe_stage(index, 4);
 	uk_lcpu_init_auxsp(slots[index].expected_auxsp,
 			   slots[index].expected_tlsp);
-	probe_stage(index, 4);
+	probe_stage(index, 5);
 	rc = publish_secondary_context(index);
 	if (rc)
 		goto failed;
-	probe_stage(index, 5);
+	probe_stage(index, 6);
 	uk_lcpu_idle();
 failed:
 	__atomic_store_n(&callback_error, rc, __ATOMIC_RELEASE);
@@ -186,6 +202,11 @@ UK_TESTCASE(lcpu_smp, bootstrap_and_overlap)
 	}
 	expected_mask = ~0ULL >> (64 - cpu_count);
 	if (uk_pcpuvar_current_get(uk_pcpuvar_cpu_idx) != 0) {
+		rc = -EINVAL;
+		goto finish;
+	}
+	probe_vas = uk_vas_get_active();
+	if (!probe_vas || !probe_vas->pt) {
 		rc = -EINVAL;
 		goto finish;
 	}
@@ -325,6 +346,8 @@ finish:
 	if (!rc) {
 		uk_pr_info("SMP_PROBE discovered_count=%u\n", cpu_count);
 		for (unsigned int i = 0; i < cpu_count; i++) {
+			uk_pr_info("SMP_ADDRESS cpu=%u root=%lx\n", i,
+				   (unsigned long)slots[i].observed_page_table_root);
 			uk_pr_info("SMP_CONTEXT cpu=%u tls=%lx aux=%lx marker=%lu ready=%u startup_stack_checked=%u\n",
 				   i, (unsigned long)slots[i].observed_tlsp,
 				   (unsigned long)slots[i].observed_auxsp,
