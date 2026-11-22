@@ -15,6 +15,7 @@
 #include <uk/vmem/vma_types.h>
 
 #define COW_TEST_FRAMES 128
+#define COW_TEST_PAGE_FLAGS UK_PAGING_PAGE_FLAG_SIZE(UK_PAGING_PAGE_LEVEL)
 
 struct cow_test_frame {
 	__paddr_t paddr;
@@ -41,6 +42,8 @@ struct cow_test_metadata {
 	unsigned long freed;
 	unsigned int remaining;
 	bool fail;
+	bool poison;
+	unsigned long poisoned;
 };
 
 struct cow_test_family {
@@ -147,6 +150,10 @@ static void cow_test_pfree(struct uk_alloc *a, void *ptr, unsigned long pages)
 {
 	struct cow_test_metadata *p = (void *)a->priv;
 
+	if (p->poison) {
+		memset_isr(ptr, 0, pages * UK_PAGING_PAGE_SIZE);
+		p->poisoned += pages;
+	}
 	uk_pfree(p->real, ptr, pages);
 	__atomic_add_fetch(&p->freed, pages, __ATOMIC_RELAXED);
 }
@@ -381,6 +388,169 @@ UK_TESTCASE(cow_vmas, bounded_repeated_clone_resource_balance)
 		if (rc)
 			return;
 	}
+}
+
+struct cow_test_pending_fault {
+	struct uk_vma *vma;
+	struct uk_vm_fault_op *operation;
+	unsigned int prepared;
+	unsigned int results;
+	int status;
+};
+
+static bool cow_test_completion_active;
+static unsigned int cow_test_completion_faults;
+
+#if CONFIG_ARCH_X86_64 && CONFIG_LIBUKPLAT_NATIVE_EXCEPT
+#include <uk/arch/x86_64.h>
+#include <uk/event.h>
+#include <uk/pcpuvar.h>
+
+static unsigned int cow_test_completion_cpu;
+
+static int cow_test_completion_observe(void *arg)
+{
+	__u64 orig_gsbase = uk_arch_x86_64_enter_kernel_gsbase();
+	struct uk_lcpu_except_err_ctx *ctx = arg;
+	struct uk_lcpu_regs *regs;
+
+	if (__atomic_load_n(&cow_test_completion_active, __ATOMIC_ACQUIRE) &&
+	    uk_pcpuvar_current_get(uk_pcpuvar_cpu_idx) ==
+	    cow_test_completion_cpu) {
+		regs = (struct uk_lcpu_regs *)
+			uk_lcpu_except_err_ctx_get_regs(ctx);
+		__atomic_add_fetch(&cow_test_completion_faults, 1,
+				   __ATOMIC_RELAXED);
+		uk_pr_info_isr("COW_VMA_AFTER_UNMAP_FAULT ip=%#lx\n",
+			       (unsigned long)uk_lcpu_regs_get(regs, RIP));
+	}
+	uk_arch_x86_64_exit_kernel_gsbase(orig_gsbase);
+	return UK_EVENT_NOT_HANDLED;
+}
+
+UK_EVENT_HANDLER_PRIO(UK_LCPU_EXCEPT_EVENT_ERR_PAGE_FAULT,
+		      cow_test_completion_observe,
+		      UK_PRIO_BEFORE(CONFIG_LIBUKVMEM_PAGEFAULT_HANDLER_PRIO));
+#endif
+
+static int cow_test_pending_map(struct uk_pagetable *pt __unused,
+				__vaddr_t vaddr, __vaddr_t pt_vaddr __unused,
+				unsigned int level, __pte_t *pte, void *arg)
+{
+	struct cow_test_pending_fault *p = arg;
+	struct uk_vm_fault fault = {
+		.vaddr = vaddr,
+		.vbase = vaddr,
+		.len = UK_PAGING_PAGE_Lx_SIZE(level),
+		.paddr = UK_PAGING_PT_Lx_PTE_PADDR(*pte, level),
+		.type = UK_VMA_FAULT_WRITE | UK_VMA_FAULT_NONPRESENT |
+			UK_VMA_FAULT_SOFT | UK_VMA_FAULT_IRQS_ENABLED,
+		.pte = *pte,
+		.level = level,
+		.operation = &p->operation
+	};
+	int rc;
+
+	p->prepared++;
+	rc = p->vma->ops->fault(p->vma, &fault);
+	if (!rc)
+		*pte = UK_PAGING_PT_Lx_PTE_SET_PADDR(fault.pte, level,
+						     fault.paddr);
+	return rc;
+}
+
+static void cow_test_pending_result(struct uk_pagetable *pt,
+				    __vaddr_t vaddr __unused,
+				    __vaddr_t pt_vaddr __unused,
+				    unsigned int level __unused,
+				    int status, void *arg)
+{
+	struct cow_test_pending_fault *p = arg;
+	struct uk_vm_fault_op *op = p->operation;
+
+	p->operation = NULL;
+	p->results++;
+	p->status = status;
+	if (op)
+		op->result(op, status, pt->defer_batch);
+}
+
+UK_TESTCASE(cow_vmas, unmap_before_new_page_completion)
+{
+	struct cow_test_family family;
+	struct cow_test_space *space = NULL;
+	struct cow_test_pending_fault pending = { 0 };
+	struct uk_paging_page_mapx mapx = {
+		.map = cow_test_pending_map, .ctx = &pending
+	};
+	struct uk_paging_free_batch batch;
+	struct cow_test_metadata *metadata;
+	__vaddr_t address = UK_PAL_PAGE_Lx_SIZE(UK_PAL_PT_LEVELS - 1);
+	unsigned long irqf;
+	int rc;
+
+	rc = cow_test_family_init(&family);
+	UK_TEST_EXPECT_ZERO(rc);
+	if (rc)
+		return;
+	metadata = (void *)family.resident->priv;
+	space = cow_test_space_new(&family);
+	UK_TEST_EXPECT_NOT_NULL(space);
+	if (!space)
+		goto out;
+	rc = uk_vas_enable_cow(&space->vas, family.resident);
+	UK_TEST_EXPECT_ZERO(rc);
+	if (rc)
+		goto out;
+	rc = uk_vma_map_anon(&space->vas, &address, UK_PAGING_PAGE_SIZE,
+			     UK_PAGING_PAGE_ATTR_PROT_RW,
+			     UK_VMA_MAP_SIZE_4KB, NULL);
+	UK_TEST_EXPECT_ZERO(rc);
+	if (rc)
+		goto out;
+	pending.vma = uk_vma_find(&space->vas, address);
+	UK_TEST_EXPECT_NOT_NULL(pending.vma);
+	if (!pending.vma)
+		goto out;
+	/* Hold only the completion, after the real mapper committed its PTE. */
+	ukplat_spin_lock_irqsave(&space->vas.lock, irqf);
+	uk_paging_batch_begin(&batch, &space->pt);
+	rc = uk_paging_page_mapx_with_result(&space->pt, address, 0, 1,
+					     UK_PAGING_PAGE_ATTR_PROT_RW,
+					     COW_TEST_PAGE_FLAGS, &mapx,
+					     cow_test_pending_result);
+					     uk_paging_batch_end(&batch);
+	ukplat_spin_unlock_irqrestore(&space->vas.lock, irqf);
+	UK_TEST_EXPECT_ZERO(rc);
+	UK_TEST_EXPECT_SNUM_EQ(pending.prepared, 1);
+	UK_TEST_EXPECT_SNUM_EQ(pending.results, 1);
+	UK_TEST_EXPECT_ZERO(pending.status);
+	UK_TEST_EXPECT_NOT_NULL(batch.calls);
+	/* Another CPU may unmap this VMA before the fault completion runs. */
+	metadata->poison = true;
+	rc = uk_vma_unmap(&space->vas, address, UK_PAGING_PAGE_SIZE, 0);
+	UK_TEST_EXPECT_ZERO(rc);
+	UK_TEST_EXPECT_NULL(uk_vma_find(&space->vas, address));
+	UK_TEST_EXPECT(metadata->poisoned > 0);
+	__atomic_store_n(&cow_test_completion_faults, 0, __ATOMIC_RELAXED);
+#if CONFIG_ARCH_X86_64 && CONFIG_LIBUKPLAT_NATIVE_EXCEPT
+	cow_test_completion_cpu = uk_sched_current()->lcpu_idx;
+#endif
+	uk_pr_info("COW_VMA_AFTER_UNMAP_BEGIN\n");
+	__atomic_store_n(&cow_test_completion_active, true, __ATOMIC_RELEASE);
+	uk_paging_free_batch_finish(&batch);
+	__atomic_store_n(&cow_test_completion_active, false, __ATOMIC_RELEASE);
+	UK_TEST_EXPECT_ZERO(cow_test_completion_faults);
+	uk_pr_info("COW_VMA_AFTER_UNMAP_PASS\n");
+out:
+	cow_test_space_put(&space);
+	cow_test_family_close(&family);
+	UK_TEST_EXPECT_ZERO(family.cleanup_errors);
+	UK_TEST_EXPECT_ZERO(family.frames.errors);
+	UK_TEST_EXPECT_ZERO(family.frames.live);
+	UK_TEST_EXPECT_SNUM_EQ(family.frames.allocated, family.frames.freed);
+	UK_TEST_EXPECT_SNUM_EQ(family.metadata_allocated,
+			       family.metadata_freed);
 }
 
 UK_TESTCASE(cow_vmas, private_clone_and_parent_exit)
