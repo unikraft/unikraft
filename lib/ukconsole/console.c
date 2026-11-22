@@ -142,20 +142,26 @@ __isr __ssz uk_console_emerg_out(const char *buf, __sz len)
 	return len;
 }
 
-__ssz uk_console_out_direct(struct uk_console *dev, const char *buf, __sz len)
+static __isr __ssz console_write(struct uk_console *dev, uk_console_out_func write,
+				 const char *buf, __sz len)
 {
-	UK_ASSERT(dev && dev->ops);
-
 	if (unlikely(!len))
 		return 0;
 
 	if (unlikely(!buf))
 		return -EINVAL;
 
-	if (unlikely(!dev->ops->out))
+	if (unlikely(!write))
 		return -EIO;
 
-	return dev->ops->out(dev, buf, len);
+	return write(dev, buf, len);
+}
+
+__ssz uk_console_out_direct(struct uk_console *dev, const char *buf, __sz len)
+{
+	UK_ASSERT(dev && dev->ops);
+
+	return console_write(dev, dev->ops->out, buf, len);
 }
 
 __ssz uk_console_in_direct(struct uk_console *dev, char *buf, __sz len)
@@ -179,16 +185,7 @@ __isr __ssz uk_console_emerg_out_direct(struct uk_console *dev,
 {
 	UK_ASSERT(dev && dev->ops);
 
-	if (unlikely(!len))
-		return 0;
-
-	if (unlikely(!buf))
-		return -EINVAL;
-
-	if (unlikely(!dev->ops->emerg_out))
-		return -EIO;
-
-	return dev->ops->emerg_out(dev, buf, len);
+	return console_write(dev, dev->ops->emerg_out, buf, len);
 }
 
 int uk_console_out_direct_all(struct uk_console *dev,
@@ -209,8 +206,7 @@ int uk_console_out_direct_all(struct uk_console *dev,
 		return -EIO;
 
 	while (bytes_written < len) {
-		rc = dev->ops->out(dev, buf + bytes_written,
-				   len - bytes_written);
+		rc = console_write(dev, dev->ops->out, buf + bytes_written, len - bytes_written);
 		if (unlikely(rc < 0))
 			return (int)rc;
 
@@ -267,8 +263,7 @@ __isr int uk_console_emerg_out_direct_all(struct uk_console *dev,
 		return -EIO;
 
 	while (bytes_written < len) {
-		rc = dev->ops->emerg_out(dev, buf + bytes_written,
-					 len - bytes_written);
+		rc = console_write(dev, dev->ops->emerg_out, buf + bytes_written, len - bytes_written);
 		if (unlikely(rc < 0))
 			return (int)rc;
 
