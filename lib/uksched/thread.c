@@ -45,6 +45,9 @@
 #include <uk/arch/tls.h>
 #include <uk/plat/memory.h>
 #include "thread_state.h"
+#if CONFIG_LIBUKVMEM_VAS_REFCOUNT
+#include <uk/vmem.h>
+#endif
 
 #if CONFIG_LIBUKSCHED_TCB_INIT && !CONFIG_UKARCH_TLS_HAVE_TCB
 #error CONFIG_LIBUKSCHED_TCB_INIT requires that a TLS contains reserved space for a TCB
@@ -224,6 +227,9 @@ void uk_thread_set_exited(struct uk_thread *t)
 	if (uk_thread_is_exited(t))
 		return;
 
+#if CONFIG_LIBUKVMEM_VAS_REFCOUNT
+	t->vas_releasing = true;
+#endif
 	_uk_thread_call_termtab(t);
 	t->flags |= UK_THREADF_EXITED;
 }
@@ -995,6 +1001,47 @@ err_out:
 	return NULL;
 }
 
+#if CONFIG_LIBUKVMEM_VAS_REFCOUNT
+int uk_thread_set_vas(struct uk_thread *t, struct uk_vas *vas)
+{
+	struct uk_vas *target = vas ? vas : uk_vas_get_kernel();
+	struct uk_vas *old, *held;
+	bool current, change;
+	unsigned long irqf;
+	int rc = 0;
+
+	UK_ASSERT(t);
+	if (t->vas_releasing || uk_thread_is_exited(t))
+		return -ESRCH;
+	if (!target)
+		return -EINVAL;
+	current = t == uk_thread_current();
+	if (t->sched && !current)
+		return -EBUSY;
+	old = t->vas_ref;
+	held = uk_vas_is_owned(vas) ? vas : __NULL;
+	change = current && target != uk_vas_get_active();
+	if (t->vas == vas && old == held && !change)
+		return 0;
+	if ((old || change) && uk_lcpu_irqs_disabled())
+		return -EWOULDBLOCK;
+	uk_vas_get(held);
+	irqf = uk_lcpu_save_irqf();
+	if (change)
+		rc = uk_vas_set_active(target);
+	if (!rc) {
+		t->vas = vas;
+		t->vas_ref = held;
+	}
+	uk_lcpu_restore_irqf(irqf);
+	if (rc)
+		uk_vas_put(held);
+	else
+		uk_vas_put(old);
+	return rc;
+}
+#endif
+
 void uk_thread_release(struct uk_thread *t)
 {
 	struct uk_alloc *a;
@@ -1004,11 +1051,19 @@ void uk_thread_release(struct uk_thread *t)
 	void *stack;
 	void *auxstack;
 	void *tls;
+#if CONFIG_LIBUKVMEM_VAS_REFCOUNT
+	struct uk_vas *vas_ref;
+#endif
 
 	UK_ASSERT(t);
 	UK_ASSERT(t != uk_thread_current());
 	UK_ASSERT(!t->sched); /* Thread must be disconnected from scheduler */
 
+#if CONFIG_LIBUKVMEM_VAS_REFCOUNT
+	vas_ref = t->vas_ref;
+	t->vas_ref = __NULL;
+	t->vas_releasing = true;
+#endif
 #if CONFIG_LIBUKVMEM_TRACE_PAGEFAULTS
 	uk_pr_info_isr("Thread %p paging: faults=%llu handler_ns=%llu alloc_ns=%llu zero_ns=%llu\n",
 		       (void *)t, (unsigned long long)t->vmem_faults,
@@ -1046,6 +1101,9 @@ void uk_thread_release(struct uk_thread *t)
 		uk_free(auxstack_a, auxstack);
 	if (a)
 		uk_free(a, t);
+#if CONFIG_LIBUKVMEM_VAS_REFCOUNT
+	uk_vas_put(vas_ref);
+#endif
 }
 
 void uk_thread_block_until(struct uk_thread *thread, __snsec until)
