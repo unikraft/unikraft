@@ -35,6 +35,9 @@ static const char EPOLL_VOLID[] = "epoll_vol";
 #define EPOLL_EVENTS \
 	(UKFD_POLLIN|UKFD_POLLOUT|EPOLLRDHUP|EPOLLPRI|UKFD_POLL_ALWAYS)
 #define EPOLL_OPTS (EPOLLET|EPOLLONESHOT|EPOLLWAKEUP|EPOLLEXCLUSIVE)
+#define EPOLL_EXCLUSIVE_EVENTS \
+	(EPOLLEXCLUSIVE | EPOLLIN | EPOLLOUT | EPOLLERR | EPOLLHUP | \
+	 EPOLLET | EPOLLWAKEUP)
 
 #define events2mask(ev) (((ev) & EPOLL_EVENTS) | UKFD_POLL_ALWAYS)
 
@@ -296,6 +299,8 @@ static int epoll_add(const struct uk_file *epf, struct epoll_entry **tail,
 			.arg = ent
 		}
 	};
+	if (event->events & EPOLLEXCLUSIVE)
+		ent->tick.type = UK_POLL_CHAINTYPE_CALLBACK_EXCLUSIVE;
 	*tail = ent;
 	/* Poll, register & update if needed */
 	epoll_register(epf, ent, 1);
@@ -471,9 +476,7 @@ int uk_sys_epoll_ctl(const struct uk_file *epf, int op, int fd,
 	union uk_shim_file sf;
 	union epoll_shim_file esf;
 	struct epoll_entry **entp;
-#if CONFIG_LIBVFSCORE
-	int legacy;
-#endif /* CONFIG_LIBVFSCORE */
+	int legacy = 0;
 
 	if (unlikely(epf->vol != EPOLL_VOLID))
 		return -EINVAL;
@@ -495,6 +498,20 @@ int uk_sys_epoll_ctl(const struct uk_file *epf, int op, int fd,
 	esf.file = sf.ofile->file;
 #endif /* !CONFIG_LIBVFSCORE */
 
+	if (op == EPOLL_CTL_ADD || op == EPOLL_CTL_MOD) {
+		if (unlikely(!event)) {
+			ret = -EFAULT;
+			goto out_release;
+		}
+		if ((event->events & EPOLLEXCLUSIVE) &&
+		    (op != EPOLL_CTL_ADD ||
+		     (event->events & ~EPOLL_EXCLUSIVE_EVENTS) ||
+		     (!legacy && esf.file->vol == EPOLL_VOLID))) {
+			ret = -EINVAL;
+			goto out_release;
+		}
+	}
+
 	uk_file_wlock(epf);
 
 #if CONFIG_LIBVFSCORE
@@ -505,9 +522,7 @@ int uk_sys_epoll_ctl(const struct uk_file *epf, int op, int fd,
 
 	switch (op) {
 	case EPOLL_CTL_ADD:
-		if (unlikely(!event))
-			ret = -EFAULT;
-		else if (unlikely(*entp))
+		if (unlikely(*entp))
 			ret = -EEXIST;
 		else
 #if CONFIG_LIBVFSCORE
@@ -520,10 +535,10 @@ int uk_sys_epoll_ctl(const struct uk_file *epf, int op, int fd,
 		break;
 
 	case EPOLL_CTL_MOD:
-		if (unlikely(!event))
-			ret = -EFAULT;
-		else if (unlikely(!*entp))
+		if (unlikely(!*entp))
 			ret = -ENOENT;
+		else if ((*entp)->event.events & EPOLLEXCLUSIVE)
+			ret = -EINVAL;
 		else
 #if CONFIG_LIBVFSCORE
 			if (legacy)
@@ -545,6 +560,7 @@ int uk_sys_epoll_ctl(const struct uk_file *epf, int op, int fd,
 	}
 	uk_file_wunlock(epf);
 
+out_release:
 #if CONFIG_LIBVFSCORE
 	if (legacy)
 		fdrop(sf.vfile);

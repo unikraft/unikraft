@@ -35,6 +35,7 @@ static void pollq_propagate(struct uk_pollq *q,
 {
 	uk_mutex_lock(&q->proplock);
 	if (q->propmask & set) {
+		struct uk_poll_chain *exclusive = NULL;
 		struct uk_poll_chain *t;
 		uk_pollevent seen = 0;
 
@@ -58,11 +59,22 @@ static void pollq_propagate(struct uk_pollq *q,
 						break;
 					}
 					break;
+				case UK_POLL_CHAINTYPE_CALLBACK_EXCLUSIVE:
+					if (op != UK_POLL_CHAINOP_SET ||
+					    exclusive)
+						break;
+					exclusive = t;
+					__fallthrough;
 				case UK_POLL_CHAINTYPE_CALLBACK:
 					t->callback(req, op, t);
 					break;
 				}
 			}
+		}
+		if (exclusive && UK_STAILQ_NEXT(exclusive, list_entry)) {
+			UK_STAILQ_REMOVE(&q->prop, exclusive,
+					 struct uk_poll_chain, list_entry);
+			UK_STAILQ_INSERT_TAIL(&q->prop, exclusive, list_entry);
 		}
 		q->propmask = seen; /* Prune propmask */
 		q->_tag = NULL; /* Clear tag */

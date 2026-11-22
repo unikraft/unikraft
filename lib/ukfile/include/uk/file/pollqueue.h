@@ -65,7 +65,8 @@ typedef uk_pollevent (*uk_poll_func)(const struct uk_file *f,
 
 enum uk_poll_chain_type {
 	UK_POLL_CHAINTYPE_UPDATE,
-	UK_POLL_CHAINTYPE_CALLBACK
+	UK_POLL_CHAINTYPE_CALLBACK,
+	UK_POLL_CHAINTYPE_CALLBACK_EXCLUSIVE
 };
 
 enum uk_poll_chain_op {
@@ -92,7 +93,9 @@ typedef void (*uk_poll_chain_callback_fn)(uk_pollevent ev,
  * If newly modified events overlap with those in `mask`, perform a chain update
  * of these overlapping bits according to `type`:
  *   - UK_POLL_CHAINTYPE_UPDATE: propagate events to `queue`.
- *   - UK_POLL_CHAINTYPE_CALLBACK: call `callback`
+ *   - UK_POLL_CHAINTYPE_CALLBACK: call `callback`.
+ *   - UK_POLL_CHAINTYPE_CALLBACK_EXCLUSIVE: call one matching exclusive
+ *     callback on set, rotating it to the end of the list.
  */
 struct uk_poll_chain {
 	UK_STAILQ_ENTRY(struct uk_poll_chain) list_entry;
