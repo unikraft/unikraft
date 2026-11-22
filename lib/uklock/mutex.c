@@ -58,6 +58,12 @@ void _uk_mutex_lock_wait(struct uk_mutex *m, __uptr tid, __uptr v)
 			continue;
 		}
 
+		/* Compare against the marked state. The owner may release
+		 * and reacquire without the contested bit before the
+		 * waitq condition is checked.
+		 */
+		v |= _UK_MUTEX_CONTESTED;
+
 		/* From this point, we know that the other side will also go
 		 * through the waitq spinlock.
 		 * Wait until something changed, and retry locking the mutex.
