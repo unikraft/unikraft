@@ -272,6 +272,99 @@ UK_TESTCASE(vas_refs, thread_lifetime)
 	UK_TEST_EXPECT(probe.dtor_vas_live);
 }
 
+UK_TESTCASE(vas_refs, explicit_access)
+{
+	struct vas_ref_probe first = { 0 }, second = { 0 };
+	struct uk_thread *current = uk_thread_current();
+	struct uk_vas *previous = current->vas;
+	struct uk_vas *kernel = uk_vas_get_kernel();
+	struct vas_ref_space *left, *right;
+	__vaddr_t extra, shared = UK_PAGING_VADDR_ANY;
+	unsigned long irqf;
+	bool have_shared = false;
+	int rc;
+
+	UK_TEST_EXPECT(uk_vas_get_active() == kernel &&
+		       (!previous || previous == kernel));
+	if (uk_vas_get_active() != kernel || (previous && previous != kernel))
+		return;
+	left = vas_ref_create(&first);
+	UK_TEST_EXPECT_NOT_NULL(left);
+	if (!left)
+		return;
+	right = vas_ref_create(&second);
+	UK_TEST_EXPECT_NOT_NULL(right);
+	if (!right)
+		goto put_left;
+	extra = second.address + UK_PAGING_PAGE_SIZE;
+	rc = uk_vma_map_anon(second.vas, &extra, UK_PAGING_PAGE_SIZE,
+			     UK_PAGING_PAGE_ATTR_PROT_RW, 0, NULL);
+	UK_TEST_EXPECT_ZERO(rc);
+	if (rc)
+		goto put_right;
+	rc = uk_thread_set_vas(current, first.vas);
+	UK_TEST_EXPECT_ZERO(rc);
+	if (rc)
+		goto put_right;
+	*(__u32 *)first.address = 0x11112222U;
+	rc = uk_vas_store_u32(second.vas, second.address, 0x33334444U);
+	UK_TEST_EXPECT_ZERO(rc);
+	UK_TEST_EXPECT_SNUM_EQ(*(__u32 *)first.address, 0x11112222U);
+	UK_TEST_EXPECT_PTR_EQ(uk_vas_get_active(), first.vas);
+	UK_TEST_EXPECT_PTR_EQ(uk_paging_pt_get_active(), first.vas->pt);
+	/* Populate the absent second page through the software fault path. */
+	UK_TEST_EXPECT_ZERO(uk_vas_store_u32(second.vas, extra, 0x55556666U));
+	UK_TEST_EXPECT_ZERO(uk_vas_fault(second.vas, extra, UK_VMA_FAULT_READ));
+	UK_TEST_EXPECT_SNUM_EQ(uk_vas_fault(second.vas, extra, 3), -EINVAL);
+	rc = uk_vas_store_u32(second.vas, second.address + 1, 0);
+	UK_TEST_EXPECT_SNUM_EQ(rc, -EINVAL);
+	rc = uk_vas_store_u32(second.vas, extra + UK_PAGING_PAGE_SIZE, 0);
+	UK_TEST_EXPECT_SNUM_EQ(rc, -EFAULT);
+	irqf = uk_lcpu_save_irqf();
+	rc = uk_vas_store_u32(second.vas, second.address, 0);
+	uk_lcpu_restore_irqf(irqf);
+	UK_TEST_EXPECT_SNUM_EQ(rc, -EWOULDBLOCK);
+	rc = uk_vma_set_attr(second.vas, second.address, UK_PAGING_PAGE_SIZE,
+			     UK_PAGING_PAGE_ATTR_PROT_READ, 0);
+	UK_TEST_EXPECT_ZERO(rc);
+	rc = uk_vas_store_u32(second.vas, second.address, 0);
+	UK_TEST_EXPECT_SNUM_EQ(rc, -EFAULT);
+	rc = uk_vma_map_anon(kernel, &shared, UK_PAGING_PAGE_SIZE,
+			     UK_PAGING_PAGE_ATTR_PROT_RW, UK_VMA_MAP_POPULATE,
+			     NULL);
+	UK_TEST_EXPECT_ZERO(rc);
+	if (!rc) {
+		have_shared = true;
+		rc = uk_vas_store_u32(second.vas, shared, 0x77778888U);
+		UK_TEST_EXPECT_ZERO(rc);
+		UK_TEST_EXPECT_SNUM_EQ(*(__u32 *)shared, 0x77778888U);
+	}
+	rc = uk_thread_set_vas(current, second.vas);
+	UK_TEST_EXPECT_ZERO(rc);
+	if (rc)
+		UK_CRASH("Cannot inspect explicit VAS writes");
+	UK_TEST_EXPECT_SNUM_EQ(*(__u32 *)second.address, 0x33334444U);
+	UK_TEST_EXPECT_SNUM_EQ(*(__u32 *)extra, 0x55556666U);
+	rc = uk_thread_set_vas(current, previous);
+	UK_TEST_EXPECT_ZERO(rc);
+	if (rc)
+		UK_CRASH("Cannot restore explicit VAS test context");
+	if (have_shared) {
+		rc = uk_vma_unmap(kernel, shared, UK_PAGING_PAGE_SIZE, 0);
+		UK_TEST_EXPECT_ZERO(rc);
+	}
+put_right:
+	uk_vas_put(second.vas);
+	UK_TEST_EXPECT_SNUM_EQ(second.releases, 1);
+	UK_TEST_EXPECT_ZERO(second.cleanup_rc);
+	UK_TEST_EXPECT(second.released_inactive);
+put_left:
+	uk_vas_put(first.vas);
+	UK_TEST_EXPECT_SNUM_EQ(first.releases, 1);
+	UK_TEST_EXPECT_ZERO(first.cleanup_rc);
+	UK_TEST_EXPECT(first.released_inactive);
+}
+
 _UK_TESTSUITE(vas_refs, NULL);
 
 static void __constructor run_vas_refs(void)
