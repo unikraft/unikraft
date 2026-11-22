@@ -295,6 +295,11 @@ int pprocess_clone_prepared_vas(struct posix_process *process,
 #endif
 #endif /* CONFIG_LIBPOSIX_PROCESS_PREPARE */
 
+#if CONFIG_LIBPOSIX_PROCESS_FORK
+int pprocess_fork(struct clone_args *args, size_t args_len,
+		  struct ukarch_execenv *execenv);
+#endif
+
 int uk_clone(struct clone_args *cl_args, size_t cl_args_len,
 	     struct ukarch_execenv *execenv);
 
