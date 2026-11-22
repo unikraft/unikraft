@@ -47,6 +47,7 @@ struct uk_thread *pprocess_thread_main;
  *       An application should never get PID/TID 0 assigned.
  */
 static struct posix_thread *tid_thread[TIDMAP_SIZE];
+/* Allocation also reserves every published process ID it encounters. */
 static unsigned long tid_map[UK_BITS_TO_LONGS(TIDMAP_SIZE)] = { [0] = 0x01UL };
 
 /* Process Table */
@@ -71,6 +72,15 @@ static inline pid_t find_free_tid_locked(void)
 	if (found == TIDMAP_SIZE) {
 		/* search again starting from the beginning */
 		found = uk_find_first_zero_bit(tid_map, TIDMAP_SIZE);
+	}
+	/* A leader may exit while its process stays published. Reconcile its
+	 * reservation here so thread release needs no process-table lookup.
+	 */
+	while (found < TIDMAP_SIZE && pid_process[found]) {
+		uk_set_bit(found, tid_map);
+		found = uk_find_next_zero_bit(tid_map, TIDMAP_SIZE, found + 1);
+		if (found == TIDMAP_SIZE)
+			found = uk_find_first_zero_bit(tid_map, TIDMAP_SIZE);
 	}
 	if (found == TIDMAP_SIZE) {
 		/* no free PID */
@@ -786,6 +796,8 @@ void pprocess_release(struct posix_process *pprocess)
 			uk_list_del_init(&pprocess->child_list_entry);
 		pid = pprocess->pid;
 		__atomic_store_n(&pid_process[pid], NULL, __ATOMIC_RELEASE);
+		if (!tid_thread[pid])
+			uk_clear_bit(pid, tid_map);
 		pprocess_lock_release(flags);
 	}
 
