@@ -1,2 +1,3 @@
 uk_intctlr_probe
+uk_intctlr_xpic_msi_message
 uk_intctlr_xpic_handle_irq
