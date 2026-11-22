@@ -8,6 +8,9 @@
 #include <string.h>
 
 #include <uk/config.h>
+#if CONFIG_LIBUKDEBUG_ENABLE_ASSERT
+#include <uk/print.h>
+#endif
 #include <uk/assert.h>
 #include <uk/falloc.h>
 #include <uk/posix-fdtab.h>
@@ -82,6 +85,11 @@ int file_backing_new(struct uk_vas *vas, const struct uk_file *f,
 				__NULL, 0);
 		if (r <= 0) {
 			rc = r ? r : -ENXIO;
+#if CONFIG_LIBUKDEBUG_ENABLE_ASSERT
+			uk_pr_err("Cannot pin file backing: %d (raw %ld, offset %lld, done %zu of %zu, mem %p)\n",
+				  rc, (long)r, (long long)offset, b->acquired,
+				  len, (const void *)f->ops->mem);
+#endif
 			goto fail;
 		}
 		if (!UK_PAGING_PAGE_ALIGNED(r) || (__sz)r > len - b->acquired)
@@ -94,6 +102,10 @@ int file_backing_new(struct uk_vas *vas, const struct uk_file *f,
 		if (r != 1 || !iov.iov_base || !iov.iov_len ||
 		    !UK_PAGING_PAGE_ALIGNED((__vaddr_t)iov.iov_base)) {
 			rc = r < 0 ? r : -EIO;
+#if CONFIG_LIBUKDEBUG_ENABLE_ASSERT
+			uk_pr_err("Cannot read file backing: %d (raw %ld, offset %lld, done %zu of %zu)\n",
+				  rc, (long)r, (long long)offset, done, len);
+#endif
 			goto fail;
 		}
 		/* PINNED guarantees resident, physically stable pages. The
