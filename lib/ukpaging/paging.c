@@ -729,6 +729,19 @@ void uk_paging_batch_end(struct uk_paging_free_batch *batch)
 	}
 }
 
+struct uk_paging_free_batch *
+uk_paging_batch_current(struct uk_pagetable *pt)
+{
+	struct uk_paging_free_batch *batch;
+
+	UK_ASSERT(pt);
+	UK_ASSERT(uk_lcpu_irqs_disabled());
+	batch = uk_pcpuvar_current_get(pg_cpu_defer_batch);
+	if (!batch || batch->pt != pt)
+		return __NULL;
+	return batch;
+}
+
 #if CONFIG_HAVE_SMP
 #define PG_TLB_SHOOTDOWN_FULL_THRESHOLD (32UL * UK_PAGING_PAGE_SIZE)
 

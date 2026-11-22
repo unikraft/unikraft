@@ -511,6 +511,19 @@ void uk_paging_batch_begin(struct uk_paging_free_batch *batch,
 			   struct uk_pagetable *pt);
 void uk_paging_batch_end(struct uk_paging_free_batch *batch);
 
+/**
+ * Return this CPU's outer batch for pt, or NULL if no matching batch exists.
+ *
+ * The caller keeps local interrupts disabled from lookup through use of the
+ * returned batch and must not yield. Unlike pt->defer_batch, this pointer
+ * remains available between public paging operations, until batch_end().
+ * The caller owns the enclosing batch and must finish it after dropping
+ * its VAS and paging locks. A missing batch does not authorize early release
+ * of backing references for mappings that still require TLB invalidation.
+ */
+struct uk_paging_free_batch *
+uk_paging_batch_current(struct uk_pagetable *pt);
+
 #if CONFIG_LIBUKPAGING_DEFERRED_RELEASE
 /**
  * Queue a release after the batch's local and remote TLB invalidations.
