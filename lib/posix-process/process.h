@@ -81,6 +81,8 @@ struct posix_process {
 	unsigned int exiting_threads;
 	enum posix_process_state state;
 	bool exiting;
+	bool reap_claimed;
+	bool orphaned;
 	__u64 exit_signal;
 	int exit_status;
 #if CONFIG_LIBPOSIX_PROCESS_BRK

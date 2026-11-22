@@ -21,7 +21,8 @@
 #include "signal/siginfo.h"
 
 #define PPROCESS_STATE_CHANGED(_pp, _state)				  \
-	(((_state) & WEXITED) && ((_pp)->state == POSIX_PROCESS_EXITED || \
+	(!(_pp)->reap_claimed && ((_state) & WEXITED) &&		 \
+	 ((_pp)->state == POSIX_PROCESS_EXITED ||			 \
 				(_pp)->state == POSIX_PROCESS_KILLED))
 
 static inline
@@ -101,6 +102,7 @@ static int pprocess_wait(pid_t pid, siginfo_t *si, int opt)
 			set_siginfo_wait(waitable, si);
 			if (!(opt & WNOWAIT)) {
 				/* Claim the child before unlocking. */
+				waitable->reap_claimed = true;
 				uk_list_del_init(&waitable->child_list_entry);
 				waitable->parent = NULL;
 				reap = waitable;

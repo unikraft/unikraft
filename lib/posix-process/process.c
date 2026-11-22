@@ -996,6 +996,7 @@ void pprocess_put(struct posix_process *pprocess)
 	UK_ASSERT(uk_list_empty(&pprocess->threads));
 	UK_ASSERT(uk_list_empty(&pprocess->children));
 	UK_ASSERT(uk_list_empty(&pprocess->child_list_entry));
+	UK_ASSERT(!pprocess->exiting_threads);
 	pid = pprocess->pid;
 	UK_ASSERT(__atomic_load_n(&pid_process[pid], __ATOMIC_ACQUIRE) !=
 		  pprocess);
@@ -1029,6 +1030,7 @@ void pprocess_release(struct posix_process *pprocess)
 	UK_ASSERT(uk_list_empty(&pprocess->threads));
 	UK_ASSERT(uk_list_empty(&pprocess->children));
 	flags = pprocess_lock_acquire();
+	pprocess->reap_claimed = true;
 	if (pprocess->parent) {
 		uk_list_del_init(&pprocess->child_list_entry);
 		pprocess->parent = NULL;
