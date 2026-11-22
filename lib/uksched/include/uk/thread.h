@@ -84,6 +84,9 @@ struct uk_thread {
 	__nsec exec_time;		/**< Time the thread was scheduled */
 #if CONFIG_LIBUKVMEM_TRACE_PAGEFAULTS
 	__u64 vmem_faults;
+	__nsec vmem_fault_time;
+	__nsec vmem_fault_anon_alloc_time;
+	__nsec vmem_fault_anon_zero_time;
 #endif
 	const char *name;		/**< Reference to thread name */
 	UK_TAILQ_ENTRY(struct uk_thread) thread_list;

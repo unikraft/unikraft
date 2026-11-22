@@ -252,6 +252,7 @@ static void _uk_thread_struct_init(struct uk_thread *t,
 	t->exec_time = 0;
 #if CONFIG_LIBUKVMEM_TRACE_PAGEFAULTS
 	t->vmem_faults = 0;
+	t->vmem_fault_time = 0;
 #endif
 	t->wait_ticket = UK_WAITQ_TICKET_INIT_VALUE;
 
@@ -1008,6 +1009,13 @@ void uk_thread_release(struct uk_thread *t)
 	UK_ASSERT(t != uk_thread_current());
 	UK_ASSERT(!t->sched); /* Thread must be disconnected from scheduler */
 
+#if CONFIG_LIBUKVMEM_TRACE_PAGEFAULTS
+	uk_pr_info_isr("Thread %p paging: faults=%llu handler_ns=%llu alloc_ns=%llu zero_ns=%llu\n",
+		       (void *)t, (unsigned long long)t->vmem_faults,
+		       (unsigned long long)t->vmem_fault_time,
+		       (unsigned long long)t->vmem_fault_anon_alloc_time,
+		       (unsigned long long)t->vmem_fault_anon_zero_time);
+#endif
 	uk_thread_set_exited(t);
 
 	/* Take copies of associated allocation information.

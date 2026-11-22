@@ -16,12 +16,16 @@
 #include <uk/lcpu.h>
 #include <string.h>
 #if CONFIG_LIBUKVMEM_TRACE_PAGEFAULTS
+#include <uk/plat/time.h>
 #include <uk/thread.h>
 #endif
 
 static int vmem_arch_pagefault(void *data)
 {
 	__u64 orig_gsbase = uk_arch_x86_64_enter_kernel_gsbase();
+#if CONFIG_LIBUKVMEM_TRACE_PAGEFAULTS
+	const __nsec handler_started = ukplat_monotonic_clock();
+#endif
 	struct uk_lcpu_except_err_ctx *ctx = data;
 	__vaddr_t vaddr = (__vaddr_t)uk_lcpu_except_err_ctx_get_fault_addr(ctx);
 	const char *faultstr[] __maybe_unused = {
@@ -52,8 +56,10 @@ static int vmem_arch_pagefault(void *data)
 			    (struct uk_lcpu_regs *)
 			    uk_lcpu_except_err_ctx_get_regs(ctx));
 #if CONFIG_LIBUKVMEM_TRACE_PAGEFAULTS
-	if (!rc && thread && (faulttype & UK_VMA_FAULT_NONPRESENT))
+	if (!rc && thread && (faulttype & UK_VMA_FAULT_NONPRESENT)) {
 		thread->vmem_faults++;
+		thread->vmem_fault_time += ukplat_monotonic_clock() - handler_started;
+	}
 #endif
 	if (rc < 0) {
 		vas = uk_vas_get_active();
