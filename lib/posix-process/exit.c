@@ -214,6 +214,28 @@ static void pprocess_reparent_children(struct posix_process *process)
 	}
 }
 
+static void wake_vfork_parent(struct posix_thread *child)
+{
+	struct posix_process *process = child->process;
+	struct posix_thread *parent, *next;
+	unsigned long flags;
+
+	if (child->tid != process->pid || !child->parent)
+		return;
+	flags = pprocess_lock_acquire();
+	if (process->parent) {
+		uk_pprocess_foreach_pthread(process->parent, parent, next) {
+			if (parent == child->parent &&
+			    parent->state == POSIX_THREAD_BLOCKED_VFORK) {
+				uk_thread_wake(parent->thread);
+				parent->state = POSIX_THREAD_RUNNING;
+				break;
+			}
+		}
+	}
+	pprocess_lock_release(flags);
+}
+
 /* Exit AND release pthread.
  * Notice: Unlike pprocesses, pthreads are released upon exit.
  */
@@ -223,7 +245,6 @@ void pprocess_exit_pthread(struct posix_thread *pthread,
 {
 	struct posix_process_ptexit_event_data event_data;
 	struct posix_process *pprocess;
-	struct posix_thread *parent_pthread;
 	struct uk_thread *thread;
 
 	UK_ASSERT(state == POSIX_THREAD_EXITED ||
@@ -239,9 +260,6 @@ void pprocess_exit_pthread(struct posix_thread *pthread,
 
 	uk_pr_debug("pid %d: exit tid %d\n", pprocess->pid, pthread->tid);
 
-	/* May be NULL if init terminated early */
-	parent_pthread = pthread->parent;
-
 	/* Update state */
 	pthread->state = state;
 
@@ -250,12 +268,7 @@ void pprocess_exit_pthread(struct posix_thread *pthread,
 	event_data.tid = pthread->tid;
 	pprocess_raise_ptexit_event(&event_data);
 
-	/* Wake up parent if it was blocking on vfork */
-	if (parent_pthread &&
-	    parent_pthread->state == POSIX_THREAD_BLOCKED_VFORK) {
-		uk_thread_wake(parent_pthread->thread);
-		parent_pthread->state = POSIX_THREAD_RUNNING;
-	}
+	wake_vfork_parent(pthread);
 
 	/* Release pthread and terminate the underlying uk_thread
 	 * unless it's the current one or if it hasn't been associated
@@ -369,6 +382,59 @@ void pprocess_exit(struct posix_process *pprocess,
 	(void)pprocess_try_exit(pprocess, state, exit_status);
 }
 
+void pprocess_mark_signal_exit_locked(struct posix_process *process, int sig)
+{
+	struct posix_thread *pt, *next;
+
+	if (process->exiting || pprocess_terminating_signal(process))
+		return;
+	__atomic_store_n(&process->terminating_signal, sig, __ATOMIC_RELEASE);
+	uk_pprocess_foreach_pthread(process, pt, next) {
+		uk_thread_interrupt_wait(pt->thread);
+		if (pt->state == POSIX_THREAD_BLOCKED_WAIT)
+			uk_semaphore_up(&pt->wait_semaphore);
+#if CONFIG_LIBPOSIX_PROCESS_SIGNAL
+		if (pt->state == POSIX_THREAD_BLOCKED_SIGWAIT)
+			uk_thread_wake(pt->thread);
+		if (pt->state == POSIX_THREAD_BLOCKED_SIGNAL)
+			uk_semaphore_up(&pt->signal->deliver_semaphore);
+#endif /* CONFIG_LIBPOSIX_PROCESS_SIGNAL */
+	}
+}
+
+static void __noreturn exit_current_thread(int status)
+{
+	struct uk_thread *thread = uk_thread_current();
+	struct posix_thread *pt;
+	bool became_empty;
+
+	pt = pprocess_claim_pthread_exit(thread, &became_empty);
+	if (pt) {
+		struct posix_process *process = pt->process;
+		int sig = pprocess_terminating_signal(process);
+		enum posix_process_state state;
+
+		state = sig ? POSIX_PROCESS_KILLED : POSIX_PROCESS_EXITED;
+		pprocess_exit_pthread(pt, PP2PT_EXIT_STATE(state), status);
+		pprocess_complete_pthread_exit(process);
+		/* The last linked thread waits for any other exit callbacks. */
+		if (became_empty)
+			pprocess_exit(process, state, sig ? sig : status);
+		pprocess_put(process);
+	}
+	uk_sched_thread_exit();
+}
+
+void pprocess_exit_signalled(int sig)
+{
+	struct posix_process *process = uk_pprocess_current();
+	unsigned long flags = pprocess_lock_acquire();
+
+	pprocess_mark_signal_exit_locked(process, sig);
+	pprocess_lock_release(flags);
+	exit_current_thread(0);
+}
+
 /* NOTE: The man pages of _exit(2) say:
  *       "In glibc up to version 2.3, the _exit() wrapper function invoked
  *        the kernel system call of the same name.  Since glibc 2.3, the
@@ -381,23 +447,7 @@ void pprocess_exit(struct posix_process *pprocess,
  */
 UK_LLSYSCALL_R_DEFINE(int, exit, int, status)
 {
-	struct posix_process *pprocess;
-	struct posix_thread *this_pthread;
-	struct uk_thread *this_thread;
-	bool became_empty = false;
-
-	this_thread = uk_thread_current();
-	this_pthread = pprocess_claim_pthread_exit(this_thread, &became_empty);
-	if (this_pthread) {
-		pprocess = this_pthread->process;
-		pprocess_exit_pthread(this_pthread, POSIX_THREAD_EXITED,
-				      status);
-		pprocess_complete_pthread_exit(pprocess);
-		if (became_empty)
-			pprocess_exit(pprocess, POSIX_PROCESS_EXITED, status);
-		pprocess_put(pprocess);
-	}
-	uk_sched_thread_exit();
+	exit_current_thread(status);
 }
 
 UK_LLSYSCALL_R_DEFINE(int, exit_group, int, status)
@@ -407,6 +457,8 @@ UK_LLSYSCALL_R_DEFINE(int, exit_group, int, status)
 	pprocess = uk_pprocess_current();
 	UK_ASSERT(pprocess);
 
+	if (pprocess_terminating_signal(pprocess))
+		exit_current_thread(status);
 	pprocess_exit(pprocess, POSIX_PROCESS_EXITED, status);
 	uk_sched_thread_exit();
 }

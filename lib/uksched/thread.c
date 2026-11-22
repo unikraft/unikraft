@@ -1110,10 +1110,12 @@ void uk_thread_release(struct uk_thread *t)
 #endif
 }
 
-void uk_thread_block_until(struct uk_thread *thread, __snsec until)
+static bool thread_block_until(struct uk_thread *thread, __snsec until,
+			       bool interruptible)
 {
 	struct uk_sched *s;
 	unsigned long flags;
+	bool blocked = false;
 
 	UK_ASSERT(thread);
 
@@ -1123,15 +1125,31 @@ void uk_thread_block_until(struct uk_thread *thread, __snsec until)
 	else
 		flags = uk_lcpu_save_irqf();
 
+	if (interruptible && uk_thread_wait_interrupted(thread))
+		goto out;
+	thread->wait_interruptible = interruptible;
 	thread->wakeup_time = until;
 	uk_thread_set_blocked(thread);
 	if (s && thread->sched == s)
 		uk_sched_thread_blocked(thread);
+	blocked = true;
 
+out:
 	if (s)
 		ukplat_spin_unlock_irqrestore(&s->lock, flags);
 	else
 		uk_lcpu_restore_irqf(flags);
+	return blocked;
+}
+
+void uk_thread_block_until(struct uk_thread *thread, __snsec until)
+{
+	(void)thread_block_until(thread, until, false);
+}
+
+bool uk_thread_block_interruptible(struct uk_thread *thread, __snsec until)
+{
+	return thread_block_until(thread, until, true);
 }
 
 void uk_thread_block_timeout(struct uk_thread *thread, __nsec nsec)
@@ -1155,6 +1173,14 @@ void uk_thread_wake(struct uk_thread *thread)
 	unsigned long flags;
 
 	flags = uk_lcpu_save_irqf();
-	_uk_thread_wake_transition(thread, uk_sched_thread_woken);
+	_uk_thread_wake_transition(thread, false, uk_sched_thread_woken);
+	uk_lcpu_restore_irqf(flags);
+}
+
+void uk_thread_interrupt_wait(struct uk_thread *thread)
+{
+	unsigned long flags = uk_lcpu_save_irqf();
+
+	_uk_thread_wake_transition(thread, true, uk_sched_thread_woken);
 	uk_lcpu_restore_irqf(flags);
 }

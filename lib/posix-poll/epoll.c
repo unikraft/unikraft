@@ -588,9 +588,16 @@ int uk_sys_epoll_pwait2(const struct uk_file *epf, struct epoll_event *events,
 	uk_sched_yield();
 #endif /* CONFIG_LIBPOSIX_POLL_YIELD */
 
-	while (uk_file_poll_until(epf, UKFD_POLLIN, deadline)) {
+	for (;;) {
+		uk_pollevent pending;
+		int rc;
 		int lvlev = 0;
 		int nout = 0;
+
+		rc = uk_file_poll_interruptible(epf, UKFD_POLLIN, deadline,
+						&pending);
+		if (rc || !pending)
+			return rc;
 
 		uk_file_event_clear(epf, UKFD_POLLIN);
 		uk_file_rlock(epf);
@@ -647,8 +654,6 @@ int uk_sys_epoll_pwait2(const struct uk_file *epf, struct epoll_event *events,
 			return nout;
 		/* If nout == 0 loop back around */
 	}
-	/* Timeout */
-	return 0;
 }
 
 /* Userspace Syscalls */

@@ -11,6 +11,7 @@
  * Caller retains its normal/ISR notification path and local IRQ guard.
  */
 static inline bool _uk_thread_wake_transition(struct uk_thread *thread,
+					      bool interrupt,
 					      void (*notify)(struct uk_thread *))
 {
 	struct uk_sched *s;
@@ -21,6 +22,13 @@ static inline bool _uk_thread_wake_transition(struct uk_thread *thread,
 	if (s)
 		ukarch_spin_lock(&s->lock);
 
+	if (interrupt) {
+		__atomic_store_n(&thread->wait_interrupted, true,
+				 __ATOMIC_RELEASE);
+		if (!thread->wait_interruptible)
+			goto out;
+	}
+	thread->wait_interruptible = false;
 	if (!uk_thread_is_runnable(thread)) {
 		uk_thread_set_runnable(thread);
 		if (s && thread->sched == s) {
@@ -30,6 +38,7 @@ static inline bool _uk_thread_wake_transition(struct uk_thread *thread,
 	}
 	thread->wakeup_time = 0LL;
 
+out:
 	if (s)
 		ukarch_spin_unlock(&s->lock);
 	if (woken)

@@ -345,13 +345,19 @@ const struct uk_file *uk_socket_accept(const struct uk_file *sock, int blocking,
 		return ERR2PTR(-ENOMEM);
 
 	for (;;) {
+		int rc;
+
 		uk_file_rlock(sock);
 		new_data = posix_socket_accept4(sock, addr, addr_len, flags);
 		uk_file_runlock(sock);
 		if (!blocking ||
 		    !PTRISERR(new_data) || !_ERR_BLOCK(PTR2ERR(new_data)))
 			break;
-		(void)uk_file_poll(sock, UKFD_POLLIN);
+		rc = uk_file_wait_interruptible(sock, UKFD_POLLIN);
+		if (rc) {
+			new_data = ERR2PTR(rc);
+			break;
+		}
 	}
 	if (unlikely(PTRISERR(new_data))) {
 		uk_free(n->driver->allocator, al);
@@ -685,12 +691,15 @@ UK_SYSCALL_R_DEFINE(int, connect, int, sock, const struct sockaddr *, addr,
 	if (ret == -EINPROGRESS && _SHOULD_BLOCK(mode)) {
 		socklen_t _opsz = sizeof(ret);
 
-		(void)uk_file_poll(of->file, UKFD_POLLOUT | UKFD_POLL_ALWAYS);
-		/* Get err status from getsockopt */
-		uk_file_rlock(of->file);
-		posix_socket_getsockopt(of->file, SOL_SOCKET, SO_ERROR,
-					&ret, &_opsz);
-		uk_file_runlock(of->file);
+		ret = uk_file_wait_interruptible(of->file, UKFD_POLLOUT |
+						 UKFD_POLL_ALWAYS);
+		if (!ret) {
+			/* Get err status from getsockopt */
+			uk_file_rlock(of->file);
+			posix_socket_getsockopt(of->file, SOL_SOCKET, SO_ERROR,
+						&ret, &_opsz);
+			uk_file_runlock(of->file);
+		}
 	}
 	uk_ofile_release(of);
 
@@ -777,7 +786,9 @@ UK_SYSCALL_R_DEFINE(ssize_t, recvfrom, int, sock, void *, buf, size_t, len,
 		    (flags & MSG_DONTWAIT) ||
 		    !_ERR_BLOCK(ret))
 			break;
-		(void)uk_file_poll(of->file, UKFD_POLLIN);
+		ret = uk_file_wait_interruptible(of->file, UKFD_POLLIN);
+		if (ret)
+			break;
 	}
 	uk_ofile_release(of);
 
@@ -828,7 +839,9 @@ UK_SYSCALL_R_DEFINE(ssize_t, recvmsg, int, sock, struct msghdr *, msg,
 		    (flags & MSG_DONTWAIT) ||
 		    !_ERR_BLOCK(ret))
 			break;
-		(void)uk_file_poll(of->file, UKFD_POLLIN);
+		ret = uk_file_wait_interruptible(of->file, UKFD_POLLIN);
+		if (ret)
+			break;
 	}
 	uk_ofile_release(of);
 
@@ -872,7 +885,9 @@ UK_SYSCALL_R_DEFINE(ssize_t, sendmsg, int, sock, const struct msghdr *, msg,
 		    (flags & MSG_DONTWAIT) ||
 		    !_ERR_BLOCK(ret))
 			break;
-		(void)uk_file_poll(of->file, UKFD_POLLOUT);
+		ret = uk_file_wait_interruptible(of->file, UKFD_POLLOUT);
+		if (ret)
+			break;
 	}
 	uk_ofile_release(of);
 
@@ -919,7 +934,9 @@ UK_SYSCALL_R_DEFINE(ssize_t, sendto, int, sock, const void *, buf, size_t, len,
 		    (flags & MSG_DONTWAIT) ||
 		    !_ERR_BLOCK(ret))
 			break;
-		(void)uk_file_poll(of->file, UKFD_POLLOUT);
+		ret = uk_file_wait_interruptible(of->file, UKFD_POLLOUT);
+		if (ret)
+			break;
 	}
 	uk_ofile_release(of);
 

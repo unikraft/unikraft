@@ -124,7 +124,12 @@ int uk_sys_nanosleep(const struct timespec *req, struct timespec *rem)
 	}
 
 #if CONFIG_HAVE_SCHED
-	uk_sched_thread_sleep(nsec);
+	{
+		struct uk_thread *thread = uk_thread_current();
+
+		if (uk_thread_block_interruptible(thread, before + nsec))
+			uk_sched_yield();
+	}
 #else
 	__spin_wait(nsec);
 #endif

@@ -304,20 +304,24 @@ uk_pollevent _uk_pollq_lock(struct uk_pollq *q, uk_pollevent req,
  * @param deadline Max number of nanoseconds to wait or, or 0 if forever
  *
  * @return
- *   0 on timeout
- *   non-zero if awoken
+ *   0 if awoken, 1 on timeout, -EINTR if interrupted
  */
 static inline
-int _uk_pollq_wait(struct uk_pollq *q, uk_pollevent req, __nsec deadline)
+int _uk_pollq_wait(struct uk_pollq *q, uk_pollevent req, __nsec deadline,
+		   bool interruptible)
 {
 	/* Mark request in waitmask */
 	(void)uk_or(&q->waitmask, req);
 	/* Set events as cookie & wait */
 	uk_waitq_set_cookie(req);
-	return !uk_waitq_wait_deadline_locked(&q->waitq, deadline,
-					      uk_rwlock_rlock,
-					      uk_rwlock_runlock,
-					      &q->waitlock);
+	if (interruptible)
+		return uk_waitq_wait_interruptible(&q->waitq, deadline,
+						   uk_rwlock_rlock,
+						   uk_rwlock_runlock,
+						   &q->waitlock);
+	return uk_waitq_wait_deadline_locked(&q->waitq, deadline,
+					     uk_rwlock_rlock, uk_rwlock_runlock,
+					     &q->waitlock);
 }
 
 /**
@@ -360,22 +364,36 @@ uk_pollevent uk_pollq_poll_level(struct uk_pollq *q, uk_pollevent req,
  * @return
  *   Bitwise AND between `req` and the events set in `q`, or 0 if timed out
  */
-static inline
-uk_pollevent uk_pollq_poll_until(struct uk_pollq *q, uk_pollevent req,
-				 __nsec deadline, const struct uk_file *f)
+static inline int
+_uk_pollq_poll_until(struct uk_pollq *q, uk_pollevent req, __nsec deadline,
+		     const struct uk_file *f, bool interruptible,
+		     uk_pollevent *events)
 {
 	uk_pollevent ev;
+	int wait = 0;
 
-	if ((ev = _uk_pollq_poll_immediate(q, req)))
-		return ev;
-	if ((ev = _uk_pollq_lock(q, req, f)))
-		return ev;
-	while (_uk_pollq_wait(q, req, deadline)) {
+	if ((ev = _uk_pollq_poll_immediate(q, req)) ||
+	    (ev = _uk_pollq_lock(q, req, f)))
+		goto out;
+	while (!(wait = _uk_pollq_wait(q, req, deadline, interruptible))) {
 		if ((ev = _uk_pollq_poll_locked(q, req, f)))
 			break;
 	}
 	uk_rwlock_runlock(&q->waitlock);
-	return ev;
+out:
+	if (events)
+		*events = ev;
+	return wait < 0 ? wait : 0;
+}
+
+static inline uk_pollevent
+uk_pollq_poll_until(struct uk_pollq *q, uk_pollevent req, __nsec deadline,
+		    const struct uk_file *f)
+{
+	uk_pollevent events;
+
+	(void)_uk_pollq_poll_until(q, req, deadline, f, false, &events);
+	return events;
 }
 
 /**

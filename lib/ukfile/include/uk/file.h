@@ -523,6 +523,21 @@ uk_pollevent uk_file_poll(const struct uk_file *f, uk_pollevent req)
 	return uk_file_poll_until(f, req, 0);
 }
 
+/* Wait for file readiness. The optional out mask is zero on timeout. */
+static inline int
+uk_file_poll_interruptible(const struct uk_file *f, uk_pollevent req,
+			   __nsec deadline, uk_pollevent *events)
+{
+	return _uk_pollq_poll_until(&f->state->pollq, req, deadline, f, true,
+				    events);
+}
+
+static inline int uk_file_wait_interruptible(const struct uk_file *f,
+					     uk_pollevent req)
+{
+	return uk_file_poll_interruptible(f, req, 0, NULL);
+}
+
 static inline
 uk_pollevent uk_file_event_clear(const struct uk_file *f, uk_pollevent clr)
 {

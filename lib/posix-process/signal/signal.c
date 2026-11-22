@@ -39,6 +39,32 @@ static void signal_wake_waiter(struct posix_thread *thread, int signum)
 	}
 }
 
+static void signal_request_exit(struct posix_process *process,
+				struct posix_thread *target, int signum)
+{
+	struct posix_thread *thread, *next;
+
+	if (signum == SIGKILL) {
+		pprocess_mark_signal_exit_locked(process, signum);
+		return;
+	}
+	if (KERN_SIGACTION(process, signum)->ks_handler != SIG_DFL ||
+	    (signum < SIGRTMIN &&
+	     !(UK_BIT(signum) & (SIGACT_TERM_MASK | SIGACT_CORE_MASK))))
+		return;
+	if (target) {
+		if (!IS_MASKED(target, signum))
+			pprocess_mark_signal_exit_locked(process, signum);
+		return;
+	}
+	uk_pprocess_foreach_pthread(process, thread, next) {
+		if (!IS_MASKED(thread, signum)) {
+			pprocess_mark_signal_exit_locked(process, signum);
+			break;
+		}
+	}
+}
+
 /* Enqueue signal for a thread or a process
  *
  * Setting pthread to NULL signifies that the signal
@@ -69,6 +95,9 @@ int pprocess_signal_queue_locked(struct posix_process *pproc,
 	pproc->signal->queued_count++;
 	*queued = true;
 notify:
+	signal_request_exit(pproc, pthread, signum);
+	if (pprocess_terminating_signal(pproc))
+		return 0;
 	/* Keep each waiter linked for the duration of its wakeup. */
 	if (pthread) {
 		signal_wake_waiter(pthread, signum);
@@ -293,7 +322,8 @@ void pprocess_signal_wait(struct posix_thread *thread)
 	for (;;) {
 		unsigned long pflags = pprocess_lock_acquire();
 
-		if (signal_unmasked_pending_locked(thread)) {
+		if (pprocess_terminating_signal(thread->process) ||
+		    signal_unmasked_pending_locked(thread)) {
 			thread->state = POSIX_THREAD_RUNNING;
 			pprocess_lock_release(pflags);
 			return;
@@ -318,6 +348,10 @@ void pprocess_signal_suspend(struct posix_thread *thread, uk_sigset_t mask)
 	tdesc->mask = mask;
 
 	for (;;) {
+		if (pprocess_terminating_signal(thread->process)) {
+			tdesc->mask = tdesc->suspend_saved_mask;
+			goto out;
+		}
 		signum = signal_unmasked_pending_locked(thread);
 		if (signum)
 			break;
@@ -334,6 +368,7 @@ void pprocess_signal_suspend(struct posix_thread *thread, uk_sigset_t mask)
 	uk_sigaddset(&selected, signum);
 	tdesc->suspend_signal = signal_dequeue_set_locked(thread, selected);
 	UK_ASSERT(tdesc->suspend_signal);
+out:
 	thread->state = POSIX_THREAD_RUNNING;
 	pprocess_lock_release(flags);
 }
@@ -342,7 +377,7 @@ int pprocess_signal_wait_set(struct posix_thread *thread, uk_sigset_t set,
 			     __snsec deadline, siginfo_t *info)
 {
 	unsigned long flags;
-	struct uk_signal *sig;
+	struct uk_signal *sig = NULL;
 	int ret;
 
 	uk_sigdelset(&set, SIGSTOP);
@@ -350,6 +385,10 @@ int pprocess_signal_wait_set(struct posix_thread *thread, uk_sigset_t set,
 
 	for (;;) {
 		flags = pprocess_lock_acquire();
+		if (pprocess_terminating_signal(thread->process)) {
+			ret = -EINTR;
+			break;
+		}
 		sig = signal_dequeue_set_locked(thread, set);
 		if (sig) {
 			ret = sig->siginfo.si_signo;
