@@ -18,7 +18,7 @@
 #include <uk/plat/native/paging.h>
 #include <uk/plat/native/page.h>
 
-int uk_plat_native_paging_init(void)
+int uk_plat_native_paging_init_cpu(__paddr_t *max_physaddr)
 {
 	__u32 eax, ebx, ecx, edx;
 	__u32 max_addr_bit;
@@ -73,7 +73,19 @@ int uk_plat_native_paging_init(void)
 	}
 
 	max_addr_bit = (eax & __X86_64_PG_PADDR_MASK) >> __X86_64_PG_PADDR_SHIFT;
-	uk_plat_native_x86_64_pg_maxphysaddr = (1UL << max_addr_bit) - 1;
+	if (max_physaddr)
+		*max_physaddr = (1UL << max_addr_bit) - 1;
 
 	return 0;
+}
+
+int uk_plat_native_paging_init(void)
+{
+	__paddr_t max_physaddr;
+	int rc;
+
+	rc = uk_plat_native_paging_init_cpu(&max_physaddr);
+	if (!rc)
+		uk_plat_native_x86_64_pg_maxphysaddr = max_physaddr;
+	return rc;
 }
