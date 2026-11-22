@@ -13,7 +13,7 @@ if LIBPOSIX_PROCESS_MULTITHREADING
 config LIBPOSIX_PROCESS_MAX_PID
 	int "Largest TID"
 	range 1 32767
-	default 31
+	default 1023
 
 config LIBPOSIX_PROCESS_CREATE_TEST
 	bool "Test process thread allocation rollback"
