@@ -38,8 +38,11 @@ UK_TESTCASE(vas_sched, deferred_backing_release)
 	struct uk_vas *kernel = uk_vas_get_kernel();
 	struct uk_paging_deferred_call calls[2];
 	struct uk_paging_free_batch batch;
+	struct uk_paging_free_batch *current;
+	struct uk_pagetable unrelated = { 0 };
 	struct deferred_release_probe probe = { .pt = kernel->pt };
 	__vaddr_t address = UK_PAGING_VADDR_ANY;
+	unsigned long irqf;
 	int rc;
 
 	rc = uk_vma_map_anon(kernel, &address, UK_PAGING_PAGE_SIZE,
@@ -50,14 +53,26 @@ UK_TESTCASE(vas_sched, deferred_backing_release)
 		return;
 	probe.address = address;
 
+	irqf = uk_lcpu_save_irqf();
+	UK_TEST_EXPECT_NULL(uk_paging_batch_current(kernel->pt));
 	uk_paging_batch_begin(&batch, kernel->pt);
+	UK_TEST_EXPECT_NULL(uk_paging_batch_current(&unrelated));
 	uk_paging_batch_defer(&batch, &calls[0], deferred_release, &probe);
-	uk_paging_batch_defer(&batch, &calls[1], deferred_release, &probe);
 	rc = uk_paging_page_set_attr(kernel->pt, address, 1,
 				     UK_PAGING_PAGE_ATTR_PROT_READ, 0);
 	UK_TEST_EXPECT_ZERO(rc);
 	UK_TEST_EXPECT_ZERO(probe.calls);
+	/* The inner operation has dropped its own binding, but the VAS batch
+	 * must still accept retirement of backend-owned backing afterwards.
+	 */
+	current = uk_paging_batch_current(kernel->pt);
+	UK_TEST_EXPECT_PTR_EQ(current, &batch);
+	if (current)
+		uk_paging_batch_defer(current, &calls[1],
+				      deferred_release, &probe);
 	uk_paging_batch_end(&batch);
+	UK_TEST_EXPECT_NULL(uk_paging_batch_current(kernel->pt));
+	uk_lcpu_restore_irqf(irqf);
 	UK_TEST_EXPECT_ZERO(probe.calls);
 	uk_paging_free_batch_finish(&batch);
 	UK_TEST_EXPECT_SNUM_EQ(probe.calls, 2);
