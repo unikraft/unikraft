@@ -15,6 +15,12 @@ config LIBPOSIX_PROCESS_MAX_PID
 	range 1 32767
 	default 31
 
+config LIBPOSIX_PROCESS_CREATE_TEST
+	bool "Test process thread allocation rollback"
+	depends on LIBPOSIX_PROCESS_SIGNAL && HAVE_SCHED
+	select LIBUKTEST
+	default n
+
 menuconfig LIBPOSIX_PROCESS_BRK
 	bool "brk() system call and sbrk() libc function"
 	select LIBUKALLOC
