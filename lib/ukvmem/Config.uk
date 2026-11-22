@@ -60,6 +60,14 @@ config LIBUKVMEM_COW_ALLOC_TEST
 	select LIBUKTEST
 	default n
 
+config LIBUKVMEM_FAULT_RESULT_TEST
+	bool "Test staged fault ownership results"
+	depends on LIBUKVMEM_THREAD_VAS && LIBUKPAGING_DIRECTMAP
+	select LIBUKVMEM_COW
+	select LIBUKVMEM_VAS_ACCESS
+	select LIBUKTEST
+	default n
+
 config LIBUKVMEM_TRACE_PAGEFAULTS
 	bool "Expose per-thread minor fault count for development measurements"
 	depends on ARCH_X86_64 && HAVE_SCHED && LIBPOSIX_PROCESS
