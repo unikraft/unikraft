@@ -109,9 +109,9 @@ static int uk_posix_clone_sighand(void *arg)
 	struct posix_thread *ct, *pt;
 
 	UK_ASSERT(event_data && event_data->cl_args && event_data->child);
-	ct = tid2pthread(ukthread2tid(event_data->child));
+	ct = uk_thread_uktls_var(event_data->child, pthread_self);
 	pt = event_data->parent ?
-		tid2pthread(ukthread2tid(event_data->parent)) : __NULL;
+		uk_thread_uktls_var(event_data->parent, pthread_self) : __NULL;
 	return pprocess_signal_clone(ct, pt, event_data->cl_args->flags);
 }
 #else /* !CONFIG_LIBPOSIX_PROCESS_SIGNAL */

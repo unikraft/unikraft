@@ -54,6 +54,7 @@ static int pprocess_brk_init(void *arg)
 {
 	struct posix_process_clone_event_data *event_data;
 	struct posix_process *pprocess;
+	struct posix_thread *pthread;
 	int rc;
 
 	UK_ASSERT(arg);
@@ -68,7 +69,9 @@ static int pprocess_brk_init(void *arg)
 	if (!(event_data->cl_args->flags & CLONE_VFORK))
 		return 0;
 
-	pprocess = pid2pprocess(event_data->pid);
+	pthread = uk_thread_uktls_var(event_data->child, pthread_self);
+	UK_ASSERT(pthread && pthread->process);
+	pprocess = pthread->process;
 
 	UK_ASSERT(!pprocess->brk_ctx.base);
 
