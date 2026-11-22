@@ -206,7 +206,6 @@ struct uk_signal_tdesc {
 	uk_sigset_t sigwait_set;
 	struct uk_signal_queue sigqueue;
 	struct uk_semaphore deliver_semaphore;
-	struct uk_semaphore pending_semaphore;
 };
 
 /* System error descriptor passed to handler */
@@ -298,8 +297,11 @@ int pprocess_signal_queue_locked(struct posix_process *proc,
 				 struct posix_thread *thread,
 				 struct uk_signal *sig, bool *queued);
 
-/* Get next pending signal of a given thread */
-struct uk_signal *pprocess_signal_next_pending_t(struct posix_thread *pthread);
+/* Consume a matching thread or process signal, or wait until deadline.
+ * A deadline of zero means no timeout.
+ */
+int pprocess_signal_wait_set(struct posix_thread *thread, uk_sigset_t set,
+			     __snsec deadline, siginfo_t *info);
 
 /* Signal a process (abstraction for kill / sigqueueinfo) */
 int pprocess_signal_process_do(pid_t pid, int signum, siginfo_t *siginfo);

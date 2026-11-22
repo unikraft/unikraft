@@ -51,6 +51,7 @@ enum posix_thread_state {
 	POSIX_THREAD_BLOCKED_VFORK,  /* waiting for child to call execve */
 	POSIX_THREAD_BLOCKED_WAIT,   /* waiting for process state change */
 	POSIX_THREAD_BLOCKED_SIGNAL, /* waiting for signal */
+	POSIX_THREAD_BLOCKED_SIGWAIT, /* waiting for a set of signals */
 	POSIX_THREAD_EXITED,         /* terminated normally */
 	POSIX_THREAD_KILLED,         /* terminated by signal */
 };
