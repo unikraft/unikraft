@@ -60,10 +60,6 @@ UK_LLSYSCALL_R_DEFINE(int, rt_sigaction, int, signum,
 	if (action.ks_flags & SA_NOCLDSTOP)
 		uk_pr_warn("ks_flags: SA_NOCLDSTOP not supported, ignoring\n");
 
-	if (action.ks_flags & SA_RESTART)
-		uk_pr_warn("ks_flags: SA_RESTART not supported, ignoring\n");
-
-
 	return 0;
 }
 #else /* !CONFIG_LIBPOSIX_PROCESS_SIGNAL */
