@@ -70,14 +70,6 @@
 	 (KERN_SIGACTION(_pproc, _signum)->ks_handler == SIG_DFL &&	\
 	  UK_BIT(_signum) & SIGACT_IGN_MASK))
 
-/* Allocate and return `struct uk_signal` or NULL */
-#define uk_signal_alloc(_alloc)						\
-	uk_zalloc(_alloc, sizeof(struct uk_signal))
-
-/* Free a previously allocated `struct uk_signal` */
-#define uk_signal_free(_alloc, _sig)					\
-	uk_free(_alloc, _sig)
-
 /* Helper to get pointer to kern_sigaction from process,
  * for a given signal
  */
@@ -126,7 +118,19 @@ struct uk_sigaction {
 struct uk_signal {
 	siginfo_t siginfo;
 	struct uk_list_head list_head;
+	struct uk_alloc *alloc;
 };
+
+static inline struct uk_signal *uk_signal_alloc(struct uk_alloc *alloc)
+{
+	struct uk_signal *sig = uk_zalloc(alloc, sizeof(*sig));
+
+	if (sig)
+		sig->alloc = alloc;
+	return sig;
+}
+
+#define uk_signal_free(_alloc, _sig) uk_free((_alloc), (_sig))
 
 /* Descriptor of a signal queue.
  *
@@ -284,6 +288,15 @@ void pprocess_signal_sigaction_clear(struct kern_sigaction *ks);
  * the queue.
  */
 void pprocess_signal_clear_pending(struct posix_process *proc, int signum);
+/* Caller holds pprocess_lock; detached nodes are freed after unlocking. */
+void pprocess_signal_clear_pending_locked(struct posix_process *proc,
+					  int signum,
+					  struct uk_list_head *discard);
+void pprocess_signal_free_list(struct uk_list_head *discard);
+/* No allocation/free: queued is false for a coalesced standard signal. */
+int pprocess_signal_queue_locked(struct posix_process *proc,
+				 struct posix_thread *thread,
+				 struct uk_signal *sig, bool *queued);
 
 /* Get next pending signal of a given thread */
 struct uk_signal *pprocess_signal_next_pending_t(struct posix_thread *pthread);

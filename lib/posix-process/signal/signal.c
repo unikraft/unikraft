@@ -35,53 +35,29 @@ static void signal_wake_waiter(struct posix_thread *thread, int signum)
  * targets the process. Success consumes sig, including coalesced signals;
  * on error the caller retains ownership.
  */
-static int pprocess_signal_enqueue(struct posix_process *pproc,
-				   struct posix_thread *pthread,
-				   struct uk_signal *sig)
+int pprocess_signal_queue_locked(struct posix_process *pproc,
+				 struct posix_thread *pthread,
+				 struct uk_signal *sig, bool *queued)
 {
-	unsigned long pflags;
-	bool queued = false;
+	struct uk_signal_queue *queue;
 	int signum;
 
-	UK_ASSERT(sig);
-	UK_ASSERT(pproc);
-
+	UK_ASSERT(sig && pproc && queued);
 	if (pthread)
 		UK_ASSERT(pthread->process == pproc);
-
+	*queued = false;
 	signum = sig->siginfo.si_signo;
-
-	pflags = pprocess_lock_acquire();
-	if (unlikely(pproc->signal->queued_count >= pproc->signal->queued_max)) {
-		pprocess_lock_release(pflags);
+	queue = pthread ? &pthread->signal->sigqueue : &pproc->signal->sigqueue;
+	/* Coalescing needs no capacity, even when real-time queues are full. */
+	if (signum < SIGRTMIN && IS_PENDING(*queue, signum))
+		goto notify;
+	if (unlikely(pproc->signal->queued_count >= pproc->signal->queued_max))
 		return -EAGAIN;
-	}
-
-	if (pthread) {
-		/* Standard signals can be queued once */
-		if (signum < SIGRTMIN &&
-		    IS_PENDING(pthread->signal->sigqueue, signum))
-			goto notify;
-
-		uk_list_add_tail(&sig->list_head,
-				 &pthread->signal->sigqueue.list_head[signum]);
-		__atomic_or_fetch(&pthread->signal->sigqueue.pending,
-				  (1UL << (signum - 1)), __ATOMIC_RELEASE);
-	} else {
-		/* Standard signals can be queued once */
-		if (signum < SIGRTMIN &&
-		    IS_PENDING(pproc->signal->sigqueue, signum))
-			goto notify;
-
-		uk_list_add_tail(&sig->list_head,
-				 &pproc->signal->sigqueue.list_head[signum]);
-		__atomic_or_fetch(&pproc->signal->sigqueue.pending,
-				  (1UL << (signum - 1)), __ATOMIC_RELEASE);
-	}
-
+	uk_list_add_tail(&sig->list_head, &queue->list_head[signum]);
+	__atomic_or_fetch(&queue->pending, (1UL << (signum - 1)),
+			  __ATOMIC_RELEASE);
 	pproc->signal->queued_count++;
-	queued = true;
-
+	*queued = true;
 notify:
 	/* Keep each waiter linked for the duration of its wakeup. */
 	if (pthread) {
@@ -92,11 +68,24 @@ notify:
 		uk_pprocess_foreach_pthread(pproc, thread, threadn)
 			signal_wake_waiter(thread, signum);
 	}
-	pprocess_lock_release(pflags);
-	if (!queued)
-		uk_signal_free(pthread ? pthread->_a : pproc->_a, sig);
-
 	return 0;
+}
+
+/* Success consumes sig, including a coalesced signal; error retains it. */
+static int pprocess_signal_enqueue(struct posix_process *pproc,
+				   struct posix_thread *pthread,
+				   struct uk_signal *sig)
+{
+	unsigned long flags;
+	bool queued;
+	int rc;
+
+	flags = pprocess_lock_acquire();
+	rc = pprocess_signal_queue_locked(pproc, pthread, sig, &queued);
+	pprocess_lock_release(flags);
+	if (!rc && !queued)
+		uk_signal_free(sig->alloc, sig);
+	return rc;
 }
 
 struct uk_signal *pprocess_signal_dequeue(struct posix_process *pproc,
@@ -160,22 +149,57 @@ struct uk_signal *pprocess_signal_next_pending_t(struct posix_thread *pthread)
 	return NULL;
 }
 
-void pprocess_signal_clear_pending(struct posix_process *proc, int signum)
+static void detach_pending_queue(struct posix_process *proc,
+				 struct uk_signal_queue *queue, int signum,
+				 struct uk_list_head *discard)
 {
-	struct posix_thread *thread, *threadn;
 	struct uk_signal *sig;
 
-	if (IS_PENDING(proc->signal->sigqueue, signum)) {
-		while ((sig = pprocess_signal_dequeue(proc, NULL, signum)))
-			uk_signal_free(proc->_a, sig);
+	while (!uk_list_empty(&queue->list_head[signum])) {
+		sig = uk_list_first_entry(&queue->list_head[signum],
+					  struct uk_signal, list_head);
+		uk_list_del(&sig->list_head);
+		uk_list_add_tail(&sig->list_head, discard);
+		UK_ASSERT(proc->signal->queued_count);
+		proc->signal->queued_count--;
 	}
+	__atomic_and_fetch(&queue->pending, ~(1UL << (signum - 1)),
+			   __ATOMIC_RELEASE);
+}
 
-	uk_pprocess_foreach_pthread(proc, thread, threadn) {
-		if (!IS_PENDING(thread->signal->sigqueue, signum))
-			continue;
-		while ((sig = pprocess_signal_dequeue(proc, thread, signum)))
-			uk_signal_free(thread->_a, sig);
+void pprocess_signal_clear_pending_locked(struct posix_process *proc,
+					  int signum,
+					  struct uk_list_head *discard)
+{
+	struct posix_thread *thread, *next;
+
+	detach_pending_queue(proc, &proc->signal->sigqueue, signum, discard);
+	uk_pprocess_foreach_pthread(proc, thread, next)
+		detach_pending_queue(proc, &thread->signal->sigqueue, signum,
+				     discard);
+}
+
+void pprocess_signal_free_list(struct uk_list_head *discard)
+{
+	struct uk_signal *sig;
+
+	while (!uk_list_empty(discard)) {
+		sig = uk_list_first_entry(discard, struct uk_signal, list_head);
+		uk_list_del(&sig->list_head);
+		uk_signal_free(sig->alloc, sig);
 	}
+}
+
+void pprocess_signal_clear_pending(struct posix_process *proc, int signum)
+{
+	struct uk_list_head discard;
+	unsigned long flags;
+
+	UK_INIT_LIST_HEAD(&discard);
+	flags = pprocess_lock_acquire();
+	pprocess_signal_clear_pending_locked(proc, signum, &discard);
+	pprocess_lock_release(flags);
+	pprocess_signal_free_list(&discard);
 }
 
 void pprocess_signal_sigaction_clear(struct kern_sigaction *ks)

@@ -169,7 +169,9 @@ static void do_deliver(struct posix_thread *pthread, struct uk_signal *sig,
 		       struct ukarch_execenv *execenv)
 {
 	struct posix_process *pproc;
+	struct kern_sigaction action;
 	uk_sigset_t saved_mask;
+	unsigned long flags;
 	int signum;
 
 	UK_ASSERT(sig && sig->siginfo.si_signo);
@@ -179,9 +181,17 @@ static void do_deliver(struct posix_thread *pthread, struct uk_signal *sig,
 	UK_ASSERT(pproc);
 
 	signum = sig->siginfo.si_signo;
+	flags = pprocess_lock_acquire();
+	action = *KERN_SIGACTION(pproc, signum);
+	if (action.ks_handler != SIG_DFL && action.ks_handler != SIG_IGN &&
+	    (action.ks_flags & SA_RESETHAND))
+		pprocess_signal_sigaction_clear(KERN_SIGACTION(pproc, signum));
+	pprocess_lock_release(flags);
+	if (action.ks_handler == SIG_IGN)
+		return;
 
 	/* Execute the default action if a signal handler is not defined */
-	if (KERN_SIGACTION(pproc, signum)->ks_handler == SIG_DFL) {
+	if (action.ks_handler == SIG_DFL) {
 		/* Standard signals: Invoke signal-specific default action */
 		if (signum < SIGRTMIN) {
 			if (UK_BIT(signum) & SIGACT_CORE_MASK)
@@ -205,22 +215,17 @@ static void do_deliver(struct posix_thread *pthread, struct uk_signal *sig,
 
 	/* Save original mask and apply mask from sigaction */
 	saved_mask = pthread->signal->mask;
-	uk_sigorset(&pthread->signal->mask,
-		    &KERN_SIGACTION(pproc, signum)->ks_mask);
+	uk_sigorset(&pthread->signal->mask, &action.ks_mask);
 
 	/* Also add this signal to masked signals */
-	if (!(KERN_SIGACTION(pproc, signum)->ks_flags & SA_NODEFER))
+	if (!(action.ks_flags & SA_NODEFER))
 		SET_MASKED(pthread, signum);
 
 	/* Execute handler */
-	handle_self(sig, KERN_SIGACTION(pproc, signum), execenv);
+	handle_self(sig, &action, execenv);
 
 	/* Restore original mask */
 	pthread->signal->mask = saved_mask;
-
-	/* If SA_RESETHAND flag is set, restore the default handler */
-	if (KERN_SIGACTION(pproc, signum)->ks_flags & SA_RESETHAND)
-		pprocess_signal_sigaction_clear(KERN_SIGACTION(pproc, signum));
 }
 
 /* Deliver pending signals of a given process. We deliver each
