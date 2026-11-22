@@ -41,6 +41,7 @@
 
 #include <uk/config.h>
 #include <stdio.h>
+#include <stdbool.h>
 #include <errno.h>
 #include <time.h>
 #include <inttypes.h>
@@ -66,6 +67,7 @@
  */
 struct uk_futex {
 	uint32_t *uaddr;
+	uint32_t bitset;
 	int woken;
 };
 
@@ -95,10 +97,11 @@ static void futex_guard_unlock(struct futex_guard *guard)
  * The external spinlock is released by waitq only after enqueue AND block,
  * and re-acquired before detaching the ticket.
  */
-static int futex_wait(uint32_t *uaddr, uint32_t val, const __nsec *timeout)
+static int futex_wait_bitset(uint32_t *uaddr, uint32_t val,
+			     const __nsec *timeout, uint32_t bitset)
 {
 	struct uk_thread *current = uk_thread_current();
-	struct uk_futex f = { .uaddr = uaddr, .woken = 0 };
+	struct uk_futex f = { .uaddr = uaddr, .bitset = bitset, .woken = 0 };
 	struct futex_guard guard;
 	__uptr previous_cookie;
 	int timedout;
@@ -130,8 +133,14 @@ static int futex_wait(uint32_t *uaddr, uint32_t val, const __nsec *timeout)
 	return result;
 }
 
+static int futex_wait(uint32_t *uaddr, uint32_t val, const __nsec *timeout)
+{
+	return futex_wait_bitset(uaddr, val, timeout, FUTEX_BITSET_MATCH_ANY);
+}
+
 struct futex_wake_request {
 	uint32_t *uaddr;
+	uint32_t bitset;
 	uint32_t remaining;
 	uint32_t count;
 };
@@ -144,6 +153,8 @@ static int futex_select_wake(struct uk_waitq_ticket *ticket,
 
 	if (!request->remaining || f->woken || f->uaddr != request->uaddr)
 		return 0;
+	if (!(f->bitset & request->bitset))
+		return 0;
 
 	f->woken = 1;
 	request->remaining--;
@@ -152,11 +163,15 @@ static int futex_select_wake(struct uk_waitq_ticket *ticket,
 }
 
 /* The address lock remains held across compare/wake/requeue transactions. */
-static int futex_wake_locked(uint32_t *uaddr, uint32_t val)
+static int futex_wake_bitset_locked(uint32_t *uaddr, uint32_t val,
+				    uint32_t bitset)
 {
 	struct uk_waitq_ticket *ticket;
 	struct futex_wake_request request = {
-		.uaddr = uaddr, .remaining = val, .count = 0
+		.uaddr = uaddr,
+		.bitset = bitset,
+		.remaining = val,
+		.count = 0,
 	};
 
 	if (!val)
@@ -167,15 +182,76 @@ static int futex_wake_locked(uint32_t *uaddr, uint32_t val)
 	return (int)request.count;
 }
 
-static int futex_wake(uint32_t *uaddr, uint32_t val)
+static int futex_wake_locked(uint32_t *uaddr, uint32_t val)
+{
+	return futex_wake_bitset_locked(uaddr, val, FUTEX_BITSET_MATCH_ANY);
+}
+
+static int futex_wake_bitset(uint32_t *uaddr, uint32_t val, uint32_t bitset)
 {
 	struct futex_guard guard;
 	int count;
 
 	futex_guard_lock(&guard);
-	count = futex_wake_locked(uaddr, val);
+	count = futex_wake_bitset_locked(uaddr, val, bitset);
 	futex_guard_unlock(&guard);
 	return count;
+}
+
+static int futex_wake(uint32_t *uaddr, uint32_t val)
+{
+	return futex_wake_bitset(uaddr, val, FUTEX_BITSET_MATCH_ANY);
+}
+
+static int futex_timeout_deadline(const struct timespec *timeout,
+				  bool abs_time,
+				  bool realtime_clock,
+				  __nsec *deadline_out)
+{
+	__nsec max_deadline = (__nsec)__SNSEC_MAX;
+	__nsec max_sec = max_deadline / (__nsec)UKARCH_NSEC_PER_SEC;
+	__nsec ts_ns, deadline;
+
+	if (timeout->tv_sec < 0 || timeout->tv_nsec < 0 ||
+	    timeout->tv_nsec >= UKARCH_NSEC_PER_SEC)
+		return -EINVAL;
+
+	if ((__nsec)timeout->tv_sec >= max_sec) {
+		ts_ns = max_deadline;
+	} else {
+		__nsec sec_ns = (__nsec)timeout->tv_sec *
+				(__nsec)UKARCH_NSEC_PER_SEC;
+		__nsec sub_ns = (__nsec)timeout->tv_nsec;
+
+		ts_ns = (sub_ns > max_deadline - sec_ns) ?
+			max_deadline : (sec_ns + sub_ns);
+	}
+
+	if (!abs_time) {
+		__nsec now_mono = ukplat_monotonic_clock();
+
+		deadline = (ts_ns > max_deadline - now_mono) ?
+			   max_deadline : (now_mono + ts_ns);
+	} else if (realtime_clock) {
+		__nsec now_real = ukplat_wall_clock();
+		__nsec now_mono = ukplat_monotonic_clock();
+
+		if (ts_ns <= now_real) {
+			deadline = 1;
+		} else {
+			__nsec delta = ts_ns - now_real;
+
+			deadline = (delta > max_deadline - now_mono) ?
+				   max_deadline : (now_mono + delta);
+		}
+	} else {
+		deadline = ts_ns;
+	}
+
+	if (deadline == 0)
+		deadline = 1;
+	*deadline_out = deadline;
+	return 0;
 }
 
 static int futex_cmp_requeue(uint32_t *uaddr, uint32_t val, uint32_t val2,
@@ -248,34 +324,38 @@ UK_LLSYSCALL_R_DEFINE(int, futex, uint32_t *, uaddr, int, futex_op,
 	 */
 	switch (cmd) {
 	case FUTEX_WAIT:
-		/*
-		 * `timeout` is relative to "now" (whenever that is). To
-		 * simplify the implementation regarding overflows, we will only
-		 * honor the nanosecond part of the timespec.
-		 */
-		if (timeout)
-			timeout_ns = ukplat_monotonic_clock() +
-				     ukarch_time_sec_to_nsec(timeout->tv_sec) +
-				     timeout->tv_nsec;
+		if (timeout) {
+			int rc = futex_timeout_deadline(
+				timeout, false,
+				!!(futex_op & FUTEX_CLOCK_REALTIME),
+				&timeout_ns);
+			if (rc < 0)
+				return rc;
+		}
 		return futex_wait(uaddr, val, timeout ? &timeout_ns : NULL);
 
 	case FUTEX_WAIT_BITSET:
-		/*
-		 * Special case implementation for cases where the val3/mask has
-		 * all bits set. Some applications do this to use the absolute
-		 * timeout mode. We return ENOSYS for all non-supported calls.
-		 */
-		if (val3 != UINT32_MAX)
-			return -ENOSYS;
+		if (val3 == 0)
+			return -EINVAL;
 
-		if (timeout)
-			timeout_ns = ukarch_time_sec_to_nsec(timeout->tv_sec)
-				     + timeout->tv_nsec;
-
-		return futex_wait(uaddr, val, timeout ? &timeout_ns : NULL);
+		if (timeout) {
+			int rc = futex_timeout_deadline(
+				timeout, true,
+				!!(futex_op & FUTEX_CLOCK_REALTIME),
+				&timeout_ns);
+			if (rc < 0)
+				return rc;
+		}
+		return futex_wait_bitset(uaddr, val,
+					 timeout ? &timeout_ns : NULL, val3);
 
 	case FUTEX_WAKE:
 		return futex_wake(uaddr, val);
+
+	case FUTEX_WAKE_BITSET:
+		if (val3 == 0)
+			return -EINVAL;
+		return futex_wake_bitset(uaddr, val, val3);
 
 	case FUTEX_FD:
 	case FUTEX_REQUEUE:
