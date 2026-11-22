@@ -24,3 +24,5 @@ LIBUKVMEM_SRCS-y += $(LIBUKVMEM_BASE)/tests/test_vmem.c
 endif
 
 LIBUKVMEM_SRCS-$(CONFIG_LIBUKVMEM_SYNC_TEST) += $(LIBUKVMEM_BASE)/tests/test_vma_sync.c
+LIBUKVMEM_SRCS-$(CONFIG_LIBUKVMEM_NESTED_FAULT_TEST) += \
+	$(LIBUKVMEM_BASE)/tests/test_nested_fault.c|isr
