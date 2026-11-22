@@ -112,6 +112,7 @@ struct posix_thread {
 	struct uk_signal_tdesc *signal;
 #endif /* CONFIG_LIBPOSIX_PROCESS_SIGNAL */
 	pid_t wait_pid;
+	pid_t wait_pgid;
 
 	/* TODO: Mutex */
 };

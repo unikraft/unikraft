@@ -33,19 +33,6 @@ struct posix_process *pprocess_state_changed(struct posix_process *pproc,
 	return (PPROCESS_STATE_CHANGED(pproc, state)) ? pproc : NULL;
 }
 
-static inline
-struct posix_process *pprocess_waitable_child(struct posix_process *parent,
-					      int state)
-{
-	struct posix_process *pchild, *pchildn;
-	struct posix_process *pproc;
-
-	uk_pprocess_foreach_child(parent, pchild, pchildn)
-		if ((pproc = pprocess_state_changed(pchild, state)))
-			return pproc;
-	return NULL;
-}
-
 static void pprocess_reap(struct posix_process *pprocess)
 {
 	UK_ASSERT(pprocess);
@@ -57,15 +44,17 @@ static void pprocess_reap(struct posix_process *pprocess)
 /* Wait helper
  *
  * @param pid: child pid to wait for or -1 for any
+ * @param pgid: restrict any-child selection to this group, or zero
  * @param opt: same as waitid()
  * @return child pid, zero if no waitable, negative value on error
  */
-static int pprocess_wait(pid_t pid, siginfo_t *si, int opt)
+static int pprocess_wait(pid_t pid, pid_t pgid, siginfo_t *si, int opt)
 {
 	struct posix_process *this_process;
 	struct posix_thread *this_thread;
 	struct posix_process *waitable = NULL;
-	struct posix_process *child, *reap = NULL;
+	struct posix_process *child, *next, *reap = NULL;
+	bool matched;
 	unsigned long flags;
 	int ret;
 
@@ -81,6 +70,7 @@ static int pprocess_wait(pid_t pid, siginfo_t *si, int opt)
 	for (;;) {
 		flags = pprocess_lock_acquire();
 		this_thread->wait_pid = pid;
+		this_thread->wait_pgid = pgid;
 		this_thread->state = POSIX_THREAD_BLOCKED_WAIT;
 		if (uk_list_empty(&this_process->children)) {
 			ret = -ECHILD;
@@ -88,13 +78,28 @@ static int pprocess_wait(pid_t pid, siginfo_t *si, int opt)
 		}
 		if (pid > 0) {
 			child = pid2pprocess(pid);
-			if (!child || child->parent != this_process) {
+			if (!child || child->parent != this_process ||
+			    child->reap_claimed) {
 				ret = -ECHILD;
 				goto out;
 			}
 			waitable = pprocess_state_changed(child, opt);
 		} else {
-			waitable = pprocess_waitable_child(this_process, opt);
+			matched = false;
+			waitable = NULL;
+			uk_pprocess_foreach_child(this_process, child, next) {
+				if (child->reap_claimed ||
+				    (pgid && child->pgid != pgid))
+					continue;
+				matched = true;
+				waitable = pprocess_state_changed(child, opt);
+				if (waitable)
+					break;
+			}
+			if (!matched) {
+				ret = -ECHILD;
+				goto out;
+			}
 		}
 
 		if (waitable) {
@@ -127,21 +132,33 @@ out:
 	return ret;
 }
 
+/* Capture PID-zero group selection once, before the first blocking wait. */
+static pid_t current_group(void)
+{
+	unsigned long flags = pprocess_lock_acquire();
+	pid_t pgid = uk_pthread_current()->process->pgid;
+
+	pprocess_lock_release(flags);
+	return pgid;
+}
+
 UK_SYSCALL_R_DEFINE(pid_t, wait4, pid_t, pid,
 		    int *, wstatus, int, options,
 		    struct rusage *, rusage)
 {
 	siginfo_t si;
+	pid_t pgid = 0;
 	int ret;
 
-	if (options)
-		if (unlikely(!(options & (WNOHANG | WUNTRACED | WCONTINUED))))
-			return -EINVAL;
-
-	if (pid < -1 || pid == 0) /* process groups */
-		return -ENOTSUP;
-
-	ret = pprocess_wait(pid, &si, options | WEXITED);
+	if (options & ~(WNOHANG | WUNTRACED | WCONTINUED))
+		return -EINVAL;
+	if (pid < -CONFIG_LIBPOSIX_PROCESS_MAX_PID)
+		return -ECHILD;
+	if (pid <= 0 && pid != -1) {
+		pgid = pid ? -pid : current_group();
+		pid = -1;
+	}
+	ret = pprocess_wait(pid, pgid, &si, options | WEXITED);
 
 	if (ret > 0 && wstatus) {
 		if (si.si_code == CLD_KILLED)
@@ -170,13 +187,18 @@ UK_LLSYSCALL_R_DEFINE(int, waitid, idtype_t, idtype, id_t, id,
 	case P_PID:
 		if ((pid_t)id <= 0)
 			return -EINVAL;
-		ret = pprocess_wait(id, &si, options);
+		ret = pprocess_wait(id, 0, &si, options);
+		break;
+	case P_PGID:
+		if ((pid_t)id < 0)
+			return -EINVAL;
+		ret = pprocess_wait(-1, id ? (pid_t)id : current_group(),
+				    &si, options);
 		break;
 	case P_PIDFD:
-	case P_PGID:
 		return -ENOTSUP;
 	case P_ALL:
-		ret = pprocess_wait(-1, &si, options);
+		ret = pprocess_wait(-1, 0, &si, options);
 		break;
 	default:
 		return -EINVAL;

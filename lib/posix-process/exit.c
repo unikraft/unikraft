@@ -22,13 +22,17 @@
 
 #include "process.h"
 
-#define PTHREAD_WAITING_FOR_PID(_pt, _pid)				\
-	((_pt)->state == POSIX_THREAD_BLOCKED_WAIT &&			\
-	 ((_pt)->wait_pid == (_pid) || (_pt)->wait_pid == -1))
-
 int pprocess_exit_status = PPROCESS_EXIT_STATUS_UNSET;
 
 #if CONFIG_LIBPOSIX_PROCESS_MULTITHREADING
+
+static bool pthread_waiting_for_child(const struct posix_thread *thread,
+				      const struct posix_process *child)
+{
+	return thread->state == POSIX_THREAD_BLOCKED_WAIT &&
+		(thread->wait_pid == child->pid || thread->wait_pid == -1) &&
+		(!thread->wait_pgid || thread->wait_pgid == child->pgid);
+}
 
 /* pprocess exit state to pthread exit state */
 #define PP2PT_EXIT_STATE(_pp_state)					\
@@ -146,7 +150,7 @@ static int prepare_child_notice_locked(struct posix_process *child,
 #endif
 	/* Also wake auto-reap waiters so they can observe ECHILD. */
 	uk_pprocess_foreach_pthread(parent, thread, next) {
-		if (PTHREAD_WAITING_FOR_PID(thread, child->pid))
+		if (pthread_waiting_for_child(thread, child))
 			uk_semaphore_up(&thread->wait_semaphore);
 	}
 	return rc;

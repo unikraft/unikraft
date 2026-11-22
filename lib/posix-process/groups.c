@@ -34,6 +34,14 @@ static void group_change_locked(struct posix_process *process, pid_t pgid)
 	pprocess_id_get_locked(pgid);
 	pprocess_id_put_locked(process->pgid);
 	process->pgid = pgid;
+	if (process->parent) {
+		struct posix_thread *thread, *next;
+
+		/* A blocked group wait may now have no matching children. */
+		uk_pprocess_foreach_pthread(process->parent, thread, next)
+			if (thread->state == POSIX_THREAD_BLOCKED_WAIT)
+				uk_semaphore_up(&thread->wait_semaphore);
+	}
 }
 
 static pid_t process_identity(pid_t pid, bool session)
