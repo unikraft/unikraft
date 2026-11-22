@@ -213,6 +213,11 @@ int uk_clone(struct clone_args *cl_args, size_t cl_args_len,
 	}
 #endif /* !CONFIG_LIBPOSIX_PROCESS_MULTIPROCESS */
 
+#if CONFIG_LIBPOSIX_PROCESS_FORK
+	if (!(flags & CLONE_VM))
+		return pprocess_fork(cl_args, cl_args_len, execenv);
+#endif
+
 	if (unlikely(!(flags & CLONE_VM))) {
 		uk_pr_err("CLONE_VM not set: Multiple address spaces are not supported\n");
 		return -ENOTSUP;

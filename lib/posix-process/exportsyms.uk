@@ -45,6 +45,7 @@ brk
 sbrk
 clone
 vfork
+fork
 kill
 pause
 sigaddset

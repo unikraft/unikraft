@@ -95,6 +95,19 @@ config LIBPOSIX_PROCESS_MULTIPROCESS
 	select LIBUKLOCK
 	select LIBUKLOCK_SEMAPHORE
 
+config LIBPOSIX_PROCESS_FORK
+	bool "Fork native ELF processes using copy-on-write"
+	depends on ARCH_X86_64 && LIBPOSIX_PROCESS_MULTIPROCESS
+	depends on LIBUKPLAT_NATIVE_PAGING && LIBUKVMEM_THREAD_VAS
+	depends on LIBUKPAGING_DIRECTMAP && LIBPOSIX_FUTEX && LIBSYSCALL_SHIM
+	select LIBPOSIX_PROCESS_PREPARE
+	select LIBPOSIX_FUTEX_VAS
+	default n
+	help
+	  Duplicate a private ELF process address space and resume only its
+	  calling thread in the child. Kernel threads and unsupported clone
+	  flags or mapping classes fail before child publication.
+
 config LIBPOSIX_PROCESS_PREPARE
 	bool
 	depends on LIBPOSIX_PROCESS_MULTIPROCESS
