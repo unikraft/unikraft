@@ -21,7 +21,7 @@
 
 #if CONFIG_LIBUKCONSOLE
 #include <uk/console.h>
-#include <errno.h>
+#include <uk/spinlock.h>
 #endif /* CONFIG_LIBUKCONSOLE */
 
 #include "print.h"
@@ -69,135 +69,67 @@ unsigned int uk_print_console_lvl = UK_PRINT_KLVL_MAX;
 
 #define BUFLEN 192
 
-typedef __ssz (*cout_func)(const char *buf, __sz len);
+#define LINEBUF_LEN (3 * BUFLEN)
 
 struct vprint_console {
-	cout_func cout;
+	struct uk_spinlock lock;
 	int newline;
 	int prevlvl;
 };
 
-#if CONFIG_LIBUKCONSOLE
+struct vprint_line {
+	char buf[LINEBUF_LEN];
+	__sz len;
+};
+
+static struct vprint_console kconsole = {
+	.lock = UK_SPINLOCK_INITIALIZER(),
+	.newline = 1,
+	.prevlvl = INT_MIN,
+};
+
+static struct vprint_console kconsole_isr = {
+	.lock = UK_SPINLOCK_INITIALIZER(),
+	.newline = 1,
+	.prevlvl = INT_MIN,
+};
+
+static __isr void vprint_append(struct vprint_line *line, const char *buf, __sz len)
+{
+	/* Always leave room for a complete line ending. */
+	len = MIN(len, sizeof(line->buf) - line->len - 2);
+	memcpy_isr(line->buf + line->len, buf, len);
+	line->len += len;
+}
+
+static __isr void vprint_end_line(struct vprint_line *line)
+{
 #if !CONFIG_LIBUKPRINT_NOCARRIAGERETURN
-/* TODO: Some consoles require both a newline and a carriage return to
- * go to the start of the next line. This kind of behavior should be in
- * a single place in posix-tty. We keep this workaround until we have feature
- * in posix-tty that handles newline characters correctly.
- */
-static __ssz console_out(const char *buf, __sz len)
-{
-	const char *next_nl = __NULL;
-	__sz l = len;
-	__sz off = 0;
-	__ssz rc = 0;
-
-	if (unlikely(!len))
-		return 0;
-	if (unlikely(!buf))
-		return -EINVAL;
-
-	while (l > 0) {
-		next_nl = memchr(buf, '\n', l);
-		if (next_nl) {
-			off = next_nl - buf;
-			if ((rc = uk_console_out(buf, off)) < 0)
-				return rc;
-			if ((rc = uk_console_out("\r\n", 2)) < 0)
-				return rc;
-			buf = next_nl + 1;
-			l -= off + 1;
-		} else {
-			if ((rc = uk_console_out(buf, l)) < 0)
-				return rc;
-			break;
-		}
-	}
-
-	return len;
+	line->buf[line->len++] = '\r';
+#endif
+	line->buf[line->len++] = '\n';
 }
 
-__isr static __ssz console_out_isr(const char *buf, __sz len)
+static void vprint_flush(struct vprint_line *line, __bool newline)
 {
-	const char *next_nl = __NULL;
-	__sz l = len;
-	__sz off = 0;
-	__ssz rc = 0;
-
-	if (unlikely(!len))
-		return 0;
-	if (unlikely(!buf))
-		return -EINVAL;
-
-	while (l > 0) {
-		next_nl = memchr_isr(buf, '\n', l);
-		if (next_nl) {
-			off = next_nl - buf;
-			if ((rc = uk_console_emerg_out(buf, off)) < 0)
-				return rc;
-			if ((rc = uk_console_emerg_out("\r\n", 2)) < 0)
-				return rc;
-			buf = next_nl + 1;
-			l -= off + 1;
-		} else {
-			if ((rc = uk_console_emerg_out(buf, l)) < 0)
-				return rc;
-			break;
-		}
-	}
-
-	return len;
-}
-#else /* CONFIG_LIBUKPRINT_NOCARRIAGERETURN */
-static __ssz console_out(const char *buf, __sz len)
-{
-	return uk_console_out(buf, len);
+	if (newline)
+		vprint_end_line(line);
+	if (line->len)
+		uk_console_out(line->buf, line->len);
+	line->len = 0;
 }
 
-__isr static __ssz console_out_isr(const char *buf, __sz len)
+static __isr void vprint_flush_isr(struct vprint_line *line, __bool newline)
 {
-	return uk_console_emerg_out(buf, len);
-}
-#endif /* CONFIG_LIBUKPRINT_NOCARRIAGERETURN */
-#endif /* CONFIG_LIBUKCONSOLE */
-
-/* Console state for kernel output */
-static struct vprint_console kconsole  = {
-#if CONFIG_LIBUKCONSOLE
-	.cout = console_out,
-#else /* !CONFIG_LIBUKCONSOLE */
-	.cout = __NULL,
-#endif /* !CONFIG_LIBUKCONSOLE */
-	.newline = 1,
-	.prevlvl = INT_MIN
-};
-
-/* Console state for interrupt-safe kernel output */
-static struct vprint_console kconsole_isr  = {
-#if CONFIG_LIBUKCONSOLE
-	.cout = console_out_isr,
-#else /* !CONFIG_LIBUKCONSOLE */
-	.cout = __NULL,
-#endif /* !CONFIG_LIBUKCONSOLE */
-	.newline = 1,
-	.prevlvl = INT_MIN
-};
-
-static inline void vprint_cout(struct vprint_console *cons,
-			       const char *buf, __sz len)
-{
-	if (cons->cout)
-		cons->cout(buf, len);
-}
-
-__isr static inline void vprint_cout_isr(struct vprint_console *cons,
-					 const char *buf, __sz len)
-{
-	if (cons->cout)
-		cons->cout(buf, len);
+	if (newline)
+		vprint_end_line(line);
+	if (line->len)
+		uk_console_emerg_out(line->buf, line->len);
+	line->len = 0;
 }
 
 #if CONFIG_LIBUKPRINT_PRINT_TIME
-static void print_timestamp(struct vprint_console *cons)
+static void print_timestamp(struct vprint_line *line)
 {
 	char buf[BUFLEN];
 	int len;
@@ -209,10 +141,10 @@ static void print_timestamp(struct vprint_console *cons)
 	len = uk_snprintf(buf, BUFLEN, LVLC_RESET LVLC_TS
 			  "[%5" __PRInsec ".%06" __PRInsec "] ",
 			  sec, rem_usec);
-	vprint_cout(cons, (char *)buf, len);
+	vprint_append(line, buf, len > 0 ? (__sz)MIN(len, BUFLEN - 1) : 0);
 }
 
-__isr static void print_timestamp_isr(struct vprint_console *cons)
+__isr static void print_timestamp_isr(struct vprint_line *line)
 {
 	char buf[BUFLEN];
 	int len;
@@ -228,12 +160,12 @@ __isr static void print_timestamp_isr(struct vprint_console *cons)
 	len = uk_snprintf_isr(buf, BUFLEN, LVLC_RESET LVLC_TS
 			      "[%5" __PRInsec ".%06" __PRInsec "] ",
 			      sec, rem_usec);
-	vprint_cout_isr(cons, (char *)buf, len);
+	vprint_append(line, buf, len > 0 ? (__sz)MIN(len, BUFLEN - 1) : 0);
 }
 #endif /* CONFIG_LIBUKPRINT_PRINT_TIME */
 
 #if CONFIG_LIBUKPRINT_PRINT_THREAD
-static void print_thread(struct vprint_console *cons)
+static void print_thread(struct vprint_line *line)
 {
 	struct uk_thread *t = uk_thread_current();
 	char buf[BUFLEN];
@@ -251,10 +183,10 @@ static void print_thread(struct vprint_console *cons)
 		len = uk_snprintf(buf, BUFLEN, LVLC_RESET LVLC_THREAD
 				  "<<n/a>> ");
 	}
-	vprint_cout(cons, (char *)buf, len);
+	vprint_append(line, buf, len > 0 ? (__sz)MIN(len, BUFLEN - 1) : 0);
 }
 
-__isr static void print_thread_isr(struct vprint_console *cons)
+__isr static void print_thread_isr(struct vprint_line *line)
 {
 	struct uk_thread *t;
 	char buf[BUFLEN];
@@ -277,22 +209,22 @@ __isr static void print_thread_isr(struct vprint_console *cons)
 		len = uk_snprintf_isr(buf, BUFLEN, LVLC_RESET LVLC_THREAD
 				      "<<n/a>> ");
 	}
-	vprint_cout_isr(cons, (char *)buf, len);
+	vprint_append(line, buf, len > 0 ? (__sz)MIN(len, BUFLEN - 1) : 0);
 }
 #endif /* CONFIG_LIBUKPRINT_PRINT_THREAD */
 
 #if CONFIG_LIBUKPRINT_PRINT_CALLER
-static void print_caller(struct vprint_console *cons, __uptr ra, __uptr fa)
+static void print_caller(struct vprint_line *line, __uptr ra, __uptr fa)
 {
 	char buf[BUFLEN];
 	int len;
 
 	len = uk_snprintf(buf, BUFLEN, LVLC_RESET LVLC_CALLER
 			  "{r:%p,f:%p} ", (void *)ra, (void *)fa);
-	vprint_cout(cons, (char *)buf, len);
+	vprint_append(line, buf, len > 0 ? (__sz)MIN(len, BUFLEN - 1) : 0);
 }
 
-__isr static void print_caller_isr(struct vprint_console *cons, __uptr ra,
+__isr static void print_caller_isr(struct vprint_line *line, __uptr ra,
 				   __uptr fa)
 {
 	char buf[BUFLEN];
@@ -300,13 +232,15 @@ __isr static void print_caller_isr(struct vprint_console *cons, __uptr ra,
 
 	len = uk_snprintf_isr(buf, BUFLEN, LVLC_RESET LVLC_CALLER
 			      "{r:%p,f:%p} ", (void *)ra, (void *)fa);
-	vprint_cout_isr(cons, (char *)buf, len);
+	vprint_append(line, buf, len > 0 ? (__sz)MIN(len, BUFLEN - 1) : 0);
 }
 #endif /* CONFIG_LIBUKPRINT_PRINT_CALLER */
 
 void uk_print_console_write(struct uk_print_msg *msg)
 {
 	char lbuf[BUFLEN];
+	struct vprint_line line;
+	unsigned long flags;
 	int len, llen;
 	const char *msghdr = __NULL;
 	const char *lptr = __NULL;
@@ -346,55 +280,56 @@ void uk_print_console_write(struct uk_print_msg *msg)
 		break;
 	}
 
+	len = uk_vsnprintf(lbuf, BUFLEN, msg->fmt, msg->ap);
+	len = MIN(len, BUFLEN - 1);
+	line.len = 0;
+	uk_spin_lock_irqsave(&cons->lock, flags);
+
 	if (lvl != cons->prevlvl) {
 		/* level changed from previous call */
 		if (cons->prevlvl != INT_MIN && !cons->newline) {
 			/* level changed without closing with '\n',
 			 * enforce printing '\n', before the new message header
 			 */
-			vprint_cout(cons, "\n", 1);
+			vprint_flush(&line, __true);
 		}
 		cons->prevlvl = lvl;
 		cons->newline = 1; /* enforce printing the message header */
 	}
 
-	len = uk_vsnprintf(lbuf, BUFLEN, msg->fmt, msg->ap);
 	lptr = lbuf;
 	while (len > 0) {
 		if (cons->newline && !raw) {
 #if CONFIG_LIBUKPRINT_PRINT_TIME
-			print_timestamp(cons);
+			print_timestamp(&line);
 #endif /* CONFIG_LIBUKPRINT_PRINT_TIME */
-			vprint_cout(cons, DECONST(char *, msghdr),
-				    strlen(msghdr));
+			vprint_append(&line, msghdr, strlen(msghdr));
 #if CONFIG_LIBUKPRINT_PRINT_THREAD
-			print_thread(cons);
+			print_thread(&line);
 #endif /* CONFIG_LIBUKPRINT_PRINT_THREAD */
 #if CONFIG_LIBUKPRINT_PRINT_CALLER
-			print_caller(cons, msg->retaddr, msg->frameaddr);
+			print_caller(&line, msg->retaddr, msg->frameaddr);
 #endif /* CONFIG_LIBUKPRINT_PRINT_CALLER */
 			if (libname) {
-				vprint_cout(cons, LVLC_RESET LVLC_LIBNAME "[",
+				vprint_append(&line, LVLC_RESET LVLC_LIBNAME "[",
 					sizeof(LVLC_RESET LVLC_LIBNAME "[")
 						- 1);
-				vprint_cout(cons, DECONST(char *, libname),
-					    strlen(libname));
-				vprint_cout(cons, "] ", 2);
+				vprint_append(&line, libname, strlen(libname));
+				vprint_append(&line, "] ", 2);
 			}
 #if CONFIG_LIBUKPRINT_PRINT_SRCNAME
 			if (msg->srcname) {
-				char lnobuf[6];
+				char lnobuf[11];
 
-				vprint_cout(cons, LVLC_RESET LVLC_SRCNAME "<",
+				vprint_append(&line, LVLC_RESET LVLC_SRCNAME "<",
 					sizeof(LVLC_RESET LVLC_SRCNAME "<")
 						- 1);
-				vprint_cout(cons, DECONST(char *, msg->srcname),
-					    strlen(msg->srcname));
-				vprint_cout(cons, " @ ", 3);
-				vprint_cout(cons, lnobuf,
+				vprint_append(&line, msg->srcname, strlen(msg->srcname));
+				vprint_append(&line, " @ ", 3);
+				vprint_append(&line, lnobuf,
 					    uk_snprintf(lnobuf, sizeof(lnobuf),
 							"%4u", msg->srcline));
-				vprint_cout(cons, "> ", 2);
+				vprint_append(&line, "> ", 2);
 			}
 #endif /* CONFIG_LIBUKPRINT_PRINT_SRCNAME */
 			cons->newline = 0;
@@ -411,34 +346,38 @@ void uk_print_console_write(struct uk_print_msg *msg)
 		/* Message body */
 		switch (lvl) {
 		case UK_PRINT_KLVL_CRIT:
-			vprint_cout(cons, LVLC_RESET LVLC_CRIT_MSG,
+			vprint_append(&line, LVLC_RESET LVLC_CRIT_MSG,
 				    sizeof(LVLC_RESET LVLC_CRIT_MSG) - 1);
 			break;
 		case UK_PRINT_KLVL_ERR:
-			vprint_cout(cons, LVLC_RESET LVLC_ERROR_MSG,
+			vprint_append(&line, LVLC_RESET LVLC_ERROR_MSG,
 				    sizeof(LVLC_RESET LVLC_ERROR_MSG) - 1);
 			break;
 		default:
-			vprint_cout(cons, LVLC_RESET, sizeof(LVLC_RESET) - 1);
+			vprint_append(&line, LVLC_RESET, sizeof(LVLC_RESET) - 1);
 		}
 		/* Write the reset before the trailing '\n' so consoles that
 		 * flush on newline (e.g. Xen vpl011) keep the reset on the
 		 * same line and colors do not bleed to the next line.
 		 * Order: body -> reset -> '\n'.
 		 */
-		vprint_cout(cons, (char *)lptr, nlptr ? llen - 1 : llen);
-		vprint_cout(cons, LVLC_RESET, sizeof(LVLC_RESET) - 1);
+		vprint_append(&line, lptr, nlptr ? llen - 1 : llen);
+		vprint_append(&line, LVLC_RESET, sizeof(LVLC_RESET) - 1);
 		if (nlptr)
-			vprint_cout(cons, "\n", 1);
+			vprint_flush(&line, __true);
 
 		len -= llen;
 		lptr = nlptr ? nlptr + 1 : lptr + llen;
 	}
+	vprint_flush(&line, __false);
+	uk_spin_unlock_irqrestore(&cons->lock, flags);
 }
 
 __isr void uk_print_console_write_isr(struct uk_print_msg *msg)
 {
 	char lbuf[BUFLEN];
+	struct vprint_line line;
+	unsigned long flags;
 	int len, llen;
 	const char *msghdr = __NULL;
 	const char *lptr = __NULL;
@@ -478,61 +417,61 @@ __isr void uk_print_console_write_isr(struct uk_print_msg *msg)
 		break;
 	}
 
+	len = uk_vsnprintf_isr(lbuf, BUFLEN, msg->fmt,
+			       msg->ap);
+	len = MIN(len, BUFLEN - 1);
+	line.len = 0;
+	uk_spin_lock_irqsave(&cons->lock, flags);
+
 	if (lvl != cons->prevlvl) {
 		/* level changed from previous call */
 		if (cons->prevlvl != INT_MIN && !cons->newline) {
 			/* level changed without closing with '\n',
 			 * enforce printing '\n', before the new message header
 			 */
-			vprint_cout_isr(cons, "\n", 1);
+			vprint_flush_isr(&line, __true);
 		}
 		cons->prevlvl = lvl;
 		cons->newline = 1; /* enforce printing the message header */
 	}
 
-	len = uk_vsnprintf_isr(lbuf, BUFLEN, msg->fmt,
-			       msg->ap);
 	lptr = lbuf;
 	while (len > 0) {
 		if (cons->newline && !raw) {
 #if CONFIG_LIBUKPRINT_PRINT_TIME
-			print_timestamp_isr(cons);
+			print_timestamp_isr(&line);
 #endif /* CONFIG_LIBUKPRINT_PRINT_TIME */
-			vprint_cout_isr(cons, DECONST(char *, msghdr),
-					strlen_isr(msghdr));
+			vprint_append(&line, msghdr, strlen_isr(msghdr));
 #if CONFIG_LIBUKPRINT_PRINT_THREAD
-			print_thread_isr(cons);
+			print_thread_isr(&line);
 #endif /* CONFIG_LIBUKPRINT_PRINT_THREAD */
 #if CONFIG_LIBUKPRINT_PRINT_CALLER
-			print_caller_isr(cons, msg->retaddr, msg->frameaddr);
+			print_caller_isr(&line, msg->retaddr, msg->frameaddr);
 #endif /* CONFIG_LIBUKPRINT_PRINT_CALLER */
 			if (libname) {
-				vprint_cout_isr(cons,
+				vprint_append(&line,
 						LVLC_RESET LVLC_LIBNAME "[",
 						sizeof(LVLC_RESET
 						       LVLC_LIBNAME "[") - 1);
-				vprint_cout_isr(cons, DECONST(char *, libname),
-						strlen_isr(libname));
-				vprint_cout_isr(cons, "] ", 2);
+				vprint_append(&line, libname, strlen_isr(libname));
+				vprint_append(&line, "] ", 2);
 			}
 #if CONFIG_LIBUKPRINT_PRINT_SRCNAME
 			if (msg->srcname) {
-				char lnobuf[6];
+				char lnobuf[11];
 
-				vprint_cout_isr(cons,
+				vprint_append(&line,
 						LVLC_RESET LVLC_SRCNAME "<",
 						sizeof(LVLC_RESET
 						       LVLC_SRCNAME "<") - 1);
-				vprint_cout_isr(cons,
-						DECONST(char *, msg->srcname),
-						strlen_isr(msg->srcname));
-				vprint_cout_isr(cons, " @ ", 3);
-				vprint_cout_isr(cons, lnobuf,
+				vprint_append(&line, msg->srcname, strlen_isr(msg->srcname));
+				vprint_append(&line, " @ ", 3);
+				vprint_append(&line, lnobuf,
 						uk_snprintf_isr(lnobuf,
 								sizeof(lnobuf),
 								"%4u",
 								msg->srcline));
-				vprint_cout_isr(cons, "> ", 2);
+				vprint_append(&line, "> ", 2);
 			}
 #endif /* CONFIG_LIBUKPRINT_PRINT_SRCNAME */
 			cons->newline = 0;
@@ -549,24 +488,26 @@ __isr void uk_print_console_write_isr(struct uk_print_msg *msg)
 		/* Message body */
 		switch (lvl) {
 		case UK_PRINT_KLVL_CRIT:
-			vprint_cout_isr(cons, LVLC_RESET LVLC_CRIT_MSG,
+			vprint_append(&line, LVLC_RESET LVLC_CRIT_MSG,
 					sizeof(LVLC_RESET LVLC_CRIT_MSG) - 1);
 			break;
 		case UK_PRINT_KLVL_ERR:
-			vprint_cout_isr(cons, LVLC_RESET LVLC_ERROR_MSG,
+			vprint_append(&line, LVLC_RESET LVLC_ERROR_MSG,
 					sizeof(LVLC_RESET LVLC_ERROR_MSG) - 1);
 			break;
 		default:
-			vprint_cout_isr(cons, LVLC_RESET,
+			vprint_append(&line, LVLC_RESET,
 					sizeof(LVLC_RESET) - 1);
 		}
 		/* Write the reset before the trailing '\n' (see non-ISR). */
-		vprint_cout_isr(cons, (char *)lptr, nlptr ? llen - 1 : llen);
-		vprint_cout_isr(cons, LVLC_RESET, sizeof(LVLC_RESET) - 1);
+		vprint_append(&line, lptr, nlptr ? llen - 1 : llen);
+		vprint_append(&line, LVLC_RESET, sizeof(LVLC_RESET) - 1);
 		if (nlptr)
-			vprint_cout_isr(cons, "\n", 1);
+			vprint_flush_isr(&line, __true);
 
 		len -= llen;
 		lptr = nlptr ? nlptr + 1 : lptr + llen;
 	}
+	vprint_flush_isr(&line, __false);
+	uk_spin_unlock_irqrestore(&cons->lock, flags);
 }
