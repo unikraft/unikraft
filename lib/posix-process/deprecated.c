@@ -42,6 +42,9 @@
 #include <uk/print.h>
 #include <uk/syscall.h>
 #include <uk/arch/limits.h>
+#if CONFIG_LIBUKVMEM_TRACE_PAGEFAULTS
+#include <uk/thread.h>
+#endif
 
 #define UNIKRAFT_SID      0
 #define UNIKRAFT_PGID     0
@@ -398,6 +401,10 @@ UK_SYSCALL_R_DEFINE(int, getrusage, int, who,
 		return -EFAULT;
 
 	memset(usage, 0, sizeof(*usage));
+#if CONFIG_LIBUKVMEM_TRACE_PAGEFAULTS
+	if (who == RUSAGE_THREAD)
+		usage->ru_minflt = uk_thread_current()->vmem_faults;
+#endif
 	return 0;
 }
 

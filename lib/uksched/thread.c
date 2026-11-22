@@ -250,6 +250,9 @@ static void _uk_thread_struct_init(struct uk_thread *t,
 	t->priv = priv;
 	t->dtor = dtor;
 	t->exec_time = 0;
+#if CONFIG_LIBUKVMEM_TRACE_PAGEFAULTS
+	t->vmem_faults = 0;
+#endif
 	t->wait_ticket = UK_WAITQ_TICKET_INIT_VALUE;
 
 	if (auxsp) {
