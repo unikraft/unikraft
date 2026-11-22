@@ -13,7 +13,7 @@
 /* Allocate and zero backing in mapping context. Faults only install a
  * resident page; split mappings and cloned VASes retain the same object.
  */
-struct shared_anon {
+struct uk_vma_shared_anon {
 	struct uk_alloc *a;
 	struct uk_falloc *fa;
 	__atomic refs;
@@ -23,11 +23,11 @@ struct shared_anon {
 
 struct shared_vma {
 	struct uk_vma base;
-	struct shared_anon *backing;
+	struct uk_vma_shared_anon *backing;
 	__sz first;
 };
 
-static void shared_anon_put(struct shared_anon *b)
+void uk_vma_shared_anon_release(struct uk_vma_shared_anon *b)
 {
 	__sz i;
 
@@ -40,14 +40,14 @@ static void shared_anon_put(struct shared_anon *b)
 
 static void shared_ref_get(const void *object)
 {
-	struct shared_anon *b = (struct shared_anon *)object;
+	struct uk_vma_shared_anon *b = (struct uk_vma_shared_anon *)object;
 
 	uk_refcount_acquire(&b->refs);
 }
 
 static void shared_ref_put(const void *object)
 {
-	shared_anon_put((struct shared_anon *)object);
+	uk_vma_shared_anon_release((struct uk_vma_shared_anon *)object);
 }
 
 static void shared_ref(struct uk_vma *vma, __vaddr_t addr,
@@ -77,32 +77,23 @@ void uk_vma_shared_ref_put(struct uk_vma_shared_ref *ref)
 		old.put(old.object);
 }
 
-static int shared_new(struct uk_vas *vas, __vaddr_t vaddr __unused,
-		      __sz len, void *data __unused,
-		      unsigned long attr __unused, unsigned long *flags,
-		      struct uk_vma **out)
+int uk_vma_shared_anon_create(struct uk_vas *vas, __sz len,
+			      struct uk_vma_shared_anon **out)
 {
 	const __sz count = len / UK_PAGING_PAGE_SIZE;
-	unsigned int order = UK_VMA_MAP_SIZE_TO_ORDER(*flags);
 	struct uk_pagetable *pt = vas->pt;
-	struct shared_anon *b;
-	struct shared_vma *v;
+	struct uk_vma_shared_anon *b;
 	__vaddr_t alias;
 	__paddr_t page;
 	int rc;
 
-	if (order && order != UK_PAGING_PAGE_SHIFT)
-		return -ENOTSUP;
-	if (!count || count > (__SZ_MAX - sizeof(*b)) / sizeof(b->pages[0]))
-		return -ENOMEM;
-	v = uk_malloc(vas->a, sizeof(*v));
-	if (!v)
+	if (!len || !UK_PAGING_PAGE_ALIGNED(len))
+		return -EINVAL;
+	if (count > (__SZ_MAX - sizeof(*b)) / sizeof(b->pages[0]))
 		return -ENOMEM;
 	b = uk_malloc(vas->a, sizeof(*b) + count * sizeof(b->pages[0]));
-	if (!b) {
-		uk_free(vas->a, v);
+	if (!b)
 		return -ENOMEM;
-	}
 	b->a = vas->a;
 	b->fa = pt->fa;
 	b->count = 0;
@@ -121,15 +112,36 @@ static int shared_new(struct uk_vas *vas, __vaddr_t vaddr __unused,
 		memset_isr((void *)alias, 0, UK_PAGING_PAGE_SIZE);
 		uk_paging_page_kunmap(pt, alias, 1, 0);
 	}
-	v->backing = b;
+	*out = b;
+	return 0;
+fail:
+	uk_vma_shared_anon_release(b);
+	return rc;
+}
+
+static int shared_new(struct uk_vas *vas, __vaddr_t vaddr __unused,
+		      __sz len, void *data __unused,
+		      unsigned long attr __unused, unsigned long *flags,
+		      struct uk_vma **out)
+{
+	unsigned int order = UK_VMA_MAP_SIZE_TO_ORDER(*flags);
+	struct shared_vma *v;
+	int rc;
+
+	if (order && order != UK_PAGING_PAGE_SHIFT)
+		return -ENOTSUP;
+	v = uk_malloc(vas->a, sizeof(*v));
+	if (!v)
+		return -ENOMEM;
+	rc = uk_vma_shared_anon_create(vas, len, &v->backing);
+	if (rc) {
+		uk_free(vas->a, v);
+		return rc;
+	}
 	v->first = 0;
 	v->base.name = NULL;
 	*out = &v->base;
 	return 0;
-fail:
-	shared_anon_put(b);
-	uk_free(vas->a, v);
-	return rc;
 }
 
 static int shared_fault(struct uk_vma *vma, struct uk_vm_fault *fault)
@@ -156,7 +168,7 @@ static int shared_unmap(struct uk_vma *vma, __vaddr_t addr, __sz len)
 
 static void shared_destroy(struct uk_vma *vma)
 {
-	shared_anon_put(((struct shared_vma *)vma)->backing);
+	uk_vma_shared_anon_release(((struct shared_vma *)vma)->backing);
 }
 
 static int shared_clone(struct uk_vma *vma, struct uk_alloc *a,
@@ -214,4 +226,94 @@ const struct uk_vma_ops uk_vma_shared_anon_ops = {
 	.merge = shared_merge,
 	.set_attr = uk_vma_op_set_attr,
 	.advise = shared_advise
+};
+
+struct shared_attachment_vma {
+	struct shared_vma shared;
+	struct uk_vma_shared_anon_attachment attachment;
+};
+
+static int attachment_new(struct uk_vas *vas, __vaddr_t vaddr __unused,
+			  __sz len, void *data, unsigned long attr __unused,
+			  unsigned long *flags, struct uk_vma **out)
+{
+	const struct uk_vma_shared_anon_attachment *attachment = data;
+	unsigned int order = UK_VMA_MAP_SIZE_TO_ORDER(*flags);
+	struct shared_attachment_vma *v;
+
+	if (order && order != UK_PAGING_PAGE_SHIFT)
+		return -ENOTSUP;
+	if (len / UK_PAGING_PAGE_SIZE != attachment->backing->count)
+		return -EINVAL;
+	v = uk_malloc(vas->a, sizeof(*v));
+	if (!v)
+		return -ENOMEM;
+	v->shared.backing = attachment->backing;
+	v->shared.first = 0;
+	v->shared.base.name = NULL;
+	v->attachment = *attachment;
+	shared_ref_get(v->shared.backing);
+	v->attachment.attach(v->attachment.arg);
+	*out = &v->shared.base;
+	return 0;
+}
+
+static int attachment_clone(struct uk_vma *vma, struct uk_alloc *a,
+			    struct uk_vma **out)
+{
+	struct shared_attachment_vma *old = (struct shared_attachment_vma *)vma;
+	struct shared_attachment_vma *v = uk_malloc(a, sizeof(*v));
+
+	if (!v)
+		return -ENOMEM;
+	v->shared.backing = old->shared.backing;
+	v->shared.first = 0;
+	v->attachment = old->attachment;
+	shared_ref_get(v->shared.backing);
+	v->attachment.attach(v->attachment.arg);
+	*out = &v->shared.base;
+	return 0;
+}
+
+static void attachment_destroy(struct uk_vma *vma)
+{
+	struct shared_attachment_vma *v = (struct shared_attachment_vma *)vma;
+
+	v->attachment.detach(v->attachment.arg);
+	shared_destroy(vma);
+}
+
+static int attachment_split(struct uk_vma *vma __unused,
+			    __vaddr_t addr __unused,
+			    struct uk_vma **out __unused)
+{
+	return -ENOTSUP;
+}
+
+static int attachment_merge(struct uk_vma *vma __unused,
+			    struct uk_vma *next __unused)
+{
+	return -ENOTSUP;
+}
+
+static int attachment_set_attr(struct uk_vma *vma, unsigned long attr)
+{
+	struct shared_attachment_vma *v = (struct shared_attachment_vma *)vma;
+
+	if (v->attachment.readonly && (attr & UK_PAGING_PAGE_ATTR_PROT_WRITE))
+		return -EACCES;
+	return uk_vma_op_set_attr(vma, attr);
+}
+
+const struct uk_vma_ops uk_vma_shared_anon_attachment_ops = {
+	.new = attachment_new,
+	.destroy = attachment_destroy,
+	.clone_cow = attachment_clone,
+	.shared_ref = shared_ref,
+	.fault = shared_fault,
+	.unmap = shared_unmap,
+	.split = attachment_split,
+	.merge = attachment_merge,
+	.set_attr = attachment_set_attr,
+	.advise = shared_advise,
 };

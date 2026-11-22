@@ -76,6 +76,28 @@ extern const struct uk_vma_ops uk_vma_anon_ops;
 extern const struct uk_vma_ops uk_vma_cow_anon_ops;
 /* Anonymous mappings with a reference-counted backing shared across VASes. */
 extern const struct uk_vma_ops uk_vma_shared_anon_ops;
+
+struct uk_vma_shared_anon;
+
+/* Own a zeroed backing independently of any mapping. */
+int uk_vma_shared_anon_create(struct uk_vas *vas, __sz len,
+			      struct uk_vma_shared_anon **out);
+void uk_vma_shared_anon_release(struct uk_vma_shared_anon *backing);
+
+/**
+ * Arguments for attaching a whole shared backing. The callbacks run for
+ * each initial or inherited attachment, and after its final unmap. They
+ * must work with interrupts disabled, including from the COW clone path.
+ */
+struct uk_vma_shared_anon_attachment {
+	struct uk_vma_shared_anon *backing;
+	void (*attach)(void *arg);
+	void (*detach)(void *arg);
+	void *arg;
+	int readonly;
+};
+
+extern const struct uk_vma_ops uk_vma_shared_anon_attachment_ops;
 #endif
 
 /**

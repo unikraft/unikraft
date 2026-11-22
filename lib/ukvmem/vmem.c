@@ -877,7 +877,8 @@ int uk_vma_unmap(struct uk_vas *vas, __vaddr_t vaddr, __sz len,
 	return rc;
 }
 
-int uk_vma_unmap_at(struct uk_vas *vas, __vaddr_t vaddr)
+static int vmem_unmap_at(struct uk_vas *vas, __vaddr_t vaddr,
+			 const struct uk_vma_ops *ops)
 {
 	struct uk_paging_free_batch batch;
 	struct vmem_unmap_range range;
@@ -898,6 +899,8 @@ int uk_vma_unmap_at(struct uk_vas *vas, __vaddr_t vaddr)
 	vma = vmem_vma_find(vas, vaddr, 0);
 	if (unlikely(!vma))
 		rc = -ENOENT;
+	else if (ops && (vma->start != vaddr || vma->ops != ops))
+		rc = -EINVAL;
 	else
 		rc = vmem_do_unmap_locked(vas, vma->start,
 					  vma->end - vma->start, 0,
@@ -910,6 +913,18 @@ int uk_vma_unmap_at(struct uk_vas *vas, __vaddr_t vaddr)
 	vmem_vma_destroy_list(&dead_vmas);
 
 	return rc;
+}
+
+int uk_vma_unmap_at(struct uk_vas *vas, __vaddr_t vaddr)
+{
+	return vmem_unmap_at(vas, vaddr, NULL);
+}
+
+int uk_vma_unmap_at_exact(struct uk_vas *vas, __vaddr_t vaddr,
+			  const struct uk_vma_ops *ops)
+{
+	UK_ASSERT(ops);
+	return vmem_unmap_at(vas, vaddr, ops);
 }
 
 static __vaddr_t vmem_first_fit_vmas(struct uk_vas *vas, __vaddr_t base,
