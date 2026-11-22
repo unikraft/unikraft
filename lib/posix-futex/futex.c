@@ -98,6 +98,16 @@ static void futex_guard_unlock(struct futex_guard *guard)
 	uk_lcpu_restore_irqf(guard->irqf);
 }
 
+static int futex_wait_result(struct uk_thread *thread, int wait,
+			     bool woken, bool timed)
+{
+	if (woken)
+		return 0;
+	if (wait == -EINTR && !timed && uk_thread_wait_signalled(thread))
+		return -UK_SYSCALL_ERESTARTSYS;
+	return wait > 0 ? -ETIMEDOUT : wait;
+}
+
 #if !CONFIG_LIBPOSIX_FUTEX_VAS
 /*
  * Perform the first read before taking the address lock.  The caller must
@@ -128,19 +138,16 @@ static int futex_wait_bitset(uint32_t *uaddr, uint32_t val,
 
 	previous_cookie = current->wait_ticket.cookie;
 	uk_waitq_set_cookie((__uptr)&f);
-	timedout = uk_waitq_wait_interruptible(&futex_waiters, deadline,
-					       futex_guard_lock,
-					       futex_guard_unlock, &guard);
+	timedout = uk_waitq_wait_sigintr(&futex_waiters, deadline,
+					 futex_guard_lock,
+					 futex_guard_unlock, &guard);
 
 	/*
 	 * Requeue changes the address cookie, not the registration lifetime.
 	 * Waitq already detached this thread regardless of its current address.
 	 * A committed wake wins over a deadline noticed after rescheduling.
 	 */
-	if (timedout < 0)
-		result = timedout;
-	else
-		result = (!f.woken && timedout) ? -ETIMEDOUT : 0;
+	result = futex_wait_result(current, timedout, f.woken, timeout);
 	uk_waitq_set_cookie(previous_cookie);
 	futex_guard_unlock(&guard);
 	return result;
@@ -260,13 +267,10 @@ static int futex_vas_wait(__u32 *addr, __u32 val,
 	uk_thread_uktls_var(current, futex_active_wait) = &f;
 	previous_cookie = current->wait_ticket.cookie;
 	uk_waitq_set_cookie((__uptr)&f);
-	timedout = uk_waitq_wait_interruptible(&futex_waiters, deadline,
-					       futex_guard_lock,
-					       futex_guard_unlock, &guard);
-	if (timedout < 0)
-		rc = timedout;
-	else
-		rc = (!f.woken && timedout) ? -ETIMEDOUT : 0;
+	timedout = uk_waitq_wait_sigintr(&futex_waiters, deadline,
+					 futex_guard_lock,
+					 futex_guard_unlock, &guard);
+	rc = futex_wait_result(current, timedout, f.woken, timeout);
 	uk_waitq_set_cookie(previous_cookie);
 	uk_thread_uktls_var(current, futex_active_wait) = NULL;
 	futex_guard_unlock(&guard);
