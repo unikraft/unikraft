@@ -205,11 +205,23 @@ struct posix_thread *pprocess_create_pthread(struct posix_process *pprocess,
 	}
 #endif /* CONFIG_LIBPOSIX_PROCESS_SIGNAL */
 
+#if CONFIG_LIBUKVMEM_VAS_REFCOUNT
+	/* Binding may finish paging work; never hold the process lock here. */
+	err = uk_thread_set_vas(th, pprocess->vas);
+	if (unlikely(err)) {
+#if CONFIG_LIBPOSIX_PROCESS_SIGNAL
+		pprocess_signal_tdesc_free(pthread);
+#endif
+		uk_free(a, pthread);
+		goto err_free_tid;
+	}
+#endif
+
 	/* Store reference to pthread with TID and add to process thread list */
 	{
 		unsigned long flags = pprocess_lock_acquire();
 
-#if CONFIG_LIBUKVMEM_THREAD_VAS
+#if CONFIG_LIBUKVMEM_THREAD_VAS && !CONFIG_LIBUKVMEM_VAS_REFCOUNT
 		th->vas = pprocess->vas;
 #endif
 		uk_thread_uktls_var(th, pthread_self) = pthread;
@@ -318,6 +330,9 @@ struct posix_process *pprocess_create(struct uk_alloc *a,
 #if CONFIG_LIBUKVMEM_THREAD_VAS
 	pprocess->vas = parent_pprocess ? parent_pprocess->vas
 					: uk_vas_get_active();
+#if CONFIG_LIBUKVMEM_VAS_REFCOUNT
+	uk_vas_get(pprocess->vas);
+#endif
 #endif
 	UK_INIT_LIST_HEAD(&pprocess->threads);
 	UK_INIT_LIST_HEAD(&pprocess->children);
@@ -331,6 +346,9 @@ struct posix_process *pprocess_create(struct uk_alloc *a,
 		/* Free manually as we can jump to err_free_pprocess
 		 * after this allocation is successful.
 		 */
+#if CONFIG_LIBUKVMEM_VAS_REFCOUNT
+		uk_vas_put(pprocess->vas);
+#endif
 		uk_free(a, pprocess);
 		goto err_out;
 	}
@@ -359,6 +377,12 @@ struct posix_process *pprocess_create(struct uk_alloc *a,
 	} else {
 		/* Re-use existing pthread, re-link it and re-use its TID */
 		UK_ASSERT((*pthread)->thread == thread);
+
+#if CONFIG_LIBUKVMEM_VAS_REFCOUNT
+		ret = uk_thread_set_vas(thread, pprocess->vas);
+		if (unlikely(ret))
+			goto err_free_pprocess;
+#endif
 
 		/* Remove thread from original process and re-link */
 		{
@@ -401,7 +425,7 @@ struct posix_process *pprocess_create(struct uk_alloc *a,
 		unsigned long flags = pprocess_lock_acquire();
 
 		pprocess->parent = parent_pprocess;
-#if CONFIG_LIBUKVMEM_THREAD_VAS
+#if CONFIG_LIBUKVMEM_THREAD_VAS && !CONFIG_LIBUKVMEM_VAS_REFCOUNT
 		thread->vas = pprocess->vas;
 #endif
 		if (parent_pprocess) {
@@ -422,6 +446,9 @@ err_free_pprocess:
 #if CONFIG_LIBPOSIX_PROCESS_SIGNAL
 	pprocess_signal_pdesc_free(pprocess);
 #endif /* CONFIG_LIBPOSIX_PROCESS_SIGNAL */
+#if CONFIG_LIBUKVMEM_VAS_REFCOUNT
+	uk_vas_put(pprocess->vas);
+#endif
 	uk_free(a, pprocess);
 err_out:
 	return ERR2PTR(ret);
@@ -561,6 +588,9 @@ err_free_thread:
 void pprocess_release(struct posix_process *pprocess)
 {
 	pid_t pid;
+#if CONFIG_LIBUKVMEM_VAS_REFCOUNT
+	struct uk_vas *vas;
+#endif
 
 	UK_ASSERT(pprocess);
 	UK_ASSERT(uk_list_empty(&pprocess->threads));
@@ -581,7 +611,13 @@ void pprocess_release(struct posix_process *pprocess)
 	pprocess_signal_pdesc_free(pprocess);
 #endif /* CONFIG_LIBPOSIX_PROCESS_SIGNAL */
 
+#if CONFIG_LIBUKVMEM_VAS_REFCOUNT
+	vas = pprocess->vas;
+#endif
 	uk_free(pprocess->_a, pprocess);
+#if CONFIG_LIBUKVMEM_VAS_REFCOUNT
+	uk_vas_put(vas);
+#endif
 
 	uk_pr_debug("pid %d released\n", pid);
 }

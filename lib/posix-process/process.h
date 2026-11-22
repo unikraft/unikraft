@@ -67,6 +67,7 @@ struct posix_process {
 	struct uk_list_head threads;
 	struct uk_alloc *_a;
 #if CONFIG_LIBUKVMEM_THREAD_VAS
+	/* One owned reference, independent of pins held by UK threads. */
 	struct uk_vas *vas;
 #endif
 #if CONFIG_LIBPOSIX_PROCESS_SIGNAL
