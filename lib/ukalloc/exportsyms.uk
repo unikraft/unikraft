@@ -22,4 +22,5 @@ uk_alloc_pavailmem_total
 _uk_alloc_head
 uk_alloc_stats_get
 _uk_alloc_stats_global
+_uk_alloc_stats_global_lock
 uk_alloc_stats_get_global

@@ -551,6 +551,8 @@ int uk_lcpu_wait(const __u64 lcpuidx[], unsigned int *num,
 				rc = -ETIMEDOUT; /* Timed out */
 				goto lcpu_wait_err;
 			}
+
+			uk_arch_spinwait();
 		}
 	}
 
