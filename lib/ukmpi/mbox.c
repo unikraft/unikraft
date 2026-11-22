@@ -41,6 +41,17 @@ void uk_mbox_free(struct uk_alloc *a, struct uk_mbox *m)
 	uk_free(a, m);
 }
 
+bool uk_mbox_is_empty(struct uk_mbox *m)
+{
+	unsigned long irqf;
+	bool empty;
+
+	uk_spin_lock_irqsave(&m->lock, irqf);
+	empty = m->readpos == m->writepos;
+	uk_spin_unlock_irqrestore(&m->lock, irqf);
+	return empty;
+}
+
 void uk_mbox_post(struct uk_mbox *m, void *msg)
 {
 	/* The caller got a semaphore token, so we are now allowed to increment

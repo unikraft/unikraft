@@ -38,6 +38,7 @@
 
 #if CONFIG_LIBUKMPI_MBOX
 #include <errno.h>
+#include <stdbool.h>
 #include <uk/semaphore.h>
 #include <uk/alloc.h>
 #include <uk/arch/time.h>
@@ -50,6 +51,9 @@ struct uk_mbox;
 
 struct uk_mbox *uk_mbox_create(struct uk_alloc *a, size_t size);
 void uk_mbox_free(struct uk_alloc *a, struct uk_mbox *m);
+
+/* Snapshot the mailbox state without consuming a message. */
+bool uk_mbox_is_empty(struct uk_mbox *m);
 
 void uk_mbox_post(struct uk_mbox *m, void *msg);
 int uk_mbox_post_try(struct uk_mbox *m, void *msg);
