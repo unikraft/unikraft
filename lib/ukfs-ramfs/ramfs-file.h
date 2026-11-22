@@ -11,6 +11,7 @@
 
 #include <uk/file/iovutil.h>
 #include <uk/fs/prio.h>
+#include <uk/init.h>
 #include <uk/pod.h>
 #include <uk/pod/anon.h>
 #include <uk/sparsebuf.h>
