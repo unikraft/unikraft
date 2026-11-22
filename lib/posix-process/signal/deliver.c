@@ -328,6 +328,7 @@ static void uk_signal_deliver(struct uk_syscall_exit_ctx *exit_ctx)
 	struct ukarch_execenv *execenv;
 	struct posix_thread *pthread;
 	struct posix_process *pproc;
+	struct uk_thread *thread;
 	int sig;
 
 	UK_ASSERT(exit_ctx);
@@ -341,17 +342,19 @@ static void uk_signal_deliver(struct uk_syscall_exit_ctx *exit_ctx)
 	if (!execenv)
 		return;
 
+	thread = uk_thread_current();
 	pthread = uk_pthread_current();
 	if (unlikely(!pthread)) {
-		if (!uk_thread_current()->sched)
+		if (!thread->sched)
 			uk_sched_yield();
 		return;
 	}
 
 	pproc = pthread->process;
 	UK_ASSERT(pproc);
-	/* Signals that arrive from here on mark the thread again */
-	uk_thread_wait_signal_clear(uk_thread_current());
+	/* Clear an existing mark before delivering pending signals. */
+	if (uk_thread_wait_signalled(thread))
+		uk_thread_wait_signal_clear(thread);
 	sig = pprocess_terminating_signal(pproc);
 	if (sig)
 		pprocess_exit_signalled(sig);
