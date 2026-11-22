@@ -47,6 +47,12 @@ UK_TESTCASE(shared_vas_refs, word_load_is_fault_free)
 	uk_lcpu_restore_irqf(irqf);
 	UK_TEST_EXPECT_ZERO(rc);
 	UK_TEST_EXPECT_ZERO(value);
+	irqf = uk_lcpu_save_irqf();
+	rc = uk_vas_load_u32_shared_try(parent, addr, &value, &ref);
+	uk_lcpu_restore_irqf(irqf);
+	UK_TEST_EXPECT_ZERO(rc);
+	UK_TEST_EXPECT_ZERO(value);
+	UK_TEST_EXPECT_NULL(ref.object);
 	UK_TEST_EXPECT_ZERO(uk_vas_store_u32(parent, addr, 0x1234));
 	rc = uk_vas_clone_process(parent, &child);
 	UK_TEST_EXPECT_ZERO(rc);
@@ -108,10 +114,11 @@ UK_TESTCASE(shared_vas_refs, identity_survives_all_mappings)
 		goto out;
 	word = addr + UK_PAGING_PAGE_SIZE + sizeof(__u32);
 	UK_TEST_EXPECT_ZERO(uk_vas_store_u32(parent, word, 0x5555));
-	rc = uk_vas_get_shared_ref(parent, word, sizeof(__u32), &first);
+	rc = uk_vas_load_u32_shared_try(parent, word, &value, &first);
 	UK_TEST_EXPECT_ZERO(rc);
 	if (rc)
 		goto out;
+	UK_TEST_EXPECT_SNUM_EQ(value, 0x5555);
 	UK_TEST_EXPECT_SNUM_EQ(first.offset,
 			       UK_PAGING_PAGE_SIZE + sizeof(__u32));
 	rc = uk_vma_set_attr(parent, addr, UK_PAGING_PAGE_SIZE,
@@ -130,6 +137,24 @@ UK_TESTCASE(shared_vas_refs, identity_survives_all_mappings)
 		goto out;
 	UK_TEST_EXPECT(first.object == second.object);
 	UK_TEST_EXPECT_SNUM_EQ(first.offset, second.offset);
+	value = 0x7777;
+	rc = uk_vas_load_u32_shared_try(child, word, &value, &first);
+	UK_TEST_EXPECT_SNUM_EQ(rc, -EAGAIN);
+	UK_TEST_EXPECT_SNUM_EQ(value, 0x7777);
+	UK_TEST_EXPECT(first.object == second.object);
+	UK_TEST_EXPECT_SNUM_EQ(first.offset, second.offset);
+	rc = uk_vas_fault(child, word, UK_VMA_FAULT_READ);
+	UK_TEST_EXPECT_ZERO(rc);
+	if (rc)
+		goto out;
+	rc = uk_vas_load_u32_shared_try(child, word, &value, &copy);
+	UK_TEST_EXPECT_ZERO(rc);
+	if (rc)
+		goto out;
+	UK_TEST_EXPECT_SNUM_EQ(value, 0x5555);
+	UK_TEST_EXPECT(first.object == copy.object);
+	UK_TEST_EXPECT_SNUM_EQ(first.offset, copy.offset);
+	uk_vma_shared_ref_put(&copy);
 	rc = vmem_vas_transition_begin(child, &transition);
 	UK_TEST_EXPECT_ZERO(rc);
 	if (rc)

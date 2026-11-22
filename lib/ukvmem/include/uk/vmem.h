@@ -512,6 +512,17 @@ int uk_vas_fault(struct uk_vas *vas, __vaddr_t vaddr, unsigned int access);
  */
 int uk_vas_load_u32_try(struct uk_vas *vas, __vaddr_t addr, __u32 *out);
 
+#if CONFIG_LIBUKVMEM_COW_VMA
+/**
+ * Read a word and pin its shared identity in the same VAS transaction.
+ * A private mapping returns an empty reference. The reference output must
+ * be empty on entry to a successful call. Both outputs stay unchanged on
+ * failure; other constraints match uk_vas_load_u32_try().
+ */
+int uk_vas_load_u32_shared_try(struct uk_vas *vas, __vaddr_t addr,
+			       __u32 *out, struct uk_vma_shared_ref *ref);
+#endif
+
 /**
  * Store an aligned 32-bit value in an explicit VAS, without activating it.
  * Resolve a writable mapping with IRQs enabled, then recheck and store through
