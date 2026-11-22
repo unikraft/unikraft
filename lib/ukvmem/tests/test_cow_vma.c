@@ -9,6 +9,7 @@
 #include <uk/falloc.h>
 #include <uk/isr/string.h>
 #include <uk/plat/spinlock.h>
+#include <uk/print.h>
 #include <uk/test.h>
 #include <uk/vmem.h>
 #include <uk/vmem/vma_types.h>
@@ -278,6 +279,108 @@ static int cow_test_read(struct cow_test_space *s, __vaddr_t vaddr,
 	*value = *(__u32 *)(mapped + vaddr % UK_PAGING_PAGE_SIZE);
 	uk_paging_page_kunmap(&s->pt, mapped, 1, 0);
 	return 0;
+}
+
+static unsigned long cow_test_kernel_alias_frames(void)
+{
+	struct uk_pagetable *pt = uk_vas_get_kernel()->pt;
+	unsigned long frames = 0;
+	unsigned int level;
+
+	/* Count mapped base-frame equivalents, including the direct map. */
+	for (level = 0; level < UK_PAL_PT_LEVELS; level++)
+		frames += pt->nr_lx_pages[level] *
+			(UK_PAGING_PAGE_Lx_SIZE(level) / UK_PAGING_PAGE_SIZE);
+	return frames;
+}
+
+static int cow_test_clone_cycle(struct cow_test_family *family,
+				unsigned int cycle)
+{
+	struct cow_test_space *parent = NULL, *child = NULL;
+	__vaddr_t address = UK_PAL_PAGE_Lx_SIZE(UK_PAL_PT_LEVELS - 1);
+	__u32 value = 0;
+	int rc = -ENOMEM;
+
+	parent = cow_test_space_new(family);
+	child = cow_test_space_new(family);
+	if (!parent || !child)
+		goto out;
+	rc = uk_vas_enable_cow(&parent->vas, family->resident);
+	if (rc)
+		goto out;
+	rc = uk_vma_map_anon(&parent->vas, &address, UK_PAGING_PAGE_SIZE,
+			     UK_PAGING_PAGE_ATTR_PROT_RW, 0, NULL);
+	if (rc)
+		goto out;
+	rc = uk_vas_store_u32(&parent->vas, address, cycle);
+	if (rc)
+		goto out;
+	rc = uk_vas_clone_cow(&child->vas, &parent->vas);
+	if (rc)
+		goto out;
+	rc = uk_vas_store_u32(&child->vas, address, cycle + 64);
+	if (rc)
+		goto out;
+	rc = cow_test_read(parent, address, &value);
+	if (!rc && value != cycle)
+		rc = -EIO;
+	if (rc)
+		goto out;
+	cow_test_space_put(&parent);
+	rc = cow_test_read(child, address, &value);
+	if (!rc && value != cycle + 64)
+		rc = -EIO;
+out:
+	cow_test_space_put(&parent);
+	cow_test_space_put(&child);
+	return rc;
+}
+
+UK_TESTCASE(cow_vmas, bounded_repeated_clone_resource_balance)
+{
+	struct cow_test_family family;
+	struct uk_falloc *fa = uk_vas_get_kernel()->pt->fa;
+	unsigned long first_free = 0, first_aliases = 0, first_allocated = 0;
+	unsigned long free_bytes, aliases, allocated;
+	unsigned int cycle;
+	int rc;
+
+	for (cycle = 1; cycle <= 64; cycle++) {
+		rc = cow_test_family_init(&family);
+		UK_TEST_EXPECT_ZERO(rc);
+		if (rc)
+			return;
+		rc = cow_test_clone_cycle(&family, cycle);
+		cow_test_family_close(&family);
+		UK_TEST_EXPECT_ZERO(rc);
+		UK_TEST_EXPECT_SNUM_EQ(family.released, 2);
+		UK_TEST_EXPECT_ZERO(family.cleanup_errors);
+		UK_TEST_EXPECT_ZERO(family.frames.errors);
+		UK_TEST_EXPECT_ZERO(family.frames.live);
+		UK_TEST_EXPECT_SNUM_EQ(family.frames.allocated,
+				       family.frames.freed);
+		UK_TEST_EXPECT_SNUM_EQ(family.metadata_allocated,
+				       family.metadata_freed);
+		free_bytes = fa->free_memory;
+		aliases = cow_test_kernel_alias_frames();
+		allocated = (fa->total_memory - free_bytes) /
+			UK_PAGING_PAGE_SIZE;
+		if (cycle == 1) {
+			first_free = free_bytes;
+			first_aliases = aliases;
+			first_allocated = allocated;
+		}
+		UK_TEST_EXPECT_SNUM_EQ(free_bytes, first_free);
+		UK_TEST_EXPECT_SNUM_EQ(aliases, first_aliases);
+		UK_TEST_EXPECT_SNUM_EQ(allocated, first_allocated);
+		uk_pr_info("COW_VMA_CYCLE cycle=%u free_bytes=%lu alias_frames=%lu kernel_allocated_frames=%lu app_live=%lu metadata_live=%lu\n",
+			   cycle,
+			   free_bytes, aliases, allocated, family.frames.live,
+			   family.metadata_allocated - family.metadata_freed);
+		if (rc)
+			return;
+	}
 }
 
 UK_TESTCASE(cow_vmas, private_clone_and_parent_exit)
