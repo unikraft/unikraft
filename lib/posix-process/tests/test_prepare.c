@@ -472,6 +472,8 @@ UK_TESTCASE(process_prepare, pid_survives_thread_descriptor_release)
 	struct posix_thread *pt;
 	unsigned int before = prepare_processes();
 	unsigned int rounds = CONFIG_LIBPOSIX_PROCESS_MAX_PID + 1;
+	unsigned int freed;
+	unsigned long flags;
 	pid_t held_pid;
 	bool complete = false, reused = false;
 	int rc;
@@ -515,9 +517,28 @@ UK_TESTCASE(process_prepare, pid_survives_thread_descriptor_release)
 	}
 	complete = true;
 release_held:
+	flags = pprocess_lock_acquire();
+	pprocess_get(held);
+	pprocess_lock_release(flags);
+	freed = alloc->freed;
 	pprocess_release(held);
-	held = NULL;
 	UK_TEST_EXPECT_NULL(pid2pprocess(held_pid));
+	UK_TEST_EXPECT_SNUM_EQ(alloc->freed, freed);
+	/* Removal is visible immediately, but the pin still protects the ID. */
+	if (complete) {
+		for (unsigned int round = 0; round < rounds; round++) {
+			other = pprocess_prepare(a, other_thread, parent);
+			UK_TEST_EXPECT(!PTRISERR(other));
+			if (PTRISERR(other)) {
+				complete = false;
+				break;
+			}
+			UK_TEST_EXPECT(other->pid != held_pid);
+			pprocess_abort(other);
+		}
+	}
+	pprocess_put(held);
+	held = NULL;
 	if (complete) {
 		for (unsigned int round = 0; round < rounds; round++) {
 			other = pprocess_prepare(a, other_thread, parent);

@@ -17,6 +17,7 @@
 #include <uk/arch/ctx.h>
 #include <uk/plat/spinlock.h>
 #include <uk/process.h>
+#include <uk/refcount.h>
 #include <uk/semaphore.h>
 #include <uk/thread.h>
 #if CONFIG_LIBPOSIX_PROCESS_BRK
@@ -60,6 +61,8 @@ enum posix_process_state {
 };
 
 struct posix_process {
+	/* Namespace ownership plus temporary pins on a published process. */
+	__atomic refs;
 	pid_t pid;
 	struct posix_process *parent;
 	struct uk_list_head children; /* child processes */
@@ -147,6 +150,17 @@ extern __uk_tls struct posix_thread *pthread_self;
 	uk_pthread_current()->process
 
 struct posix_process *pid2pprocess(pid_t pid);
+/* The caller must own a pin or hold pprocess_lock around a live lookup.
+ * Unpublished prepared processes remain owned exclusively by their creator.
+ */
+static inline void pprocess_get(struct posix_process *process)
+{
+	UK_ASSERT(process);
+	UK_ASSERT(uk_refcount_read(&process->refs));
+	uk_refcount_acquire(&process->refs);
+}
+
+void pprocess_put(struct posix_process *process);
 struct uk_thread *tid2ukthread(pid_t tid);
 struct posix_thread *tid2pthread(pid_t tid);
 struct posix_process *tid2pprocess(pid_t tid);

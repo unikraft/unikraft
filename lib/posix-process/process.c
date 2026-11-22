@@ -51,7 +51,9 @@ struct uk_thread *pprocess_thread_main;
  *       An application should never get PID/TID 0 assigned.
  */
 static struct posix_thread *tid_thread[TIDMAP_SIZE];
-/* Allocation also reserves every published process ID it encounters. */
+/* Objects retaining an identity, including after namespace removal. */
+static unsigned int pid_users[TIDMAP_SIZE];
+/* Allocation reserves every published or pinned process ID it encounters. */
 static unsigned long tid_map[UK_BITS_TO_LONGS(TIDMAP_SIZE)] = { [0] = 0x01UL };
 
 /* Process Table */
@@ -77,10 +79,11 @@ static inline pid_t find_free_tid_locked(void)
 		/* search again starting from the beginning */
 		found = uk_find_first_zero_bit(tid_map, TIDMAP_SIZE);
 	}
-	/* A leader may exit while its process stays published. Reconcile its
-	 * reservation here so thread release needs no process-table lookup.
+	/* A leader may exit while its process stays published or pinned.
+	 * Reconcile its reservation here so thread release needs no lookup.
 	 */
-	while (found < TIDMAP_SIZE && pid_process[found]) {
+	while (found < TIDMAP_SIZE &&
+	       (pid_process[found] || pid_users[found])) {
 		uk_set_bit(found, tid_map);
 		found = uk_find_next_zero_bit(tid_map, TIDMAP_SIZE, found + 1);
 		if (found == TIDMAP_SIZE)
@@ -117,7 +120,30 @@ static void release_tid(pid_t tid)
 	UK_ASSERT(tid > 0 && tid <= CONFIG_LIBPOSIX_PROCESS_MAX_PID);
 
 	flags = pprocess_lock_acquire();
-	uk_clear_bit(tid, tid_map);
+	if (!pid_users[tid] && !pid_process[tid] && !tid_thread[tid])
+		uk_clear_bit(tid, tid_map);
+	pprocess_lock_release(flags);
+}
+
+static void pprocess_assign_pid_locked(struct posix_process *process, pid_t pid)
+{
+	UK_ASSERT(!process->pid);
+	UK_ASSERT(pid > 0 && pid <= CONFIG_LIBPOSIX_PROCESS_MAX_PID);
+	UK_ASSERT(pid_users[pid] != (unsigned int)-1);
+	pid_users[pid]++;
+	process->pid = pid;
+}
+
+static void pprocess_release_pid(pid_t pid)
+{
+	unsigned long flags;
+
+	if (!pid)
+		return;
+	flags = pprocess_lock_acquire();
+	UK_ASSERT(pid_users[pid]);
+	if (!--pid_users[pid] && !pid_process[pid] && !tid_thread[pid])
+		uk_clear_bit(pid, tid_map);
 	pprocess_lock_release(flags);
 }
 
@@ -329,6 +355,7 @@ static struct posix_process *pprocess_new(struct uk_alloc *a,
 		goto err_out;
 	}
 	pprocess->_a = a;
+	uk_refcount_init(&pprocess->refs, 1);
 #if CONFIG_LIBUKVMEM_THREAD_VAS
 	pprocess->vas = parent ? parent->vas : uk_vas_get_active();
 #if CONFIG_LIBUKVMEM_VAS_REFCOUNT
@@ -385,6 +412,7 @@ struct posix_process *pprocess_prepare(struct uk_alloc *a,
 {
 	struct posix_thread *parent_thread = NULL, *pt;
 	struct posix_process *p;
+	unsigned long flags;
 	int rc;
 
 	if (!a || !thread || thread == uk_thread_current() || thread->sched ||
@@ -417,7 +445,9 @@ struct posix_process *pprocess_prepare(struct uk_alloc *a,
 		uk_free(a, p);
 		return ERR2PTR(rc);
 	}
-	p->pid = pt->tid;
+	flags = pprocess_lock_acquire();
+	pprocess_assign_pid_locked(p, pt->tid);
+	pprocess_lock_release(flags);
 	p->parent = parent_thread ? parent_thread->process : NULL;
 	pt->parent = parent_thread;
 	return p;
@@ -676,9 +706,8 @@ void pprocess_abort(struct posix_process *p)
 #if CONFIG_LIBUKVMEM_VAS_REFCOUNT
 	uk_vas_put(p->vas);
 #endif
-	/* Do not clear a PID table entry: releasing the reserved TID above
-	 * already allows another process to reserve the same number.
-	 */
+	/* Do not clear a PID table entry when releasing an unpublished ID. */
+	pprocess_release_pid(p->pid);
 	uk_free(p->_a, p);
 }
 #endif /* CONFIG_LIBPOSIX_PROCESS_PREPARE */
@@ -727,7 +756,12 @@ struct posix_process *pprocess_create(struct uk_alloc *a,
 			goto err_free_pprocess;
 		}
 		/* take thread id for process id */
-		pprocess->pid = _pthread->tid;
+		{
+			unsigned long flags = pprocess_lock_acquire();
+
+			pprocess_assign_pid_locked(pprocess, _pthread->tid);
+			pprocess_lock_release(flags);
+		}
 		*pthread = _pthread;
 	} else {
 		/* Re-use existing pthread, re-link it and re-use its TID */
@@ -747,7 +781,7 @@ struct posix_process *pprocess_create(struct uk_alloc *a,
 			orig_pprocess = (*pthread)->process;
 			uk_list_del_init(&(*pthread)->thread_list_entry);
 			(*pthread)->process = pprocess;
-			pprocess->pid = (*pthread)->tid;
+			pprocess_assign_pid_locked(pprocess, (*pthread)->tid);
 			uk_list_add_tail(&(*pthread)->thread_list_entry,
 					 &pprocess->threads);
 			(*pthread)->parent = parent_pthread;
@@ -804,6 +838,7 @@ err_free_pprocess:
 #if CONFIG_LIBUKVMEM_VAS_REFCOUNT
 	uk_vas_put(pprocess->vas);
 #endif
+	pprocess_release_pid(pprocess->pid);
 	uk_free(a, pprocess);
 err_out:
 	return ERR2PTR(ret);
@@ -935,12 +970,7 @@ err_free_thread:
 }
 #endif /* CONFIG_LIBPOSIX_PROCESS_MULTIPROCESS */
 
-/* Releases pprocess memory and other resources.
- * NOTE: All pthreads must be removed already
- *       from this pprocess. All chilren must
- *       be already reparented.
- */
-void pprocess_release(struct posix_process *pprocess)
+void pprocess_put(struct posix_process *pprocess)
 {
 	pid_t pid;
 #if CONFIG_LIBUKVMEM_VAS_REFCOUNT
@@ -948,21 +978,14 @@ void pprocess_release(struct posix_process *pprocess)
 #endif
 
 	UK_ASSERT(pprocess);
+	if (!uk_refcount_release(&pprocess->refs))
+		return;
 	UK_ASSERT(uk_list_empty(&pprocess->threads));
 	UK_ASSERT(uk_list_empty(&pprocess->children));
-
-	/* Unlink this process from its parent and clear process table */
-	{
-		unsigned long flags = pprocess_lock_acquire();
-
-		if (pprocess->parent)
-			uk_list_del_init(&pprocess->child_list_entry);
-		pid = pprocess->pid;
-		__atomic_store_n(&pid_process[pid], NULL, __ATOMIC_RELEASE);
-		if (!tid_thread[pid])
-			uk_clear_bit(pid, tid_map);
-		pprocess_lock_release(flags);
-	}
+	UK_ASSERT(uk_list_empty(&pprocess->child_list_entry));
+	pid = pprocess->pid;
+	UK_ASSERT(__atomic_load_n(&pid_process[pid], __ATOMIC_ACQUIRE) !=
+		  pprocess);
 
 #if CONFIG_LIBPOSIX_PROCESS_SIGNAL
 	pprocess_signal_pdesc_free(pprocess);
@@ -975,8 +998,32 @@ void pprocess_release(struct posix_process *pprocess)
 #if CONFIG_LIBUKVMEM_VAS_REFCOUNT
 	uk_vas_put(vas);
 #endif
+	/* A pin also protects the identity after removal from the namespace. */
+	pprocess_release_pid(pid);
 
 	uk_pr_debug("pid %d released\n", pid);
+}
+
+/* Remove a published process and drop namespace ownership. Pins retain its
+ * resources and identity until pprocess_put(). All threads and children must
+ * already have been removed. Only the owner of its reap/release may call this.
+ */
+void pprocess_release(struct posix_process *pprocess)
+{
+	unsigned long flags;
+
+	UK_ASSERT(pprocess);
+	UK_ASSERT(uk_list_empty(&pprocess->threads));
+	UK_ASSERT(uk_list_empty(&pprocess->children));
+	flags = pprocess_lock_acquire();
+	if (pprocess->parent) {
+		uk_list_del_init(&pprocess->child_list_entry);
+		pprocess->parent = NULL;
+	}
+	UK_ASSERT(pid_process[pprocess->pid] == pprocess);
+	__atomic_store_n(&pid_process[pprocess->pid], NULL, __ATOMIC_RELEASE);
+	pprocess_lock_release(flags);
+	pprocess_put(pprocess);
 }
 
 static int posix_process_init(struct uk_init_ctx *ictx)
