@@ -116,12 +116,26 @@ static void vas_switch_thread(void *arg)
 	uk_thread_exit();
 }
 
+static int vas_switch_bind_current(struct uk_vas *vas)
+{
+#if CONFIG_LIBUKVMEM_VAS_REFCOUNT
+	return uk_thread_set_vas(uk_thread_current(), vas);
+#else
+	int rc = uk_vas_set_active(vas ? vas : uk_vas_get_kernel());
+
+	if (!rc)
+		uk_thread_current()->vas = vas;
+	return rc;
+#endif
+}
+
 UK_TESTCASE(vas_sched, switch_distinct_address_spaces)
 {
 	struct uk_vas *kernel = uk_vas_get_kernel();
+	struct uk_vas *saved_binding = uk_thread_current()->vas;
 	struct uk_sched *sched = uk_sched_current();
-	struct uk_pagetable child_pt;
-	struct uk_vas child;
+	struct uk_pagetable root_pt, child_pt;
+	struct uk_vas root, child;
 	struct vas_switch_probe probe = { .vas = &child };
 	struct uk_thread *thread = NULL;
 	const __sz shared_len = UK_PAL_PAGE_Lx_SIZE(UK_PAL_PT_LEVELS - 1);
@@ -134,18 +148,26 @@ UK_TESTCASE(vas_sched, switch_distinct_address_spaces)
 	if (!kernel || uk_vas_get_active() != kernel)
 		return;
 
-	/* Keep the private page in a different top-level branch. */
-	rc = uk_vma_map_anon(kernel, &address, UK_PAGING_PAGE_SIZE,
-			     UK_PAGING_PAGE_ATTR_PROT_RW, 0, NULL);
+	/* Neither private mapping belongs in the shared kernel VAS. */
+	rc = uk_paging_pt_clone_shared(&root_pt, kernel->pt, 0, shared_len);
 	UK_TEST_EXPECT_ZERO(rc);
 	if (rc)
 		return;
+	rc = uk_vas_init(&root, &root_pt, kernel->a);
+	UK_TEST_EXPECT_ZERO(rc);
+	if (rc)
+		goto free_root_pt;
+	rc = uk_vma_map_anon(&root, &address, UK_PAGING_PAGE_SIZE,
+			     UK_PAGING_PAGE_ATTR_PROT_RW, 0, NULL);
+	UK_TEST_EXPECT_ZERO(rc);
+	if (rc)
+		goto destroy_root;
 
 	rc = uk_vma_map_anon(kernel, &kernel_address, UK_PAGING_PAGE_SIZE,
 			     UK_PAGING_PAGE_ATTR_PROT_RW, 0, NULL);
 	UK_TEST_EXPECT_ZERO(rc);
 	if (rc)
-		goto unmap_kernel;
+		goto destroy_root;
 	UK_TEST_EXPECT(kernel_address < shared_len);
 
 	rc = uk_paging_pt_clone_shared(&child_pt, kernel->pt, 0, shared_len);
@@ -172,6 +194,10 @@ UK_TESTCASE(vas_sched, switch_distinct_address_spaces)
 	if (rc)
 		goto destroy_child;
 	UK_TEST_EXPECT(probe.address == address);
+	rc = vas_switch_bind_current(&root);
+	UK_TEST_EXPECT_ZERO(rc);
+	if (rc)
+		goto destroy_child;
 	__atomic_store_n((__u64 *)address, 1, __ATOMIC_RELAXED);
 
 	/* Allocate the kernel stack and TLS after cloning the page table. */
@@ -197,7 +223,7 @@ UK_TESTCASE(vas_sched, switch_distinct_address_spaces)
 		UK_CRASH("Address-space test thread did not terminate\n");
 	UK_TEST_EXPECT(probe.first_active);
 	UK_TEST_EXPECT(probe.restored);
-	UK_TEST_EXPECT(uk_vas_get_active() == kernel);
+	UK_TEST_EXPECT(uk_vas_get_active() == &root);
 	root_value = __atomic_load_n((__u64 *)address, __ATOMIC_RELAXED);
 	UK_TEST_EXPECT_SNUM_EQ(root_value, 1);
 	shared_value = __atomic_load_n((__u64 *)kernel_address,
@@ -205,6 +231,7 @@ UK_TESTCASE(vas_sched, switch_distinct_address_spaces)
 	UK_TEST_EXPECT_SNUM_EQ(shared_value, 3);
 
 destroy_child:
+	UK_TEST_EXPECT_ZERO(vas_switch_bind_current(saved_binding));
 	uk_vas_destroy(&child);
 free_pt:
 	UK_TEST_EXPECT_ZERO(uk_paging_pt_free(&child_pt,
@@ -214,8 +241,10 @@ free_pt:
 unmap_shared:
 	rc = uk_vma_unmap(kernel, kernel_address, UK_PAGING_PAGE_SIZE, 0);
 	UK_TEST_EXPECT_ZERO(rc);
-unmap_kernel:
-	rc = uk_vma_unmap(kernel, address, UK_PAGING_PAGE_SIZE, 0);
+destroy_root:
+	uk_vas_destroy(&root);
+free_root_pt:
+	rc = uk_paging_pt_free(&root_pt, UK_PAGING_PAGE_FLAG_KEEP_FRAMES);
 	UK_TEST_EXPECT_ZERO(rc);
 }
 
