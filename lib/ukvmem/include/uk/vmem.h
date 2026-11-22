@@ -54,6 +54,9 @@ struct uk_pagetable;
 
 struct uk_vma;
 struct uk_vma_ops;
+#if CONFIG_LIBUKVMEM_COW
+struct vmem_vas_transition;
+#endif
 
 /** Virtual address space (VAS) */
 struct uk_vas {
@@ -82,6 +85,10 @@ struct uk_vas {
 
 	/** Serializes VMA list and page-table mutations across CPUs/IRQs */
 	struct __spinlock lock;
+#if CONFIG_LIBUKVMEM_COW
+	/** Mapping transition awaiting completion outside the VAS lock. */
+	struct vmem_vas_transition *transition;
+#endif
 };
 
 /**

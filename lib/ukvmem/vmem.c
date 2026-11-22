@@ -16,6 +16,7 @@
 #endif /* CONFIG_LIBUKPAGING */
 #include <uk/alloc.h>
 #include <uk/assert.h>
+#include <uk/crash.h>
 #if CONFIG_LIBUKVMEM_VAS_ACCESS
 #include <uk/atomic.h>
 #endif
@@ -50,6 +51,101 @@ void uk_vas_set_kernel(struct uk_vas *vas)
 static void vmem_vma_unmap(struct uk_vma *vma, __vaddr_t vaddr, __sz len);
 
 static void vmem_vma_destroy_list(struct uk_list_head *head);
+
+#if CONFIG_LIBUKVMEM_COW
+void vmem_vas_transition_wait(struct uk_vas *vas)
+{
+	UK_ASSERT(!uk_lcpu_irqs_disabled());
+	while (__atomic_load_n(&vas->transition, __ATOMIC_ACQUIRE))
+		uk_arch_spinwait();
+}
+#endif
+
+/* A transition owner never schedules. Wait without locks, allowing the IPIs
+ * that its TLB completion may need from this CPU. Hardware faults need an
+ * architecture-specific IRQ window preserving their exception stack.
+ */
+#if CONFIG_LIBUKVMEM_COW
+static int vmem_vas_lock(struct uk_vas *vas, unsigned long *irqf,
+			 struct uk_lcpu_regs *regs __maybe_unused)
+{
+	int rc;
+
+	for (;;) {
+		ukplat_spin_lock_irqsave(&vas->lock, *irqf);
+		if (!__atomic_load_n(&vas->transition, __ATOMIC_ACQUIRE))
+			return 0;
+		ukplat_spin_unlock_irqrestore(&vas->lock, *irqf);
+		if (regs) {
+			rc = vmem_arch_pagefault_wait(vas, regs);
+			if (rc)
+				return rc;
+		} else {
+			if (uk_lcpu_irqs_disabled())
+				return -EWOULDBLOCK;
+			vmem_vas_transition_wait(vas);
+		}
+	}
+}
+#endif
+
+#if CONFIG_LIBUKVMEM_COW
+int vmem_vas_transition_mark_locked(struct uk_vas *vas,
+				    struct vmem_vas_transition *transition)
+{
+	UK_ASSERT(uk_lcpu_irqs_disabled());
+	if (!vas || !transition || transition->vas)
+		return -EINVAL;
+#if CONFIG_LIBUKVMEM_THREAD_VAS
+	/* Shared kernel branches keep code, stacks and metadata accessible. */
+	if (vas == uk_vas_get_kernel())
+		return -EINVAL;
+#endif
+	if (__atomic_load_n(&vas->transition, __ATOMIC_ACQUIRE))
+		return -EBUSY;
+	transition->vas = vas;
+	__atomic_store_n(&vas->transition, transition, __ATOMIC_RELEASE);
+	return 0;
+}
+
+int vmem_vas_transition_begin(struct uk_vas *vas,
+			      struct vmem_vas_transition *transition)
+{
+	unsigned long irqf;
+	int rc;
+
+	if (!vas || !transition || transition->vas)
+		return -EINVAL;
+	if (uk_lcpu_irqs_disabled())
+		return -EWOULDBLOCK;
+#if CONFIG_LIBUKVMEM_COW
+	rc = vmem_vas_lock(vas, &irqf, NULL);
+	if (rc)
+		return rc;
+#else
+	ukplat_spin_lock_irqsave(&vas->lock, irqf);
+#endif
+	rc = vmem_vas_transition_mark_locked(vas, transition);
+	ukplat_spin_unlock_irqrestore(&vas->lock, irqf);
+	return rc;
+}
+
+void vmem_vas_transition_end(struct vmem_vas_transition *transition)
+{
+	struct uk_vas *vas;
+	unsigned long irqf;
+
+	UK_ASSERT(transition && transition->vas);
+	UK_ASSERT(!uk_lcpu_irqs_disabled());
+	vas = transition->vas;
+	ukplat_spin_lock_irqsave(&vas->lock, irqf);
+	UK_ASSERT(__atomic_load_n(&vas->transition, __ATOMIC_ACQUIRE) ==
+		  transition);
+	transition->vas = NULL;
+	__atomic_store_n(&vas->transition, NULL, __ATOMIC_RELEASE);
+	ukplat_spin_unlock_irqrestore(&vas->lock, irqf);
+}
+#endif
 
 struct uk_vas *uk_vas_get_active(void)
 {
@@ -113,6 +209,9 @@ int uk_vas_init(struct uk_vas *vas, struct uk_pagetable *pt __maybe_unused,
 
 	vas->flags = 0;
 	ukarch_spin_init(&vas->lock);
+#if CONFIG_LIBUKVMEM_COW
+	vas->transition = NULL;
+#endif
 
 	UK_INIT_LIST_HEAD(&vas->vma_list);
 
@@ -156,8 +255,18 @@ void uk_vas_destroy(struct uk_vas *vas)
 	UK_LIST_HEAD(dead_vmas);
 	struct uk_vma *vma, *next;
 	unsigned long irqf;
+#if CONFIG_LIBUKVMEM_COW
+	int rc;
+#endif
 
+#if CONFIG_LIBUKVMEM_COW
+	rc = vmem_vas_lock(vas, &irqf, NULL);
+	UK_ASSERT(!rc);
+	if (rc)
+		UK_CRASH("Cannot destroy VAS during a mapping transition\n");
+#else
 	ukplat_spin_lock_irqsave(&vas->lock, irqf);
+#endif
 	uk_paging_batch_begin(&batch, vas->pt);
 
 	uk_list_for_each_entry_safe(vma, next, &vas->vma_list, vma_list) {
@@ -658,7 +767,13 @@ int uk_vma_unmap(struct uk_vas *vas, __vaddr_t vaddr, __sz len,
 	if (unlikely(len == 0))
 		return 0;
 
+#if CONFIG_LIBUKVMEM_COW
+	rc = vmem_vas_lock(vas, &irqf, NULL);
+	if (rc)
+		return rc;
+#else
 	ukplat_spin_lock_irqsave(&vas->lock, irqf);
+#endif
 	uk_paging_batch_begin(&batch, vas->pt);
 	rc = vmem_do_unmap_locked(vas, vaddr, len, flags, &dead_vmas);
 	uk_paging_batch_end(&batch);
@@ -678,7 +793,13 @@ int uk_vma_unmap_at(struct uk_vas *vas, __vaddr_t vaddr)
 	unsigned long irqf;
 	int rc;
 
+#if CONFIG_LIBUKVMEM_COW
+	rc = vmem_vas_lock(vas, &irqf, NULL);
+	if (rc)
+		return rc;
+#else
 	ukplat_spin_lock_irqsave(&vas->lock, irqf);
+#endif
 	uk_paging_batch_begin(&batch, vas->pt);
 	vma = vmem_vma_find(vas, vaddr, 0);
 	if (unlikely(!vma))
@@ -904,7 +1025,15 @@ int uk_vma_map(struct uk_vas *vas, __vaddr_t *vaddr, __sz len,
 	vma->ops = ops;
 	vma->sync_inflight = 0;
 
+#if CONFIG_LIBUKVMEM_COW
+	rc = vmem_vas_lock(vas, &irqf, NULL);
+	if (rc) {
+		vmem_vma_destroy(vma);
+		return rc;
+	}
+#else
 	ukplat_spin_lock_irqsave(&vas->lock, irqf);
+#endif
 	uk_paging_batch_begin(&batch, vas->pt);
 
 	if (va == UK_PAGING_VADDR_ANY) {
@@ -1109,7 +1238,13 @@ int uk_vma_set_attr(struct uk_vas *vas, __vaddr_t vaddr, __sz len,
 	if (unlikely(len == 0))
 		return 0;
 
+#if CONFIG_LIBUKVMEM_COW
+	rc = vmem_vas_lock(vas, &irqf, NULL);
+	if (rc)
+		return rc;
+#else
 	ukplat_spin_lock_irqsave(&vas->lock, irqf);
+#endif
 	uk_paging_batch_begin(&batch, vas->pt);
 
 	rc = vmem_vma_split_vmas(vas, vaddr, len, &attr,
@@ -1223,7 +1358,13 @@ int uk_vma_advise(struct uk_vas *vas, __vaddr_t vaddr, __sz len,
 	if (unlikely(len == 0))
 		return 0;
 
+#if CONFIG_LIBUKVMEM_COW
+	rc = vmem_vas_lock(vas, &irqf, NULL);
+	if (rc)
+		return rc;
+#else
 	ukplat_spin_lock_irqsave(&vas->lock, irqf);
+#endif
 	uk_paging_batch_begin(&batch, vas->pt);
 
 	rc = vmem_vma_find_range(vas, &vaddr, &len,
@@ -1280,7 +1421,13 @@ int uk_vma_sync(struct uk_vas *vas, __vaddr_t vaddr, __sz len)
 	if (!len)
 		return 0;
 
+#if CONFIG_LIBUKVMEM_COW
+	rc = vmem_vas_lock(vas, &irqf, NULL);
+	if (rc)
+		return rc;
+#else
 	ukplat_spin_lock_irqsave(&vas->lock, irqf);
+#endif
 	rc = vmem_vma_find_range(vas, &vaddr, &len, &first, &last, 1);
 	if (unlikely(rc)) {
 		ukplat_spin_unlock_irqrestore(&vas->lock, irqf);
@@ -1479,7 +1626,13 @@ static int vmem_fault(struct uk_vas *vas, __vaddr_t vaddr, unsigned int type,
 		vas = uk_vas_get_kernel();
 #endif
 
+#if CONFIG_LIBUKVMEM_COW
+	rc = vmem_vas_lock(vas, &irqf, regs);
+	if (rc)
+		return rc;
+#else
 	ukplat_spin_lock_irqsave(&vas->lock, irqf);
+#endif
 	if (unlikely(!uk_vas_paging_enabled(vas))) {
 		ukplat_spin_unlock_irqrestore(&vas->lock, irqf);
 		return -EFAULT;
@@ -1597,7 +1750,13 @@ int uk_vas_store_u32(struct uk_vas *vas, __vaddr_t vaddr, __u32 value)
 		    uk_paging_pt_get_owner(vas->pt, vaddr) ==
 		    uk_vas_get_kernel()->pt)
 			owner = uk_vas_get_kernel();
+#if CONFIG_LIBUKVMEM_COW
+		rc = vmem_vas_lock(owner, &irqf, NULL);
+		if (rc)
+			return rc;
+#else
 		ukplat_spin_lock_irqsave(&owner->lock, irqf);
+#endif
 		vma = vmem_vma_find(owner, vaddr, sizeof(value));
 		if (!vma || vaddr < vma->start ||
 		    vaddr > vma->end - sizeof(value) ||

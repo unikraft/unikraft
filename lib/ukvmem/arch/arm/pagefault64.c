@@ -6,6 +6,7 @@
 
 #include "../../vmem.h"
 
+#include <errno.h>
 #include <uk/assert.h>
 #include <uk/arch/types.h>
 #include <uk/config.h>
@@ -14,6 +15,15 @@
 #include <uk/print.h>
 
 #include <string.h>
+
+#if CONFIG_LIBUKVMEM_COW
+int vmem_arch_pagefault_wait(struct uk_vas *vas __unused,
+			     struct uk_lcpu_regs *regs __unused)
+{
+	/* COW transition waits currently support x86 exception stacks only. */
+	return -EWOULDBLOCK;
+}
+#endif
 
 void vmem_arch_pagefault_finish(struct uk_paging_free_batch *batch,
 				struct uk_lcpu_regs *regs __unused)

@@ -6,6 +6,7 @@
 
 #include "../../vmem.h"
 
+#include <errno.h>
 #include <uk/arch/util.h>
 #include <uk/arch/x86_64.h>
 #include <uk/assert.h>
@@ -19,6 +20,30 @@
 #if CONFIG_LIBUKVMEM_TRACE_PAGEFAULTS
 #include <uk/plat/time.h>
 #include <uk/thread.h>
+#endif
+
+#if CONFIG_LIBUKVMEM_COW
+int vmem_arch_pagefault_wait(struct uk_vas *vas,
+			     struct uk_lcpu_regs *regs __maybe_unused)
+{
+#if CONFIG_LIBUKPLAT_NATIVE_EXCEPT
+	unsigned long irqf;
+
+	if (!(uk_lcpu_regs_get(regs, RFLAGS) & UK_ARCH_X86_64_RFLAGS_IF))
+		return -EWOULDBLOCK;
+	irqf = uk_lcpu_save_irqf();
+	uk_lcpu_except_push_nested();
+	uk_lcpu_enable_irq();
+	vmem_vas_transition_wait(vas);
+	uk_lcpu_disable_irq();
+	uk_lcpu_except_pop_nested();
+	uk_lcpu_restore_irqf(irqf);
+	return 0;
+#else
+	(void)vas;
+	return -EWOULDBLOCK;
+#endif
+}
 #endif
 
 void vmem_arch_pagefault_finish(struct uk_paging_free_batch *batch,
