@@ -36,6 +36,7 @@ struct uk_thread *pprocess_thread_main;
 #endif
 #if CONFIG_LIBUKVMEM_PROCESS_VAS
 #include <uk/vmem/process.h>
+#include <uk/process/prepared.h>
 #endif
 
 #if CONFIG_LIBPOSIX_PROCESS_SIGNAL
@@ -536,6 +537,118 @@ int pprocess_clone_prepared_vas(struct posix_process *p,
 #endif
 	uk_vas_put(vas);
 	return rc;
+}
+
+/* An unpublished process is reachable only through the caller-owned UKTLS. */
+static struct posix_process *pprocess_prepared_thread(struct uk_thread *thread,
+						      bool unscheduled)
+{
+	struct posix_process *p;
+	struct posix_thread *pt;
+	unsigned long flags;
+	bool published;
+
+	if (!thread || thread == uk_thread_current() ||
+	    !(thread->flags & UK_THREADF_UKTLS))
+		return ERR2PTR(-EINVAL);
+	if (uk_thread_is_exited(thread) || uk_thread_is_runnable(thread) ||
+	    (unscheduled && thread->sched))
+		return ERR2PTR(-EBUSY);
+	pt = uk_thread_uktls_var(thread, pthread_self);
+	if (!pt || !pt->process)
+		return ERR2PTR(-EINVAL);
+	p = pt->process;
+	if (p->pid <= 0 || (unsigned int)p->pid >= TIDMAP_SIZE ||
+	    pt->tid != p->pid || p->threads.next != &pt->thread_list_entry ||
+	    pt->thread_list_entry.next != &p->threads)
+		return ERR2PTR(-EINVAL);
+	flags = pprocess_lock_acquire();
+	published = pid_process[p->pid] || tid_thread[pt->tid];
+	pprocess_lock_release(flags);
+	return published ? ERR2PTR(-EBUSY) : p;
+}
+
+pid_t uk_posix_process_prepare_spawn(struct uk_alloc *a,
+				     struct uk_thread *child,
+				     struct uk_vas **out)
+{
+	struct uk_vas *kernel = uk_vas_get_kernel(), *vas = NULL;
+	struct posix_process *p;
+	struct clone_args args = { 0 };
+	struct posix_process_clone_event_data data;
+	struct posix_process_execve_event_data exec_data;
+	int rc;
+
+	if (!out)
+		return -EINVAL;
+	*out = NULL;
+#if !CONFIG_LIBPOSIX_FDTAB_MULTITAB || CONFIG_LIBVFSCORE
+	return -ENOTSUP;
+#endif
+	if (!kernel)
+		return -ENODEV;
+	p = pprocess_prepare(a, child, uk_thread_current());
+	if (PTRISERR(p))
+		return PTR2ERR(p);
+	rc = uk_vas_create_process(kernel->a, &vas);
+	if (!rc)
+		rc = pprocess_bind_prepared_vas(p, vas);
+#if CONFIG_LIBPOSIX_PROCESS_BRK
+	if (!rc)
+		rc = pprocess_brk_init_space(p);
+#endif
+	if (rc)
+		goto abort;
+#if CONFIG_LIBPOSIX_PROCESS_SIGNAL
+	args.flags = CLONE_CLEAR_SIGHAND;
+#endif
+	data = (struct posix_process_clone_event_data) {
+		.cl_args = &args, .cl_args_len = sizeof(args),
+		.child = child, .parent = uk_thread_current(),
+		.ppid = ukthread2pid(uk_thread_current()),
+		.pid = p->pid, .tid = p->pid
+	};
+	rc = pprocess_raise_clone_event(&data);
+	if (rc < 0)
+		goto abort;
+	exec_data = (struct posix_process_execve_event_data) {
+		.thread = child, .pid = p->pid, .tid = p->pid
+	};
+	rc = pprocess_raise_execve_event(&exec_data);
+	if (rc < 0)
+		goto abort;
+	p->exit_signal = SIGCHLD;
+	*out = vas;
+	return p->pid;
+abort:
+	pprocess_abort(p);
+	uk_vas_put(vas);
+	return rc;
+}
+
+int uk_posix_process_publish_prepared(struct uk_thread *child)
+{
+	struct posix_process *p;
+
+	if (uk_lcpu_irqs_disabled())
+		return -EWOULDBLOCK;
+	p = pprocess_prepared_thread(child, false);
+	return PTRISERR(p) ? PTR2ERR(p) : pprocess_publish(p);
+}
+
+int uk_posix_process_abort_prepared(struct uk_thread *child)
+{
+	struct posix_process *p;
+
+	if (!child)
+		return 0;
+	if (uk_lcpu_irqs_disabled())
+		return -EWOULDBLOCK;
+	p = pprocess_prepared_thread(child, true);
+	if (PTRISERR(p))
+		return PTR2ERR(p);
+	pprocess_abort(p);
+	return 0;
 }
 #endif /* CONFIG_LIBUKVMEM_PROCESS_VAS */
 #endif /* CONFIG_LIBUKVMEM_VAS_REFCOUNT */
