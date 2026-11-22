@@ -40,3 +40,4 @@ uk_vas_clone_cow
 uk_vas_create_process
 uk_vas_clone_process
 uk_vma_cow_anon_ops
+uk_vma_shared_anon_ops
