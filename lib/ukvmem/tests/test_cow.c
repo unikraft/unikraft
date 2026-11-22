@@ -27,6 +27,34 @@ struct cow_release_probe {
 	bool irqs_enabled;
 };
 
+struct cow_metadata_probe {
+	struct uk_alloc *real;
+	unsigned int allocated;
+	unsigned int freed;
+	bool fail;
+};
+
+static void *cow_metadata_alloc(struct uk_alloc *a, __sz size)
+{
+	struct cow_metadata_probe *probe = (void *)a->priv;
+	void *ptr;
+
+	if (probe->fail)
+		return NULL;
+	ptr = uk_malloc(probe->real, size);
+	if (ptr)
+		probe->allocated++;
+	return ptr;
+}
+
+static void cow_metadata_free(struct uk_alloc *a, void *ptr)
+{
+	struct cow_metadata_probe *probe = (void *)a->priv;
+
+	probe->freed++;
+	uk_free(probe->real, ptr);
+}
+
 static int cow_test_alloc(struct uk_falloc *fa, __paddr_t *paddr,
 			  unsigned long frames, unsigned long flags)
 {
@@ -211,6 +239,70 @@ out_source:
 	vmem_cow_ref_release(&source, NULL);
 	UK_TEST_EXPECT_SNUM_EQ(a.allocated, a.freed);
 	UK_TEST_EXPECT_SNUM_EQ(probe.calls, a.allocated);
+}
+
+UK_TESTCASE(cow_frames, metadata_failure_and_last_release)
+{
+	struct uk_vas *kernel = uk_vas_get_active();
+	struct vmem_cow_ref source = { 0 }, copy = { 0 };
+	struct uk_paging_free_batch batch;
+	struct cow_metadata_probe *probe;
+	struct uk_alloc *metadata;
+	struct cow_allocator frames;
+	int rc;
+
+	/* Do not register this test allocator globally. */
+	metadata = uk_malloc(kernel->a, sizeof(*metadata) + sizeof(*probe));
+	UK_TEST_EXPECT_NOT_NULL(metadata);
+	if (!metadata)
+		return;
+	memset_isr(metadata, 0, sizeof(*metadata) + sizeof(*probe));
+	probe = (void *)metadata->priv;
+	probe->real = kernel->a;
+	metadata->malloc = cow_metadata_alloc;
+	metadata->free = cow_metadata_free;
+	cow_test_allocator(&frames, kernel->pt->fa);
+
+	probe->fail = true;
+	rc = vmem_cow_ref_alloc(&source, metadata, &frames.fa, NULL, NULL);
+	UK_TEST_EXPECT_SNUM_EQ(rc, -ENOMEM);
+	UK_TEST_EXPECT_NULL(source.page);
+	UK_TEST_EXPECT_ZERO(probe->allocated);
+	UK_TEST_EXPECT_ZERO(frames.allocated);
+	probe->fail = false;
+	frames.fail = true;
+	rc = vmem_cow_ref_alloc(&source, metadata, &frames.fa, NULL, NULL);
+	UK_TEST_EXPECT_SNUM_EQ(rc, -ENOMEM);
+	UK_TEST_EXPECT_NULL(source.page);
+	UK_TEST_EXPECT_SNUM_EQ(probe->allocated, 1);
+	UK_TEST_EXPECT_SNUM_EQ(probe->freed, 1);
+	UK_TEST_EXPECT_ZERO(frames.allocated);
+	frames.fail = false;
+	rc = vmem_cow_ref_alloc(&source, metadata, &frames.fa, NULL, NULL);
+	UK_TEST_EXPECT_ZERO(rc);
+	if (rc)
+		goto out_metadata;
+
+	probe->fail = true;
+	rc = vmem_cow_ref_copy(&copy, &source, kernel->pt, NULL, NULL);
+	UK_TEST_EXPECT_SNUM_EQ(rc, -ENOMEM);
+	UK_TEST_EXPECT_NULL(copy.page);
+	UK_TEST_EXPECT(vmem_cow_ref_exclusive(&source));
+	UK_TEST_EXPECT_SNUM_EQ(frames.allocated, 1);
+	probe->fail = false;
+	vmem_cow_ref_clone(&copy, &source, NULL, NULL);
+	/* Sharing must not allocate a second ownership record. */
+	UK_TEST_EXPECT_SNUM_EQ(probe->allocated, 2);
+	uk_paging_free_batch_init(&batch, kernel->pt);
+	vmem_cow_ref_release(&copy, &batch);
+	vmem_cow_ref_release(&source, NULL);
+	UK_TEST_EXPECT_SNUM_EQ(probe->freed, 1);
+	UK_TEST_EXPECT_ZERO(frames.freed);
+	uk_paging_free_batch_finish(&batch);
+	UK_TEST_EXPECT_SNUM_EQ(probe->allocated, probe->freed);
+	UK_TEST_EXPECT_SNUM_EQ(frames.allocated, frames.freed);
+out_metadata:
+	uk_free(kernel->a, metadata);
 }
 
 _UK_TESTSUITE(cow_frames, NULL);
