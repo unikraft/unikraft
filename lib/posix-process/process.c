@@ -125,12 +125,30 @@ static void release_tid(pid_t tid)
 	pprocess_lock_release(flags);
 }
 
+void pprocess_id_get_locked(pid_t id)
+{
+	UK_ASSERT(id > 0 && id <= CONFIG_LIBPOSIX_PROCESS_MAX_PID);
+	UK_ASSERT(pid_users[id] != (unsigned int)-1);
+	/* Thread exit may clear the bitmap before allocation reconciles a
+	 * retained identity. Existing pins still authorize another reference.
+	 */
+	UK_ASSERT(uk_test_bit(id, tid_map) || pid_users[id]);
+	pid_users[id]++;
+}
+
+void pprocess_id_put_locked(pid_t id)
+{
+	UK_ASSERT(id > 0 && id <= CONFIG_LIBPOSIX_PROCESS_MAX_PID);
+	UK_ASSERT(pid_users[id]);
+	if (!--pid_users[id] && !pid_process[id] && !tid_thread[id])
+		uk_clear_bit(id, tid_map);
+}
+
 static void pprocess_assign_pid_locked(struct posix_process *process, pid_t pid)
 {
 	UK_ASSERT(!process->pid);
 	UK_ASSERT(pid > 0 && pid <= CONFIG_LIBPOSIX_PROCESS_MAX_PID);
-	UK_ASSERT(pid_users[pid] != (unsigned int)-1);
-	pid_users[pid]++;
+	pprocess_id_get_locked(pid);
 	process->pid = pid;
 }
 
@@ -141,9 +159,7 @@ static void pprocess_release_pid(pid_t pid)
 	if (!pid)
 		return;
 	flags = pprocess_lock_acquire();
-	UK_ASSERT(pid_users[pid]);
-	if (!--pid_users[pid] && !pid_process[pid] && !tid_thread[pid])
-		uk_clear_bit(pid, tid_map);
+	pprocess_id_put_locked(pid);
 	pprocess_lock_release(flags);
 }
 
@@ -490,6 +506,7 @@ int pprocess_publish(struct posix_process *p)
 				p->parent->state != POSIX_PROCESS_RUNNING)) {
 		rc = -ESRCH;
 	} else {
+		pprocess_groups_init_locked(p);
 		if (p->parent)
 			uk_list_add_tail(&p->child_list_entry,
 					 &p->parent->children);
@@ -827,6 +844,7 @@ struct posix_process *pprocess_create(struct uk_alloc *a,
 		unsigned long flags = pprocess_lock_acquire();
 
 		pprocess->parent = parent_pprocess;
+		pprocess_groups_init_locked(pprocess);
 #if CONFIG_LIBUKVMEM_THREAD_VAS && !CONFIG_LIBUKVMEM_VAS_REFCOUNT
 		thread->vas = pprocess->vas;
 #endif
@@ -985,7 +1003,7 @@ err_free_thread:
 
 void pprocess_put(struct posix_process *pprocess)
 {
-	pid_t pid;
+	pid_t pid, pgid, sid;
 #if CONFIG_LIBUKVMEM_VAS_REFCOUNT
 	struct uk_vas *vas;
 #endif
@@ -998,6 +1016,8 @@ void pprocess_put(struct posix_process *pprocess)
 	UK_ASSERT(uk_list_empty(&pprocess->child_list_entry));
 	UK_ASSERT(!pprocess->exiting_threads);
 	pid = pprocess->pid;
+	pgid = pprocess->pgid;
+	sid = pprocess->sid;
 	UK_ASSERT(__atomic_load_n(&pid_process[pid], __ATOMIC_ACQUIRE) !=
 		  pprocess);
 
@@ -1014,6 +1034,8 @@ void pprocess_put(struct posix_process *pprocess)
 #endif
 	/* A pin also protects the identity after removal from the namespace. */
 	pprocess_release_pid(pid);
+	pprocess_release_pid(pgid);
+	pprocess_release_pid(sid);
 
 	uk_pr_debug("pid %d released\n", pid);
 }

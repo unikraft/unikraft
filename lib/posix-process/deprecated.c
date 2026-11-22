@@ -46,7 +46,6 @@
 #include <uk/thread.h>
 #endif
 
-#define UNIKRAFT_SID      0
 #define UNIKRAFT_PGID     0
 #define UNIKRAFT_PROCESS_PRIO 0
 
@@ -169,52 +168,10 @@ int pclose(FILE *stream __unused)
 	return -1;
 }
 
-UK_SYSCALL_R_DEFINE(pid_t, setsid)
-{
-	/* We have a single "session" with a single "process" */
-	return (pid_t) -EPERM;
-}
-
-UK_SYSCALL_R_DEFINE(pid_t, getsid, pid_t, pid)
-{
-	if (pid != 0) {
-		/* We support only calls for the only calling "process" */
-		return (pid_t) -ESRCH;
-	}
-	return UNIKRAFT_SID;
-}
-
-UK_SYSCALL_R_DEFINE(int, setpgid, pid_t, pid, pid_t, pgid)
-{
-	if (pid != 0) {
-		/* We support only calls for the only calling "process" */
-		return (pid_t) -ESRCH;
-	}
-	if (pgid != 0) {
-		/* We have a single "group" with a single "process" */
-		return (pid_t) -EPERM;
-	}
-	return 0;
-}
-
-UK_SYSCALL_R_DEFINE(pid_t, getpgid, pid_t, pid)
-{
-	if (pid != 0) {
-		/* We support only calls for the only calling "process" */
-		return (pid_t) -ESRCH;
-	}
-	return UNIKRAFT_PGID;
-}
-
-UK_SYSCALL_R_DEFINE(pid_t, getpgrp)
-{
-	return UNIKRAFT_PGID;
-}
-
 #if UK_LIBC_SYSCALLS
 int setpgrp(void)
 {
-	return setpgid(0, 0);
+	return uk_syscall_e_setpgid(0, 0);
 }
 #endif /* UK_LIBC_SYSCALLS */
 

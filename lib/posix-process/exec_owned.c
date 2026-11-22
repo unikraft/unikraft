@@ -170,6 +170,7 @@ int pprocess_execve_owned(struct ukarch_execenv *execenv, const char *pathname,
 		goto out;
 	}
 	/* Commit: allocation and image preparation have finished. */
+	process->execed = true;
 	process->vas = vas;
 	vas = NULL; /* Transfer the prepared reference to the process. */
 #if CONFIG_LIBPOSIX_PROCESS_BRK
