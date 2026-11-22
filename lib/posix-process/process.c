@@ -28,6 +28,7 @@ struct uk_thread *pprocess_thread_main;
 #include <uk/init.h>
 #include <uk/errptr.h>
 #include <uk/essentials.h>
+#include <uk/lcpu.h>
 #include <uk/plat/config.h>
 #include <uk/process.h>
 #if CONFIG_LIBUKVMEM_THREAD_VAS
@@ -151,19 +152,20 @@ bool pprocess_claim_process_exit(struct posix_process *pprocess)
 }
 
 /* Allocate a thread for a process */
-struct posix_thread *pprocess_create_pthread(struct posix_process *pprocess,
-					     struct uk_thread *th)
+static struct posix_thread *pprocess_alloc_pthread(struct posix_process *p,
+						   struct uk_thread *th,
+						   bool publish)
 {
 	struct posix_thread *pthread;
 	struct uk_alloc *a;
 	pid_t tid;
 	int err;
 
-	UK_ASSERT(pprocess);
-	UK_ASSERT(pprocess->_a);
+	UK_ASSERT(p);
+	UK_ASSERT(p->_a);
 
 	/* Take allocator from process */
-	a = pprocess->_a;
+	a = p->_a;
 
 	tid = find_and_reserve_tid();
 	if (unlikely(tid < 0)) {
@@ -178,7 +180,7 @@ struct posix_thread *pprocess_create_pthread(struct posix_process *pprocess,
 	}
 
 	pthread->_a = a;
-	pthread->process = pprocess;
+	pthread->process = p;
 	pthread->parent = uk_pthread_current();
 	pthread->tid = tid;
 	pthread->thread = th;
@@ -207,7 +209,7 @@ struct posix_thread *pprocess_create_pthread(struct posix_process *pprocess,
 
 #if CONFIG_LIBUKVMEM_VAS_REFCOUNT
 	/* Binding may finish paging work; never hold the process lock here. */
-	err = uk_thread_set_vas(th, pprocess->vas);
+	err = uk_thread_set_vas(th, p->vas);
 	if (unlikely(err)) {
 #if CONFIG_LIBPOSIX_PROCESS_SIGNAL
 		pprocess_signal_tdesc_free(pthread);
@@ -222,23 +224,31 @@ struct posix_thread *pprocess_create_pthread(struct posix_process *pprocess,
 		unsigned long flags = pprocess_lock_acquire();
 
 #if CONFIG_LIBUKVMEM_THREAD_VAS && !CONFIG_LIBUKVMEM_VAS_REFCOUNT
-		th->vas = pprocess->vas;
+		th->vas = p->vas;
 #endif
 		uk_thread_uktls_var(th, pthread_self) = pthread;
-		__atomic_store_n(&tid_thread[tid], pthread, __ATOMIC_RELEASE);
+		if (publish)
+			__atomic_store_n(&tid_thread[tid], pthread,
+					 __ATOMIC_RELEASE);
 		uk_list_add_tail(&pthread->thread_list_entry,
-				 &pprocess->threads);
+				 &p->threads);
 		pprocess_lock_release(flags);
 	}
 
 	uk_pr_debug("Process PID %d: New thread TID %d\n",
-		    (int) pprocess->pid, (int) pthread->tid);
+		    (int)p->pid, (int)pthread->tid);
 	return pthread;
 
 err_free_tid:
 	release_tid(tid);
 err_out:
 	return ERR2PTR(err);
+}
+
+struct posix_thread *pprocess_create_pthread(struct posix_process *pprocess,
+					     struct uk_thread *th)
+{
+	return pprocess_alloc_pthread(pprocess, th, true);
 }
 
 /* Free thread that is part of a process
@@ -292,8 +302,8 @@ int uk_posix_process_create_pthread(struct uk_thread *thread)
 }
 
 /* Create a new posix process for a given thread */
-static struct posix_process *pprocess_alloc(struct uk_alloc *a,
-					    struct posix_process *parent)
+static struct posix_process *pprocess_new(struct uk_alloc *a,
+					  struct posix_process *parent __unused)
 {
 	struct posix_process *pprocess;
 	int ret;
@@ -354,6 +364,152 @@ err_out:
 	return ERR2PTR(ret);
 }
 
+#if CONFIG_LIBPOSIX_PROCESS_PREPARE
+struct posix_process *pprocess_prepare(struct uk_alloc *a,
+				       struct uk_thread *thread,
+				       struct uk_thread *parent)
+{
+	struct posix_thread *parent_thread = NULL, *pt;
+	struct posix_process *p;
+	int rc;
+
+	if (!a || !thread || thread == uk_thread_current() || thread->sched ||
+	    !(thread->flags & UK_THREADF_UKTLS) ||
+	    uk_thread_is_exited(thread) || uk_thread_is_runnable(thread))
+		return ERR2PTR(-EINVAL);
+	if (uk_lcpu_irqs_disabled())
+		return ERR2PTR(-EWOULDBLOCK);
+	if (uk_thread_uktls_var(thread, pthread_self))
+		return ERR2PTR(-EBUSY);
+	if (parent) {
+		if (!(parent->flags & UK_THREADF_UKTLS))
+			return ERR2PTR(-EINVAL);
+		parent_thread = uk_thread_uktls_var(parent, pthread_self);
+		if (!parent_thread)
+			return ERR2PTR(-EINVAL);
+	}
+	p = pprocess_new(a, parent_thread ? parent_thread->process : NULL);
+	if (PTRISERR(p))
+		return p;
+	pt = pprocess_alloc_pthread(p, thread, false);
+	if (PTRISERR(pt)) {
+		rc = PTR2ERR(pt);
+#if CONFIG_LIBPOSIX_PROCESS_SIGNAL
+		pprocess_signal_pdesc_free(p);
+#endif
+#if CONFIG_LIBUKVMEM_VAS_REFCOUNT
+		uk_vas_put(p->vas);
+#endif
+		uk_free(a, p);
+		return ERR2PTR(rc);
+	}
+	p->pid = pt->tid;
+	p->parent = parent_thread ? parent_thread->process : NULL;
+	pt->parent = parent_thread;
+	return p;
+}
+
+int pprocess_publish(struct posix_process *p)
+{
+	struct posix_thread *pt;
+	unsigned long flags;
+	int rc = 0;
+
+	if (!p || p->pid <= 0 || (unsigned int)p->pid >= TIDMAP_SIZE)
+		return -EINVAL;
+	pt = uk_list_first_entry_or_null(&p->threads, struct posix_thread,
+					 thread_list_entry);
+	if (!pt || pt->tid != p->pid ||
+	    pt->thread_list_entry.next != &p->threads ||
+	    uk_thread_is_exited(pt->thread) ||
+	    uk_thread_is_runnable(pt->thread))
+		return -EINVAL;
+	flags = pprocess_lock_acquire();
+	if (pid_process[p->pid] || tid_thread[pt->tid]) {
+		rc = -EEXIST;
+	} else if (p->exiting || p->state != POSIX_PROCESS_RUNNING) {
+		rc = -ESRCH;
+	} else if (p->parent && (p->parent->exiting ||
+				p->parent->state != POSIX_PROCESS_RUNNING)) {
+		rc = -ESRCH;
+	} else {
+		if (p->parent)
+			uk_list_add_tail(&p->child_list_entry,
+					 &p->parent->children);
+		__atomic_store_n(&tid_thread[pt->tid], pt, __ATOMIC_RELEASE);
+		__atomic_store_n(&pid_process[p->pid], p, __ATOMIC_RELEASE);
+	}
+	pprocess_lock_release(flags);
+	return rc;
+}
+
+#if CONFIG_LIBUKVMEM_VAS_REFCOUNT
+int pprocess_bind_prepared_vas(struct posix_process *p, struct uk_vas *vas)
+{
+	struct posix_thread *pt;
+	struct uk_vas *old;
+	unsigned long flags;
+	bool published;
+	int rc;
+
+	if (!p || !vas || !uk_vas_is_owned(vas) || p->pid <= 0 ||
+	    (unsigned int)p->pid >= TIDMAP_SIZE)
+		return -EINVAL;
+	pt = uk_list_first_entry_or_null(&p->threads, struct posix_thread,
+					 thread_list_entry);
+	if (!pt || pt->tid != p->pid ||
+	    pt->thread_list_entry.next != &p->threads || pt->thread->sched)
+		return -EBUSY;
+	flags = pprocess_lock_acquire();
+	published = pid_process[p->pid] || tid_thread[pt->tid];
+	pprocess_lock_release(flags);
+	if (published)
+		return -EBUSY;
+	if (p->vas == vas)
+		return 0;
+	uk_vas_get(vas);
+	rc = uk_thread_set_vas(pt->thread, vas);
+	if (rc) {
+		uk_vas_put(vas);
+		return rc;
+	}
+	old = p->vas;
+	p->vas = vas;
+	uk_vas_put(old);
+	return 0;
+}
+#endif /* CONFIG_LIBUKVMEM_VAS_REFCOUNT */
+
+void pprocess_abort(struct posix_process *p)
+{
+	struct posix_thread *pt;
+	unsigned long flags;
+
+	if (!p)
+		return;
+	UK_ASSERT(!uk_lcpu_irqs_disabled());
+	UK_ASSERT(uk_list_empty(&p->children));
+	pt = uk_list_first_entry(&p->threads, struct posix_thread,
+				 thread_list_entry);
+	UK_ASSERT(pt->thread_list_entry.next == &p->threads);
+	UK_ASSERT(!pt->thread->sched);
+	flags = pprocess_lock_acquire();
+	UK_ASSERT(!pid_process[p->pid] && !tid_thread[pt->tid]);
+	pprocess_lock_release(flags);
+	pprocess_release_pthread(pt);
+#if CONFIG_LIBPOSIX_PROCESS_SIGNAL
+	pprocess_signal_pdesc_free(p);
+#endif
+#if CONFIG_LIBUKVMEM_VAS_REFCOUNT
+	uk_vas_put(p->vas);
+#endif
+	/* Do not clear a PID table entry: releasing the reserved TID above
+	 * already allows another process to reserve the same number.
+	 */
+	uk_free(p->_a, p);
+}
+#endif /* CONFIG_LIBPOSIX_PROCESS_PREPARE */
+
 struct posix_process *pprocess_create(struct uk_alloc *a,
 				      struct uk_thread *thread,
 				      struct uk_thread *parent)
@@ -382,7 +538,7 @@ struct posix_process *pprocess_create(struct uk_alloc *a,
 		parent_pprocess = parent_pthread->process;
 	}
 
-	pprocess = pprocess_alloc(a, parent_pprocess);
+	pprocess = pprocess_new(a, parent_pprocess);
 	if (PTRISERR(pprocess)) {
 		ret = PTR2ERR(pprocess);
 		goto err_out;
