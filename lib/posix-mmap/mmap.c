@@ -206,6 +206,19 @@ static int do_mmap(void **addr, size_t len, int prot, int flags, int fd,
 	/* MAP_NONBLOCKED: Ignored for now */
 	/* MAP_NORESERVE : Ignored for now */
 
+#if CONFIG_LIBPOSIX_MMAP_POPULATE_SMALL_ANON
+	/* Plain allocator mappings have neither stack nor reservation flags. */
+	if (flags == (MAP_PRIVATE | MAP_ANONYMOUS) &&
+	    prot == (PROT_READ | PROT_WRITE) &&
+	    vaddr == UK_PAGING_VADDR_ANY && len <= UK_PAGING_PAGE_LARGE_SIZE) {
+		rc = uk_vma_map(vas, &vaddr, len, vattr,
+				vflags | UK_VMA_MAP_POPULATE, NULL, vops, vargs);
+		if (rc != -ENOMEM) {
+			*addr = (void *)vaddr;
+			return rc;
+		}
+	}
+#endif
 	rc = uk_vma_map(vas, &vaddr, len, vattr, vflags, NULL, vops, vargs);
 	if (unlikely(rc && !(flags & MAP_FIXED) &&
 		     vaddr != UK_PAGING_VADDR_ANY)) {
