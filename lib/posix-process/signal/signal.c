@@ -47,7 +47,8 @@ static bool signal_interrupt_waiter(struct posix_thread *thread, int signum)
 {
 	const struct kern_sigaction *ks;
 
-	if (thread->state != POSIX_THREAD_RUNNING || !thread->thread ||
+	if ((thread->state != POSIX_THREAD_RUNNING &&
+	     thread->state != POSIX_THREAD_BLOCKED_WAIT) || !thread->thread ||
 	    IS_MASKED(thread, signum))
 		return false;
 	ks = KERN_SIGACTION(thread->process, signum);

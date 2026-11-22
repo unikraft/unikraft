@@ -74,7 +74,7 @@ static void group_change_locked(struct posix_process *process, pid_t pgid)
 		/* A blocked group wait may now have no matching children. */
 		uk_pprocess_foreach_pthread(process->parent, thread, next)
 			if (thread->state == POSIX_THREAD_BLOCKED_WAIT)
-				uk_semaphore_up(&thread->wait_semaphore);
+				uk_thread_wake(thread->thread);
 	}
 }
 

@@ -151,7 +151,7 @@ static int prepare_child_notice_locked(struct posix_process *child,
 	/* Also wake auto-reap waiters so they can observe ECHILD. */
 	uk_pprocess_foreach_pthread(parent, thread, next) {
 		if (pthread_waiting_for_child(thread, child))
-			uk_semaphore_up(&thread->wait_semaphore);
+			uk_thread_wake(thread->thread);
 	}
 	return rc;
 }
@@ -391,8 +391,6 @@ void pprocess_mark_signal_exit_locked(struct posix_process *process, int sig)
 	__atomic_store_n(&process->terminating_signal, sig, __ATOMIC_RELEASE);
 	uk_pprocess_foreach_pthread(process, pt, next) {
 		uk_thread_interrupt_wait(pt->thread);
-		if (pt->state == POSIX_THREAD_BLOCKED_WAIT)
-			uk_semaphore_up(&pt->wait_semaphore);
 #if CONFIG_LIBPOSIX_PROCESS_SIGNAL
 		if (pt->state == POSIX_THREAD_BLOCKED_SIGWAIT)
 			uk_thread_wake(pt->thread);

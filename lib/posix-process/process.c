@@ -253,7 +253,6 @@ static struct posix_thread *pprocess_alloc_pthread(struct posix_process *p,
 	pthread->parent = uk_pthread_current();
 	pthread->tid = tid;
 	pthread->thread = th;
-	uk_semaphore_init(&pthread->wait_semaphore, 0);
 
 #if CONFIG_LIBPOSIX_PROCESS_SIGNAL
 	err = pprocess_signal_tdesc_alloc(pthread);

@@ -122,7 +122,6 @@ struct posix_thread {
 	struct uk_thread *thread;
 	struct uk_alloc *_a;
 	enum posix_thread_state state;
-	struct uk_semaphore wait_semaphore;
 #if CONFIG_LIBPOSIX_PROCESS_SIGNAL
 	struct uk_signal_tdesc *signal;
 #endif /* CONFIG_LIBPOSIX_PROCESS_SIGNAL */

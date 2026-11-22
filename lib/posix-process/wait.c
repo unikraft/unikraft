@@ -15,7 +15,7 @@
 
 #if CONFIG_LIBPOSIX_PROCESS_MULTIPROCESS
 #include <uk/process.h>
-#include <uk/semaphore.h>
+#include <uk/sched.h>
 
 #include "process.h"
 #include "signal/siginfo.h"
@@ -54,7 +54,7 @@ static int pprocess_wait(pid_t pid, pid_t pgid, siginfo_t *si, int opt)
 	struct posix_thread *this_thread;
 	struct posix_process *waitable = NULL;
 	struct posix_process *child, *next, *reap = NULL;
-	bool matched;
+	bool matched, blocked;
 	unsigned long flags;
 	int ret;
 
@@ -124,8 +124,16 @@ static int pprocess_wait(pid_t pid, pid_t pgid, siginfo_t *si, int opt)
 			goto out;
 		}
 
+		if (uk_thread_wait_signalled(this_thread->thread)) {
+			ret = -UK_SYSCALL_ERESTARTSYS;
+			goto out;
+		}
+
+		/* Child-state and signal notifications use the same lock. */
+		blocked = uk_thread_block_sigintr(this_thread->thread, 0);
 		pprocess_lock_release(flags);
-		uk_semaphore_down(&this_thread->wait_semaphore);
+		if (blocked)
+			uk_sched_yield();
 	}
 
 out:
