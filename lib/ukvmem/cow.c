@@ -62,6 +62,28 @@ int vmem_cow_ref_alloc(struct vmem_cow_ref *ref, struct uk_alloc *a,
 	return 0;
 }
 
+int vmem_cow_ref_adopt(struct vmem_cow_ref *ref, struct uk_alloc *a,
+		       struct uk_falloc *fa, __paddr_t paddr,
+		       void (*released)(void *), void *arg)
+{
+	struct vmem_cow_page *page;
+
+	UK_ASSERT(ref && !ref->page);
+	UK_ASSERT(a && fa);
+	UK_ASSERT(paddr != UK_PAGING_PADDR_INV);
+	UK_ASSERT(UK_PAGING_PAGE_ALIGNED(paddr));
+	page = uk_malloc(a, sizeof(*page));
+	if (!page)
+		return -ENOMEM;
+
+	page->a = a;
+	page->fa = fa;
+	page->paddr = paddr;
+	uk_refcount_init(&page->refs, 1);
+	cow_ref_init(ref, page, released, arg);
+	return 0;
+}
+
 void vmem_cow_ref_clone(struct vmem_cow_ref *dst,
 			const struct vmem_cow_ref *src,
 			void (*released)(void *), void *arg)

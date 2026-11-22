@@ -33,6 +33,15 @@ struct vmem_cow_ref {
 int vmem_cow_ref_alloc(struct vmem_cow_ref *ref, struct uk_alloc *a,
 		       struct uk_falloc *fa,
 		       void (*released)(void *), void *arg);
+/*
+ * Adopt one aligned frame allocated by fa, preserving its contents. The frame
+ * must be unpublished and exclusively owned by the caller; this does not add
+ * ownership of an active mapping or a shared file-cache page. Success transfers
+ * ownership to ref. Failure leaves ownership with the caller and ref empty.
+ */
+int vmem_cow_ref_adopt(struct vmem_cow_ref *ref, struct uk_alloc *a,
+		       struct uk_falloc *fa, __paddr_t paddr,
+		       void (*released)(void *), void *arg);
 void vmem_cow_ref_clone(struct vmem_cow_ref *dst,
 			const struct vmem_cow_ref *src,
 			void (*released)(void *), void *arg);
