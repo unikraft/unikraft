@@ -15,6 +15,12 @@
 
 #include <string.h>
 
+void vmem_arch_pagefault_finish(struct uk_paging_free_batch *batch,
+				struct uk_lcpu_regs *regs __unused)
+{
+	uk_paging_free_batch_finish(batch);
+}
+
 static int vmem_arch_pagefault(void *data)
 {
 	const char *faultstr[] __maybe_unused = {

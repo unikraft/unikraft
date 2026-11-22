@@ -1462,7 +1462,7 @@ int vmem_pagefault(__vaddr_t vaddr, unsigned int type,
 	uk_paging_batch_end(&batch);
 	ukplat_spin_unlock_irqrestore(&vas->lock, irqf);
 
-	uk_paging_free_batch_finish(&batch);
+	vmem_arch_pagefault_finish(&batch, regs);
 	return rc;
 }
 #endif /* CONFIG_LIBUKPAGING */

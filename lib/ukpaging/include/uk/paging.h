@@ -520,6 +520,7 @@ void uk_paging_batch_end(struct uk_paging_free_batch *batch);
  * at a time. Its release function may free call and runs after all paging
  * locks have been dropped. No allocation is required to queue a call.
  * Callers must finish the batch even if a later page-table operation fails.
+ * Releases queued by page-fault handlers must not block or yield.
  */
 void uk_paging_batch_defer(struct uk_paging_free_batch *batch,
 			   struct uk_paging_deferred_call *call,
