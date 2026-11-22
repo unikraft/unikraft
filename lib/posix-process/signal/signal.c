@@ -22,6 +22,13 @@
  */
 #define signal_check_perm(_target_process) true
 
+static void signal_wake_waiter(struct posix_thread *thread, int signum)
+{
+	if (thread->state == POSIX_THREAD_BLOCKED_SIGNAL &&
+	    !IS_MASKED(thread, signum) && !IS_IGNORED(thread->process, signum))
+		uk_semaphore_up(&thread->signal->deliver_semaphore);
+}
+
 /* Enqueue signal for a thread or a process
  *
  * Setting pthread to NULL signifies that the signal
@@ -51,10 +58,8 @@ static int pprocess_signal_enqueue(struct posix_process *pproc,
 	if (pthread) {
 		/* Standard signals can be queued once */
 		if (signum < SIGRTMIN &&
-		    IS_PENDING(pthread->signal->sigqueue, signum)) {
-			pprocess_lock_release(pflags);
-			return 0;
-		}
+		    IS_PENDING(pthread->signal->sigqueue, signum))
+			goto notify;
 
 		uk_list_add_tail(&sig->list_head,
 				 &pthread->signal->sigqueue.list_head[signum]);
@@ -63,10 +68,8 @@ static int pprocess_signal_enqueue(struct posix_process *pproc,
 	} else {
 		/* Standard signals can be queued once */
 		if (signum < SIGRTMIN &&
-		    IS_PENDING(pproc->signal->sigqueue, signum)) {
-			pprocess_lock_release(pflags);
-			return 0;
-		}
+		    IS_PENDING(pproc->signal->sigqueue, signum))
+			goto notify;
 
 		uk_list_add_tail(&sig->list_head,
 				 &pproc->signal->sigqueue.list_head[signum]);
@@ -75,6 +78,17 @@ static int pprocess_signal_enqueue(struct posix_process *pproc,
 	}
 
 	pproc->signal->queued_count++;
+
+notify:
+	/* Keep each waiter linked for the duration of its wakeup. */
+	if (pthread) {
+		signal_wake_waiter(pthread, signum);
+	} else {
+		struct posix_thread *thread, *threadn;
+
+		uk_pprocess_foreach_pthread(pproc, thread, threadn)
+			signal_wake_waiter(thread, signum);
+	}
 	pprocess_lock_release(pflags);
 
 	return 0;
@@ -213,21 +227,29 @@ int pprocess_signal_send(struct posix_process *proc, int signum,
 	return 0;
 }
 
-static void pprocess_signal_wake_waiters(struct posix_process *pproc)
+void pprocess_signal_wait(struct posix_thread *thread)
 {
-	struct posix_thread *thread, *threadn;
-	struct uk_semaphore *sems[16];
-	unsigned int nsems = 0, i;
-	unsigned long pflags = pprocess_lock_acquire();
+	struct posix_process *proc = thread->process;
+	int signum;
 
-	uk_pprocess_foreach_pthread(pproc, thread, threadn) {
-		if (thread->state == POSIX_THREAD_BLOCKED_SIGNAL &&
-		    nsems < ARRAY_SIZE(sems))
-			sems[nsems++] = &thread->signal->deliver_semaphore;
+	for (;;) {
+		unsigned long pflags = pprocess_lock_acquire();
+
+		pprocess_signal_foreach(signum) {
+			if ((IS_PENDING(thread->signal->sigqueue, signum) ||
+			     IS_PENDING(proc->signal->sigqueue, signum)) &&
+			    !IS_MASKED(thread, signum) && !IS_IGNORED(proc, signum)) {
+				thread->state = POSIX_THREAD_RUNNING;
+				pprocess_lock_release(pflags);
+				return;
+			}
+		}
+
+		/* Publish the waiter under the same lock used to enqueue. */
+		thread->state = POSIX_THREAD_BLOCKED_SIGNAL;
+		pprocess_lock_release(pflags);
+		uk_semaphore_down(&thread->signal->deliver_semaphore);
 	}
-	pprocess_lock_release(pflags);
-	for (i = 0; i < nsems; i++)
-		uk_semaphore_up(sems[i]);
 }
 
 int pprocess_signal_process_do(pid_t pid, int signum, siginfo_t *siginfo)
@@ -287,12 +309,7 @@ int pprocess_signal_process_do(pid_t pid, int signum, siginfo_t *siginfo)
 	if (pprocess_signal_should_drop(pproc, signum))
 		return 0;
 
-	rc = pprocess_signal_send(pproc, signum, siginfo);
-	if (unlikely(rc))
-		return rc;
-
-	pprocess_signal_wake_waiters(pproc);
-	return 0;
+	return pprocess_signal_send(pproc, signum, siginfo);
 }
 
 int pprocess_signal_thread_do(int tid, int signum, siginfo_t *siginfo)
@@ -327,9 +344,6 @@ int pprocess_signal_thread_do(int tid, int signum, siginfo_t *siginfo)
 		uk_signal_free(pthread->_a, sig);
 		return rc;
 	}
-
-	if (pthread->state == POSIX_THREAD_BLOCKED_SIGNAL)
-		uk_semaphore_up(&pthread->signal->deliver_semaphore);
 
 #if CONFIG_LIBPOSIX_PROCESS_SIGNALFD
 	pthread_signal_files_notify(pproc, pthread, signum);
