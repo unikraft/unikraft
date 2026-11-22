@@ -49,6 +49,19 @@ static int pg_page_mapx(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 			struct uk_paging_page_mapx *mapx,
 			uk_paging_page_mapx_result_t result);
 
+/* Distance from vaddr to the end of the level-lvl PTE that covers it. A walk
+ * that starts in the middle of a PTE without a page table below it must
+ * continue at the next boundary of that level. For a full walk
+ * (UK_PAL_VADDR_INV), page_size is 0 and returned unchanged.
+ */
+static inline __sz pg_step_to_boundary(__vaddr_t vaddr, unsigned int lvl,
+				       __sz page_size)
+{
+	if (vaddr == UK_PAL_VADDR_INV || !page_size)
+		return page_size;
+	return UK_PAL_PAGE_Lx_ALIGN_DOWN(vaddr, lvl) + page_size - vaddr;
+}
+
 static int pg_page_unmap(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 			 unsigned int level, __vaddr_t vaddr, __sz len,
 			 unsigned long flags);
@@ -1409,7 +1422,7 @@ static int pg_page_unmap(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 	unsigned int plvl, lvl = level;
 	__vaddr_t pt_vaddr_cache[UK_PAL_PT_LEVELS];
 	__pte_t pte, new_pte;
-	__sz page_size;
+	__sz page_size, step;
 	unsigned int pte_idx_cache[UK_PAL_PT_LEVELS];
 	unsigned int first_pte_idx[UK_PAL_PT_LEVELS];
 	unsigned int pte_idx, i;
@@ -1544,20 +1557,28 @@ static int pg_page_unmap(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 #if CONFIG_LIBUKPAGING_SHARED
 next_entry:
 #endif
+		/* The current PTE covers the range up to the next boundary of
+		 * this level. The range may start in the middle of a PTE that
+		 * has no page table below it, so step to that boundary and not
+		 * by a whole page size. Otherwise, the start of the next page
+		 * table would be skipped and its pages would stay mapped.
+		 */
+		step = pg_step_to_boundary(vaddr, lvl, page_size);
+
 		/* If this is not the last PTE and there are still pages to
 		 * unmap, we continue to the next PTE in this level
 		 */
-		if ((pte_idx < UK_PAL_PT_Lx_PTES(lvl) - 1) && len > page_size) {
-			UK_ASSERT(vaddr <= __VADDR_MAX - page_size);
-			vaddr += page_size;
-			len -= page_size;
+		if ((pte_idx < UK_PAL_PT_Lx_PTES(lvl) - 1) && len > step) {
+			UK_ASSERT(vaddr <= __VADDR_MAX - step);
+			vaddr += step;
+			len -= step;
 			pte_idx++;
 
 			continue;
 		}
 
 		UK_ASSERT((pte_idx == UK_PAL_PT_Lx_PTES(lvl) - 1) ||
-			  (len <= page_size));
+			  (len <= step));
 
 		/* At this point, we either invalidated the last PTE in this
 		 * page table and we have to walk up again, or we tried to
@@ -1569,7 +1590,7 @@ next_entry:
 		 * the PTEs and all other PTEs are INVALID.
 		 */
 		while ((pte_idx == UK_PAL_PT_Lx_PTES(lvl) - 1) ||
-		       ((len <= page_size) && !skip_pt_free)) {
+		       ((len <= step) && !skip_pt_free)) {
 
 			/* If we reached the top level, stop. */
 			if (lvl == level)
@@ -1660,17 +1681,20 @@ next_entry:
 			pg_pt_free(pt, pt_vaddr_cache[plvl], plvl, true);
 		}
 
-		if (len <= page_size)
+		if (len <= step)
 			break;
 
 		pt_vaddr = pt_vaddr_cache[lvl];
 
-		UK_ASSERT(vaddr <= __VADDR_MAX - page_size);
-		vaddr += page_size;
-		len -= page_size;
-
-		if (vaddr != UK_PAL_VADDR_INV)
+		/* Continue with the next PTE of the level we walked up to */
+		if (vaddr != UK_PAL_VADDR_INV) {
+			step = pg_step_to_boundary(vaddr, lvl,
+						   UK_PAL_PAGE_Lx_SIZE(lvl));
+			UK_ASSERT(len > step);
+			vaddr += step;
+			len -= step;
 			page_size = UK_PAL_PAGE_Lx_SIZE(lvl);
+		}
 
 		/* Do not move this into the while condition. We use continue */
 		if (++pte_idx == UK_PAL_PT_Lx_PTES(lvl))
@@ -1746,7 +1770,7 @@ static int pg_page_set_attr(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 	unsigned int lvl = level;
 	__vaddr_t pt_vaddr_cache[UK_PAL_PT_LEVELS];
 	__pte_t pte;
-	__sz page_size;
+	__sz page_size, step;
 	unsigned int pte_idx_cache[UK_PAL_PT_LEVELS];
 	unsigned int pte_idx;
 	int rc;
@@ -1844,14 +1868,20 @@ static int pg_page_set_attr(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 			pg_batch_record_tlb(pt->defer_batch, vaddr, page_size);
 		}
 
+		/* The current PTE covers the range up to the next boundary of
+		 * this level, which is closer than a whole page size if the
+		 * range starts in the middle of a PTE without a page table.
+		 */
+		step = pg_step_to_boundary(vaddr, lvl, page_size);
+
 		/* Bail out if there is nothing more to do */
-		if (page_size >= len)
+		if (step >= len)
 			break;
 
-		len -= page_size;
+		len -= step;
 
-		UK_ASSERT(vaddr <= __VADDR_MAX - page_size);
-		vaddr += page_size;
+		UK_ASSERT(vaddr <= __VADDR_MAX - step);
+		vaddr += step;
 
 		/* We need to change more pages. If we have reached the last PTE
 		 * in this page table, we have to walk up again until we reach
