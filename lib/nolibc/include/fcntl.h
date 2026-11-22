@@ -152,13 +152,10 @@ int lockf(int, int, off_t);
 #define F_OWNER_PID 1
 #define F_OWNER_PGRP 2
 #define F_OWNER_GID 2
-#if 0
-/* Not implemented */
 struct f_owner_ex {
 	int type;
 	pid_t pid;
 };
-#endif
 
 #if CONFIG_LIBUKFILE
 #include <linux/falloc.h>

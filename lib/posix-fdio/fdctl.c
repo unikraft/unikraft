@@ -57,6 +57,23 @@ int uk_sys_ioctl(struct uk_ofile *of, int cmd, void *arg)
 /* File flags we actually support & care about changing */
 #define _SETFL_MASK (_FCNTL_MASK & UKFD_MODE_MASK)
 
+#if CONFIG_LIBPOSIX_PROCESS_SIGNAL && CONFIG_LIBPOSIX_FD_HEAPOFD
+static int ofile_set_owner(struct uk_ofile *of, pid_t owner)
+{
+	pid_t previous;
+	int ret = uk_sigowner_acquire(owner);
+
+	if (ret)
+		return ret;
+	uk_mutex_lock(&of->lock);
+	previous = of->signal_owner;
+	UK_WRITE_ONCE(of->signal_owner, owner);
+	uk_mutex_unlock(&of->lock);
+	uk_sigowner_release(previous);
+	return 0;
+}
+#endif /* CONFIG_LIBPOSIX_PROCESS_SIGNAL && CONFIG_LIBPOSIX_FD_HEAPOFD */
+
 int uk_sys_fcntl(struct uk_ofile *of, int cmd, unsigned long arg)
 {
 	switch (cmd) {
@@ -73,6 +90,41 @@ int uk_sys_fcntl(struct uk_ofile *of, int cmd, unsigned long arg)
 		} while (!uk_compare_exchange_n(&of->mode, &mode, newmode));
 		return 0;
 	}
+#if CONFIG_LIBPOSIX_PROCESS_SIGNAL && CONFIG_LIBPOSIX_FD_HEAPOFD
+	case F_SETOWN:
+		return ofile_set_owner(of, (pid_t)arg);
+	case F_GETOWN:
+		return UK_READ_ONCE(of->signal_owner);
+	case F_SETOWN_EX:
+	{
+		const struct f_owner_ex *owner = (const void *)arg;
+
+		if (!owner)
+			return -EFAULT;
+		if (owner->pid < 0)
+			return -EINVAL;
+		switch (owner->type) {
+		case F_OWNER_PID:
+			return ofile_set_owner(of, owner->pid);
+		case F_OWNER_PGRP:
+			return ofile_set_owner(of, -owner->pid);
+		default:
+			return -EINVAL;
+		}
+	}
+	case F_GETOWN_EX:
+	{
+		struct f_owner_ex *owner = (void *)arg;
+		pid_t id;
+
+		if (!owner)
+			return -EFAULT;
+		id = UK_READ_ONCE(of->signal_owner);
+		owner->type = id < 0 ? F_OWNER_PGRP : F_OWNER_PID;
+		owner->pid = id < 0 ? -id : id;
+		return 0;
+	}
+#endif /* CONFIG_LIBPOSIX_PROCESS_SIGNAL && CONFIG_LIBPOSIX_FD_HEAPOFD */
 	case F_SETLK:
 	case F_SETLKW:
 		/* We currently stub file locking; revisit if needed */
