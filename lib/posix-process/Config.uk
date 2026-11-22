@@ -33,6 +33,13 @@ menuconfig LIBPOSIX_PROCESS_BRK
 
 if LIBPOSIX_PROCESS_BRK
 
+config LIBPOSIX_PROCESS_BRK_VAS_TEST
+	bool "Test brk initialization and teardown in an inactive process VAS"
+	depends on LIBPOSIX_PROCESS_PREPARE && LIBPOSIX_PROCESS_SIGNAL
+	depends on LIBUKVMEM_PROCESS_VAS
+	select LIBUKTEST
+	default n
+
 config LIBPOSIX_PROCESS_BRK_PAGE_ORDER
 	int "Heap size for brk (page order)"
 	default 9
