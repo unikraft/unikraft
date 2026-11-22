@@ -54,6 +54,13 @@ config LIBPOSIX_VFS_FSTAB_MOUNT_DEV
 	bool "/dev: devfs"
 	select LIBUKFS_DEVFS
 
+config LIBPOSIX_VFS_FSTAB_MOUNT_SHM
+	bool "/dev/shm: RAMfs for POSIX shared memory"
+	depends on LIBPOSIX_VFS_FSTAB_MOUNT_DEV
+	select LIBUKFS_RAMFS
+	help
+	  Mount a separate RAMfs on /dev/shm after devfs is mounted.
+
 endif # LIBPOSIX_VFS_FSTAB_BUILTIN || LIBPOSIX_VFS_FSTAB_USER
 
 endif # LIBPOSIX_VFS_FSTAB
