@@ -57,10 +57,13 @@ int uk_file_finref_try_acquire(struct uk_file_finref *r)
 	return uk_swrefcount_try_acquire(&r->cnt);
 }
 
+/* The releasing strong reference keeps its accompanying weak reference
+ * until resource teardown and finalizers have completed.
+ */
 static inline
 int uk_file_finref_release(struct uk_file_finref *r)
 {
-	return uk_swrefcount_release(&r->cnt);
+	return uk_refcount_release(&r->cnt.strong);
 }
 
 static inline

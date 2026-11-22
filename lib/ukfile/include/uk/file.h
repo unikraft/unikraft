@@ -333,8 +333,6 @@ typedef struct uk_swrefcount uk_file_refcnt;
 #define UK_FILE_REFCNT_INIT_VALUE_V(name, v) \
 	UK_SWREFCOUNT_INIT_VALUE((v), (v))
 
-#define uk_file_refcnt_finalize(_) do { } while (0)
-
 #define uk_file_refcnt_acquire		uk_swrefcount_acquire
 #define uk_file_refcnt_acquire_weak	uk_swrefcount_acquire_weak
 #define uk_file_refcnt_try_acquire	uk_swrefcount_try_acquire
@@ -441,23 +439,29 @@ int uk_file_try_acquire(const struct uk_file *f)
 }
 
 static inline
-void uk_file_release(const struct uk_file *f)
-{
-	int r = uk_file_refcnt_release(f->refcnt);
-
-	if (r)
-		f->_release(f, r);
-	if (r | UK_SWREFCOUNT_LAST_STRONG)
-		uk_file_refcnt_finalize(f->refcnt);
-}
-
-static inline
 void uk_file_release_weak(const struct uk_file *f)
 {
 	int r = uk_file_refcnt_release_weak(f->refcnt);
 
 	if (r)
 		f->_release(f, r);
+}
+
+static inline
+void uk_file_release(const struct uk_file *f)
+{
+#if CONFIG_LIBUKFILE_FINALIZERS
+	if (uk_file_refcnt_release(f->refcnt)) {
+		f->_release(f, UK_FILE_RELEASE_RES);
+		uk_file_refcnt_finalize(f->refcnt);
+	}
+	uk_file_release_weak(f);
+#else
+	int r = uk_file_refcnt_release(f->refcnt);
+
+	if (r)
+		f->_release(f, r);
+#endif
 }
 
 #if CONFIG_LIBUKFILE_FINALIZERS
