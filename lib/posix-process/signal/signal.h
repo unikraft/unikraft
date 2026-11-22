@@ -287,6 +287,9 @@ int pprocess_signal_thread_do(int tid, int signum, siginfo_t *siginfo);
 int pprocess_signal_send(struct posix_process *proc, int signum,
 			 siginfo_t *siginfo);
 
+/* Wait until an unmasked signal can be delivered to the calling thread. */
+void pprocess_signal_wait(struct posix_thread *thread);
+
 /* Jump to signal handler
  *
  * Trampoline to jump from unikraft to userspace context.
