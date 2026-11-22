@@ -13,6 +13,12 @@ menuconfig LIBUKVMEM
 
 if LIBUKVMEM
 
+config LIBUKVMEM_TRACE_PAGEFAULTS
+	bool "Expose per-thread minor fault count for development measurements"
+	depends on ARCH_X86_64 && HAVE_SCHED && LIBPOSIX_PROCESS
+	depends on LIBUKDEBUG_ENABLE_ASSERT
+	default n
+
 config LIBUKVMEM_DEMAND_PAGE_IN_SIZE
 	int "Page size in log2 for demand-paging"
 	default 12

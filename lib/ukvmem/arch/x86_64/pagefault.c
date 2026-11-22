@@ -15,6 +15,9 @@
 #include <uk/config.h>
 #include <uk/lcpu.h>
 #include <string.h>
+#if CONFIG_LIBUKVMEM_TRACE_PAGEFAULTS
+#include <uk/thread.h>
+#endif
 
 static int vmem_arch_pagefault(void *data)
 {
@@ -42,9 +45,16 @@ static int vmem_arch_pagefault(void *data)
 	else if (error_code & UK_ARCH_X86_64_PF_EC_RSVD)
 		faulttype |= UK_VMA_FAULT_MISCONFIG;
 
+#if CONFIG_LIBUKVMEM_TRACE_PAGEFAULTS
+	struct uk_thread *thread = uk_thread_current();
+#endif
 	rc = vmem_pagefault(vaddr, faulttype,
 			    (struct uk_lcpu_regs *)
 			    uk_lcpu_except_err_ctx_get_regs(ctx));
+#if CONFIG_LIBUKVMEM_TRACE_PAGEFAULTS
+	if (!rc && thread && (faulttype & UK_VMA_FAULT_NONPRESENT))
+		thread->vmem_faults++;
+#endif
 	if (rc < 0) {
 		vas = uk_vas_get_active();
 		if (unlikely(uk_vas_paging_enabled(vas)))
