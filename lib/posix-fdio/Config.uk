@@ -21,4 +21,14 @@ config LIBPOSIX_FDIO_VMA
 	  acquire the mapped range; unsupported backends fail rather than copy.
 
 
+config LIBPOSIX_FDIO_VMA_COW_TEST
+	bool "Test private and shared file mappings in COW address spaces"
+	depends on LIBPOSIX_FDIO_VMA && LIBPOSIX_FDTAB && LIBPOSIX_MMAP
+	depends on LIBUKVMEM_PROCESS_VAS && LIBPOSIX_FUTEX_VAS
+	depends on LIBUKLOCK_SEMAPHORE && LIBSYSCALL_SHIM
+	select LIBUKTEST
+	select LIBUKPAGING_STATS
+	default n
+
+
 endif
