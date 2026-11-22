@@ -131,6 +131,21 @@ static inline __sz uk_vma_len(struct uk_vma *vma)
 	return vma->end - vma->start;
 }
 
+#if CONFIG_LIBUKVMEM_COW
+/**
+ * Staged fault ownership. The result callback runs exactly once after the
+ * mapper outcome, under VAS and paging locks with IRQs masked. A zero result
+ * commits ownership; other values discard it. Retirement of replaced frames
+ * still belongs to the supplied TLB batch. Do not block, yield or reenter
+ * VAS/paging operations here; enqueue later work in the batch instead. The
+ * descriptor must outlive the fault callback and may be freed by result().
+ */
+struct uk_vm_fault_op {
+	void (*result)(struct uk_vm_fault_op *op, int status,
+		       struct uk_paging_free_batch *batch);
+};
+#endif
+
 /** Page fault context */
 struct uk_vm_fault {
 	/** Faulting virtual address */
@@ -185,6 +200,10 @@ struct uk_vm_fault {
 
 	/** Trap frame */
 	struct uk_lcpu_regs *regs;
+#if CONFIG_LIBUKVMEM_COW
+	/** Optional staged ownership result, set by the backend. */
+	struct uk_vm_fault_op **operation;
+#endif
 #endif /* CONFIG_LIBUKPAGING */
 };
 
