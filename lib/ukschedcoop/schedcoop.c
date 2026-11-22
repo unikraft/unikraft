@@ -33,6 +33,7 @@
 #include <uk/lcpu.h>
 #include <uk/plat/memory.h>
 #include <uk/plat/time.h>
+#include <uk/print.h>
 #include <uk/sched_impl.h>
 #include <uk/schedcoop.h>
 #include <uk/essentials.h>
@@ -45,8 +46,14 @@ static void schedcoop_schedule(struct uk_sched *s)
 	__snsec now, min_wakeup_time;
 	unsigned long flags;
 
-	if (unlikely(uk_lcpu_irqs_disabled()))
+	if (unlikely(uk_lcpu_irqs_disabled())) {
+#if CONFIG_LIBUKDEBUG_ENABLE_ASSERT
+		uk_pr_crit_isr("Scheduler IRQ origin caller=%p thread=%p sched=%p\n",
+			       __builtin_extract_return_addr(__builtin_return_address(0)),
+			       uk_thread_current(), s);
+#endif
 		UK_CRASH("Must not call %s with IRQs disabled\n", __func__);
+	}
 
 	now = ukplat_monotonic_clock();
 	prev = uk_thread_current();
