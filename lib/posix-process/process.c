@@ -34,6 +34,9 @@ struct uk_thread *pprocess_thread_main;
 #if CONFIG_LIBUKVMEM_THREAD_VAS
 #include <uk/vmem.h>
 #endif
+#if CONFIG_LIBUKVMEM_PROCESS_VAS
+#include <uk/vmem/process.h>
+#endif
 
 #if CONFIG_LIBPOSIX_PROCESS_SIGNAL
 #include "signal/signal.h"
@@ -488,6 +491,53 @@ int pprocess_bind_prepared_vas(struct posix_process *p, struct uk_vas *vas)
 	uk_vas_put(old);
 	return 0;
 }
+
+#if CONFIG_LIBUKVMEM_PROCESS_VAS
+int pprocess_clone_prepared_vas(struct posix_process *p,
+				struct posix_process *parent)
+{
+	struct uk_vas *vas;
+#if CONFIG_LIBPOSIX_PROCESS_BRK
+	void *base;
+	__sz pos;
+#endif
+	int rc;
+
+	if (!p || !parent || p == parent)
+		return -EINVAL;
+	if (!uk_vas_is_owned(parent->vas))
+		return -ENOTSUP;
+	if (uk_lcpu_irqs_disabled())
+		return -EWOULDBLOCK;
+#if CONFIG_LIBPOSIX_PROCESS_BRK
+	if (p->brk_ctx.base)
+		return -EBUSY;
+	/* Keep the break position and its mapped contents in one snapshot. */
+	base = parent->brk_ctx.base;
+	if (base)
+		uk_mutex_lock(&parent->brk_ctx.mtx);
+	pos = parent->brk_ctx.pos;
+#endif
+	rc = uk_vas_clone_process(parent->vas, &vas);
+#if CONFIG_LIBPOSIX_PROCESS_BRK
+	if (base)
+		uk_mutex_unlock(&parent->brk_ctx.mtx);
+#endif
+	if (rc)
+		return rc;
+	/* Binding may release the previous VAS; hold no parent mutex here. */
+	rc = pprocess_bind_prepared_vas(p, vas);
+#if CONFIG_LIBPOSIX_PROCESS_BRK
+	if (!rc) {
+		p->brk_ctx.base = base;
+		p->brk_ctx.pos = pos;
+		uk_mutex_init_config(&p->brk_ctx.mtx, UK_MUTEX_CONFIG_RECURSE);
+	}
+#endif
+	uk_vas_put(vas);
+	return rc;
+}
+#endif /* CONFIG_LIBUKVMEM_PROCESS_VAS */
 #endif /* CONFIG_LIBUKVMEM_VAS_REFCOUNT */
 
 void pprocess_abort(struct posix_process *p)
