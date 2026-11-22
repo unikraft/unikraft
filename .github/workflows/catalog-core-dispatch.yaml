@@ -1,37 +1,22 @@
 # SPDX-License-Identifier: BSD-3-Clause
+#
+# Tell catalog-core that this pull request changed (or someone commented
+# `recheck`), so it can test the change on the catalog apps. All logic lives in catalog-core; this file
+# is identical in every repository. No PR code is checked out here.
 
-name: cc-dispatch-unikraft
+name: catalog-core
 
 on:
-  pull_request_target:
-    branches: [staging]
-    types: [opened, synchronize, reopened]
+  pull_request_target:  # zizmor: ignore[dangerous-triggers] -- no checkout; only sends the PR number
+    types: [opened, synchronize, reopened, edited, ready_for_review]
+  issue_comment:        # `recheck` on a PR re-runs the tests
+    types: [created]
+
+permissions: {}
 
 jobs:
-  notify-catalog-core:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Generate App Token for Catalog Core
-        uses: actions/create-github-app-token@v1
-        id: generate_token
-        with:
-          app-id: ${{ vars.APP_ID }}
-          private-key: ${{ secrets.PRIVATE_KEY }}
-          owner: ${{ github.repository_owner }}
-          repositories: catalog-core
-
-      - name: Repository Dispatch
-        uses: actions/github-script@v7
-        with:
-          github-token: ${{ steps.generate_token.outputs.token }}
-          script: |
-            await github.rest.repos.createDispatchEvent({
-              owner: '${{ github.repository_owner }}',
-              repo: 'catalog-core',
-              event_type: 'unikraft_open_pr',
-              client_payload: {
-                pr_number: '${{ github.event.pull_request.number }}',
-                pr_repo: '${{ github.repository }}',
-                pr_sha: '${{ github.event.pull_request.head.sha }}'
-              }
-            });
+  dispatch:
+    # Upstream: unikraft/catalog-core/.github/workflows/dispatch.yml@main
+    uses: raresgoidescu/catalog-core/.github/workflows/dispatch.yml@ci/rework
+    secrets:
+      PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
