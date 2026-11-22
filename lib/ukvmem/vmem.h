@@ -7,6 +7,7 @@
 #ifndef __VMEM_H__
 #define __VMEM_H__
 
+#include <stdbool.h>
 #include <uk/vmem.h>
 #include <uk/assert.h>
 #ifdef CONFIG_LIBUKPAGING
@@ -14,6 +15,21 @@
 #endif /* CONFIG_LIBUKPAGING */
 
 #ifdef CONFIG_LIBUKPAGING
+static inline bool vmem_vas_range_allowed(struct uk_vas *vas,
+					  __vaddr_t start, __sz len)
+{
+#if CONFIG_LIBUKVMEM_VAS_BOUNDS
+	if (vas->range_end)
+		return start >= vas->range_start && start < vas->range_end &&
+			len <= vas->range_end - start;
+#else
+	(void)vas;
+	(void)start;
+	(void)len;
+#endif
+	return true;
+}
+
 /**
  * Architecture-independent page fault handler
  *

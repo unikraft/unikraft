@@ -208,6 +208,10 @@ int uk_vas_init(struct uk_vas *vas, struct uk_pagetable *pt __maybe_unused,
 
 	vas->vma_base = UK_PAGING_PAGE_ALIGN_UP(CONFIG_LIBUKVMEM_DEFAULT_BASE);
 	UK_ASSERT(uk_paging_vaddr_isvalid(vas->vma_base));
+#if CONFIG_LIBUKVMEM_VAS_BOUNDS
+	vas->range_start = 0;
+	vas->range_end = 0;
+#endif
 #endif /* CONFIG_LIBUKPAGING */
 
 	vas->flags = 0;
@@ -223,6 +227,41 @@ int uk_vas_init(struct uk_vas *vas, struct uk_pagetable *pt __maybe_unused,
 
 	return 0;
 }
+
+#if CONFIG_LIBUKVMEM_VAS_BOUNDS
+int uk_vas_set_bounds(struct uk_vas *vas, __vaddr_t start, __vaddr_t end)
+{
+	unsigned long irqf;
+	bool busy;
+	int rc = 0;
+
+	if (!vas || start >= end || !UK_PAGING_PAGE_ALIGNED(start) ||
+	    !UK_PAGING_PAGE_ALIGNED(end) ||
+	    !uk_paging_vaddr_range_isvalid(start, end - start))
+		return -EINVAL;
+	if (vas == uk_vas_get_active())
+		return -EBUSY;
+#if CONFIG_LIBUKVMEM_VAS_REFCOUNT
+	if (uk_vas_is_owned(vas) && uk_refcount_read(&vas->refs) != 1)
+		return -EBUSY;
+#endif
+	ukplat_spin_lock_irqsave(&vas->lock, irqf);
+	busy = !uk_list_empty(&vas->vma_list);
+#if CONFIG_LIBUKVMEM_COW
+	busy = busy || vas->transition;
+#endif
+	if (busy) {
+		rc = -EBUSY;
+	} else {
+		vas->range_start = start;
+		vas->range_end = end;
+		if (vas->vma_base < start || vas->vma_base >= end)
+			vas->vma_base = start;
+	}
+	ukplat_spin_unlock_irqrestore(&vas->lock, irqf);
+	return rc;
+}
+#endif
 
 #if CONFIG_LIBUKVMEM_VAS_REFCOUNT
 int uk_vas_init_owned(struct uk_vas *vas, struct uk_pagetable *pt,
@@ -1001,7 +1040,8 @@ int uk_vma_map(struct uk_vas *vas, __vaddr_t *vaddr, __sz len,
 			return -EINVAL;
 		}
 		if (unlikely(va > __VADDR_MAX - len ||
-			     !uk_paging_vaddr_range_isvalid(va, len)))
+			     !uk_paging_vaddr_range_isvalid(va, len) ||
+			     !vmem_vas_range_allowed(vas, va, len)))
 			return -ENOMEM;
 	}
 
@@ -1051,12 +1091,16 @@ int uk_vma_map(struct uk_vas *vas, __vaddr_t *vaddr, __sz len,
 		 */
 		base = (ops->get_base) ? ops->get_base(vas, args, flags) :
 					 vas->vma_base;
+#if CONFIG_LIBUKVMEM_VAS_BOUNDS
+		base = MAX(base, vas->range_start);
+#endif
 
 		va = vmem_first_fit(vas, base, UK_PAGING_PAGE_Lx_SIZE(algn_lvl),
 				    len);
 		if (unlikely(va == UK_PAGING_VADDR_INV ||
 			     va > __VADDR_MAX - len ||
-			     !uk_paging_vaddr_range_isvalid(va, len))) {
+			     !uk_paging_vaddr_range_isvalid(va, len) ||
+			     !vmem_vas_range_allowed(vas, va, len))) {
 			rc = -ENOMEM;
 			goto err_unlock_destroy;
 		}
@@ -1066,6 +1110,10 @@ int uk_vma_map(struct uk_vas *vas, __vaddr_t *vaddr, __sz len,
 		 * mappings. However, we enforce the new mapping if the replace
 		 * flag is provided by unmapping everything in the range first.
 		 */
+		if (!vmem_vas_range_allowed(vas, va, len)) {
+			rc = -ENOMEM;
+			goto err_unlock_destroy;
+		}
 		if ((vma_start = vmem_vma_find(vas, va, len))) {
 			if (unlikely(!(flags & UK_VMA_MAP_REPLACE))) {
 				rc = -EEXIST;
