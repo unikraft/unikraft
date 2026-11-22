@@ -23,4 +23,10 @@ config LIBPOSIX_MMAP_TEST
 	default n
 	select LIBUKTEST
 
+config LIBPOSIX_MMAP_COW_TEST
+	bool "Test POSIX anonymous mappings in COW address spaces"
+	depends on LIBUKVMEM_PROCESS_VAS
+	select LIBUKTEST
+	default n
+
 endif
