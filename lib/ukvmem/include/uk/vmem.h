@@ -420,7 +420,8 @@ int uk_vas_set_active(struct uk_vas *vas);
  * @param pt
  *   The page table to use for the address space
  * @param a
- *   Pointer to an allocator that should be used to allocate VMA metadata
+ *   Allocator for VMA metadata. Allocation and free must not fault into
+ *   this address space while its lock is held.
  *
  * @return
  *   0 on success, a negative errno error otherwise

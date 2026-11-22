@@ -46,6 +46,10 @@
 #include <uk/paging.h>
 #ifdef CONFIG_LIBUKVMEM
 #include <uk/vmem.h>
+#if CONFIG_LIBUKPAGING_DIRECTMAP
+#include <uk/alloc_impl.h>
+#include <uk/paging/arch.h>
+#endif
 #endif /* CONFIG_LIBUKVMEM */
 #endif /* CONFIG_LIBUKPAGING */
 /* FIXME: allocators are hard-coded for now */
@@ -135,6 +139,36 @@ struct uk_semaphore main_sema;
 
 #if defined(CONFIG_LIBUKBOOT_HEAP_BASE) && defined(CONFIG_LIBUKVMEM)
 static struct uk_vas kernel_vas;
+#if CONFIG_LIBUKPAGING_DIRECTMAP
+static struct uk_falloc *kernel_vas_frames;
+
+/* VMA operations allocate metadata with the VAS lock held. Use the
+ * direct map so neither allocation nor free can re-enter its fault handler.
+ */
+static void *kernel_vas_palloc(struct uk_alloc *a __unused, unsigned long pages)
+{
+	__paddr_t paddr = uk_falloc(kernel_vas_frames, pages);
+
+	if (unlikely(paddr == UK_PAGING_PADDR_INV))
+		return NULL;
+
+	return (void *)pgarch_directmap_paddr_to_vaddr(paddr);
+}
+
+static void kernel_vas_pfree(struct uk_alloc *a __unused, void *addr,
+			     unsigned long pages)
+{
+	uk_ffree(kernel_vas_frames,
+		 pgarch_directmap_vaddr_to_paddr((__vaddr_t)addr), pages);
+}
+
+static struct uk_alloc kernel_vas_alloc = {
+	.malloc = uk_malloc_ifpages,
+	.free = uk_free_ifpages,
+	.palloc = kernel_vas_palloc,
+	.pfree = kernel_vas_pfree,
+};
+#endif /* CONFIG_LIBUKPAGING_DIRECTMAP */
 #endif /* CONFIG_LIBUKBOOT_HEAP_BASE && CONFIG_LIBUKVMEM */
 
 #if CONFIG_HAVE_SMP && CONFIG_LIBUKBOOT_INITSCHED && \
@@ -340,7 +374,12 @@ static struct uk_alloc *heap_init()
 	if (unlikely(!a))
 		return NULL;
 
+#if CONFIG_LIBUKPAGING_DIRECTMAP
+	kernel_vas_frames = pt->fa;
+	rc = uk_vas_init(&kernel_vas, pt, &kernel_vas_alloc);
+#else
 	rc = uk_vas_init(&kernel_vas, pt, a);
+#endif
 	if (unlikely(rc))
 		return NULL;
 
