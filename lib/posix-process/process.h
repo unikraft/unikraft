@@ -276,6 +276,18 @@ void pprocess_abort(struct posix_process *process);
  */
 int pprocess_bind_prepared_vas(struct posix_process *process,
 			       struct uk_vas *vas);
+
+#if CONFIG_LIBUKVMEM_PROCESS_VAS
+/**
+ * Clone the parent's owned VAS into an exclusively held prepared process.
+ * The parent and its VAS binding must remain alive and stable. The parent
+ * break position is serialized with the COW snapshot; the child receives a
+ * fresh mutex. No process is published or woken. Requires interrupts enabled
+ * and no caller locks. Failure preserves the child's old VAS and brk state.
+ */
+int pprocess_clone_prepared_vas(struct posix_process *process,
+				struct posix_process *parent);
+#endif
 #endif
 #endif /* CONFIG_LIBPOSIX_PROCESS_PREPARE */
 
