@@ -240,6 +240,45 @@ struct posix_process *pprocess_create(struct uk_alloc *a,
 				      struct uk_thread *thread,
 				      struct uk_thread *parent);
 
+#if CONFIG_LIBPOSIX_PROCESS_PREPARE
+/**
+ * Prepare one unpublished process on a new, unscheduled, blocked UK thread.
+ * The caller exclusively owns the child and keeps the parent alive. An ID
+ * is reserved, but PID/TID lookup and the parent's child list stay unchanged.
+ * The child's UKTLS already provides its initialized POSIX descriptors.
+ * Requires interrupts enabled. Returns an error pointer on failure.
+ */
+struct posix_process *pprocess_prepare(struct uk_alloc *a,
+				       struct uk_thread *thread,
+				       struct uk_thread *parent);
+
+/**
+ * Publish a completely prepared process. The child is still blocked; it may
+ * already be registered with a scheduler. This does not allocate or wake it.
+ * On failure nothing is published. On success the caller may wake the child
+ * and must use normal process exit/reaping instead of pprocess_abort().
+ */
+int pprocess_publish(struct posix_process *process);
+
+/**
+ * Discard an unpublished process and its reserved ID, without exit events.
+ * The child must be unscheduled. Requires interrupts enabled. The caller
+ * releases the backing UK thread afterwards, including its UKTLS resources
+ * and any thread-held VAS reference. NULL is accepted.
+ */
+void pprocess_abort(struct posix_process *process);
+
+#if CONFIG_LIBUKVMEM_VAS_REFCOUNT
+/**
+ * Assign an owned VAS to the unpublished process and its unscheduled thread.
+ * Both take their own references; the caller retains its reference. Requires
+ * interrupts enabled and no caller locks. Failure retains both old bindings.
+ */
+int pprocess_bind_prepared_vas(struct posix_process *process,
+			       struct uk_vas *vas);
+#endif
+#endif /* CONFIG_LIBPOSIX_PROCESS_PREPARE */
+
 int uk_clone(struct clone_args *cl_args, size_t cl_args_len,
 	     struct ukarch_execenv *execenv);
 
