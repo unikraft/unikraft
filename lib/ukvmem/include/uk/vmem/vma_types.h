@@ -74,6 +74,8 @@ static inline int uk_vma_reserve_ex(struct uk_vas *vas, __vaddr_t *vaddr,
 extern const struct uk_vma_ops uk_vma_anon_ops;
 #if CONFIG_LIBUKVMEM_COW_VMA
 extern const struct uk_vma_ops uk_vma_cow_anon_ops;
+/* Anonymous mappings with a reference-counted backing shared across VASes. */
+extern const struct uk_vma_ops uk_vma_shared_anon_ops;
 #endif
 
 /**

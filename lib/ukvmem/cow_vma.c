@@ -475,7 +475,8 @@ int uk_vas_clone_cow(struct uk_vas *dst, struct uk_vas *src)
 	ukplat_spin_lock_irqsave(&src->lock, irqf);
 	/* Validate every class before changing source permissions. */
 	uk_list_for_each_entry(vma, &src->vma_list, vma_list) {
-		if (vma->ops != &uk_vma_cow_anon_ops ||
+		if ((vma->ops != &uk_vma_cow_anon_ops &&
+		     vma->ops != &uk_vma_shared_anon_ops) ||
 		    !vmem_vas_range_allowed(dst, vma->start,
 					vma->end - vma->start) ||
 		    vma->page_lvl > UK_PAGING_PAGE_LEVEL ||
@@ -488,10 +489,16 @@ int uk_vas_clone_cow(struct uk_vas *dst, struct uk_vas *src)
 		}
 	}
 	uk_list_for_each_entry(vma, &src->vma_list, vma_list) {
-		v = uk_malloc(dst->a, sizeof(*v));
-		if (!v) {
-			rc = -ENOMEM;
-			goto unlock;
+		if (vma->ops == &uk_vma_shared_anon_ops) {
+			rc = vmem_shared_anon_clone(vma, dst->a, &v);
+			if (rc)
+				goto unlock;
+		} else {
+			v = uk_malloc(dst->a, sizeof(*v));
+			if (!v) {
+				rc = -ENOMEM;
+				goto unlock;
+			}
 		}
 		memcpy_isr(v, vma, sizeof(*v));
 		v->vas = dst;
