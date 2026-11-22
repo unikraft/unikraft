@@ -165,7 +165,8 @@ static void handle_self(struct uk_signal *sig, const struct kern_sigaction *ks,
  * default disposition.
  */
 static void do_deliver(struct posix_thread *pthread, struct uk_signal *sig,
-		       struct ukarch_execenv *execenv)
+		       struct ukarch_execenv *execenv,
+		       struct uk_syscall_exit_ctx *exit_ctx)
 {
 	struct posix_process *pproc;
 	struct kern_sigaction action;
@@ -221,6 +222,7 @@ static void do_deliver(struct posix_thread *pthread, struct uk_signal *sig,
 		SET_MASKED(pthread, signum);
 
 	/* Execute handler */
+	uk_syscall_exit_resolve_restart(exit_ctx, action.ks_flags & SA_RESTART);
 	handle_self(sig, &action, execenv);
 
 	/* Restore original mask */
@@ -232,7 +234,7 @@ static void do_deliver(struct posix_thread *pthread, struct uk_signal *sig,
  * signal.
  */
 static int deliver_pending_proc(struct posix_process *proc,
-				struct ukarch_execenv *execenv)
+				struct uk_syscall_exit_ctx *exit_ctx)
 {
 	struct posix_thread *this_thread;
 	struct uk_signal *sig;
@@ -240,7 +242,7 @@ static int deliver_pending_proc(struct posix_process *proc,
 	int signum;
 
 	UK_ASSERT(proc);
-	UK_ASSERT(execenv);
+	UK_ASSERT(exit_ctx->execenv);
 
 	if (!proc->signal ||
 	    __atomic_load_n(&proc->signal->sigqueue.pending,
@@ -258,7 +260,8 @@ static int deliver_pending_proc(struct posix_process *proc,
 
 		/* Deliver on the current CPU's thread whose execenv is saved */
 		while ((sig = pprocess_signal_dequeue(proc, __NULL, signum))) {
-			do_deliver(this_thread, sig, execenv);
+			do_deliver(this_thread, sig, exit_ctx->execenv,
+				   exit_ctx);
 			uk_signal_free(proc->_a, sig);
 			handled_cnt++;
 		}
@@ -268,7 +271,7 @@ static int deliver_pending_proc(struct posix_process *proc,
 }
 
 static int deliver_pending_thread(struct posix_thread *thread,
-				  struct ukarch_execenv *execenv)
+				  struct uk_syscall_exit_ctx *exit_ctx)
 {
 	struct posix_process *proc;
 	struct uk_signal *sig;
@@ -293,7 +296,7 @@ static int deliver_pending_thread(struct posix_thread *thread,
 			continue;
 
 		while ((sig = pprocess_signal_dequeue(proc, thread, signum))) {
-			do_deliver(thread, sig, execenv);
+			do_deliver(thread, sig, exit_ctx->execenv, exit_ctx);
 			uk_signal_free(thread->_a, sig);
 			handled++;
 		}
@@ -303,7 +306,7 @@ static int deliver_pending_thread(struct posix_thread *thread,
 }
 
 static void deliver_suspend_signal(struct posix_thread *thread,
-				   struct ukarch_execenv *execenv)
+				   struct uk_syscall_exit_ctx *exit_ctx)
 {
 	struct uk_signal_tdesc *tdesc = thread->signal;
 	struct uk_signal *pending = tdesc->suspend_signal;
@@ -316,7 +319,7 @@ static void deliver_suspend_signal(struct posix_thread *thread,
 	saved_mask = tdesc->suspend_saved_mask;
 	sig.siginfo = pending->siginfo;
 	uk_signal_free(pending->alloc, pending);
-	do_deliver(thread, &sig, execenv);
+	do_deliver(thread, &sig, exit_ctx->execenv, exit_ctx);
 
 	flags = pprocess_lock_acquire();
 	tdesc->mask = saved_mask;
@@ -374,13 +377,13 @@ static void uk_signal_deliver(struct uk_syscall_exit_ctx *exit_ctx)
 	UK_ASSERT(!IS_PENDING(pproc->signal->sigqueue, SIGCONT));
 
 	if (pthread->signal && pthread->signal->suspend_signal)
-		deliver_suspend_signal(pthread, execenv);
+		deliver_suspend_signal(pthread, exit_ctx);
 
 	/* Deliver all pending signals of this process & thread */
-	deliver_pending_proc(pproc, execenv);
+	deliver_pending_proc(pproc, exit_ctx);
 	if (pthread->state == POSIX_THREAD_RUNNING ||
 	    pthread->state == POSIX_THREAD_BLOCKED_SIGNAL)
-		deliver_pending_thread(pthread, execenv);
+		deliver_pending_thread(pthread, exit_ctx);
 }
 
 uk_syscall_exittab_prio(uk_signal_deliver, UK_PRIO_BEFORE(UK_PRIO_LATEST));
@@ -435,7 +438,7 @@ void sys_error_handler(struct ukarch_execenv *ee __unused, long arg)
 	set_siginfo_kill(error->signum, &sig.siginfo);
 
 	/* Execute standard delivery path */
-	do_deliver(pthread, &sig, ee);
+	do_deliver(pthread, &sig, ee, NULL);
 
 	return;
 

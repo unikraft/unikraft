@@ -58,6 +58,7 @@
 #include <uk/errptr.h>
 #include <errno.h>
 #include <stdarg.h>
+#include <stdbool.h>
 #include <stddef.h>
 #include <uk/print.h>
 #include <uk/legacy_syscall.h>
@@ -85,6 +86,17 @@ void _uk_syscall_wrapper_do_exittab(struct ukarch_execenv *execenv __unused)
 { }
 #endif /* !CONFIG_LIBSYSCALL_SHIM */
 
+/* Resolve a pending binary syscall restart before invoking a signal handler. */
+#if CONFIG_LIBSYSCALL_SHIM_HANDLER
+void uk_syscall_exit_resolve_restart(struct uk_syscall_exit_ctx *exit_ctx,
+				     bool restart);
+#else /* !CONFIG_LIBSYSCALL_SHIM_HANDLER */
+static inline void
+uk_syscall_exit_resolve_restart(struct uk_syscall_exit_ctx *exit_ctx __unused,
+				bool restart __unused)
+{ }
+#endif /* !CONFIG_LIBSYSCALL_SHIM_HANDLER */
+
 #define __uk_scc(X) ((long) (X))
 typedef long uk_syscall_arg_t;
 
@@ -108,6 +120,15 @@ typedef long uk_syscall_arg_t;
 #define _UK_EXECENV_REGS_SET(_execenv, _offset, _val)			\
 	uk_lcpu_regs_set((_execenv)->regs,\
 			     _offset, (_val))
+
+/* Internal result of a restartable wait interrupted before making progress. */
+#define UK_SYSCALL_ERESTARTSYS 512
+
+static inline long uk_syscall_native_result(long ret)
+{
+	return ret == -UK_SYSCALL_ERESTARTSYS ? -EINTR : ret;
+}
+
 #define UK_EXECENV_CALLMAP0_0(...)
 #define UK_EXECENV_CALLMAP2_2(m, type, arg)				\
 	, (type)_UK_EXECENV_REGS_GET(execenv, __syscall_rarg0)
@@ -447,7 +468,7 @@ typedef long uk_syscall_arg_t;
 									\
 		_uk_syscall_wrapper_do_exittab(NULL);			\
 									\
-		return ret;						\
+		return uk_syscall_native_result(ret);			\
 	}								\
 									\
 	long doname(UK_ARG_MAPx(x, UK_S_ARG_LONG, __VA_ARGS__))		\
