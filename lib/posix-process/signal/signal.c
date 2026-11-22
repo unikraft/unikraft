@@ -123,6 +123,10 @@ struct uk_signal *pprocess_signal_dequeue(struct posix_process *pproc,
 	}
 
 	pproc->signal->queued_count--;
+#if CONFIG_LIBPOSIX_PROCESS_ITIMER
+	if (!pthread && signum == SIGALRM)
+		pprocess_itimer_dequeued_locked(pproc);
+#endif
 	pprocess_lock_release(pflags);
 
 	return sig;

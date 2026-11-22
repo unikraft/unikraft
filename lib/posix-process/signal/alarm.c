@@ -6,10 +6,17 @@
 
 #include <uk/essentials.h>
 #include <uk/syscall.h>
+#if CONFIG_LIBPOSIX_PROCESS_ITIMER
+#include <uk/process/itimer.h>
+#endif
 
 UK_SYSCALL_R_DEFINE(unsigned int, alarm,
 		    unsigned int, seconds)
 {
+#if CONFIG_LIBPOSIX_PROCESS_ITIMER
+	return uk_process_alarm(seconds);
+#else
 	UK_WARN_STUBBED();
 	return 0;
+#endif
 }

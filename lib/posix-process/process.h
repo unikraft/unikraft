@@ -15,6 +15,7 @@
 #include <stdbool.h>
 #include <linux/sched.h>
 #include <uk/arch/ctx.h>
+#include <uk/arch/time.h>
 #include <uk/plat/spinlock.h>
 #include <uk/process.h>
 #include <uk/refcount.h>
@@ -67,6 +68,16 @@ struct posix_process {
 	pid_t pgid;
 	pid_t sid;
 	bool execed;
+#if CONFIG_LIBPOSIX_PROCESS_ITIMER
+	struct {
+		__nsec deadline;
+		__nsec interval;
+		__nsec retry;
+		__u64 generation;
+		bool active;
+		bool pending;
+	} real_timer;
+#endif
 	struct posix_process *parent;
 	struct uk_list_head children; /* child processes */
 	struct uk_list_head child_list_entry;
@@ -126,6 +137,10 @@ extern __spinlock pprocess_lock;
 void pprocess_id_get_locked(pid_t id);
 void pprocess_id_put_locked(pid_t id);
 void pprocess_groups_init_locked(struct posix_process *process);
+#if CONFIG_LIBPOSIX_PROCESS_ITIMER
+/* Called for SIGALRM dequeued from the shared process queue, under the lock. */
+void pprocess_itimer_dequeued_locked(struct posix_process *process);
+#endif
 
 static inline unsigned long pprocess_lock_acquire(void)
 {
