@@ -44,20 +44,12 @@ struct posix_process *pprocess_child_state_changed(int state)
 	return NULL;
 }
 
-static int pprocess_reap(struct posix_process *pprocess, siginfo_t *si)
+static void pprocess_reap(struct posix_process *pprocess)
 {
-	pid_t pid;
-
 	UK_ASSERT(pprocess);
 	UK_ASSERT(uk_list_empty(&pprocess->threads));
 
-	if (si)
-		set_siginfo_wait(pprocess, si);
-
-	pid = pprocess->pid;
 	pprocess_release(pprocess);
-
-	return pid;
 }
 
 /* Wait helper
@@ -100,12 +92,6 @@ static int pprocess_wait(pid_t pid, siginfo_t *si, int opt)
 			goto out;
 		}
 
-		/* If the process exited already, reap and return the pid */
-		if (child->state != POSIX_PROCESS_RUNNING) {
-			ret = pprocess_reap(child, si);
-			goto out;
-		}
-
 		this_thread->wait_pid = pid;
 	} else { /* any */
 		this_thread->wait_pid = -1;
@@ -123,8 +109,9 @@ static int pprocess_wait(pid_t pid, siginfo_t *si, int opt)
 
 		if (waitable) {
 			ret = waitable->pid;
+			set_siginfo_wait(waitable, si);
 			if (!(opt & WNOWAIT))
-				pprocess_reap(waitable, si);
+				pprocess_reap(waitable);
 			break;
 		}
 
@@ -172,34 +159,37 @@ UK_LLSYSCALL_R_DEFINE(int, waitid, idtype_t, idtype, id_t, id,
 		      siginfo_t *, infop, int, options,
 		      struct rusage * __unused, rusage)
 {
+	siginfo_t si = { 0 };
 	int ret;
 
-	if (options)
-		if (unlikely(!(options & (WEXITED | WSTOPPED | WCONTINUED |
-					  WNOHANG | WNOWAIT))))
-			return -EINVAL;
+	if (unlikely(options & ~(WEXITED | WSTOPPED | WCONTINUED |
+				 WNOHANG | WNOWAIT)))
+		return -EINVAL;
+	if (unlikely(!(options & (WEXITED | WSTOPPED | WCONTINUED))))
+		return -EINVAL;
 
 	switch (idtype) {
 	case P_PID:
-		ret = pprocess_wait(id, infop, options);
+		if ((pid_t)id <= 0)
+			return -EINVAL;
+		ret = pprocess_wait(id, &si, options);
 		break;
 	case P_PIDFD:
 	case P_PGID:
 		return -ENOTSUP;
 	case P_ALL:
-		ret = pprocess_wait(-1, infop, options);
+		ret = pprocess_wait(-1, &si, options);
 		break;
 	default:
 		return -EINVAL;
 	}
 
-	/* POSIX.1-2008 requires that infop must not be NULL, yet Linux
-	 * violates the standard and returns the pid of the waited child
-	 * when that happens. wait(2) discourages applications to rely on
-	 * that behavior, still for backwards compatibility we implement
-	 * Linux's behavior nevertheless.
-	 */
-	return (infop && ret >= 0) ? 0 : ret;
+	if (ret < 0)
+		return ret;
+	/* Linux also permits a NULL result pointer and returns zero. */
+	if (infop)
+		*infop = si;
+	return 0;
 }
 #else /* !CONFIG_LIBPOSIX_PROCESS_MULTIPROCESS */
 UK_SYSCALL_R_DEFINE(pid_t, wait4, pid_t, pid,
