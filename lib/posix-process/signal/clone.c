@@ -23,6 +23,8 @@ int pprocess_signal_clone(struct posix_thread *ct, struct posix_thread *pt,
 {
 	struct posix_process *pp; /* parent process */
 	struct posix_process *cp; /* child process */
+	struct uk_sigaction *shared;
+	unsigned long irqf;
 	pid_t cpid; /* child pid */
 	int signum;
 
@@ -77,16 +79,22 @@ int pprocess_signal_clone(struct posix_thread *ct, struct posix_thread *pt,
 	} else if (flags & CLONE_SIGHAND) {
 		uk_pr_debug("CLONE_SIGHAND: pid %d gets a reference of the parent's handlers\n",
 			    cpid);
-		pprocess_signal_sigaction_acquire(pp->signal->sigaction);
+		irqf = pprocess_lock_acquire();
+		shared = pp->signal->sigaction;
+		pprocess_signal_sigaction_acquire(shared);
+		pprocess_lock_release(irqf);
 		pprocess_signal_sigaction_release(cp->signal->sigaction);
-		cp->signal->sigaction = pp->signal->sigaction;
+		cp->signal->sigaction = shared;
 	/* Default: Iherit a copy of the parent's signal dispositions. */
 	} else {
 		uk_pr_debug("pid %d gets a copy of the parent's handlers\n",
 			    cpid);
 
+		/* Snapshot dispositions against concurrent action writers. */
+		irqf = pprocess_lock_acquire();
 		memcpy(cp->signal->sigaction->ks, pp->signal->sigaction->ks,
 		       sizeof(cp->signal->sigaction->ks));
+		pprocess_lock_release(irqf);
 	}
 
 	if (pp) {
