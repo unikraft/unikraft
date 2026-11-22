@@ -369,9 +369,13 @@ _uk_pollq_poll_until(struct uk_pollq *q, uk_pollevent req, __nsec deadline,
 		     const struct uk_file *f, bool interruptible,
 		     uk_pollevent *events)
 {
-	uk_pollevent ev;
+	uk_pollevent ev = 0;
 	int wait = 0;
 
+	if (interruptible && uk_thread_wait_interrupted(uk_thread_current())) {
+		wait = -EINTR;
+		goto out;
+	}
 	if ((ev = _uk_pollq_poll_immediate(q, req)) ||
 	    (ev = _uk_pollq_lock(q, req, f)))
 		goto out;
