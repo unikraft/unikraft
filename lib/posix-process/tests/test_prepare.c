@@ -269,9 +269,9 @@ struct prepare_run {
 	struct posix_process *process;
 	struct uk_sched *caller;
 	struct uk_semaphore finish;
+	struct uk_semaphore reaped;
 	__vaddr_t address;
 	bool started;
-	bool reaped;
 	bool visible;
 	bool active;
 	bool remote;
@@ -306,7 +306,7 @@ static void prepare_run_reaped(struct uk_thread *thread)
 {
 	struct prepare_run *p = thread->priv;
 
-	__atomic_store_n(&p->reaped, true, __ATOMIC_RELEASE);
+	uk_semaphore_up(&p->reaped);
 }
 
 static void prepare_wait(bool *flag)
@@ -335,12 +335,14 @@ UK_TESTCASE(process_prepare, publish_owned_vas_lifetime)
 	unsigned int users = kernel->pt->shared_users;
 	__vaddr_t address = UK_PAGING_VADDR_ANY;
 	__nsec limit;
+	__nsec elapsed;
 	pid_t pid;
 	int rc;
 
 	for (unsigned int i = 0; i < cpus && target == local; i++)
 		target = uk_sched_select_round_robin(local);
 	uk_semaphore_init(&probe.finish, 0);
+	uk_semaphore_init(&probe.reaped, 0);
 	rc = uk_vas_create_process(kernel->a, &vas);
 	UK_TEST_EXPECT_ZERO(rc);
 	if (rc)
@@ -415,7 +417,10 @@ UK_TESTCASE(process_prepare, publish_owned_vas_lifetime)
 	UK_TEST_EXPECT_SNUM_EQ(observed_children, children);
 	UK_TEST_EXPECT_SNUM_EQ(uk_refcount_read(&vas->refs), 2);
 	uk_semaphore_up(&probe.finish);
-	prepare_wait(&probe.reaped);
+	/* Block so the local idle thread can collect the exited child. */
+	elapsed = uk_semaphore_down_to(&probe.reaped, PREPARE_TIMEOUT);
+	if (elapsed == __NSEC_MAX)
+		UK_CRASH("Prepared process thread was not reaped\n");
 	thread = NULL;
 	limit = ukplat_monotonic_clock() + PREPARE_TIMEOUT;
 	while (uk_refcount_read(&vas->refs) != 1) {
