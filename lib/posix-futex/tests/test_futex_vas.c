@@ -57,8 +57,9 @@ static long futex_test_call(__vaddr_t addr, int op, __u32 val,
 				   (long)addr2, (long)val3);
 }
 
-static long futex_test_in_vas(struct uk_vas *vas, __vaddr_t addr, int op,
-			      __u32 val, __vaddr_t addr2, __u32 val3)
+static long futex_test_in_vas_args(struct uk_vas *vas, __vaddr_t addr, int op,
+				   __u32 val, const struct timespec *timeout,
+				   __vaddr_t addr2, __u32 val3)
 {
 	struct uk_thread *current = uk_thread_current();
 	struct uk_vas *saved = current->vas;
@@ -68,10 +69,16 @@ static long futex_test_in_vas(struct uk_vas *vas, __vaddr_t addr, int op,
 	rc = uk_thread_set_vas(current, vas);
 	if (rc)
 		return rc;
-	result = futex_test_call(addr, op, val, NULL, addr2, val3);
+	result = futex_test_call(addr, op, val, timeout, addr2, val3);
 	if (uk_thread_set_vas(current, saved))
 		UK_CRASH("Cannot restore futex test address space\n");
 	return result;
+}
+
+static long futex_test_in_vas(struct uk_vas *vas, __vaddr_t addr, int op,
+			      __u32 val, __vaddr_t addr2, __u32 val3)
+{
+	return futex_test_in_vas_args(vas, addr, op, val, NULL, addr2, val3);
 }
 
 static int futex_test_spaces_new(struct futex_test_spaces *s, bool shared,
@@ -315,6 +322,188 @@ UK_TESTCASE(futex_vas, shared_backing_bitset)
 stop:
 	futex_test_probe_stop(&p);
 out:
+	futex_test_spaces_free(&s);
+}
+
+UK_TESTCASE(futex_vas, requeue_keeps_target_backing)
+{
+	struct futex_test_spaces s;
+	struct futex_test_probe probes[2] = { 0 };
+	struct uk_vas *alias = NULL;
+	const struct timespec *move_one = (const void *)(__uptr)1;
+	unsigned int i;
+	long result;
+	int rc = futex_test_spaces_new(&s, true, 0);
+
+	UK_TEST_EXPECT_ZERO(rc);
+	if (rc)
+		goto out;
+	rc = uk_vas_clone_process(s.parent, &alias);
+	UK_TEST_EXPECT_ZERO(rc);
+	if (rc)
+		goto out;
+	for (i = 0; i < 2; i++) {
+		probes[i].vas = i ? s.parent : s.child;
+		probes[i].addr = FUTEX_VAS_WORD;
+		probes[i].op = FUTEX_WAIT;
+		rc = futex_test_probe_start(&probes[i]);
+		UK_TEST_EXPECT_ZERO(rc);
+		if (!rc)
+			rc = futex_test_probe_wait(&probes[i], false);
+		UK_TEST_EXPECT_ZERO(rc);
+		if (rc)
+			goto out;
+	}
+	/* The fourth ABI argument supplies the requeue count, not a timeout. */
+	result = futex_test_in_vas_args(s.parent, FUTEX_VAS_WORD,
+					FUTEX_CMP_REQUEUE, 1, move_one,
+					FUTEX_VAS_TARGET, 1);
+	UK_TEST_EXPECT_SNUM_EQ(result, -EAGAIN);
+	result = futex_test_in_vas_args(s.parent, FUTEX_VAS_WORD,
+					FUTEX_CMP_REQUEUE, 1, move_one,
+					FUTEX_VAS_TARGET, 0);
+	UK_TEST_EXPECT_SNUM_EQ(result, 2);
+	if (result != 2)
+		goto out;
+	result = futex_test_in_vas(s.parent, FUTEX_VAS_WORD,
+				   FUTEX_WAKE, 1, 0, 0);
+	UK_TEST_EXPECT_ZERO(result);
+	rc = uk_vma_unmap(s.parent, FUTEX_VAS_TARGET,
+			  UK_PAGING_PAGE_SIZE, 0);
+	UK_TEST_EXPECT_ZERO(rc);
+	rc = uk_vma_unmap(s.child, FUTEX_VAS_TARGET,
+			  UK_PAGING_PAGE_SIZE, 0);
+	UK_TEST_EXPECT_ZERO(rc);
+	result = futex_test_in_vas(alias, FUTEX_VAS_TARGET,
+				   FUTEX_WAKE, 1, 0, 0);
+	UK_TEST_EXPECT_SNUM_EQ(result, 1);
+	rc = uk_vma_unmap(alias, FUTEX_VAS_TARGET,
+			  UK_PAGING_PAGE_SIZE, 0);
+	UK_TEST_EXPECT_ZERO(rc);
+	for (i = 0; i < 2; i++) {
+		UK_TEST_EXPECT_ZERO(futex_test_probe_wait(&probes[i], true));
+		UK_TEST_EXPECT_ZERO(probes[i].result);
+		UK_TEST_EXPECT(probes[i].active);
+	}
+	uk_pr_info("FUTEX_VAS_PASS requeue wake=1 moved=1 source_empty=1 target_alias=1\n");
+out:
+	for (i = 0; i < 2; i++)
+		futex_test_probe_stop(&probes[i]);
+	uk_vas_put(alias);
+	futex_test_spaces_free(&s);
+}
+
+static int futex_test_cancel_cycle(bool shared)
+{
+	struct futex_test_spaces s;
+	struct futex_test_probe p = { 0 };
+	int rc = futex_test_spaces_new(&s, shared, 0);
+
+	if (rc)
+		goto out;
+	p.vas = s.child;
+	p.addr = FUTEX_VAS_WORD;
+	p.op = FUTEX_WAIT | (shared ? 0 : FUTEX_PRIVATE_FLAG);
+	rc = futex_test_probe_start(&p);
+	if (!rc)
+		rc = futex_test_probe_wait(&p, false);
+	/* Terminate while blocked; it cannot run the syscall return cleanup. */
+	futex_test_probe_stop(&p);
+out:
+	futex_test_spaces_free(&s);
+	return rc;
+}
+
+UK_TESTCASE(futex_vas, cancellation_resource_balance)
+{
+	struct uk_pagetable *pt = uk_vas_get_kernel()->pt;
+	unsigned long first_free;
+	unsigned int users = pt->shared_users;
+	unsigned int cycle;
+	int rc;
+
+	/* Warm both patterns before measuring frames. */
+	for (cycle = 0; cycle < 2; cycle++) {
+		rc = futex_test_cancel_cycle(cycle != 0);
+		UK_TEST_EXPECT_ZERO(rc);
+		if (rc)
+			return;
+	}
+	first_free = pt->fa->free_memory;
+	for (cycle = 1; cycle <= 64; cycle++) {
+		rc = futex_test_cancel_cycle(cycle % 2 != 0);
+		UK_TEST_EXPECT_ZERO(rc);
+		UK_TEST_EXPECT_SNUM_EQ(pt->fa->free_memory, first_free);
+		UK_TEST_EXPECT_SNUM_EQ(pt->shared_users, users);
+		uk_pr_info("FUTEX_VAS_CYCLE cycle=%u free_bytes=%lu shared_users=%u\n",
+			   cycle, pt->fa->free_memory, pt->shared_users);
+		if (rc)
+			return;
+	}
+	uk_pr_info("FUTEX_VAS_PASS cancellation cycles=64\n");
+}
+
+UK_TESTCASE(futex_vas, foreign_clear_tid_keeps_parent_private)
+{
+	struct futex_test_spaces s;
+	struct futex_test_probe waiters[2] = { 0 }, clearer = { 0 };
+	__u32 value = 0;
+	unsigned int i;
+	bool finished;
+	long result;
+	int rc = futex_test_spaces_new(&s, false, 7);
+
+	UK_TEST_EXPECT_ZERO(rc);
+	if (rc)
+		goto out;
+	for (i = 0; i < 2; i++) {
+		waiters[i].vas = i ? s.parent : s.child;
+		waiters[i].addr = FUTEX_VAS_WORD;
+		waiters[i].op = FUTEX_WAIT;
+		waiters[i].expected = 7;
+		rc = futex_test_probe_start(&waiters[i]);
+		UK_TEST_EXPECT_ZERO(rc);
+		if (!rc)
+			rc = futex_test_probe_wait(&waiters[i], false);
+		UK_TEST_EXPECT_ZERO(rc);
+		if (rc)
+			goto out;
+	}
+	clearer.vas = s.child;
+	clearer.clear_addr = FUTEX_VAS_WORD;
+	rc = futex_test_probe_start(&clearer);
+	UK_TEST_EXPECT_ZERO(rc);
+	if (!rc)
+		rc = futex_test_probe_wait(&clearer, false);
+	UK_TEST_EXPECT_ZERO(rc);
+	if (rc)
+		goto out;
+	UK_TEST_EXPECT(clearer.active);
+	UK_TEST_EXPECT(clearer.tid > 0);
+	/* The collector releases this blocked thread from its kernel VAS. */
+	futex_test_probe_stop(&clearer);
+	UK_TEST_EXPECT_ZERO(futex_test_probe_wait(&waiters[0], true));
+	UK_TEST_EXPECT_ZERO(waiters[0].result);
+	UK_TEST_EXPECT_ZERO(waiters[0].observed);
+	finished = __atomic_load_n(&waiters[1].completed, __ATOMIC_ACQUIRE);
+	UK_TEST_EXPECT(!finished);
+	rc = uk_vas_load_u32_try(s.parent, FUTEX_VAS_WORD, &value);
+	UK_TEST_EXPECT_ZERO(rc);
+	UK_TEST_EXPECT_SNUM_EQ(value, 7);
+	rc = uk_vas_load_u32_try(s.child, FUTEX_VAS_WORD, &value);
+	UK_TEST_EXPECT_ZERO(rc);
+	UK_TEST_EXPECT_ZERO(value);
+	result = futex_test_in_vas(s.parent, FUTEX_VAS_WORD,
+				   FUTEX_WAKE, 1, 0, 0);
+	UK_TEST_EXPECT_SNUM_EQ(result, 1);
+	UK_TEST_EXPECT_ZERO(futex_test_probe_wait(&waiters[1], true));
+	UK_TEST_EXPECT_ZERO(waiters[1].result);
+	UK_TEST_EXPECT(waiters[0].active && waiters[1].active);
+	uk_pr_info("FUTEX_VAS_PASS clear_tid foreign=1 isolated=1\n");
+out:
+	futex_test_probe_stop(&clearer);
+	for (i = 0; i < 2; i++)
+		futex_test_probe_stop(&waiters[i]);
 	futex_test_spaces_free(&s);
 }
 
