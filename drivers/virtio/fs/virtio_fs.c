@@ -268,15 +268,43 @@ __u16 virtiofs_maxsegs(const struct uk_virtiofs_iovec *iov,
 }
 
 /**
+ * Make every page of a request buffer resident before its physical address
+ * is taken. Buffers may lie in demand-paged memory that the CPU has not
+ * touched yet, and buffers the device writes to may still be shared
+ * copy-on-write after fork. A read access maps buffers the device reads; a
+ * write access gives buffers the device writes a private page.
+ */
+static
+void virtiofs_touch_buf(void *base, __sz len, int device_writes)
+{
+	const __vaddr_t end = (__vaddr_t)base + len;
+	__vaddr_t va;
+
+	for (va = (__vaddr_t)base; va < end;
+	     va = UK_PAGING_PAGE_ALIGN_DOWN(va) + UK_PAGING_PAGE_SIZE) {
+		volatile char *p = (volatile char *)va;
+
+		if (device_writes)
+			*p = *p;
+		else
+			(void)*p;
+	}
+}
+
+/**
  * Prepare a sglist to point to the contents of iov[iovlen].
  */
 static
 int virtiofs_prep_sglist(struct uk_sglist *sg,
-			 const struct uk_virtiofs_iovec *iov, __u16 iovlen)
+			 const struct uk_virtiofs_iovec *iov, __u16 iovlen,
+			 int device_writes)
 {
 	for (int i = 0; i < iovlen; i++) {
-		int r = uk_sglist_append(sg, iov[i].iov_base, iov[i].iov_len);
+		int r;
 
+		virtiofs_touch_buf(iov[i].iov_base, iov[i].iov_len,
+				   device_writes);
+		r = uk_sglist_append(sg, iov[i].iov_base, iov[i].iov_len);
 		if (unlikely(r))
 			return r;
 	}
@@ -354,7 +382,7 @@ __ssz virtiofs_do_request_vec(struct uk_virtiofs_dev *dev,
 		rem = MIN(in_iovcnt, iovecs[ivec].iovcnt - pos);
 		UK_ASSERT(rem);
 
-		r = virtiofs_prep_sglist(&sg, &iovecs[ivec].iov[pos], rem);
+		r = virtiofs_prep_sglist(&sg, &iovecs[ivec].iov[pos], rem, 0);
 		if (unlikely(r))
 			return r;
 
@@ -375,7 +403,7 @@ __ssz virtiofs_do_request_vec(struct uk_virtiofs_dev *dev,
 		rem = MIN(out_iovcnt, iovecs[ivec].iovcnt - pos);
 		UK_ASSERT(rem);
 
-		r = virtiofs_prep_sglist(&sg_out, &iovecs[ivec].iov[pos], rem);
+		r = virtiofs_prep_sglist(&sg_out, &iovecs[ivec].iov[pos], rem, 1);
 		if (unlikely(r))
 			return r;
 
@@ -409,14 +437,14 @@ __ssz virtiofs_do_request(struct uk_virtiofs_dev *dev,
 
 	/* Prepare input iovs/segments */
 	uk_sglist_init(&sg, nseg, sgsegs);
-	r = virtiofs_prep_sglist(&sg, iov, in_iovlen);
+	r = virtiofs_prep_sglist(&sg, iov, in_iovlen, 0);
 	if (unlikely(r))
 		return r;
 	in_segs = sg.sg_nseg;
 
 	/* Prepare output iovs/segments */
 	uk_sglist_init(&sg_out, nseg - in_segs, &sgsegs[in_segs]);
-	r = virtiofs_prep_sglist(&sg_out, &iov[in_iovlen], out_iovlen);
+	r = virtiofs_prep_sglist(&sg_out, &iov[in_iovlen], out_iovlen, 1);
 	if (unlikely(r))
 		return r;
 	out_segs = sg_out.sg_nseg;
