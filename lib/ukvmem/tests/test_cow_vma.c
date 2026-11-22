@@ -5,17 +5,24 @@
 #include <stddef.h>
 #include <uk/alloc.h>
 #include <uk/alloc_impl.h>
+#include <uk/arch/util.h>
+#include <uk/crash.h>
 #include <uk/essentials.h>
 #include <uk/falloc.h>
 #include <uk/isr/string.h>
+#include <uk/lcpu.h>
 #include <uk/plat/spinlock.h>
+#include <uk/plat/time.h>
 #include <uk/print.h>
+#include <uk/sched.h>
+#include <uk/semaphore.h>
 #include <uk/test.h>
 #include <uk/vmem.h>
 #include <uk/vmem/vma_types.h>
 
 #define COW_TEST_FRAMES 128
 #define COW_TEST_PAGE_FLAGS UK_PAGING_PAGE_FLAG_SIZE(UK_PAGING_PAGE_LEVEL)
+#define COW_TEST_TIMEOUT (5 * UKARCH_NSEC_PER_SEC)
 
 struct cow_test_frame {
 	__paddr_t paddr;
@@ -388,6 +395,256 @@ UK_TESTCASE(cow_vmas, bounded_repeated_clone_resource_balance)
 		if (rc)
 			return;
 	}
+}
+
+struct cow_test_remote_group {
+	bool go;
+	bool cancel;
+};
+
+struct cow_test_remote {
+	struct cow_test_remote_group *group;
+	struct uk_semaphore reaped;
+	struct uk_vas *vas;
+	__vaddr_t address;
+	__u32 before;
+	__u32 after;
+	__u32 observed;
+	unsigned int cpu;
+	bool active;
+	bool ready;
+	bool completed;
+};
+
+static void cow_test_remote_worker(void *arg) __noreturn;
+
+static void cow_test_remote_worker(void *arg)
+{
+	struct cow_test_remote *p = arg;
+
+	p->active = uk_vas_get_active() == p->vas &&
+		uk_paging_pt_get_active() == p->vas->pt &&
+		uk_sched_current()->lcpu_idx == p->cpu &&
+		!uk_lcpu_irqs_disabled();
+	/* Populate a writable remote TLB entry before the parent is cloned. */
+	if (p->active)
+		__atomic_store_n((__u32 *)p->address, p->before,
+				 __ATOMIC_RELAXED);
+	__atomic_store_n(&p->ready, true, __ATOMIC_RELEASE);
+	while (!__atomic_load_n(&p->group->go, __ATOMIC_ACQUIRE))
+		uk_arch_spinwait();
+	if (!p->group->cancel && p->active) {
+		__atomic_store_n((__u32 *)p->address, p->after,
+				 __ATOMIC_RELAXED);
+		p->observed =
+			__atomic_load_n((__u32 *)p->address, __ATOMIC_RELAXED);
+		p->completed = true;
+	}
+	uk_thread_exit();
+}
+
+static void cow_test_remote_reaped(struct uk_thread *thread)
+{
+	struct cow_test_remote *p = thread->priv;
+
+	uk_semaphore_up(&p->reaped);
+}
+
+static int cow_test_remote_start(struct uk_sched *sched,
+				 struct cow_test_remote *p)
+{
+	struct uk_thread *thread;
+	int rc;
+
+	uk_semaphore_init(&p->reaped, 0);
+	thread = uk_thread_create_fn1(sched->a, cow_test_remote_worker, p,
+				      sched->a_stack, 0, sched->a_auxstack, 0,
+				      sched->a_uktls, false, "cow-remote", p,
+				      cow_test_remote_reaped);
+	if (!thread)
+		return -ENOMEM;
+	rc = uk_thread_set_vas(thread, p->vas);
+	if (!rc)
+		rc = uk_sched_thread_add(sched, thread);
+	if (rc)
+		uk_thread_release(thread);
+	return rc;
+}
+
+static int cow_test_remote_ready(struct cow_test_remote *p)
+{
+	__nsec end = ukplat_monotonic_clock() + COW_TEST_TIMEOUT;
+
+	while (!__atomic_load_n(&p->ready, __ATOMIC_ACQUIRE)) {
+		if (ukplat_monotonic_clock() >= end)
+			return -ETIMEDOUT;
+		uk_arch_spinwait();
+	}
+	return 0;
+}
+
+static void cow_test_remote_join(struct cow_test_remote *p,
+				 unsigned int started, unsigned int *reaped,
+				 struct uk_vas *vas)
+{
+	__nsec end;
+	__nsec elapsed;
+
+	for (; *reaped < started; (*reaped)++) {
+		elapsed = uk_semaphore_down_to(&p[*reaped].reaped,
+					       COW_TEST_TIMEOUT);
+		if (elapsed == __NSEC_MAX)
+			UK_CRASH("COW remote writer was not reaped\n");
+	}
+	/* The destructor precedes freeing thread storage and its VAS pin. */
+	end = ukplat_monotonic_clock() + COW_TEST_TIMEOUT;
+	while (uk_refcount_read(&vas->refs) != 1) {
+		if (ukplat_monotonic_clock() >= end)
+			UK_CRASH("COW remote writer retained its VAS\n");
+		uk_arch_spinwait();
+	}
+}
+
+UK_TESTCASE(cow_vmas, cached_remote_writes_after_clone)
+{
+	struct uk_vas *kernel = uk_vas_get_kernel();
+	struct uk_sched *local = uk_sched_current();
+	unsigned int cpus = uk_sched_started_count();
+	unsigned int words = MAX(cpus - 1, 1U);
+	struct cow_test_remote_group group = { .cancel = true };
+	struct cow_test_remote *probes = NULL;
+	struct cow_test_family family;
+	struct cow_test_space *parent = NULL, *child = NULL;
+	__vaddr_t address = UK_PAL_PAGE_Lx_SIZE(UK_PAL_PT_LEVELS - 1);
+	__paddr_t original = 0, after = 0;
+	unsigned long attr = 0, allocated = 0, copies = 0;
+	unsigned int started = 0, reaped = 0, i;
+	__u32 value = 0;
+	bool completed = false;
+	int rc;
+
+	UK_TEST_EXPECT(words <= UK_PAGING_PAGE_SIZE / sizeof(value));
+	if (words > UK_PAGING_PAGE_SIZE / sizeof(value))
+		return;
+	rc = cow_test_family_init(&family);
+	UK_TEST_EXPECT_ZERO(rc);
+	if (rc)
+		return;
+	probes = uk_malloc(kernel->a, words * sizeof(*probes));
+	if (probes)
+		memset_isr(probes, 0, words * sizeof(*probes));
+	parent = cow_test_space_new(&family);
+	child = cow_test_space_new(&family);
+	UK_TEST_EXPECT_NOT_NULL(probes);
+	UK_TEST_EXPECT_NOT_NULL(parent);
+	UK_TEST_EXPECT_NOT_NULL(child);
+	if (!probes || !parent || !child)
+		goto out;
+	rc = uk_vas_enable_cow(&parent->vas, family.resident);
+	UK_TEST_EXPECT_ZERO(rc);
+	if (rc)
+		goto out;
+	rc = uk_vma_map_anon(&parent->vas, &address, UK_PAGING_PAGE_SIZE,
+			     UK_PAGING_PAGE_ATTR_PROT_RW, 0, NULL);
+	UK_TEST_EXPECT_ZERO(rc);
+	if (rc)
+		goto out;
+	for (i = 0; i < words; i++) {
+		rc = uk_vas_store_u32(&parent->vas,
+				      address + i * sizeof(value),
+				      0x11000000U + i);
+		UK_TEST_EXPECT_ZERO(rc);
+		if (rc)
+			goto out;
+	}
+	for (i = 0; i < cpus; i++) {
+		struct uk_sched *sched = uk_sched_select_round_robin(local);
+		struct cow_test_remote *p;
+
+		if (sched->lcpu_idx == local->lcpu_idx)
+			continue;
+		UK_TEST_EXPECT(started < words);
+		if (started >= words)
+			goto out;
+		p = &probes[started];
+		p->group = &group;
+		p->vas = &parent->vas;
+		p->address = address + started * sizeof(value);
+		p->before = 0x11000000U + started;
+		p->after = 0x22000000U + started;
+		p->cpu = sched->lcpu_idx;
+		rc = cow_test_remote_start(sched, p);
+		UK_TEST_EXPECT_ZERO(rc);
+		if (rc)
+			goto out;
+		started++;
+	}
+	UK_TEST_EXPECT_SNUM_EQ(started, cpus - 1);
+	for (i = 0; i < started; i++) {
+		rc = cow_test_remote_ready(&probes[i]);
+		UK_TEST_EXPECT_ZERO(rc);
+		if (rc)
+			goto out;
+		UK_TEST_EXPECT(probes[i].active);
+	}
+	UK_TEST_EXPECT_ZERO(cow_test_mapping(parent, address, &original, NULL));
+	rc = uk_vas_clone_cow(&child->vas, &parent->vas);
+	UK_TEST_EXPECT_ZERO(rc);
+	if (rc)
+		goto out;
+	UK_TEST_EXPECT_ZERO(cow_test_mapping(parent, address, NULL, &attr));
+	UK_TEST_EXPECT_ZERO(attr & UK_PAGING_PAGE_ATTR_PROT_WRITE);
+	UK_TEST_EXPECT_ZERO(cow_test_mapping(child, address, &after, &attr));
+	UK_TEST_EXPECT_SNUM_EQ(after, original);
+	UK_TEST_EXPECT_ZERO(attr & UK_PAGING_PAGE_ATTR_PROT_WRITE);
+	allocated = family.frames.allocated;
+	group.cancel = false;
+	__atomic_store_n(&group.go, true, __ATOMIC_RELEASE);
+	if (!started) {
+		rc = uk_vas_store_u32(&parent->vas, address, 0x22000000U);
+		UK_TEST_EXPECT_ZERO(rc);
+	}
+	cow_test_remote_join(probes, started, &reaped, &parent->vas);
+	copies = family.frames.allocated - allocated;
+	UK_TEST_EXPECT_SNUM_EQ(copies, 1);
+	for (i = 0; i < started; i++) {
+		UK_TEST_EXPECT(probes[i].completed);
+		UK_TEST_EXPECT_SNUM_EQ(probes[i].observed, probes[i].after);
+	}
+	for (i = 0; i < words; i++) {
+		rc = cow_test_read(parent, address + i * sizeof(value), &value);
+		UK_TEST_EXPECT_ZERO(rc);
+		UK_TEST_EXPECT_SNUM_EQ(value, 0x22000000U + i);
+		rc = cow_test_read(child, address + i * sizeof(value), &value);
+		UK_TEST_EXPECT_ZERO(rc);
+		UK_TEST_EXPECT_SNUM_EQ(value, 0x11000000U + i);
+	}
+	UK_TEST_EXPECT_ZERO(cow_test_mapping(parent, address, &after, NULL));
+	UK_TEST_EXPECT(after != original);
+	UK_TEST_EXPECT_ZERO(cow_test_mapping(child, address, &after, NULL));
+	UK_TEST_EXPECT_SNUM_EQ(after, original);
+	completed = true;
+out:
+	if (started) {
+		if (!__atomic_load_n(&group.go, __ATOMIC_ACQUIRE)) {
+			group.cancel = true;
+			__atomic_store_n(&group.go, true, __ATOMIC_RELEASE);
+		}
+		cow_test_remote_join(probes, started, &reaped, &parent->vas);
+	}
+	uk_free(kernel->a, probes);
+	cow_test_space_put(&parent);
+	cow_test_space_put(&child);
+	cow_test_family_close(&family);
+	UK_TEST_EXPECT_ZERO(family.cleanup_errors);
+	UK_TEST_EXPECT_ZERO(family.frames.errors);
+	UK_TEST_EXPECT_ZERO(family.frames.live);
+	UK_TEST_EXPECT_SNUM_EQ(family.frames.allocated, family.frames.freed);
+	UK_TEST_EXPECT_SNUM_EQ(family.metadata_allocated,
+			       family.metadata_freed);
+	if (completed)
+		uk_pr_info("COW_VMA_REMOTE_PASS cpus=%u remote=%u copies=%lu\n",
+			   cpus, started, copies);
 }
 
 struct cow_test_pending_fault {
