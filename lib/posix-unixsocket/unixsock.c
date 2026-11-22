@@ -11,6 +11,7 @@
 #include <uk/essentials.h>
 #include <uk/socket_driver.h>
 #include <uk/posix-pipe.h>
+#include <uk/file/iovutil.h>
 #include <uk/file/pollqueue.h>
 
 #include "unixsock-bind.h"
@@ -734,9 +735,12 @@ static
 ssize_t unix_socket_recvmsg(posix_sock *file, struct msghdr *msg, int flags)
 {
 	struct unix_sock_data *data = posix_sock_get_data(file);
+	int supported_flags = MSG_DONTWAIT;
 	ssize_t ret;
 
-	if (unlikely(flags)) {
+	if (data->type != SOCK_STREAM)
+		supported_flags |= MSG_TRUNC;
+	if (unlikely(flags & ~supported_flags)) {
 		uk_pr_warn("Unsupported recv flags: %x\n", flags);
 		return -ENOSYS;
 	}
@@ -747,9 +751,29 @@ ssize_t unix_socket_recvmsg(posix_sock *file, struct msghdr *msg, int flags)
 			return -EINVAL;
 	}
 
-	uk_file_rlock(data->rpipe);
-	ret = uk_file_read(data->rpipe, msg->msg_iov, msg->msg_iovlen, 0, 0);
-	uk_file_runlock(data->rpipe);
+	if (data->type == SOCK_STREAM) {
+		uk_file_rlock(data->rpipe);
+		ret = uk_file_read(data->rpipe, msg->msg_iov, msg->msg_iovlen,
+				   0, 0);
+		uk_file_runlock(data->rpipe);
+	} else {
+		ret = uk_pipefile_recv_packet(data->rpipe, msg->msg_iov,
+					      msg->msg_iovlen);
+	}
+	if (ret < 0)
+		return ret;
+
+	msg->msg_flags = 0;
+	msg->msg_controllen = 0;
+	if (data->type != SOCK_STREAM) {
+		size_t capacity = uk_iov_len(msg->msg_iov, msg->msg_iovlen);
+
+		if ((size_t)ret > capacity) {
+			msg->msg_flags |= MSG_TRUNC;
+			if (!(flags & MSG_TRUNC))
+				ret = capacity;
+		}
+	}
 	/* Get remote addr */
 	if (msg->msg_name) {
 		if (_SOCK_CONNECTION(data->type))
@@ -759,7 +783,6 @@ ssize_t unix_socket_recvmsg(posix_sock *file, struct msghdr *msg, int flags)
 			/* TODO: impl DGRAM remote addr */
 			unix_sock_unnamed(msg->msg_name, &msg->msg_namelen);
 	}
-	/* We ignore ancillary data & return flags for now */
 	return ret;
 }
 
@@ -797,7 +820,7 @@ ssize_t unix_socket_sendmsg(posix_sock *file,
 	const struct uk_file *wpipe;
 	ssize_t ret;
 
-	if (unlikely(flags & ~MSG_NOSIGNAL)) {
+	if (unlikely(flags & ~(MSG_NOSIGNAL | MSG_DONTWAIT))) {
 		uk_pr_warn("Unsupported send flags: %x\n", flags);
 		return -ENOSYS;
 	}
@@ -844,15 +867,14 @@ ssize_t unix_socket_sendmsg(posix_sock *file,
 			: (msg->msg_name
 				? -ECONNREFUSED : -ENOTCONN);
 
-	uk_file_wlock(wpipe);
-	ret = uk_file_write(wpipe, msg->msg_iov, msg->msg_iovlen, 0,
-			    data->type != SOCK_STREAM ? O_DIRECT : 0);
-	uk_file_wunlock(wpipe);
-	/* We ignore ancillary data for now */
-
-	/* 0-length datagrams will be silently lost; warn */
-	if (!ret && data->type != SOCK_STREAM)
-		uk_pr_warn("0-length datagram write; message will be lost\n");
+	if (data->type == SOCK_STREAM) {
+		uk_file_wlock(wpipe);
+		ret = uk_file_write(wpipe, msg->msg_iov, msg->msg_iovlen, 0, 0);
+		uk_file_wunlock(wpipe);
+	} else {
+		ret = uk_pipefile_send_packet(wpipe, msg->msg_iov,
+					      msg->msg_iovlen);
+	}
 
 	if (!_SOCK_CONNECTION(data->type) && remote) {
 		uk_file_release(wpipe);
