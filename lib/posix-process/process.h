@@ -12,8 +12,10 @@
 #include <uk/config.h>
 
 #if CONFIG_LIBPOSIX_PROCESS_MULTITHREADING
+#include <stdbool.h>
 #include <linux/sched.h>
 #include <uk/arch/ctx.h>
+#include <uk/plat/spinlock.h>
 #include <uk/process.h>
 #include <uk/semaphore.h>
 #include <uk/thread.h>
@@ -70,6 +72,7 @@ struct posix_process {
 	struct uk_semaphore wait_semaphore;
 	struct uk_semaphore exit_semaphore;
 	enum posix_process_state state;
+	bool exiting;
 	__u64 exit_signal;
 	int exit_status;
 #if CONFIG_LIBPOSIX_PROCESS_BRK
@@ -100,13 +103,29 @@ struct posix_thread {
 };
 
 extern struct posix_process *pid_process[TIDMAP_SIZE];
+extern __spinlock pprocess_lock;
+
+static inline unsigned long pprocess_lock_acquire(void)
+{
+	unsigned long flags;
+
+	ukplat_spin_lock_irqsave(&pprocess_lock, flags);
+	return flags;
+}
+
+static inline void pprocess_lock_release(unsigned long flags)
+{
+	ukplat_spin_unlock_irqrestore(&pprocess_lock, flags);
+}
 
 extern __uk_tls struct posix_thread *pthread_self;
 
 #define uk_pprocess_foreach(_p)						\
 	for (int _j = 1, _i = 0; _i != ARRAY_SIZE(pid_process);		\
 		_j = !_j, _i++)						\
-			for ((_p) = pid_process[_i]; _j; _j = !_j)	\
+			for ((_p) = __atomic_load_n(&pid_process[_i],	\
+						    __ATOMIC_ACQUIRE);	\
+			     _j; _j = !_j)				\
 				if ((_p))
 
 #define uk_pprocess_foreach_pthread(_proc, _pthread, _pthreadn)		\
@@ -129,6 +148,13 @@ struct posix_thread *tid2pthread(pid_t tid);
 struct posix_process *tid2pprocess(pid_t tid);
 pid_t ukthread2tid(struct uk_thread *thread);
 pid_t ukthread2pid(struct uk_thread *thread);
+
+bool pprocess_claim_pthread_exit(struct posix_thread *pthread,
+				 bool *became_empty);
+bool pprocess_claim_process_exit(struct posix_process *pprocess);
+bool pprocess_try_exit(struct posix_process *process,
+		       enum posix_process_state state,
+		       int exit_status);
 
 /**
  * INTERNAL. Exit and release a pthread

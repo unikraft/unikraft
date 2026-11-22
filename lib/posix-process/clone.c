@@ -131,6 +131,7 @@ int uk_clone(struct clone_args *cl_args, size_t cl_args_len,
 	struct uk_thread *child = NULL;
 	struct uk_thread *t;
 	struct uk_sched *s;
+	struct uk_sched *target_s;
 	pid_t child_tid;
 	pid_t child_pid;
 	__u64 stack_size;
@@ -394,22 +395,27 @@ int uk_clone(struct clone_args *cl_args, size_t cl_args_len,
 
 	clone_setup_child_ctx(execenv, child, (__uptr)stack);
 
+	/* Publish user TID pointers before adding the runnable child to a
+	 * remote CPU scheduler, which may begin executing it immediately.
+	 */
+	if (flags & CLONE_CHILD_SETTID)
+		__atomic_store_n((pid_t *)cl_args->child_tid, child_tid,
+				 __ATOMIC_RELEASE);
+
+	if (flags & CLONE_PARENT_SETTID)
+		__atomic_store_n((pid_t *)cl_args->parent_tid, child_tid,
+				 __ATOMIC_RELEASE);
+
 	uk_thread_set_runnable(child);
 
-	/* Assign the child to the scheduler */
-	ret = uk_sched_thread_add(s, child);
+	/* Assign pthreads round-robin across online per-CPU schedulers */
+	target_s = (flags & CLONE_THREAD) ? uk_sched_select_round_robin(s) : s;
+	ret = uk_sched_thread_add(target_s, child);
 	if (unlikely(ret)) {
 		uk_pr_err("Unable to add tid %d to scheduler (%d)\n",
 			  child_tid, ret);
 		goto err_free_child;
 	}
-
-	/* Can't fail past this point, update user parameters */
-	if (flags & CLONE_CHILD_SETTID)
-		*((pid_t *)cl_args->child_tid) = child_tid;
-
-	if (flags & CLONE_PARENT_SETTID)
-		*((pid_t *)cl_args->parent_tid) = child_tid;
 
 	/* Set the return value depending on whether
 	 * a thread or a process is created.

@@ -115,6 +115,8 @@ struct uk_sched {
 #endif /* CONFIG_LIBUKSCHED_STATS */
 };
 
+struct uk_sched *uk_sched_current_cpu(void);
+
 /* wrapper functions over scheduler callbacks */
 static inline void uk_sched_yield(void)
 {
@@ -124,6 +126,8 @@ static inline void uk_sched_yield(void)
 	UK_ASSERT(current);
 
 	s = current->sched;
+	if (unlikely(!s))
+		s = uk_sched_current_cpu();
 	UK_ASSERT(s);
 	s->yield(s);
 }
@@ -131,6 +135,12 @@ static inline void uk_sched_yield(void)
 int uk_sched_thread_add(struct uk_sched *s, struct uk_thread *t);
 
 int uk_sched_thread_remove(struct uk_thread *t);
+
+unsigned int uk_sched_started_count(void);
+
+struct uk_sched *uk_sched_select_round_robin(struct uk_sched *fallback);
+
+void uk_sched_kick_cpu(struct uk_sched *s);
 
 static inline void uk_sched_thread_blocked(struct uk_thread *t)
 {

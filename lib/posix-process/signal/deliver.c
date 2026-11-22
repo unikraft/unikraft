@@ -230,63 +230,33 @@ static void do_deliver(struct posix_thread *pthread, struct uk_signal *sig,
 static int deliver_pending_proc(struct posix_process *proc,
 				struct ukarch_execenv *execenv)
 {
-	struct posix_thread *thread, *threadn;
 	struct posix_thread *this_thread;
 	struct uk_signal *sig;
 	int handled_cnt = 0;
-	bool handled;
 	int signum;
 
 	UK_ASSERT(proc);
 	UK_ASSERT(execenv);
 
+	if (!proc->signal ||
+	    __atomic_load_n(&proc->signal->sigqueue.pending,
+			    __ATOMIC_ACQUIRE) == 0)
+		return 0;
+
 	this_thread = uk_pthread_current();
 	UK_ASSERT(this_thread);
 
 	pprocess_signal_foreach(signum) {
-		handled = false;
-
-		/* Skip if the process ignores this signal altogether */
-		if (IS_IGNORED(proc, signum))
+		if (!IS_PENDING(proc->signal->sigqueue, signum) ||
+		    IS_IGNORED(proc, signum) ||
+		    IS_MASKED(this_thread, signum))
 			continue;
 
-		/* POSIX specifies that if a signal targets the
-		 * current process / thread, then at least one
-		 * signal for this process /thread must be
-		 * delivered before the syscall returns, as long as:
-		 *
-		 * 1. No other thread has that signal unblocked
-		 * 2. No other thread is in sigwait() for that signal (TODO)
-		 */
-		uk_pprocess_foreach_pthread(proc, thread, threadn) {
-			if (thread->tid == this_thread->tid)
-				continue;
-
-			if (IS_MASKED(thread, signum))
-				continue;
-
-			while ((sig = pprocess_signal_dequeue(proc, __NULL,
-							      signum))) {
-				do_deliver(thread, sig, execenv);
-				uk_signal_free(proc->_a, sig);
-				handled = true;
-				handled_cnt++;
-			}
-			break;
-		}
-
-		/* Try to deliver to this thread */
-		if (!handled) {
-			if (IS_MASKED(this_thread, signum))
-				continue;
-
-			while ((sig = pprocess_signal_dequeue(proc, __NULL,
-							      signum))) {
-				do_deliver(this_thread, sig, execenv);
-				uk_signal_free(proc->_a, sig);
-				handled = true;
-				handled_cnt++;
-			}
+		/* Deliver on the current CPU's thread whose execenv is saved */
+		while ((sig = pprocess_signal_dequeue(proc, __NULL, signum))) {
+			do_deliver(this_thread, sig, execenv);
+			uk_signal_free(proc->_a, sig);
+			handled_cnt++;
 		}
 	}
 
@@ -301,7 +271,12 @@ static int deliver_pending_thread(struct posix_thread *thread,
 	int handled = 0;
 	int signum;
 
-	proc = tid2pprocess(thread->tid);
+	if (!thread->signal ||
+	    __atomic_load_n(&thread->signal->sigqueue.pending,
+			    __ATOMIC_ACQUIRE) == 0)
+		return 0;
+
+	proc = thread->process;
 	UK_ASSERT(proc);
 
 	/* Deliver this thread's signals. SUS requires that RT signals
@@ -341,9 +316,13 @@ static void uk_signal_deliver(struct uk_syscall_exit_ctx *exit_ctx)
 		return;
 
 	pthread = uk_pthread_current();
-	UK_ASSERT(pthread);
+	if (unlikely(!pthread)) {
+		if (!uk_thread_current()->sched)
+			uk_sched_yield();
+		return;
+	}
 
-	pproc = uk_pprocess_current();
+	pproc = pthread->process;
 	UK_ASSERT(pproc);
 
 	/* If there's SIGKILL pending, kill the process right away */

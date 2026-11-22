@@ -32,6 +32,8 @@ static inline bool _uk_thread_wake_transition(struct uk_thread *thread,
 
 	if (s)
 		ukarch_spin_unlock(&s->lock);
+	if (woken)
+		uk_sched_kick_cpu(s);
 	return woken;
 }
 

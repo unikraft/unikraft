@@ -1,6 +1,10 @@
 uk_sched_register
 uk_sched_create
 uk_sched_start
+uk_sched_current_cpu
+uk_sched_started_count
+uk_sched_select_round_robin
+uk_sched_kick_cpu
 uk_sched_thread_create_fn0
 uk_sched_thread_create_fn1
 uk_sched_thread_create_fn2

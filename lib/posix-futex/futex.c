@@ -348,12 +348,15 @@ static int pthread_exit_handler(void *arg)
 {
 	struct posix_process_ptexit_event_data *event_data;
 	struct uk_thread *child;
+	pid_t *clear_ref;
 	struct futex_guard guard;
 
 	UK_ASSERT(arg);
 
 	event_data = (struct posix_process_ptexit_event_data *)arg;
 	child = event_data->thread;
+	clear_ref = (pid_t *)uk_thread_uktls_var(child, child_tid_clear_ref);
+	uk_thread_uktls_var(child, child_tid_clear_ref) = NULL;
 
 	/* Retire the old registration before publishing the exit notification. */
 	futex_guard_lock(&guard);
@@ -361,9 +364,9 @@ static int pthread_exit_handler(void *arg)
 		uk_waitq_cancel(child);
 
 	/* Linux clear-child-tid publishes zero and wakes one join waiter. */
-	if (child_tid_clear_ref != NULL) {
-		uk_store_n((pid_t *)child_tid_clear_ref, 0);
-		futex_wake_locked((uint32_t *)child_tid_clear_ref, 1);
+	if (clear_ref != NULL) {
+		uk_store_n(clear_ref, 0);
+		futex_wake_locked((uint32_t *)clear_ref, 1);
 	}
 	futex_guard_unlock(&guard);
 	return 0;

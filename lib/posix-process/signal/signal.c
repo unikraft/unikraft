@@ -31,6 +31,7 @@ static int pprocess_signal_enqueue(struct posix_process *pproc,
 				   struct posix_thread *pthread,
 				   struct uk_signal *sig)
 {
+	unsigned long pflags;
 	int signum;
 
 	UK_ASSERT(sig);
@@ -39,36 +40,42 @@ static int pprocess_signal_enqueue(struct posix_process *pproc,
 	if (pthread)
 		UK_ASSERT(pthread->process == pproc);
 
-	if (unlikely(pproc->signal->queued_count >= pproc->signal->queued_max))
-		return -EAGAIN;
-
 	signum = sig->siginfo.si_signo;
+
+	pflags = pprocess_lock_acquire();
+	if (unlikely(pproc->signal->queued_count >= pproc->signal->queued_max)) {
+		pprocess_lock_release(pflags);
+		return -EAGAIN;
+	}
 
 	if (pthread) {
 		/* Standard signals can be queued once */
-		if (signum < SIGRTMIN && IS_PENDING(pthread->signal->sigqueue, signum))
+		if (signum < SIGRTMIN &&
+		    IS_PENDING(pthread->signal->sigqueue, signum)) {
+			pprocess_lock_release(pflags);
 			return 0;
-
-		uk_pr_debug("Queueing signal %d for tid %d (pid %d)\n",
-			    signum, pthread->tid, pproc->pid);
+		}
 
 		uk_list_add_tail(&sig->list_head,
 				 &pthread->signal->sigqueue.list_head[signum]);
-		SET_PENDING(pproc->signal->sigqueue, signum);
+		__atomic_or_fetch(&pthread->signal->sigqueue.pending,
+				  (1UL << (signum - 1)), __ATOMIC_RELEASE);
 	} else {
 		/* Standard signals can be queued once */
-		if (signum < SIGRTMIN && IS_PENDING(pproc->signal->sigqueue, signum))
+		if (signum < SIGRTMIN &&
+		    IS_PENDING(pproc->signal->sigqueue, signum)) {
+			pprocess_lock_release(pflags);
 			return 0;
-
-		uk_pr_debug("Queueing signal %d for pid %d\n",
-			    signum, pproc->pid);
+		}
 
 		uk_list_add_tail(&sig->list_head,
 				 &pproc->signal->sigqueue.list_head[signum]);
-		SET_PENDING(pproc->signal->sigqueue, signum);
+		__atomic_or_fetch(&pproc->signal->sigqueue.pending,
+				  (1UL << (signum - 1)), __ATOMIC_RELEASE);
 	}
 
 	pproc->signal->queued_count++;
+	pprocess_lock_release(pflags);
 
 	return 0;
 }
@@ -79,6 +86,7 @@ struct uk_signal *pprocess_signal_dequeue(struct posix_process *pproc,
 {
 	struct uk_signal_queue *sigqueue;
 	struct uk_signal *sig;
+	unsigned long pflags;
 
 	UK_ASSERT(pproc);
 
@@ -89,23 +97,25 @@ struct uk_signal *pprocess_signal_dequeue(struct posix_process *pproc,
 		sigqueue = &pproc->signal->sigqueue;
 	}
 
+	pflags = pprocess_lock_acquire();
 	sig = uk_list_first_entry_or_null(&sigqueue->list_head[signum],
 					  struct uk_signal,
 					  list_head);
-	if (!sig)
-		return sig;
+	if (!sig) {
+		pprocess_lock_release(pflags);
+		return NULL;
+	}
 
 	uk_list_del(&sig->list_head);
 
 	/* Reset pending bit if the signal queue is empty */
 	if (uk_list_empty(&sigqueue->list_head[signum])) {
-		if (pthread)
-			RESET_PENDING(pthread->signal->sigqueue, signum);
-		else
-			RESET_PENDING(pproc->signal->sigqueue, signum);
+		__atomic_and_fetch(&sigqueue->pending,
+				   ~(1UL << (signum - 1)), __ATOMIC_RELEASE);
 	}
 
 	pproc->signal->queued_count--;
+	pprocess_lock_release(pflags);
 
 	return sig;
 }
@@ -266,9 +276,20 @@ int pprocess_signal_process_do(pid_t pid, int signum, siginfo_t *siginfo)
 		return rc;
 
 	/* Wake up any threads that may be paused */
-	uk_pprocess_foreach_pthread(pproc, thread, threadn) {
-		if (thread->state == POSIX_THREAD_BLOCKED_SIGNAL)
-			uk_semaphore_up(&thread->signal->deliver_semaphore);
+	{
+		struct uk_semaphore *sems[16];
+		unsigned int nsems = 0, i;
+		unsigned long pflags = pprocess_lock_acquire();
+
+		uk_pprocess_foreach_pthread(pproc, thread, threadn) {
+			if (thread->state == POSIX_THREAD_BLOCKED_SIGNAL &&
+			    nsems < ARRAY_SIZE(sems))
+				sems[nsems++] =
+					&thread->signal->deliver_semaphore;
+		}
+		pprocess_lock_release(pflags);
+		for (i = 0; i < nsems; i++)
+			uk_semaphore_up(sems[i]);
 	}
 
 	return 0;
@@ -427,7 +448,7 @@ void pprocess_signal_tdesc_free(struct posix_thread *thread)
 	UK_ASSERT(thread);
 	UK_ASSERT(thread->signal);
 
-	pproc = tid2pprocess(thread->tid);
+	pproc = thread->process;
 	UK_ASSERT(pproc);
 
 	pprocess_signal_foreach(signum)

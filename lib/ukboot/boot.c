@@ -137,6 +137,160 @@ struct uk_semaphore main_sema;
 static struct uk_vas kernel_vas;
 #endif /* CONFIG_LIBUKBOOT_HEAP_BASE && CONFIG_LIBUKVMEM */
 
+#if CONFIG_HAVE_SMP && CONFIG_LIBUKBOOT_INITSCHED && \
+	CONFIG_LIBUKBOOT_INITSCHEDCOOP && CONFIG_LIBUKBOOT_INITALLOC && \
+	!CONFIG_LIBUKLCPU_SMP_TEST
+#include <uk/pcpuvar.h>
+
+#define UKBOOT_AP_STACK_BYTES (64 * 1024)
+#define UKBOOT_AP_START_TIMEOUT_NS ((__nsec)5000000000ULL)
+
+struct ukboot_ap_slot {
+	struct uk_sched *sched;
+	__uptr uktlsp;
+	__uptr auxsp;
+	unsigned int started;
+	int error;
+};
+
+static struct ukboot_ap_slot ukboot_ap_slots[CONFIG_UKPLAT_CPU_MAXCOUNT];
+static unsigned char
+ukboot_ap_stacks[CONFIG_UKPLAT_CPU_MAXCOUNT][UKBOOT_AP_STACK_BYTES]
+	__align(UKARCH_SP_ALIGN);
+#if CONFIG_LIBUKVMEM
+static struct uk_vas *ukboot_ap_vas;
+#endif
+
+/* Kept out of uk_boot_ap_entry so TLS/per-CPU address calculations cannot be
+ * hoisted across uk_vas_set_active() or uk_lcpu_tlsp_set().
+ */
+static __noinline __noreturn void
+uk_boot_ap_sched_enter(struct ukboot_ap_slot *slot)
+{
+	int rc;
+
+	rc = uk_sched_start(slot->sched);
+	if (unlikely(rc)) {
+		__atomic_store_n(&slot->error, rc, __ATOMIC_RELEASE);
+		uk_lcpu_halt();
+	}
+	__atomic_store_n(&slot->started, 1U, __ATOMIC_RELEASE);
+
+	/* Park the AP bootstrap container thread permanently so this CPU
+	 * enters its cooperative scheduler idle loop ready for pthreads.
+	 */
+	uk_thread_block(uk_thread_current());
+	uk_sched_yield();
+	UK_CRASH("Unexpected return to AP bootstrap thread\n");
+}
+
+static void __noreturn uk_boot_ap_entry(struct uk_lcpu *this_lcpu)
+{
+	const __u64 idx = uk_pcpuvar_current_get(uk_pcpuvar_cpu_idx);
+	struct ukboot_ap_slot *slot;
+	int rc;
+
+	if (unlikely(!idx || idx >= CONFIG_UKPLAT_CPU_MAXCOUNT))
+		uk_lcpu_halt();
+
+	slot = &ukboot_ap_slots[idx];
+	rc = uk_lcpu_init(this_lcpu);
+	if (unlikely(rc))
+		goto err_halt;
+#if CONFIG_LIBUKVMEM
+	if (ukboot_ap_vas) {
+		rc = uk_vas_set_active(ukboot_ap_vas);
+		if (unlikely(rc))
+			goto err_halt;
+	}
+#endif
+	uk_lcpu_tlsp_set(slot->uktlsp);
+	uk_lcpu_init_auxsp(slot->auxsp, slot->uktlsp);
+	uk_boot_ap_sched_enter(slot);
+
+err_halt:
+	__atomic_store_n(&slot->error, rc, __ATOMIC_RELEASE);
+	uk_lcpu_halt();
+}
+
+static void uk_boot_start_secondary_schedulers(struct uk_alloc *a,
+					       struct uk_alloc *sa,
+					       struct uk_alloc *auxsa)
+{
+	const unsigned int cpu_count = uk_lcpu_discovered_count();
+	__u64 indices[CONFIG_UKPLAT_CPU_MAXCOUNT];
+	__u64 sps[CONFIG_UKPLAT_CPU_MAXCOUNT];
+	__uptr entries[CONFIG_UKPLAT_CPU_MAXCOUNT];
+	unsigned int remote_count, started;
+	__nsec deadline;
+	unsigned int i;
+	int rc;
+
+	if (cpu_count <= 1)
+		return;
+	if (unlikely(cpu_count > CONFIG_UKPLAT_CPU_MAXCOUNT))
+		UK_CRASH("Discovered %u CPUs exceeding MAXCOUNT %u\n",
+			 cpu_count, CONFIG_UKPLAT_CPU_MAXCOUNT);
+
+#if CONFIG_LIBUKVMEM
+	ukboot_ap_vas = uk_vas_get_active();
+#endif
+	remote_count = cpu_count - 1;
+	for (i = 1; i < cpu_count; i++) {
+		struct ukboot_ap_slot *slot = &ukboot_ap_slots[i];
+		void *ap_tls, *ap_auxstack;
+
+		ap_tls = uk_memalign(a, ukarch_tls_area_align(),
+				     ukarch_tls_area_size());
+		if (unlikely(!ap_tls))
+			UK_CRASH("Failed to allocate TLS for CPU %u\n", i);
+		ukarch_tls_area_init(ap_tls);
+		slot->uktlsp = ukarch_tls_tlsp(ap_tls);
+
+		ap_auxstack = uk_memalign(auxsa, UKARCH_AUXSP_ALIGN,
+					  AUXSTACK_SIZE);
+		if (unlikely(!ap_auxstack))
+			UK_CRASH("Failed to allocate auxstack for CPU %u\n", i);
+		slot->auxsp = ukarch_gen_sp(ap_auxstack, AUXSTACK_SIZE);
+
+		slot->sched = uk_schedcoop_create(a, sa, auxsa, a);
+		if (unlikely(!slot->sched))
+			UK_CRASH("Failed to create scheduler for CPU %u\n", i);
+
+		slot->started = 0;
+		slot->error = 0;
+		indices[i - 1] = i;
+		sps[i - 1] = (__u64)ukarch_gen_sp(ukboot_ap_stacks[i],
+						  sizeof(ukboot_ap_stacks[i]));
+		entries[i - 1] = (__uptr)uk_boot_ap_entry;
+	}
+
+	started = remote_count;
+	rc = uk_lcpu_start(indices, &started, sps, entries, 0);
+	if (unlikely(rc || started != remote_count))
+		UK_CRASH("Failed to start %u secondary CPUs (rc=%d, started=%u)\n",
+			 remote_count, rc, started);
+
+	deadline = ukplat_monotonic_clock() + UKBOOT_AP_START_TIMEOUT_NS;
+	for (i = 1; i < cpu_count; i++) {
+		while (!__atomic_load_n(&ukboot_ap_slots[i].started,
+					__ATOMIC_ACQUIRE)) {
+			int err = __atomic_load_n(&ukboot_ap_slots[i].error,
+						  __ATOMIC_ACQUIRE);
+			if (unlikely(err))
+				UK_CRASH("CPU %u scheduler init failed (%d)\n",
+					 i, err);
+			if (unlikely(ukplat_monotonic_clock() >= deadline))
+				UK_CRASH("Timed out waiting for CPU %u scheduler\n",
+					 i);
+			uk_arch_spinwait();
+		}
+	}
+	uk_pr_info("Started %u application scheduler(s) across %u logical CPU(s)\n",
+		   uk_sched_started_count(), cpu_count);
+}
+#endif /* CONFIG_HAVE_SMP && !CONFIG_LIBUKLCPU_SMP_TEST */
+
 static struct uk_alloc *heap_init()
 {
 	struct uk_alloc *a = NULL;
@@ -423,6 +577,12 @@ void uk_boot_entry(void)
 
 #ifdef CONFIG_LIBUKSP
 	uk_stack_chk_guard_setup();
+#endif
+
+#if CONFIG_HAVE_SMP && CONFIG_LIBUKBOOT_INITSCHED && \
+	CONFIG_LIBUKBOOT_INITSCHEDCOOP && CONFIG_LIBUKBOOT_INITALLOC && \
+	!CONFIG_LIBUKLCPU_SMP_TEST
+	uk_boot_start_secondary_schedulers(a, sa, auxsa);
 #endif
 
 	print_banner(stdout);
