@@ -28,11 +28,11 @@ static inline void *_do_mbox_recv_item(struct uk_mbox *m)
 	void *ret;
 
 	uk_pr_debug("Receive message from mailbox %p\n", m);
-	irqf = uk_lcpu_save_irqf();
+	uk_spin_lock_irqsave(&m->lock, irqf);
 	UK_ASSERT(m->readpos != m->writepos);
 	ret = m->msgs[m->readpos];
 	m->readpos = (m->readpos + 1) % m->len;
-	uk_lcpu_restore_irqf(irqf);
+	uk_spin_unlock_irqrestore(&m->lock, irqf);
 
 	return ret;
 }
@@ -56,11 +56,11 @@ static inline void _do_mbox_post_item(struct uk_mbox *m, void *msg)
 
 	UK_ASSERT(m);
 
-	irqf = uk_lcpu_save_irqf();
+	uk_spin_lock_irqsave(&m->lock, irqf);
 	m->msgs[m->writepos] = msg;
 	m->writepos = (m->writepos + 1) % m->len;
 	UK_ASSERT(m->readpos != m->writepos);
-	uk_lcpu_restore_irqf(irqf);
+	uk_spin_unlock_irqrestore(&m->lock, irqf);
 	uk_pr_debug("Posted message %p to mailbox %p\n", msg, m);
 }
 
