@@ -48,6 +48,9 @@ static __noreturn void console_writer(void *unused __unused)
 			UK_CRASH("Console test line exceeds its buffer\n");
 		write_direct(line, size);
 		uk_pr_info("CONSOLE_SMP_K cpu=%u seq=%u data=%016llx:%016llx\n", cpu, i, value, ~value);
+		if (printf("CONSOLE_SMP_P cpu=%u seq=%u data=%016llx:%016llx\n",
+			   cpu, i, value, ~value) != size)
+			UK_CRASH("Failed to write complete stdio test line\n");
 	}
 	uk_semaphore_up(&finished);
 	uk_sched_thread_exit();
@@ -81,6 +84,6 @@ static void __constructor run_console_smp(void)
 		if (uk_semaphore_down_to(&finished, 10000000000ULL) == __NSEC_MAX)
 			UK_CRASH("Console writer failed to complete\n");
 	size = snprintf(end, sizeof(end), "CONSOLE_SMP_END mask=%llx lines=%u\n",
-			  uk_load_n(&cpu_mask), online * LINES_PER_WRITER * 2U);
+			  uk_load_n(&cpu_mask), online * LINES_PER_WRITER * 3U);
 	write_direct(end, size);
 }
