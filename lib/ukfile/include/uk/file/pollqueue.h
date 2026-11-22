@@ -482,6 +482,19 @@ out:
  */
 uk_pollevent uk_pollq_set_n(struct uk_pollq *q, uk_pollevent set, int one);
 
+#if CONFIG_LIBUKFILE_POLLED
+/**
+ * Notify waiters of an externally polled queue.
+ *
+ * Direct waiters recheck readiness for the sampled levels and rising edges.
+ * Only rising edges are propagated to poll chains. The driver retains
+ * ownership of the current levels and must notify when they may become ready,
+ * even without a new edge in its callback stream. May block.
+ */
+void uk_pollq_notify_polled(struct uk_pollq *q, uk_pollevent levels,
+			    uk_pollevent edges);
+#endif /* CONFIG_LIBUKFILE_POLLED */
+
 /**
  * Update events, clearing those in `clr`.
  *
