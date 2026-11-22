@@ -46,6 +46,46 @@
 #include <uk/paging.h>
 #include <uk/falloc.h>
 #endif /* CONFIG_LIBUKPAGING */
+#ifdef CONFIG_LIBUKPCPUVAR
+#include <uk/pcpuvar.h>
+#endif /* CONFIG_LIBUKPCPUVAR */
+#ifdef CONFIG_LIBUKLCPU
+#include <uk/lcpu.h>
+#endif /* CONFIG_LIBUKLCPU */
+#ifdef CONFIG_LIBUKSCHED
+#include <uk/sched.h>
+#endif /* CONFIG_LIBUKSCHED */
+
+static unsigned int sysinfo_current_cpu_idx(void)
+{
+#ifdef CONFIG_LIBUKPCPUVAR
+	return (unsigned int)uk_pcpuvar_current_get(uk_pcpuvar_cpu_idx);
+#else
+	return 0;
+#endif
+}
+
+static long sysinfo_online_cpus(void)
+{
+#ifdef CONFIG_LIBUKSCHED
+	unsigned int count = uk_sched_started_count();
+
+	return (long)(count ? count : 1U);
+#else
+	return 1;
+#endif
+}
+
+static long sysinfo_configured_cpus(void)
+{
+#ifdef CONFIG_LIBUKLCPU
+	unsigned int count = uk_lcpu_discovered_count();
+
+	return (long)(count ? count : 1U);
+#else
+	return 1;
+#endif
+}
 
 /**
  * The Unikraft `struct utsname` structure.
@@ -81,7 +121,7 @@ UK_SYSCALL_R_DEFINE(int, sysinfo, struct sysinfo *, info)
 {
 #ifdef CONFIG_LIBUKPAGING
 	struct uk_pagetable *pt;
-	__sz total_memory;
+	__sz total_memory, total_scaled, free_memory;
 	unsigned int mem_unit = 1;
 #endif /* CONFIG_LIBUKPAGING */
 
@@ -95,14 +135,16 @@ UK_SYSCALL_R_DEFINE(int, sysinfo, struct sysinfo *, info)
 #ifdef CONFIG_LIBUKPAGING
 	pt = uk_paging_pt_get_active();
 
-	total_memory = pt->fa->total_memory;
-	while (total_memory > __UL_MAX) {
-		total_memory >>= 1;
+	total_memory = UK_READ_ONCE(pt->fa->total_memory);
+	free_memory = UK_READ_ONCE(pt->fa->free_memory);
+	total_scaled = total_memory;
+	while (total_scaled > __UL_MAX) {
+		total_scaled >>= 1;
 		mem_unit <<= 1;
 	}
 
-	info->totalram = (unsigned long) (pt->fa->total_memory / mem_unit);
-	info->freeram = (unsigned long) (pt->fa->free_memory / mem_unit);
+	info->totalram = (unsigned long)(total_memory / mem_unit);
+	info->freeram = (unsigned long)(free_memory / mem_unit);
 	info->mem_unit = mem_unit;
 #endif /* CONFIG_LIBUKPAGING */
 
@@ -122,7 +164,10 @@ long pathconf(const char *path __unused, int name __unused)
 long sysconf(int name)
 {
 	if (name == _SC_NPROCESSORS_ONLN)
-		return 1;
+		return sysinfo_online_cpus();
+
+	if (name == _SC_NPROCESSORS_CONF)
+		return sysinfo_configured_cpus();
 
 	if (name == _SC_PAGESIZE)
 		return __PAGE_SIZE;
@@ -139,14 +184,14 @@ long sysconf(int name)
 		struct uk_pagetable *pt;
 
 		pt = uk_paging_pt_get_active();
-		return pt->fa->total_memory / UK_PAGING_PAGE_SIZE;
+		return UK_READ_ONCE(pt->fa->total_memory) / UK_PAGING_PAGE_SIZE;
 	}
 
 	if (name == _SC_AVPHYS_PAGES) {
 		struct uk_pagetable *pt;
 
 		pt = uk_paging_pt_get_active();
-		return pt->fa->free_memory / UK_PAGING_PAGE_SIZE;
+		return UK_READ_ONCE(pt->fa->free_memory) / UK_PAGING_PAGE_SIZE;
 	}
 #endif /* CONFIG_LIBUKPAGING */
 
@@ -219,7 +264,7 @@ UK_SYSCALL_R_DEFINE(int, getcpu, unsigned int *, cpu, unsigned int *, node,
 	/* tcache is ignored since Linux 2.6.24 */
 
 	if (cpu)
-		*cpu = 0;
+		*cpu = sysinfo_current_cpu_idx();
 
 	if (node)
 		*node = 0;
