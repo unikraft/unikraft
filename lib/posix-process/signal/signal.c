@@ -32,13 +32,15 @@ static void signal_wake_waiter(struct posix_thread *thread, int signum)
 /* Enqueue signal for a thread or a process
  *
  * Setting pthread to NULL signifies that the signal
- * targets the process.
+ * targets the process. Success consumes sig, including coalesced signals;
+ * on error the caller retains ownership.
  */
 static int pprocess_signal_enqueue(struct posix_process *pproc,
 				   struct posix_thread *pthread,
 				   struct uk_signal *sig)
 {
 	unsigned long pflags;
+	bool queued = false;
 	int signum;
 
 	UK_ASSERT(sig);
@@ -78,6 +80,7 @@ static int pprocess_signal_enqueue(struct posix_process *pproc,
 	}
 
 	pproc->signal->queued_count++;
+	queued = true;
 
 notify:
 	/* Keep each waiter linked for the duration of its wakeup. */
@@ -90,6 +93,8 @@ notify:
 			signal_wake_waiter(thread, signum);
 	}
 	pprocess_lock_release(pflags);
+	if (!queued)
+		uk_signal_free(pthread ? pthread->_a : pproc->_a, sig);
 
 	return 0;
 }
