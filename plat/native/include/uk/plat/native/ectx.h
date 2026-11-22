@@ -16,6 +16,7 @@
  * save/restore mechanisms.
  */
 
+#include <uk/config.h>
 #include <uk/plat/native/arch/ectx.h>
 
 /*
@@ -78,12 +79,20 @@ __isr void uk_plat_native_ectx_store(struct uk_plat_native_ectx *state);
 __isr void uk_plat_native_ectx_load(struct uk_plat_native_ectx *state);
 
 /**
- * Initialize extended context to clean default state.
- * Zeroes memory and saves a clean architectural state.
+ * Initialize a valid extended context from the current CPU state.
+ * Zeroes memory and then records the running execution state.
  *
  * @param state  Extended context to initialize (properly aligned and sized)
  */
 __isr void uk_plat_native_ectx_init(struct uk_plat_native_ectx *state);
+
+#if CONFIG_ARCH_X86_64
+/**
+ * Prepare architectural initial x87 and vector state without changing the CPU.
+ * The caller owns a correctly sized and aligned context buffer.
+ */
+__isr void uk_plat_native_ectx_reset(struct uk_plat_native_ectx *state);
+#endif
 
 /**
  * Verify extended context matches current CPU state (debug only).
