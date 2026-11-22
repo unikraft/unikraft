@@ -82,17 +82,17 @@ static inline long uk_semaphore_down_all(struct uk_semaphore *s)
 
 	for (;;) {
 		uk_waitq_wait_event(&s->wait, s->count > 0);
-		irqf = uk_lcpu_save_irqf();
+		uk_spin_lock_irqsave(&(s->sl), irqf);
 		if (s->count > 0)
 			break;
-		uk_lcpu_restore_irqf(irqf);
+		uk_spin_unlock_irqrestore(&(s->sl), irqf);
 	}
 	count = s->count;
 	s->count = 0;
 #ifdef UK_SEMAPHORE_DEBUG
 	uk_pr_debug("Decreased semaphore %p to %ld\n", s, s->count);
 #endif
-	uk_lcpu_restore_irqf(irqf);
+	uk_spin_unlock_irqrestore(&(s->sl), irqf);
 
 	return count;
 }

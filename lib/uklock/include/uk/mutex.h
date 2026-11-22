@@ -76,7 +76,7 @@ static inline int uk_mutex_is_recursive(const struct uk_mutex *m)
 #define _UK_MUTEX_CONTESTED	0x2
 #define _UK_MUTEX_STATE_MASK	(_UK_MUTEX_UNOWNED | _UK_MUTEX_CONTESTED)
 
-#if CONFIG_LIBUKLOCK_MUTEX_ATOMIC
+#if CONFIG_LIBUKLOCK_MUTEX_ATOMIC || CONFIG_HAVE_SMP
 #define _uk_mutex_lock_fetch(m, v, tid)					\
 	__atomic_compare_exchange_n(&(m)->lock,				\
 		v, tid, 0, __ATOMIC_ACQUIRE, __ATOMIC_RELAXED)
