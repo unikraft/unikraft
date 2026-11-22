@@ -23,6 +23,17 @@ config LIBPOSIX_FUTEX_DEBUG
 	bool "Enable debug messages"
 	default n
 
+config LIBPOSIX_FUTEX_VAS_TEST
+	bool "Test futexes across separate process address spaces"
+	depends on LIBPOSIX_PROCESS_MULTITHREADING
+	depends on LIBUKVMEM_THREAD_VAS && LIBUKPAGING_DIRECTMAP
+	depends on LIBUKPLAT_NATIVE_PAGING && LIBUKLOCK_SEMAPHORE
+	select LIBPOSIX_FUTEX_VAS
+	select LIBUKPAGING_STATS
+	select LIBUKTEST
+	depends on LIBSYSCALL_SHIM
+	default n
+
 config LIBPOSIX_FUTEX_TEST
 	bool "Enable tests"
 	default n
