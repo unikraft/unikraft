@@ -7,6 +7,7 @@
 #include <uk/alloc_impl.h>
 #include <uk/falloc.h>
 #include <uk/isr/string.h>
+#include <uk/lcpu.h>
 #include <uk/print.h>
 #include <uk/test.h>
 #include <uk/vmem/process.h>
@@ -339,6 +340,135 @@ UK_TESTCASE(process_spaces, repeated_create_clone_resource_balance)
 		if (rc)
 			break;
 	}
+	uk_free(kernel->a, a);
+}
+
+static int process_test_copy_cycle(struct uk_alloc *a, const __u8 *original,
+				   const __u8 *changed, __u8 *result, __sz span)
+{
+	struct uk_vas *parent = NULL, *child = NULL;
+	__vaddr_t base = UK_PAGING_VADDR_ANY, start;
+	unsigned long irqf;
+	int rc;
+
+	rc = uk_vas_create_process(a, &parent);
+	if (rc)
+		goto out;
+	rc = uk_vma_map_anon(parent, &base, 3 * UK_PAGING_PAGE_SIZE,
+			     UK_PAGING_PAGE_ATTR_PROT_RW, 0, NULL);
+	if (rc)
+		goto out;
+	start = base + UK_PAGING_PAGE_SIZE - 7;
+	rc = uk_vas_copy_to(parent, start, original, span);
+	if (rc)
+		goto out;
+	rc = uk_vas_clone_process(parent, &child);
+	if (rc)
+		goto out;
+	rc = uk_vas_copy_to(child, start, changed, span);
+	if (rc)
+		goto out;
+	rc = uk_vas_copy_from(parent, result, start, span);
+	if (rc)
+		goto out;
+	if (memcmp(result, original, span)) {
+		rc = -EIO;
+		goto out;
+	}
+	uk_vas_put(parent);
+	parent = NULL;
+	rc = uk_vas_copy_from(child, result, start, span);
+	if (rc)
+		goto out;
+	if (memcmp(result, changed, span)) {
+		rc = -EIO;
+		goto out;
+	}
+	rc = uk_vma_set_attr(child, base + 2 * UK_PAGING_PAGE_SIZE,
+			     UK_PAGING_PAGE_SIZE,
+			     UK_PAGING_PAGE_ATTR_PROT_READ, 0);
+	if (rc)
+		goto out;
+	rc = uk_vas_copy_to(child, base + 2 * UK_PAGING_PAGE_SIZE - 3,
+			    original, 8);
+	if (rc != -EFAULT) {
+		rc = -EIO;
+		goto out;
+	}
+	rc = uk_vas_copy_from(child, result,
+			      base + 2 * UK_PAGING_PAGE_SIZE - 3, 3);
+	if (rc)
+		goto out;
+	if (memcmp(result, original, 3)) {
+		rc = -EIO;
+		goto out;
+	}
+	memset_isr(result, 0xa5, 8);
+	rc = uk_vas_copy_from(child, result,
+			      base + 3 * UK_PAGING_PAGE_SIZE - 3, 8);
+	if (rc != -EFAULT || result[0] || result[1] || result[2] ||
+	    result[3] != 0xa5 || result[7] != 0xa5) {
+		rc = -EIO;
+		goto out;
+	}
+	irqf = uk_lcpu_save_irqf();
+	rc = uk_vas_copy_from(child, result, start, 1);
+	uk_lcpu_restore_irqf(irqf);
+	if (rc != -EWOULDBLOCK || uk_vas_copy_from(child, NULL, start, 0) ||
+	    uk_vas_copy_to(child, start, NULL, 0) ||
+	    uk_vas_copy_from(child, result, __VADDR_MAX - 3, 8) != -EINVAL) {
+		rc = -EIO;
+		goto out;
+	}
+	rc = 0;
+out:
+	uk_vas_put(child);
+	uk_vas_put(parent);
+	return rc;
+}
+
+UK_TESTCASE(process_spaces, byte_copy_cow_and_error_balance)
+{
+	struct uk_vas *kernel = uk_vas_get_kernel();
+	struct uk_alloc *a = process_test_allocator();
+	const __sz span = UK_PAGING_PAGE_SIZE + 13;
+	struct process_test_alloc *probe;
+	unsigned int users = kernel->pt->shared_users;
+	unsigned long free_bytes = 0, aliases = 0;
+	unsigned int i;
+	__u8 *buffer;
+	int rc;
+
+	UK_TEST_EXPECT_NOT_NULL(a);
+	if (!a)
+		return;
+	probe = (void *)a->priv;
+	buffer = uk_malloc(kernel->a, 3 * span);
+	UK_TEST_EXPECT_NOT_NULL(buffer);
+	if (!buffer)
+		goto free_allocator;
+	for (__sz i = 0; i < 3 * span; i++)
+		buffer[i] = (__u8)(i * 37 + i / 251);
+	for (i = 0; i < 16; i++) {
+		rc = process_test_copy_cycle(a, buffer, buffer + span,
+					     buffer + 2 * span, span);
+		UK_TEST_EXPECT_ZERO(rc);
+		UK_TEST_EXPECT_ZERO(probe->live);
+		UK_TEST_EXPECT_PTR_EQ(uk_vas_get_active(), kernel);
+		UK_TEST_EXPECT_SNUM_EQ(kernel->pt->shared_users, users);
+		if (!i) {
+			free_bytes = kernel->pt->fa->free_memory;
+			aliases = process_test_aliases();
+		}
+		UK_TEST_EXPECT_SNUM_EQ(kernel->pt->fa->free_memory, free_bytes);
+		UK_TEST_EXPECT_SNUM_EQ(process_test_aliases(), aliases);
+		if (rc)
+			break;
+	}
+	if (i == 16)
+		uk_pr_info("PROCESS_VAS_COPY_PASS cycles=16 pages=3 errors=1\n");
+	uk_free(kernel->a, buffer);
+free_allocator:
 	uk_free(kernel->a, a);
 }
 
