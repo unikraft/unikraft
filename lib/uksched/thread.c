@@ -44,6 +44,7 @@
 #include <uk/assert.h>
 #include <uk/arch/tls.h>
 #include <uk/plat/memory.h>
+#include "thread_state.h"
 
 #if CONFIG_LIBUKSCHED_TCB_INIT && !CONFIG_UKARCH_TLS_HAVE_TCB
 #error CONFIG_LIBUKSCHED_TCB_INIT requires that a TLS contains reserved space for a TCB
@@ -1073,11 +1074,6 @@ void uk_thread_wake(struct uk_thread *thread)
 	unsigned long flags;
 
 	flags = uk_lcpu_save_irqf();
-	if (!uk_thread_is_runnable(thread)) {
-		uk_thread_set_runnable(thread);
-		if (thread->sched)
-			uk_sched_thread_woken(thread);
-	}
-	thread->wakeup_time = 0LL;
+	_uk_thread_wake_transition(thread, uk_sched_thread_woken);
 	uk_lcpu_restore_irqf(flags);
 }
