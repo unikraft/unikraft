@@ -37,6 +37,8 @@ config LIBUKVMEM_COW_VMA
 config LIBUKVMEM_COW_VMA_TEST
 	bool "Test private anonymous COW address space cloning"
 	depends on LIBUKVMEM_THREAD_VAS && LIBUKPAGING_DIRECTMAP
+	depends on LIBUKLOCK_SEMAPHORE
+	depends on LIBUKVMEM_PAGEFAULT_HANDLER_PRIO > 0
 	select LIBUKVMEM_COW_VMA
 	select LIBUKVMEM_VAS_ACCESS
 	select LIBUKPAGING_STATS
