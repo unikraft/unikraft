@@ -80,6 +80,16 @@ pid_t uk_sys_getpid(void);
  */
 int uk_posix_process_create_pthread(struct uk_thread *thread);
 
+#define UK_POSIX_PROCESS_HAS_PROGRAM_STACK_SIZE 1
+
+/**
+ * Record the usable size in bytes of a program stack installed by a loader.
+ *
+ * Call with an initialized POSIX thread before it starts executing the new
+ * image. The caller must keep the thread and its process alive.
+ */
+void uk_posix_process_set_stack_size(struct uk_thread *thread, __sz size);
+
 #endif /* CONFIG_LIBPOSIX_PROCESS_MULTITHREADING */
 
 #if CONFIG_LIBPOSIX_PROCESS_MULTIPROCESS

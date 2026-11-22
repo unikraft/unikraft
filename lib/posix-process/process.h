@@ -15,6 +15,7 @@
 #include <stdbool.h>
 #include <linux/sched.h>
 #include <uk/arch/ctx.h>
+#include <uk/arch/limits.h>
 #include <uk/arch/time.h>
 #include <uk/plat/spinlock.h>
 #include <uk/process.h>
@@ -69,6 +70,7 @@ struct posix_process {
 	pid_t pgid;
 	pid_t sid;
 	bool execed;
+	__sz program_stack_size;
 #if CONFIG_LIBPOSIX_PROCESS_ITIMER
 	struct {
 		__nsec deadline;
@@ -180,6 +182,29 @@ extern __uk_tls struct posix_thread *pthread_self;
 
 #define uk_pprocess_current()						\
 	uk_pthread_current()->process
+
+static inline
+__sz pprocess_program_stack_size(const struct posix_process *process)
+{
+	return __atomic_load_n(&process->program_stack_size, __ATOMIC_RELAXED);
+}
+
+static inline
+void pprocess_record_stack_size(struct posix_process *process, __sz size)
+{
+	__atomic_store_n(&process->program_stack_size, size, __ATOMIC_RELAXED);
+}
+
+#if CONFIG_LIBPOSIX_PROCESS_EXECVE
+static inline
+__sz pprocess_exec_stack_size(const struct posix_process *process)
+{
+	const __sz size = pprocess_program_stack_size(process);
+
+	return size ? size : (__sz)CONFIG_LIBPOSIX_PROCESS_EXEC_STACK_NBPAGES *
+			     __PAGE_SIZE;
+}
+#endif /* CONFIG_LIBPOSIX_PROCESS_EXECVE */
 
 struct posix_process *pid2pprocess(pid_t pid);
 /* The caller must own a pin or hold pprocess_lock around a live lookup.

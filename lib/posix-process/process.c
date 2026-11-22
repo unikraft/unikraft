@@ -380,6 +380,18 @@ int uk_posix_process_create_pthread(struct uk_thread *thread)
 	return 0;
 }
 
+void uk_posix_process_set_stack_size(struct uk_thread *thread, __sz size)
+{
+	struct posix_thread *pthread;
+
+	UK_ASSERT(thread);
+	UK_ASSERT(thread->flags & UK_THREADF_UKTLS);
+	UK_ASSERT(size);
+	pthread = uk_thread_uktls_var(thread, pthread_self);
+	UK_ASSERT(pthread);
+	pprocess_record_stack_size(pthread->process, size);
+}
+
 /* Create a new posix process for a given thread */
 static struct posix_process *pprocess_new(struct uk_alloc *a,
 					  struct posix_process *parent __unused)
