@@ -46,3 +46,7 @@ uk_vma_shared_ref_get
 uk_vma_shared_ref_put
 uk_vas_load_u32_try
 uk_vas_load_u32_shared_try
+uk_vma_cow_source_take
+uk_vma_cow_source_get
+uk_vma_cow_source_put
+uk_vma_cow_source_fault

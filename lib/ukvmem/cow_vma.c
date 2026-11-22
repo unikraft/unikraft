@@ -5,6 +5,7 @@
 #include <uk/alloc.h>
 #include <uk/assert.h>
 #include <uk/essentials.h>
+#include <uk/falloc.h>
 #include <uk/isr/string.h>
 #include <uk/lcpu.h>
 #include <uk/plat/spinlock.h>
@@ -28,6 +29,13 @@ struct cow_pool {
 	struct uk_alloc *frames;
 	struct uk_alloc *objects;
 	__atomic refs;
+};
+
+struct uk_vma_cow_source {
+	struct cow_pool *pool;
+	__atomic refs;
+	__sz count;
+	struct vmem_cow_ref pages[];
 };
 
 struct vmem_cow_vas {
@@ -107,6 +115,82 @@ static struct cow_pool *cow_pool_new(struct uk_alloc *a)
 fail:
 	uk_free(a, pool);
 	return NULL;
+}
+
+struct uk_vma_cow_source *uk_vma_cow_source_get(struct uk_vma_cow_source *s)
+{
+	if (s)
+		uk_refcount_acquire(&s->refs);
+	return s;
+}
+
+void uk_vma_cow_source_put(struct uk_vma_cow_source *s)
+{
+	struct cow_pool *pool;
+	__sz i;
+
+	if (!s || !uk_refcount_release(&s->refs))
+		return;
+	UK_ASSERT(!uk_lcpu_irqs_disabled());
+	pool = s->pool;
+	for (i = 0; i < s->count; i++)
+		vmem_cow_ref_release(&s->pages[i], NULL);
+	uk_free(pool->parent, s);
+	cow_pool_put(pool);
+}
+
+int uk_vma_cow_source_take(struct uk_vas *vas, __paddr_t *pages, __sz count,
+			   struct uk_vma_cow_source **out)
+{
+	struct uk_vma_cow_source *s;
+	struct cow_pool *pool;
+	__sz i, bytes;
+	int rc;
+
+	if (!out)
+		return -EINVAL;
+	*out = NULL;
+	if (!vas || !vas->cow || !pages || !count)
+		return -EINVAL;
+	if (uk_lcpu_irqs_disabled())
+		return -EWOULDBLOCK;
+	if (count > (__SZ_MAX - sizeof(*s)) / sizeof(s->pages[0]))
+		return -EOVERFLOW;
+	for (i = 0; i < count; i++)
+		if (pages[i] == UK_PAGING_PADDR_INV ||
+		    !UK_PAGING_PAGE_ALIGNED(pages[i]))
+			return -EINVAL;
+	pool = vas->cow->pool;
+	bytes = sizeof(*s) + count * sizeof(s->pages[0]);
+	s = uk_malloc(pool->parent, bytes);
+	if (!s) {
+		rc = -ENOMEM;
+		goto free_pages;
+	}
+	memset_isr(s, 0, bytes);
+	s->pool = pool;
+	uk_refcount_init(&s->refs, 1);
+	uk_refcount_acquire(&pool->refs);
+	for (i = 0; i < count; i++) {
+		rc = vmem_cow_ref_adopt(&s->pages[i], pool->frames,
+					vas->pt->fa, pages[i], NULL, NULL);
+		if (rc) {
+			uk_vma_cow_source_put(s);
+			goto free_pages;
+		}
+		pages[i] = UK_PAGING_PADDR_INV;
+		s->count++;
+	}
+	*out = s;
+	return 0;
+free_pages:
+	for (i = 0; i < count; i++) {
+		if (pages[i] == UK_PAGING_PADDR_INV)
+			continue;
+		uk_ffree(vas->pt->fa, pages[i], 1);
+		pages[i] = UK_PAGING_PADDR_INV;
+	}
+	return rc;
 }
 
 static struct vmem_cow_vas *cow_vas_new(struct cow_pool *pool)
@@ -255,13 +339,15 @@ static void cow_fault_result(struct uk_vm_fault_op *base, int status,
 	uk_paging_batch_defer(batch, &op->after, cow_fault_after, op);
 }
 
-static int cow_anon_fault(struct uk_vma *vma, struct uk_vm_fault *fault)
+static int cow_fault_from(struct uk_vma *vma, struct uk_vm_fault *fault,
+			  struct uk_vma_cow_source *source, __sz index)
 {
 	struct vmem_cow_vas *cow = vma->vas->cow;
 	struct cow_pool *pool = cow->pool;
 	struct uk_pagetable *pt = vma->vas->pt;
 	struct cow_slot *old, *next;
 	struct cow_fault *op;
+	const struct vmem_cow_ref *initial;
 	unsigned long attr = vma->attr;
 	__paddr_t paddr;
 	__vaddr_t mapped;
@@ -272,6 +358,7 @@ static int cow_anon_fault(struct uk_vma *vma, struct uk_vm_fault *fault)
 		return -ENOMEM;
 	UK_ASSERT(fault->len == UK_PAGING_PAGE_SIZE);
 	UK_ASSERT(fault->operation && !*fault->operation);
+	initial = source ? &source->pages[index] : NULL;
 	old = UK_RB_FIND(cow_map, &cow->slots, fault->vbase);
 	write = (fault->type & UK_VMA_FAULT_ACCESSTYPE) == UK_VMA_FAULT_WRITE;
 	copied = old && write && !vmem_cow_ref_exclusive(&old->frame);
@@ -302,15 +389,24 @@ static int cow_anon_fault(struct uk_vma *vma, struct uk_vm_fault *fault)
 			rc = -ENOMEM;
 			goto fail_op;
 		}
-		if (copied)
+		if (copied) {
 			rc = vmem_cow_ref_copy(&next->frame, &old->frame,
 					       pt, cow_slot_free, next);
-		else
+		} else if (source && write) {
+			rc = vmem_cow_ref_copy(&next->frame, initial,
+					       pt, cow_slot_free, next);
+		} else if (source) {
+			vmem_cow_ref_clone(&next->frame, initial,
+					   cow_slot_free, next);
+			rc = 0;
+		} else {
 			rc = vmem_cow_ref_alloc(&next->frame, pool->frames,
 						pt->fa, cow_slot_free, next);
+		}
 		if (rc)
 			goto fail_slot;
-		if (!old && !(vma->flags & UK_VMA_FLAG_UNINITIALIZED)) {
+		if (!old && !source &&
+		    !(vma->flags & UK_VMA_FLAG_UNINITIALIZED)) {
 			paddr = vmem_cow_ref_paddr(&next->frame);
 			mapped = uk_paging_page_kmap(pt, paddr, 1, 0);
 			if (mapped == UK_PAGING_VADDR_INV) {
@@ -327,7 +423,7 @@ static int cow_anon_fault(struct uk_vma *vma, struct uk_vm_fault *fault)
 		if (rc)
 			goto fail_frame;
 	}
-	if (copied || (old && !vmem_cow_ref_exclusive(&old->frame)))
+	if (copied || !vmem_cow_ref_exclusive(&next->frame))
 		attr &= ~UK_PAGING_PAGE_ATTR_PROT_WRITE;
 	fault->paddr = vmem_cow_ref_paddr(&next->frame);
 	fault->pte = cow_fault_pte(fault, attr, fault->paddr);
@@ -342,6 +438,20 @@ fail_slot:
 fail_op:
 	uk_free(pool->objects, op);
 	return rc;
+}
+
+static int cow_anon_fault(struct uk_vma *vma, struct uk_vm_fault *fault)
+{
+	return cow_fault_from(vma, fault, NULL, 0);
+}
+
+int uk_vma_cow_source_fault(struct uk_vma *vma, struct uk_vm_fault *fault,
+			    struct uk_vma_cow_source *s, __sz index)
+{
+	if (!vma || !vma->vas || !vma->vas->cow || !fault || !s ||
+	    vma->vas->cow->pool != s->pool || index >= s->count)
+		return -EINVAL;
+	return cow_fault_from(vma, fault, s, index);
 }
 
 static int cow_anon_unmap(struct uk_vma *vma, __vaddr_t vaddr, __sz len)
