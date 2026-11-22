@@ -128,17 +128,19 @@ struct uk_alloc {
 extern struct uk_alloc *_uk_alloc_head;
 
 /* Iterate over all registered allocators */
-#define uk_alloc_foreach(iter)			\
-	for (iter = _uk_alloc_head;		\
-	     iter != __NULL;			\
-	     iter = iter->next)
+#define uk_alloc_foreach(iter)					\
+	for (iter = __atomic_load_n(&_uk_alloc_head,		\
+				    __ATOMIC_ACQUIRE);		\
+	     iter != __NULL;					\
+	     iter = __atomic_load_n(&(iter)->next,		\
+				    __ATOMIC_ACQUIRE))
 
 #if CONFIG_LIBUKALLOC_IFSTATS_PERLIB
 struct uk_alloc *uk_alloc_get_default(void);
 #else /* !CONFIG_LIBUKALLOC_IFSTATS_PERLIB */
 static inline struct uk_alloc *uk_alloc_get_default(void)
 {
-	return _uk_alloc_head;
+	return __atomic_load_n(&_uk_alloc_head, __ATOMIC_ACQUIRE);
 }
 #endif /* !CONFIG_LIBUKALLOC_IFSTATS_PERLIB */
 

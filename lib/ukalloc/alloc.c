@@ -58,18 +58,23 @@ static struct __spinlock _uk_alloc_list_lock __maybe_unused =
 
 int uk_alloc_register(struct uk_alloc *a)
 {
-	struct uk_alloc *this = _uk_alloc_head;
+	struct uk_alloc *this;
+	unsigned long irqf;
 
-	if (!_uk_alloc_head) {
-		_uk_alloc_head = a;
-		a->next = __NULL;
+	__atomic_store_n(&a->next, __NULL, __ATOMIC_RELEASE);
+
+	ukplat_spin_lock_irqsave(&_uk_alloc_list_lock, irqf);
+	this = _uk_alloc_head;
+	if (!this) {
+		__atomic_store_n(&_uk_alloc_head, a, __ATOMIC_RELEASE);
+		ukplat_spin_unlock_irqrestore(&_uk_alloc_list_lock, irqf);
 		return 0;
 	}
 
-	while (this && this->next)
+	while (this->next)
 		this = this->next;
-	this->next = a;
-	a->next = __NULL;
+	__atomic_store_n(&this->next, a, __ATOMIC_RELEASE);
+	ukplat_spin_unlock_irqrestore(&_uk_alloc_list_lock, irqf);
 	return 0;
 }
 

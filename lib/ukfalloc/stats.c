@@ -52,7 +52,7 @@ static int get_free_memory(void *cookie, __u64 *out)
 
 	fa = (struct uk_falloc *)cookie;
 
-	*out = fa->free_memory;
+	*out = UK_READ_ONCE(fa->free_memory);
 
 	return 0;
 }
@@ -66,7 +66,7 @@ static int get_total_memory(void *cookie, __u64 *out)
 
 	fa = (struct uk_falloc *)cookie;
 
-	*out = fa->total_memory;
+	*out = UK_READ_ONCE(fa->total_memory);
 
 	return 0;
 }
@@ -82,7 +82,7 @@ static const struct uk_store_entry *dyn_entries[] = {
 int _uk_falloc_init_stats(struct uk_falloc *fa)
 {
 	struct uk_store_object *obj = NULL;
-	__u64 obj_id = falloc_id++;
+	__u64 obj_id = __atomic_fetch_add(&falloc_id, 1, __ATOMIC_RELAXED);
 	struct uk_alloc *a;
 	char *obj_name;
 	int rc;

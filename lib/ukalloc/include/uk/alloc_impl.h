@@ -127,13 +127,25 @@ static inline void _uk_alloc_stats_count_alloc_locked(struct uk_alloc_stats *sta
 }
 
 /* NOTE: Please do not use this function directly */
+static inline void _uk_alloc_stats_count_alloc_with_lock(
+	struct uk_alloc_stats *stats, struct __spinlock *lock,
+	void *ptr, __sz size)
+{
+	unsigned long irqf;
+
+	ukplat_spin_lock_irqsave(lock, irqf);
+	_uk_alloc_stats_count_alloc_locked(stats, ptr, size);
+	ukplat_spin_unlock_irqrestore(lock, irqf);
+}
+
+/* NOTE: Please do not use this function directly */
 static inline void _uk_alloc_stats_count_alloc(struct uk_alloc_stats *stats,
 					       void *ptr, __sz size)
 {
-	/* TODO: SMP safety */
-	uk_preempt_disable();
+	unsigned long irqf = uk_lcpu_save_irqf();
+
 	_uk_alloc_stats_count_alloc_locked(stats, ptr, size);
-	uk_preempt_enable();
+	uk_lcpu_restore_irqf(irqf);
 }
 
 /* NOTE: Please do not use this function directly */
@@ -150,20 +162,36 @@ static inline void _uk_alloc_stats_count_free_locked(struct uk_alloc_stats *stat
 }
 
 /* NOTE: Please do not use this function directly */
+static inline void _uk_alloc_stats_count_free_with_lock(
+	struct uk_alloc_stats *stats, struct __spinlock *lock,
+	void *ptr, __sz size)
+{
+	unsigned long irqf;
+
+	ukplat_spin_lock_irqsave(lock, irqf);
+	_uk_alloc_stats_count_free_locked(stats, ptr, size);
+	ukplat_spin_unlock_irqrestore(lock, irqf);
+}
+
+/* NOTE: Please do not use this function directly */
 static inline void _uk_alloc_stats_count_free(struct uk_alloc_stats *stats,
 					      void *ptr, __sz size)
 {
-	/* TODO: SMP safety */
-	uk_preempt_disable();
+	unsigned long irqf = uk_lcpu_save_irqf();
+
 	_uk_alloc_stats_count_free_locked(stats, ptr, size);
-	uk_preempt_enable();
+	uk_lcpu_restore_irqf(irqf);
 }
 
 #if CONFIG_LIBUKALLOC_IFSTATS_GLOBAL
 #define _uk_alloc_stats_global_count_alloc(ptr, size) \
-	_uk_alloc_stats_count_alloc(&_uk_alloc_stats_global, (ptr), (size))
+	_uk_alloc_stats_count_alloc_with_lock(&_uk_alloc_stats_global, \
+					      &_uk_alloc_stats_global_lock, \
+					      (ptr), (size))
 #define _uk_alloc_stats_global_count_free(ptr, freed_size) \
-	_uk_alloc_stats_count_free(&_uk_alloc_stats_global, (ptr), (freed_size))
+	_uk_alloc_stats_count_free_with_lock(&_uk_alloc_stats_global, \
+					     &_uk_alloc_stats_global_lock, \
+					     (ptr), (freed_size))
 #else /* !CONFIG_LIBUKALLOC_IFSTATS_GLOBAL */
 #define _uk_alloc_stats_global_count_alloc(ptr, size) \
 	do {} while (0)
@@ -178,8 +206,9 @@ static inline void _uk_alloc_stats_count_free(struct uk_alloc_stats *stats,
 /* NOTE: If ptr is NULL, an ENOMEM event is counted */
 #define uk_alloc_stats_count_alloc(a, ptr, size)			\
 	do {								\
-		_uk_alloc_stats_count_alloc(&((a)->_stats),		\
-					    (ptr), (size));		\
+		_uk_alloc_stats_count_alloc_with_lock(&((a)->_stats),	\
+						      &((a)->_stats_lock), \
+						      (ptr), (size));	\
 		_uk_alloc_stats_global_count_alloc((ptr), (size));	\
 	} while (0)
 #define uk_alloc_stats_count_palloc(a, ptr, num_pages)			\
@@ -195,8 +224,9 @@ static inline void _uk_alloc_stats_count_free(struct uk_alloc_stats *stats,
 /* Note: if ptr is NULL, nothing is counted */
 #define uk_alloc_stats_count_free(a, ptr, freed_size)			\
 	do {								\
-		_uk_alloc_stats_count_free(&((a)->_stats),		\
-					   (ptr), (freed_size));	\
+		_uk_alloc_stats_count_free_with_lock(&((a)->_stats),	\
+						     &((a)->_stats_lock), \
+						     (ptr), (freed_size)); \
 		_uk_alloc_stats_global_count_free((ptr), (freed_size));	\
 	} while (0)
 #define uk_alloc_stats_count_pfree(a, ptr, num_pages)			\

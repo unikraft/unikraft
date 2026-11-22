@@ -181,7 +181,7 @@ int uk_lcpu_fn_enqueue(struct uk_lcpu *lcpu, const struct uk_lcpu_func *fn)
 	 * only take one function and return afterwards. And we only raise the
 	 * IRQ after finishing setup.
 	 */
-	lcpu->fn.user = fn->user;
+	UK_WRITE_ONCE(lcpu->fn.user, fn->user);
 
 	/* Ensure everything is written back when we return and the arch
 	 * support code will raise the IRQ
@@ -193,15 +193,15 @@ int uk_lcpu_fn_enqueue(struct uk_lcpu *lcpu, const struct uk_lcpu_func *fn)
 
 static void lcpu_fn_dequeue(struct uk_lcpu *this_lcpu, struct uk_lcpu_func *fn)
 {
-	*fn = this_lcpu->fn;
-
-	/* Ensure that we have captured the whole function object */
-	uk_arch_rmb();
+	fn->fn = __atomic_load_n(&this_lcpu->fn.fn, __ATOMIC_ACQUIRE);
+	fn->user = UK_READ_ONCE(this_lcpu->fn.user);
 
 	UK_ASSERT(fn->fn);
 
-	/* Free the slot. Another function object can be queued afterwards */
-	this_lcpu->fn.fn = __NULL;
+	/* Free the slot after capturing fn->user so a concurrent producer
+	 * cannot overwrite fn.user before we read it.
+	 */
+	__atomic_store_n(&this_lcpu->fn.fn, __NULL, __ATOMIC_RELEASE);
 }
 
 static int lcpu_ipi_run_handler(void *args __unused)
@@ -478,19 +478,15 @@ int uk_lcpu_run(const __u64 lcpuidx[], unsigned int *num,
 		 */
 		while (1) {
 			rc = uk_lcpu_fn_enqueue(lcpu, fn);
-			if (unlikely(rc))
-				goto lcpu_run_err;
-
-			rc = uk_pal_except_send_ipi(uk_pcpuvar_lval(lcpuidx[i],
-							uk_pcpuvar_cpu_id),
-						    *uk_lcpu_run_irqv);
 			if (unlikely(rc)) {
 				/* Retry if we could not enqueue the function
 				 * and it is ok to block
 				 */
 				if ((rc == -EAGAIN) &&
-				    (!(flags & UK_LCPU_RFLG_DONOTBLOCK)))
+				    (!(flags & UK_LCPU_RFLG_DONOTBLOCK))) {
+					uk_arch_spinwait();
 					continue;
+				}
 
 				/* Try to transition back one busy level. We
 				 * don't care if the CPU is no longer online
@@ -498,6 +494,12 @@ int uk_lcpu_run(const __u64 lcpuidx[], unsigned int *num,
 				lcpu_transition_safe(lcpu, -1);
 				goto lcpu_run_err;
 			}
+
+			rc = uk_pal_except_send_ipi(uk_pcpuvar_lval(lcpuidx[i],
+							uk_pcpuvar_cpu_id),
+						    *uk_lcpu_run_irqv);
+			if (unlikely(rc))
+				goto lcpu_run_err;
 
 			break;
 		}
