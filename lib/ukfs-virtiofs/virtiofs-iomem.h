@@ -54,8 +54,13 @@ ssize_t virtiofs_pod_pgin(void *addr, size_t npages, __paddr_t pa __unused,
 		};
 
 		r = virtiofs_file_read(n, off + done, size - done, &iov, 1, 0);
-		if (r < 0)
+		if (r < 0) {
+#if CONFIG_LIBUKDEBUG_ENABLE_ASSERT
+			uk_pr_err("SMP_VM_IO stage=vio_pagein rc=%zd off=%zu done=%zu len=%zu\n",
+				  r, off, done, size);
+#endif
 			return r;
+		}
 		if ((size_t)r > size - done)
 			return -EIO;
 		if (!r) {

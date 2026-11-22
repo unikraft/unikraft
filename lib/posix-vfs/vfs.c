@@ -1638,6 +1638,11 @@ int uk_posix_vfs_mount(const char *path, const struct uk_file *newroot)
 	mtab.tab[mtab.top].root = newroot; /* Uses reference from mount */
 	mtab.tab[mtab.top].parent_root = parent_ent ? parent_ent->root : NULL;
 	mtab.top++;
+#if CONFIG_LIBUKDEBUG_ENABLE_ASSERT
+	uk_pr_info("SMP_MOUNT path=%s point=%p point_node=%p point_vol=%p root=%p root_mem=%p\n",
+		   path, (const void *)target, target->node, target->vol,
+		   (const void *)newroot, (const void *)newroot->ops->mem);
+#endif
 	ret = 0;
 out_unlock:
 	uk_mutex_unlock(&mtab.lock);
@@ -1930,6 +1935,12 @@ const struct uk_file *vfs_createx(struct uk_ofile *of,
 	else
 		newf = uk_fs_createat(dir, &path[p.pos], p.len - p.pos,
 				      mode, O_EXCL, UKFS_NOTARGET);
+#if CONFIG_LIBUKDEBUG_ENABLE_ASSERT
+	if (!PTRISERR(newf))
+		uk_pr_info("SMP_MOUNT create=%s dir=%p dir_node=%p dir_vol=%p file_mem=%p\n",
+			   path, (const void *)dir, dir->node, dir->vol,
+			   (const void *)newf->ops->mem);
+#endif
 	vfs_wunlock(dir);
 out:
 	uk_file_release(dir);

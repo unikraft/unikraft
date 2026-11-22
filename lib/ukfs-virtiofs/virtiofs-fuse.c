@@ -761,8 +761,13 @@ ssize_t virtiofs_fuse_read(struct virtiofs_fuse_dev *fdev, uint64_t node,
 	err = virtiofs_limit_iov(read_iov, iovcnt, in->size, fdev->max_write,
 				 VIRTIOFS_MAX_DATA_SEGS, false,
 				 &count, &tail, &limited.size);
-	if (unlikely(err))
+	if (unlikely(err)) {
+#if CONFIG_LIBUKDEBUG_ENABLE_ASSERT
+		uk_pr_err("SMP_VM_IO stage=fuse_read_limit rc=%d size=%u iovs=%zu\n",
+			  err, in->size, iovcnt);
+#endif
 		return err;
+	}
 	const struct uk_virtiofs_iovec hdr_iov[] = {
 		{ &hdr, sizeof(hdr) },
 		{ &limited, sizeof(limited) },
@@ -778,8 +783,13 @@ ssize_t virtiofs_fuse_read(struct virtiofs_fuse_dev *fdev, uint64_t node,
 	init_hdr(fdev, &hdr, FUSE_READ, sizeof(limited));
 	rlen = uk_virtiofs_request_vec(fdev->dev, iovecs, 3, 2,
 				       1 + count + (tail.iov_len ? 1 : 0));
-	if (unlikely((err = check_reply(rlen, &ohdr))))
+	if (unlikely((err = check_reply(rlen, &ohdr)))) {
+#if CONFIG_LIBUKDEBUG_ENABLE_ASSERT
+		uk_pr_err("SMP_VM_IO stage=fuse_read_reply rc=%d transfer=%zd size=%u iovs=%zu\n",
+			  err, rlen, limited.size, iovcnt);
+#endif
 		return err;
+	}
 	plen = payload_len(rlen);
 	return plen <= limited.size ? (ssize_t)plen : -EIO;
 }

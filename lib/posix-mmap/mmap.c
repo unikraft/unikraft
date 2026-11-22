@@ -10,6 +10,9 @@
 #include <errno.h>
 
 #include <uk/config.h>
+#if CONFIG_LIBUKDEBUG_ENABLE_ASSERT
+#include <uk/print.h>
+#endif
 #include <uk/syscall.h>
 #include <uk/essentials.h>
 #include <uk/arch/limits.h>
@@ -247,6 +250,10 @@ UK_SYSCALL_DEFINE(void *, mmap, void *, addr, size_t, len, int, prot,
 
 	rc = do_mmap(&addr, len, prot, flags, fd, offset);
 	if (unlikely(rc)) {
+#if CONFIG_LIBUKDEBUG_ENABLE_ASSERT
+		uk_pr_err("SMP_VM_IO stage=mmap rc=%d addr=%p len=%zu prot=%#x flags=%#x fd=%d off=%lld\n",
+			  rc, addr, len, prot, flags, fd, (long long)offset);
+#endif
 		errno = -rc;
 		return MAP_FAILED;
 	}

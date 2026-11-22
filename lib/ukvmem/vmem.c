@@ -18,6 +18,9 @@
 #include <uk/assert.h>
 #include <uk/list.h>
 #include <uk/pcpuvar.h>
+#if CONFIG_LIBUKDEBUG_ENABLE_ASSERT
+#include <uk/print.h>
+#endif
 #include <uk/plat/spinlock.h>
 #include <uk/config.h>
 
@@ -694,6 +697,11 @@ static int vmem_mapx_populate(struct uk_pagetable *pt __unused,
 
 	rc = vma->ops->fault(vma, &fault);
 	if (unlikely(rc)) {
+#if CONFIG_LIBUKDEBUG_ENABLE_ASSERT
+		if (rc != -ENOMEM)
+			uk_pr_err_isr("VMA population failed at %#lx, level %u: %d\n",
+				      (unsigned long)vaddr, level, rc);
+#endif
 		if (rc == -ENOMEM)
 			return UK_PAGING_PAGE_MAPX_ETOOBIG;
 
@@ -741,8 +749,13 @@ int uk_vma_map(struct uk_vas *vas, __vaddr_t *vaddr, __sz len,
 		algn_lvl = UK_PAGING_PAGE_LEVEL;
 	}
 
-	if (unlikely(!UK_PAGING_PAGE_Lx_ALIGNED(len, algn_lvl)))
+	if (unlikely(!UK_PAGING_PAGE_Lx_ALIGNED(len, algn_lvl))) {
+#if CONFIG_LIBUKDEBUG_ENABLE_ASSERT
+		uk_pr_err("Invalid VMA length %#lx for level %d\n",
+			  (unsigned long)len, algn_lvl);
+#endif
 		return -EINVAL;
+	}
 
 	va = *vaddr;
 	if (va != UK_PAGING_VADDR_ANY) {
@@ -893,6 +906,11 @@ int uk_vma_map(struct uk_vas *vas, __vaddr_t *vaddr, __sz len,
 						.ctx = vma,
 					 });
 		if (unlikely(rc)) {
+#if CONFIG_LIBUKDEBUG_ENABLE_ASSERT
+			uk_pr_err_isr("Cannot map VMA at %#lx, length %#lx: %d\n",
+				      (unsigned long)vma->start,
+				      (unsigned long)len, rc);
+#endif
 			/* A partial mapx can leave PTEs. Remove them through
 			 * the owner before dropping its backing references;
 			 * private and borrowed frames have different

@@ -5,6 +5,10 @@
  */
 #define _GNU_SOURCE
 
+#include <uk/config.h>
+#if CONFIG_LIBUKDEBUG_ENABLE_ASSERT
+#include <uk/print.h>
+#endif
 #include <inttypes.h>
 #include <limits.h>
 #include <stdint.h>
@@ -675,6 +679,10 @@ ssize_t virtiofs_live_mem(struct viofs_node *n,
 	case UKFILE_MEM_GIFT:
 		return -ENODEV;
 	default:
+#if CONFIG_LIBUKDEBUG_ENABLE_ASSERT
+		uk_pr_err("SMP_VM_IO stage=vio_mem_op op=%d off=%zu len=%zu\n",
+			  (int)op, off, len);
+#endif
 		return -EINVAL;
 	}
 
@@ -686,8 +694,13 @@ ssize_t virtiofs_live_mem(struct viofs_node *n,
 
 	r = virtiofs_ensure_open(n);
 	UK_ASSERT(r <= 0);
-	if (unlikely(r))
+	if (unlikely(r)) {
+#if CONFIG_LIBUKDEBUG_ENABLE_ASSERT
+		uk_pr_err("SMP_VM_IO stage=vio_open rc=%ld op=%d off=%zu len=%zu\n",
+			  (long)r, (int)op, off, len);
+#endif
 		return r;
+	}
 
 	switch (op) {
 	case UKFILE_MEM_ACQUIRE_PINNED:
@@ -703,8 +716,14 @@ ssize_t virtiofs_live_mem(struct viofs_node *n,
 			&ctx, UK_SPARSEBUF_EMBED_HEADP(iohead, &rn->iomem.io),
 			pgoff, npages, 1
 		);
-		if (unlikely(r <= 0))
+		if (unlikely(r <= 0)) {
+#if CONFIG_LIBUKDEBUG_ENABLE_ASSERT
+			uk_pr_err("SMP_VM_IO stage=vio_pin_fill rc=%ld op=%d off=%zu len=%zu pgoff=%zu npages=%zu size=%llu\n",
+				  (long)r, (int)op, off, len, pgoff, npages,
+				  (unsigned long long)n->attr.size);
+#endif
 			return r;
+		}
 		return (pgoff + r) * UK_PAGING_PAGE_SIZE - off;
 	case UKFILE_MEM_RELEASE:
 		r = uk_sparsebuf_ref_release(
