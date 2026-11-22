@@ -24,12 +24,22 @@
 	(UK_PAGING_PAGE_SIZE * HEAP_PAGES)
 
 #if CONFIG_LIBUKVMEM
+static struct uk_vas *brk_vas(struct posix_process *p __unused)
+{
+#if CONFIG_LIBUKVMEM_THREAD_VAS
+	UK_ASSERT(p->vas);
+	return p->vas;
+#else
+	return uk_vas_get_active();
+#endif
+}
+
 static inline int pprocess_brk_init_zone(struct posix_process *pprocess)
 {
 	__vaddr_t va = UK_PAGING_VADDR_ANY;
 	int rc;
 
-	rc = uk_vma_map_anon(uk_vas_get_active(), &va, HEAP_LEN,
+	rc = uk_vma_map_anon(brk_vas(pprocess), &va, HEAP_LEN,
 			     UK_PAGING_PAGE_ATTR_PROT_RW, 0, "brk VMA");
 	if (unlikely(rc))
 		return rc;
@@ -100,7 +110,7 @@ POSIX_PROCESS_CLONE_HANDLER(CLONE_VFORK, pprocess_brk_init);
 #if CONFIG_LIBUKVMEM
 static inline int pprocess_brk_free_zone(struct posix_process *pprocess)
 {
-	return uk_vma_unmap(uk_vas_get_active(),
+	return uk_vma_unmap(brk_vas(pprocess),
 			    (__vaddr_t)pprocess->brk_ctx.base, HEAP_LEN, 0);
 }
 #else /* !CONFIG_LIBUKVMEM */
