@@ -13,7 +13,11 @@
 #include <uk/print.h>
 #endif
 #if CONFIG_LIBUKVMEM_COW_VMA
+#include <uk/alloc.h>
 #include <uk/isr/string.h>
+#include <uk/lcpu.h>
+#include <uk/list.h>
+#include <uk/spinlock.h>
 #endif
 #include <uk/assert.h>
 #include <uk/falloc.h>
@@ -38,6 +42,111 @@ struct file_backing {
 	__paddr_t pages[];
 };
 
+#if CONFIG_LIBUKVMEM_COW_VMA
+/* Canonical identity across independent descriptions of the same file.
+ * Holding its first file reference prevents node identity reuse while a
+ * mapping or a futex key still names that node. No registry lock reaches
+ * file I/O or destruction.
+ */
+struct file_identity {
+	struct uk_list_head entry;
+	__atomic refs;
+	struct uk_alloc *a;
+	const struct uk_file *file;
+	const void *vol;
+	void *node;
+	const struct uk_file *unique;
+};
+
+static UK_LIST_HEAD(file_identities);
+static uk_spinlock file_identity_lock = UK_SPINLOCK_INITIALIZER();
+
+static struct file_identity *file_identity_find(const struct uk_file *f)
+{
+	const struct uk_file *unique = f->vol || f->node ? NULL : f;
+	struct file_identity *id;
+
+	uk_list_for_each_entry(id, &file_identities, entry)
+		if (id->vol == f->vol && id->node == f->node &&
+		    id->unique == unique)
+			return id;
+	return NULL;
+}
+
+static void file_identity_acquire(const void *object)
+{
+	struct file_identity *id = (struct file_identity *)object;
+
+	if (id)
+		uk_refcount_acquire(&id->refs);
+}
+
+static void file_identity_release(const void *object)
+{
+	struct file_identity *id = (struct file_identity *)object;
+	unsigned long irqf;
+	int last;
+
+	if (!id || uk_refcount_release_if_not_last(&id->refs))
+		return;
+	irqf = uk_lcpu_save_irqf();
+	uk_spin_lock(&file_identity_lock);
+	last = uk_refcount_release(&id->refs);
+	if (last)
+		uk_list_del_init(&id->entry);
+	uk_spin_unlock(&file_identity_lock);
+	uk_lcpu_restore_irqf(irqf);
+	if (last) {
+		UK_ASSERT(!uk_lcpu_irqs_disabled());
+		uk_file_release(id->file);
+		uk_free(id->a, id);
+	}
+}
+
+static struct file_identity *file_identity_for(const struct uk_file *f)
+{
+	struct uk_alloc *a = uk_vas_get_kernel()->a;
+	struct file_identity *id, *fresh;
+	unsigned long irqf;
+
+	irqf = uk_lcpu_save_irqf();
+	uk_spin_lock(&file_identity_lock);
+	id = file_identity_find(f);
+	file_identity_acquire(id);
+	uk_spin_unlock(&file_identity_lock);
+	uk_lcpu_restore_irqf(irqf);
+	if (id)
+		return id;
+	fresh = uk_malloc(a, sizeof(*fresh));
+	if (!fresh)
+		return NULL;
+	UK_INIT_LIST_HEAD(&fresh->entry);
+	uk_refcount_init(&fresh->refs, 1);
+	fresh->a = a;
+	fresh->file = f;
+	fresh->vol = f->vol;
+	fresh->node = f->node;
+	fresh->unique = f->vol || f->node ? NULL : f;
+	uk_file_acquire(f);
+	irqf = uk_lcpu_save_irqf();
+	uk_spin_lock(&file_identity_lock);
+	id = file_identity_find(f);
+	if (id) {
+		file_identity_acquire(id);
+	} else {
+		uk_list_add_tail(&fresh->entry, &file_identities);
+		id = fresh;
+	}
+	uk_spin_unlock(&file_identity_lock);
+	uk_lcpu_restore_irqf(irqf);
+	if (id != fresh) {
+		uk_file_release(fresh->file);
+		uk_free(a, fresh);
+	}
+	return id;
+}
+#endif
+
 struct file_vma {
 	struct uk_vma base;
 
@@ -52,6 +161,7 @@ struct file_vma {
 #if CONFIG_LIBUKVMEM_COW_VMA
 	struct uk_vma_cow_source *source;
 	__sz source_first;
+	struct file_identity *identity;
 #endif
 };
 
@@ -300,6 +410,7 @@ int file_vma_new(struct uk_vas *vas, __vaddr_t vaddr __unused,
 #if CONFIG_LIBUKVMEM_COW_VMA
 	fvma->source = NULL;
 	fvma->source_first = 0;
+	fvma->identity = NULL;
 #endif
 	if (*flags & UK_VMA_FILE_SHARED) {
 		rc = file_backing_new(vas, args->of->file,
@@ -390,6 +501,9 @@ void file_vma_op_destroy(struct uk_vma *vma)
 		uk_free(vma->vas->a, b);
 	}
 	uk_ofile_release(fvma->of);
+#if CONFIG_LIBUKVMEM_COW_VMA
+	file_identity_release(fvma->identity);
+#endif
 }
 
 static
@@ -462,6 +576,8 @@ int file_vma_op_split(struct uk_vma *vma, __vaddr_t vaddr,
 #if CONFIG_LIBUKVMEM_COW_VMA
 	v->source = uk_vma_cow_source_get(fvma->source);
 	v->source_first = fvma->source_first + off / UK_PAGING_PAGE_SIZE;
+	v->identity = fvma->identity;
+	file_identity_acquire(v->identity);
 #endif
 	if (v->shared)
 		uk_refcount_acquire(&v->shared->refs);
@@ -585,7 +701,7 @@ static int file_cow_clone(struct uk_vma *vma, struct uk_alloc *a,
 	struct file_vma *fvma = (struct file_vma *)vma;
 	struct file_vma *copy;
 
-	if (!fvma->source)
+	if (!fvma->source && (!fvma->shared || !fvma->identity))
 		return -ENOTSUP;
 	copy = uk_malloc(a, sizeof(*copy));
 	if (!copy)
@@ -593,6 +709,9 @@ static int file_cow_clone(struct uk_vma *vma, struct uk_alloc *a,
 	memcpy_isr(copy, fvma, sizeof(*copy));
 	uk_ofile_acquire(copy->of);
 	uk_vma_cow_source_get(copy->source);
+	if (copy->shared)
+		uk_refcount_acquire(&copy->shared->refs);
+	file_identity_acquire(copy->identity);
 	*out = &copy->base;
 	return 0;
 }
@@ -630,6 +749,59 @@ const struct uk_vma_ops uk_fdio_cow_vma_ops = {
 	.merge = file_vma_op_merge,
 	.set_attr = file_cow_set_attr,
 	.advise = file_cow_advise
+};
+
+static int file_shared_new(struct uk_vas *vas, __vaddr_t addr, __sz len,
+			   void *data, unsigned long attr,
+			   unsigned long *flags, struct uk_vma **out)
+{
+	struct file_vma *fvma;
+	int rc;
+
+	if (!(*flags & UK_VMA_FILE_SHARED))
+		return -EINVAL;
+	rc = file_vma_op_new(vas, addr, len, data, attr, flags, out);
+	if (rc)
+		return rc;
+	fvma = (struct file_vma *)*out;
+	fvma->identity = file_identity_for(fvma->of->file);
+	if (!fvma->identity) {
+		/* Generic VMA initialization has not run on this error path. */
+		fvma->base.vas = vas;
+		file_vma_op_destroy(&fvma->base);
+		uk_free(vas->a, fvma);
+		*out = NULL;
+		return -ENOMEM;
+	}
+	return 0;
+}
+
+static void file_shared_ref(struct uk_vma *vma, __vaddr_t addr,
+			    struct uk_vma_shared_ref *out)
+{
+	struct file_vma *fvma = (struct file_vma *)vma;
+
+	UK_ASSERT(fvma->shared && fvma->identity);
+	out->object = fvma->identity;
+	out->offset = (__sz)fvma->offset + addr - vma->start;
+	out->get = file_identity_acquire;
+	out->put = file_identity_release;
+	file_identity_acquire(out->object);
+}
+
+const struct uk_vma_ops uk_fdio_shared_vma_ops = {
+	.get_base = file_vma_op_get_base,
+	.new = file_shared_new,
+	.destroy = file_vma_op_destroy,
+	.clone_cow = file_cow_clone,
+	.shared_ref = file_shared_ref,
+	.fault = file_vma_op_fault,
+	.unmap = file_vma_op_unmap,
+	.sync = file_vma_op_sync,
+	.split = file_vma_op_split,
+	.merge = file_vma_op_merge,
+	.set_attr = file_vma_op_set_attr,
+	.advise = file_vma_op_advise
 };
 #endif
 

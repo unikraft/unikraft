@@ -184,7 +184,9 @@ static int do_mmap(void **addr, size_t len, int prot, int flags, int fd,
 			vargs = &fdio_vma_args;
 			vops = &uk_fdio_vma_ops;
 #if CONFIG_LIBUKVMEM_COW_VMA
-			if (vas->cow && !(vflags & UK_VMA_FILE_SHARED))
+			if (vflags & UK_VMA_FILE_SHARED)
+				vops = &uk_fdio_shared_vma_ops;
+			else if (vas->cow)
 				vops = &uk_fdio_cow_vma_ops;
 #endif
 			/* We release the ofile after VMA creation */
