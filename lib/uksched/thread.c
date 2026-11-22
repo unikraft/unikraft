@@ -1039,18 +1039,26 @@ void uk_thread_release(struct uk_thread *t)
 
 void uk_thread_block_until(struct uk_thread *thread, __snsec until)
 {
+	struct uk_sched *s;
 	unsigned long flags;
 
 	UK_ASSERT(thread);
 
-	flags = uk_lcpu_save_irqf();
+	s = __atomic_load_n(&thread->sched, __ATOMIC_ACQUIRE);
+	if (s)
+		ukplat_spin_lock_irqsave(&s->lock, flags);
+	else
+		flags = uk_lcpu_save_irqf();
+
 	thread->wakeup_time = until;
-	if (uk_thread_is_runnable(thread)) {
-		uk_thread_set_blocked(thread);
-		if (thread->sched)
-			uk_sched_thread_blocked(thread);
-	}
-	uk_lcpu_restore_irqf(flags);
+	uk_thread_set_blocked(thread);
+	if (s && thread->sched == s)
+		uk_sched_thread_blocked(thread);
+
+	if (s)
+		ukplat_spin_unlock_irqrestore(&s->lock, flags);
+	else
+		uk_lcpu_restore_irqf(flags);
 }
 
 void uk_thread_block_timeout(struct uk_thread *thread, __nsec nsec)

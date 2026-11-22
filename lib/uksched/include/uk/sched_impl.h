@@ -77,6 +77,8 @@ int uk_sched_register(struct uk_sched *s);
 		(s)->thread_woken     = thread_woken_func; \
 		(s)->thread_woken_isr = thread_woken_isr_func; \
 		(s)->idle_thread      = idle_thread_func; \
+		ukarch_spin_init(&(s)->lock); \
+		(s)->lcpu_idx         = -1; \
 		uk_sched_register((s)); \
 		\
 		(s)->a = (sched_a); \
@@ -138,22 +140,22 @@ void uk_sched_thread_switch(struct uk_thread *next)
 #if CONFIG_LIBUKSCHED_STATS
 static inline void uk_sched_stats_idle_count_incr(struct uk_sched *s)
 {
-	s->stats.idle_count++;
+	__atomic_fetch_add(&s->stats.idle_count, 1UL, __ATOMIC_RELAXED);
 }
 
 static inline void uk_sched_stats_next_count_incr(struct uk_sched *s)
 {
-	s->stats.next_count++;
+	__atomic_fetch_add(&s->stats.next_count, 1UL, __ATOMIC_RELAXED);
 }
 
 static inline void uk_sched_stats_sched_count_incr(struct uk_sched *s)
 {
-	s->stats.sched_count++;
+	__atomic_fetch_add(&s->stats.sched_count, 1UL, __ATOMIC_RELAXED);
 }
 
 static inline void uk_sched_stats_yield_count_incr(struct uk_sched *s)
 {
-	s->stats.yield_count++;
+	__atomic_fetch_add(&s->stats.yield_count, 1UL, __ATOMIC_RELAXED);
 }
 #else /* !CONFIG_LIBUKSCHED_STATS */
 #define uk_sched_stats_idle_count_incr(_s)  do {} while (0)

@@ -46,16 +46,21 @@
 #include <uk/pcpuvar.h>
 
 struct uk_sched *uk_sched_head;
+static __spinlock uk_sched_list_lock;
 
 __uk_pcpuvar struct uk_thread *__uk_sched_thread_current;
 
 int uk_sched_register(struct uk_sched *s)
 {
-	struct uk_sched *this = uk_sched_head;
+	struct uk_sched *this;
+	unsigned long flags;
 
+	ukplat_spin_lock_irqsave(&uk_sched_list_lock, flags);
+	this = uk_sched_head;
 	if (!uk_sched_head) {
 		uk_sched_head = s;
 		s->next = NULL;
+		ukplat_spin_unlock_irqrestore(&uk_sched_list_lock, flags);
 		return 0;
 	}
 
@@ -63,6 +68,7 @@ int uk_sched_register(struct uk_sched *s)
 		this = this->next;
 	this->next = s;
 	s->next = NULL;
+	ukplat_spin_unlock_irqrestore(&uk_sched_list_lock, flags);
 	return 0;
 }
 
@@ -239,6 +245,7 @@ int uk_sched_start(struct uk_sched *s)
 
 	/* Add main to the scheduler's thread list */
 	UK_TAILQ_INSERT_TAIL(&s->thread_list, main_thread, thread_list);
+	s->lcpu_idx = (int)uk_pcpuvar_current_get(uk_pcpuvar_cpu_idx);
 
 	/* Enable scheduler, like time slicing, etc. and notify that `s`
 	 * has an (already) scheduled thread
@@ -246,7 +253,7 @@ int uk_sched_start(struct uk_sched *s)
 	ret = s->sched_start(s, main_thread);
 	if (ret < 0)
 		goto err_unset_thread_current;
-	s->is_started = true;
+	__atomic_store_n(&s->is_started, true, __ATOMIC_RELEASE);
 
 #if CONFIG_LIBUKSCHED_STATS
 	s->start_time = (__u64)ukplat_monotonic_clock();
@@ -263,12 +270,24 @@ err_out:
 
 unsigned int uk_sched_thread_gc(struct uk_sched *sched)
 {
-	struct uk_thread *thread, *tmp;
+	struct uk_thread *thread;
+	unsigned long flags;
 	unsigned int num = 0;
 
-	/* Cleanup finished threads */
-	UK_TAILQ_FOREACH_SAFE(thread, &sched->exited_threads,
-			      thread_list, tmp) {
+	/* Cleanup finished threads outside sched->lock so destructors and
+	 * termination hooks can acquire higher-level locks without inversion.
+	 */
+	for (;;) {
+		ukplat_spin_lock_irqsave(&sched->lock, flags);
+		thread = UK_TAILQ_FIRST(&sched->exited_threads);
+		if (thread)
+			UK_TAILQ_REMOVE(&sched->exited_threads, thread,
+					thread_list);
+		ukplat_spin_unlock_irqrestore(&sched->lock, flags);
+
+		if (!thread)
+			break;
+
 		UK_ASSERT(thread != uk_thread_current());
 		UK_ASSERT(uk_thread_is_exited(thread));
 
@@ -276,9 +295,8 @@ unsigned int uk_sched_thread_gc(struct uk_sched *sched)
 			    sched, thread,
 			    thread->name ? thread->name : "<unnamed>");
 
-		UK_TAILQ_REMOVE(&sched->exited_threads, thread, thread_list);
 		if (thread->_gc_fn)
-			thread->_gc_fn(thread,  thread->_gc_argp);
+			thread->_gc_fn(thread, thread->_gc_argp);
 		uk_thread_release(thread);
 		++num;
 	}
@@ -289,6 +307,7 @@ unsigned int uk_sched_thread_gc(struct uk_sched *sched)
 void uk_sched_thread_terminate(struct uk_thread *thread)
 {
 	struct uk_sched *sched;
+	unsigned long flags;
 
 	UK_ASSERT(thread);
 	 /* NOTE: The following assertion can also fail on a double-termination.
@@ -316,8 +335,10 @@ void uk_sched_thread_terminate(struct uk_thread *thread)
 		uk_pr_debug("%p: thread %p (%s) on gc list\n",
 			    sched, thread, thread->name ?
 					   thread->name : "<unnamed>");
+		ukplat_spin_lock_irqsave(&sched->lock, flags);
 		UK_TAILQ_INSERT_TAIL(&sched->exited_threads, thread,
 				     thread_list);
+		ukplat_spin_unlock_irqrestore(&sched->lock, flags);
 
 		/* leave this thread */
 		sched->yield(sched); /* we won't return */
@@ -363,16 +384,18 @@ int uk_sched_thread_add(struct uk_sched *s, struct uk_thread *t)
 	UK_ASSERT(t);
 	UK_ASSERT(!t->sched);
 
-	flags = uk_lcpu_save_irqf();
+	ukplat_spin_lock_irqsave(&s->lock, flags);
 
+	__atomic_store_n(&t->sched, s, __ATOMIC_RELEASE);
 	rc = s->thread_add(s, t);
-	if (rc < 0)
+	if (rc < 0) {
+		__atomic_store_n(&t->sched, NULL, __ATOMIC_RELEASE);
 		goto out;
+	}
 
-	t->sched = s;
 	UK_TAILQ_INSERT_TAIL(&s->thread_list, t, thread_list);
 out:
-	uk_lcpu_restore_irqf(flags);
+	ukplat_spin_unlock_irqrestore(&s->lock, flags);
 	return rc;
 }
 
@@ -384,12 +407,12 @@ int uk_sched_thread_remove(struct uk_thread *t)
 	UK_ASSERT(t);
 	UK_ASSERT(t->sched);
 
-	flags = uk_lcpu_save_irqf();
 	s = t->sched;
+	ukplat_spin_lock_irqsave(&s->lock, flags);
 	s->thread_remove(s, t);
-	t->sched = NULL;
+	__atomic_store_n(&t->sched, NULL, __ATOMIC_RELEASE);
 	UK_TAILQ_REMOVE(&s->thread_list, t, thread_list);
-	uk_lcpu_restore_irqf(flags);
+	ukplat_spin_unlock_irqrestore(&s->lock, flags);
 	return 0;
 }
 
@@ -402,6 +425,7 @@ UK_SYSCALL_R_DEFINE(int, sched_yield)
 void uk_sched_dumpk_threads(int klvl, struct uk_sched *s)
 {
 	struct uk_thread *t, *tmp;
+	unsigned long flags;
 
 	if (uk_sched_current() == s) {
 		/* Let the scheduler update the thread execution time
@@ -410,6 +434,7 @@ void uk_sched_dumpk_threads(int klvl, struct uk_sched *s)
 		uk_sched_yield();
 	}
 
+	ukplat_spin_lock_irqsave(&s->lock, flags);
 	uk_printk(klvl, "sched %p:\n", s);
 	uk_sched_foreach_thread_safe(s, t, tmp) {
 		uk_printk(klvl,
@@ -426,6 +451,7 @@ void uk_sched_dumpk_threads(int klvl, struct uk_sched *s)
 			  (t->flags & UK_THREADF_AUXSP)    ? 'A' : '-',
 			  (t->flags & UK_THREADF_UKTLS)    ? 'T' : '-');
 	}
+	ukplat_spin_unlock_irqrestore(&s->lock, flags);
 }
 
 UK_SYSCALL_R_DEFINE(int, sched_getaffinity, int, pid, long, cpusetsize,

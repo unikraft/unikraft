@@ -75,9 +75,7 @@ void _uk_waitq_remove(struct uk_thread *thread)
 static inline
 void _uk_waitq_block_until(struct uk_thread *thread, __snsec deadline)
 {
-	uk_thread_set_wakeup(thread, deadline);
-	uk_thread_set_blocked(thread);
-	uk_sched_thread_blocked(thread);
+	uk_thread_block_until(thread, deadline);
 }
 
 /**

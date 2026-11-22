@@ -41,6 +41,7 @@
 #include <uk/thread.h>
 #include <uk/assert.h>
 #include <uk/arch/types.h>
+#include <uk/plat/spinlock.h>
 #include <uk/essentials.h>
 #include <errno.h>
 
@@ -98,6 +99,8 @@ struct uk_sched {
 	uk_sched_start_t sched_start;
 
 	/* internal */
+	__spinlock lock;
+	int lcpu_idx;
 	bool is_started;
 	struct uk_thread_list thread_list;
 	struct uk_thread_list exited_threads;
