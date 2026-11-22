@@ -9,6 +9,7 @@
 #include <uk/refcount.h>
 #include <uk/sched.h>
 #include <uk/semaphore.h>
+#include <uk/process/sigowner.h>
 
 #include "process.h"
 #include "sigset.h"
@@ -418,9 +419,10 @@ static int signal_process_pinned(struct posix_process *process, int signum,
 	return result;
 }
 
-int pprocess_signal_process_do(pid_t pid, int signum, siginfo_t *siginfo)
+static int signal_processes(pid_t pid, int signum, siginfo_t *siginfo,
+			    bool file_owner)
 {
-	struct posix_process *self = uk_pthread_current()->process;
+	struct posix_process *self = file_owner ? NULL : uk_pprocess_current();
 	struct posix_process *process, *target = NULL, *single;
 	struct posix_process **targets = &single;
 	struct uk_alloc *alloc = uk_alloc_get_default();
@@ -442,10 +444,12 @@ int pprocess_signal_process_do(pid_t pid, int signum, siginfo_t *siginfo)
 	flags = pprocess_lock_acquire();
 	if (pid > 0) {
 		target = pid2pprocess(pid);
-		if (!target)
+		if (!target && !file_owner)
 			target = tid2pprocess(pid);
-	} else if (pid != -1) {
-		pgid = pid ? -pid : self->pgid;
+	} else if (pid < 0 && (file_owner || pid != -1)) {
+		pgid = -pid;
+	} else if (!pid && !file_owner) {
+		pgid = self->pgid;
 	}
 	/* Snapshot and pin recipients while membership is stable. Signal zero
 	 * only checks existence and permissions; it never queues an entry.
@@ -455,7 +459,7 @@ int pprocess_signal_process_do(pid_t pid, int signum, siginfo_t *siginfo)
 			continue;
 		if (pgid && process->pgid != pgid)
 			continue;
-		if (pid == -1 &&
+		if (!file_owner && pid == -1 &&
 		    (process == self || process->pid == UK_PID_INIT))
 			continue;
 		if (!signal_check_perm(process)) {
@@ -487,6 +491,20 @@ out:
 	if (many)
 		uk_free(alloc, targets);
 	return result;
+}
+
+int pprocess_signal_process_do(pid_t pid, int signum, siginfo_t *siginfo)
+{
+	return signal_processes(pid, signum, siginfo, false);
+}
+
+int uk_sigowner_sigio(pid_t owner)
+{
+	siginfo_t info = { .si_code = SI_KERNEL };
+
+	if (!owner)
+		return 0;
+	return signal_processes(owner, SIGIO, &info, true);
 }
 
 int pprocess_signal_thread_do(int tid, int signum, siginfo_t *siginfo)

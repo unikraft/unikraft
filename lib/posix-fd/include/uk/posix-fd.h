@@ -24,6 +24,12 @@
 #endif /* CONFIG_LIBPOSIX_PROCESS_SIGNAL */
 #endif /* CONFIG_LIBPOSIX_FD_HEAPOFD */
 
+#if CONFIG_LIBPOSIX_FDIO_ASYNC
+struct uk_ofile_async;
+struct uk_ofile;
+void uk_ofile_async_release(struct uk_ofile *of);
+#endif /* CONFIG_LIBPOSIX_FDIO_ASYNC */
+
 /* Open file description */
 struct uk_ofile {
 	const struct uk_file *file;
@@ -35,6 +41,10 @@ struct uk_ofile {
 #if CONFIG_LIBPOSIX_PROCESS_SIGNAL
 	pid_t signal_owner;
 #endif /* CONFIG_LIBPOSIX_PROCESS_SIGNAL */
+#if CONFIG_LIBPOSIX_FDIO_ASYNC
+	struct uk_ofile_async *async;
+	unsigned long async_generation;
+#endif /* CONFIG_LIBPOSIX_FDIO_ASYNC */
 #endif /* CONFIG_LIBPOSIX_FD_HEAPOFD */
 	char name[]; /* Name of open file description; driver dependent */
 	/* Filesystem-backed files should be named after the path they were
@@ -61,6 +71,10 @@ void uk_ofile_init(struct uk_ofile *of,
 #if CONFIG_LIBPOSIX_PROCESS_SIGNAL
 	of->signal_owner = 0;
 #endif /* CONFIG_LIBPOSIX_PROCESS_SIGNAL */
+#if CONFIG_LIBPOSIX_FDIO_ASYNC
+	of->async = NULL;
+	of->async_generation = 0;
+#endif /* CONFIG_LIBPOSIX_FDIO_ASYNC */
 #endif /* CONFIG_LIBPOSIX_FD_HEAPOFD */
 	uk_mutex_init(&of->lock);
 	of->file = f;
@@ -164,6 +178,9 @@ void uk_ofile_release(struct uk_ofile *of)
 	const int last_ref = uk_refcount_release(&of->refcnt);
 
 	if (unlikely(last_ref)) {
+#if CONFIG_LIBPOSIX_FDIO_ASYNC
+		uk_ofile_async_release(of);
+#endif /* CONFIG_LIBPOSIX_FDIO_ASYNC */
 #if CONFIG_LIBPOSIX_PROCESS_SIGNAL
 		uk_sigowner_release(of->signal_owner);
 #endif /* CONFIG_LIBPOSIX_PROCESS_SIGNAL */

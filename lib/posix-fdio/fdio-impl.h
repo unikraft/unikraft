@@ -28,4 +28,9 @@
 #define _of_lock(of) uk_mutex_lock(&(of)->lock)
 #define _of_unlock(of) uk_mutex_unlock(&(of)->lock)
 
+#if CONFIG_LIBPOSIX_FDIO_ASYNC
+int fdio_set_status_flags(struct uk_ofile *of, unsigned int flags,
+			  unsigned int mask);
+#endif /* CONFIG_LIBPOSIX_FDIO_ASYNC */
+
 #endif /* __UK_POSIX_FDIO_IMPL_H__ */

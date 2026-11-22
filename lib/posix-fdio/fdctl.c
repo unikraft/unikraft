@@ -38,6 +38,15 @@ int uk_sys_ioctl(struct uk_ofile *of, int cmd, void *arg)
 		return 0;
 	}
 
+#if CONFIG_LIBPOSIX_FDIO_ASYNC
+	if (cmd == FIOASYNC) {
+		if (!arg)
+			return -EFAULT;
+		return fdio_set_status_flags(of, *(int *)arg ? O_ASYNC : 0,
+					     O_ASYNC);
+	}
+#endif /* CONFIG_LIBPOSIX_FDIO_ASYNC */
+
 	iolock = _SHOULD_LOCK(of->mode);
 	f = of->file;
 	if (iolock)
@@ -56,6 +65,11 @@ int uk_sys_ioctl(struct uk_ofile *of, int cmd, void *arg)
 #define _FCNTL_MASK (O_APPEND|O_ASYNC|O_DIRECT|O_NOATIME|O_NONBLOCK)
 /* File flags we actually support & care about changing */
 #define _SETFL_MASK (_FCNTL_MASK & UKFD_MODE_MASK)
+#if CONFIG_LIBPOSIX_FDIO_ASYNC
+#define _GETFL_MASK (UKFD_MODE_MASK | O_ASYNC)
+#else
+#define _GETFL_MASK UKFD_MODE_MASK
+#endif /* CONFIG_LIBPOSIX_FDIO_ASYNC */
 
 #if CONFIG_LIBPOSIX_PROCESS_SIGNAL && CONFIG_LIBPOSIX_FD_HEAPOFD
 static int ofile_set_owner(struct uk_ofile *of, pid_t owner)
@@ -68,6 +82,10 @@ static int ofile_set_owner(struct uk_ofile *of, pid_t owner)
 	uk_mutex_lock(&of->lock);
 	previous = of->signal_owner;
 	UK_WRITE_ONCE(of->signal_owner, owner);
+#if CONFIG_LIBPOSIX_FDIO_ASYNC
+	if (previous != owner)
+		UK_WRITE_ONCE(of->async_generation, of->async_generation + 1);
+#endif /* CONFIG_LIBPOSIX_FDIO_ASYNC */
 	uk_mutex_unlock(&of->lock);
 	uk_sigowner_release(previous);
 	return 0;
@@ -78,8 +96,11 @@ int uk_sys_fcntl(struct uk_ofile *of, int cmd, unsigned long arg)
 {
 	switch (cmd) {
 	case F_GETFL:
-		return of->mode & UKFD_MODE_MASK;
+		return of->mode & _GETFL_MASK;
 	case F_SETFL:
+#if CONFIG_LIBPOSIX_FDIO_ASYNC
+		return fdio_set_status_flags(of, arg, _SETFL_MASK | O_ASYNC);
+#else
 	{
 		unsigned int mode = of->mode;
 		unsigned int newmode;
@@ -90,6 +111,7 @@ int uk_sys_fcntl(struct uk_ofile *of, int cmd, unsigned long arg)
 		} while (!uk_compare_exchange_n(&of->mode, &mode, newmode));
 		return 0;
 	}
+#endif /* CONFIG_LIBPOSIX_FDIO_ASYNC */
 #if CONFIG_LIBPOSIX_PROCESS_SIGNAL && CONFIG_LIBPOSIX_FD_HEAPOFD
 	case F_SETOWN:
 		return ofile_set_owner(of, (pid_t)arg);
