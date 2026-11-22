@@ -23,6 +23,7 @@ config LIBUKLCPU_WAKEUP_IRQ
 config LIBUKLCPU_SMP_TEST
 	bool "Test secondary CPU startup and non-yielding overlap"
 	depends on LIBUKTEST && LIBUKALLOC && ARCH_X86_64
+	depends on LIBUKDEBUG_ENABLE_ASSERT
 	depends on UKPLAT_CPU_MAXCOUNT <= 64
 	default n
 	help

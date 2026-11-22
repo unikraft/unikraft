@@ -26,6 +26,9 @@ struct cpu_probe_slot {
 	unsigned long tls_marker;
 	unsigned int context_ready;
 	unsigned int startup_stack_checked;
+#if CONFIG_LIBUKDEBUG_ENABLE_ASSERT
+	unsigned int boot_stage;
+#endif
 };
 
 static struct cpu_probe_slot slots[CONFIG_UKPLAT_CPU_MAXCOUNT];
@@ -36,6 +39,15 @@ static unsigned char auxstacks[CONFIG_UKPLAT_CPU_MAXCOUNT][PROBE_STACK_BYTES]
 static __thread unsigned long probe_tls_marker;
 static unsigned int release_probe;
 static int callback_error;
+
+#if CONFIG_LIBUKDEBUG_ENABLE_ASSERT
+static void probe_stage(__u64 index, unsigned int stage)
+{
+	__atomic_store_n(&slots[index].boot_stage, stage, __ATOMIC_RELEASE);
+}
+#else
+#define probe_stage(index, stage) do { } while (0)
+#endif
 
 static __u64 observed_hardware_id(void)
 {
@@ -102,15 +114,20 @@ static void __noreturn secondary_probe_entry(struct uk_lcpu *this_lcpu)
 		__atomic_store_n(&callback_error, -EINVAL, __ATOMIC_RELEASE);
 		uk_lcpu_halt();
 	}
+	probe_stage(index, 1);
 	rc = uk_lcpu_init(this_lcpu);
 	if (rc)
 		goto failed;
+	probe_stage(index, 2);
 	uk_lcpu_tlsp_set(slots[index].expected_tlsp);
+	probe_stage(index, 3);
 	uk_lcpu_init_auxsp(slots[index].expected_auxsp,
 			   slots[index].expected_tlsp);
+	probe_stage(index, 4);
 	rc = publish_secondary_context(index);
 	if (rc)
 		goto failed;
+	probe_stage(index, 5);
 	uk_lcpu_idle();
 failed:
 	__atomic_store_n(&callback_error, rc, __ATOMIC_RELEASE);
@@ -161,6 +178,7 @@ UK_TESTCASE(lcpu_smp, bootstrap_and_overlap)
 	__u64 mask = 0, progress_mask = 0;
 	__nsec deadline;
 	int rc = 0, wait_rc;
+	unsigned int wait_phase = 0;
 
 	if (!cpu_count || cpu_count > CONFIG_UKPLAT_CPU_MAXCOUNT || cpu_count > 64) {
 		rc = -EINVAL;
@@ -209,6 +227,7 @@ UK_TESTCASE(lcpu_smp, bootstrap_and_overlap)
 		mask = 1;
 		goto finish;
 	}
+	wait_phase = 1;
 	rc = uk_lcpu_start(indices, &started, stack_pointers, entries, 0);
 	if (rc || started != remote_count) {
 		if (!rc)
@@ -216,6 +235,7 @@ UK_TESTCASE(lcpu_smp, bootstrap_and_overlap)
 		goto finish;
 	}
 	ready = remote_count;
+	wait_phase = 2;
 	rc = uk_lcpu_wait(indices, &ready, PROBE_TIMEOUT_NS);
 	if (rc || ready != remote_count) {
 		if (!rc)
@@ -223,12 +243,14 @@ UK_TESTCASE(lcpu_smp, bootstrap_and_overlap)
 		goto finish;
 	}
 	queued = remote_count;
+	wait_phase = 3;
 	rc = uk_lcpu_run(indices, &queued, &function, UK_LCPU_RFLG_DONOTBLOCK);
 	if (rc || queued != remote_count) {
 		if (!rc)
 			rc = -EIO;
 		goto finish;
 	}
+	wait_phase = 4;
 	deadline = ukplat_monotonic_clock() + PROBE_TIMEOUT_NS;
 	for (;;) {
 		mask = 0;
@@ -285,6 +307,20 @@ finish:
 		if (mask != expected_mask || progress_mask != expected_mask)
 			rc = -EIO;
 	}
+#if CONFIG_LIBUKDEBUG_ENABLE_ASSERT
+	if (rc) {
+		uk_pr_err("SMP_BOOT_FAILURE phase=%u rc=%d started=%u queued=%u callback_error=%d\n",
+			  wait_phase, rc, started, queued,
+			  __atomic_load_n(&callback_error, __ATOMIC_ACQUIRE));
+		for (unsigned int i = 1;
+		     i < cpu_count && i < CONFIG_UKPLAT_CPU_MAXCOUNT; i++)
+			uk_pr_err("SMP_BOOT_STATE cpu=%u stage=%u state=%d error=%d ready=%u\n",
+				  i, __atomic_load_n(&slots[i].boot_stage, __ATOMIC_ACQUIRE),
+				  __atomic_load_n(&uk_pcpuvar_lval(i, uk_lcpus).state, __ATOMIC_ACQUIRE),
+				  uk_pcpuvar_lval(i, uk_lcpus).error_code,
+				  __atomic_load_n(&slots[i].context_ready, __ATOMIC_ACQUIRE));
+	}
+#endif
 	UK_TEST_EXPECT_ZERO(rc);
 	if (!rc) {
 		uk_pr_info("SMP_PROBE discovered_count=%u\n", cpu_count);
