@@ -213,10 +213,26 @@ int pprocess_signal_send(struct posix_process *proc, int signum,
 	return 0;
 }
 
+static void pprocess_signal_wake_waiters(struct posix_process *pproc)
+{
+	struct posix_thread *thread, *threadn;
+	struct uk_semaphore *sems[16];
+	unsigned int nsems = 0, i;
+	unsigned long pflags = pprocess_lock_acquire();
+
+	uk_pprocess_foreach_pthread(pproc, thread, threadn) {
+		if (thread->state == POSIX_THREAD_BLOCKED_SIGNAL &&
+		    nsems < ARRAY_SIZE(sems))
+			sems[nsems++] = &thread->signal->deliver_semaphore;
+	}
+	pprocess_lock_release(pflags);
+	for (i = 0; i < nsems; i++)
+		uk_semaphore_up(sems[i]);
+}
+
 int pprocess_signal_process_do(pid_t pid, int signum, siginfo_t *siginfo)
 {
 	struct posix_process *pproc = NULL;
-	struct posix_thread *thread, *threadn;
 	int rc;
 
 	if (unlikely(signum != 0 && !IS_VALID(signum)))
@@ -275,23 +291,7 @@ int pprocess_signal_process_do(pid_t pid, int signum, siginfo_t *siginfo)
 	if (unlikely(rc))
 		return rc;
 
-	/* Wake up any threads that may be paused */
-	{
-		struct uk_semaphore *sems[16];
-		unsigned int nsems = 0, i;
-		unsigned long pflags = pprocess_lock_acquire();
-
-		uk_pprocess_foreach_pthread(pproc, thread, threadn) {
-			if (thread->state == POSIX_THREAD_BLOCKED_SIGNAL &&
-			    nsems < ARRAY_SIZE(sems))
-				sems[nsems++] =
-					&thread->signal->deliver_semaphore;
-		}
-		pprocess_lock_release(pflags);
-		for (i = 0; i < nsems; i++)
-			uk_semaphore_up(sems[i]);
-	}
-
+	pprocess_signal_wake_waiters(pproc);
 	return 0;
 }
 
