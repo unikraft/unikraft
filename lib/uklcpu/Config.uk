@@ -20,6 +20,15 @@ config LIBUKLCPU_WAKEUP_IRQ
 	default 14 if ARCH_X86_64
 	depends on HAVE_SMP
 
+config LIBUKLCPU_SMP_TEST
+	bool "Test secondary CPU startup and non-yielding overlap"
+	depends on LIBUKTEST && ARCH_X86_64
+	depends on UKPLAT_CPU_MAXCOUNT <= 64
+	default n
+	help
+	  Isolated test-kernel hardware probe. Does not enable application
+	  threads on secondary CPUs or establish scheduler SMP safety.
+
 endif
 
 endif
