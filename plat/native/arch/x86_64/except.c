@@ -340,8 +340,6 @@ void uk_plat_native_except_irq_handler(struct uk_plat_native_regs *regs,
 	uk_arch_x86_64_exit_kernel_gsbase(orig_gsbase);
 }
 
-static struct uk_arch_x86_64_desc_table_ptr64 idtptr;
-
 static inline void idt_fillgate(unsigned int num, void *fun, unsigned int ist,
 				__u32 idx)
 {
@@ -361,10 +359,12 @@ static inline void idt_fillgate(unsigned int num, void *fun, unsigned int ist,
 	desc->p		= 1;
 }
 
-static void idt_init(void)
+static void idt_init(__u32 idx)
 {
-	/* Ensure that traps_table_init has been called */
-	UK_ASSERT(idtptr.limit != 0);
+	struct uk_arch_x86_64_desc_table_ptr64 idtptr = {
+		.limit = sizeof(cpu_idt[idx]) - 1,
+		.base = (__u64)&cpu_idt[idx],
+	};
 
 	uk_arch_x86_64_lidt(&idtptr);
 }
@@ -641,8 +641,6 @@ static void traps_table_init(__u32 idx)
 	FILL_IRQ_GATE(222, 1);
 	FILL_IRQ_GATE(223, 1);
 
-	idtptr.limit = sizeof(cpu_idt) - 1;
-	idtptr.base = (__u64)&cpu_idt;
 }
 
 static void uk_plat_native_traps_init(void)
@@ -652,7 +650,7 @@ static void uk_plat_native_traps_init(void)
 	traps_table_init(idx);
 	gdt_init(idx);
 	tss_init(idx);
-	idt_init();
+	idt_init(idx);
 }
 
 __isr __uptr uk_plat_native_except_get_except_stack_base(void)
