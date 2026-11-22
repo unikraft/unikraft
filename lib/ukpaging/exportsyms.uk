@@ -1,4 +1,5 @@
 uk_paging_batch_begin
+uk_paging_batch_defer
 uk_paging_batch_end
 uk_paging_free_batch_finish
 uk_paging_free_batch_init

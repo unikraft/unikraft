@@ -7,6 +7,68 @@
 #include <uk/test.h>
 #include <uk/vmem.h>
 
+struct deferred_release_probe {
+	struct uk_pagetable *pt;
+	__vaddr_t address;
+	unsigned int calls;
+	bool irqs_enabled;
+	bool read_only;
+};
+
+static void deferred_release(void *arg)
+{
+	struct deferred_release_probe *probe = arg;
+	unsigned int level = UK_PAGING_PAGE_LEVEL;
+	__pte_t pte;
+	int rc;
+
+	probe->calls++;
+	probe->irqs_enabled = !uk_lcpu_irqs_disabled();
+	rc = uk_paging_pt_walk(probe->pt, probe->address, &level, NULL, &pte);
+	probe->read_only = !rc &&
+		!(uk_paging_attr_from_pte(pte, level) &
+		  UK_PAGING_PAGE_ATTR_PROT_WRITE);
+}
+
+UK_TESTCASE(vas_sched, deferred_backing_release)
+{
+	struct uk_vas *kernel = uk_vas_get_kernel();
+	struct uk_paging_deferred_call calls[2];
+	struct uk_paging_free_batch batch;
+	struct deferred_release_probe probe = { .pt = kernel->pt };
+	__vaddr_t address = UK_PAGING_VADDR_ANY;
+	int rc;
+
+	rc = uk_vma_map_anon(kernel, &address, UK_PAGING_PAGE_SIZE,
+			     UK_PAGING_PAGE_ATTR_PROT_RW, UK_VMA_MAP_POPULATE,
+			     NULL);
+	UK_TEST_EXPECT_ZERO(rc);
+	if (rc)
+		return;
+	probe.address = address;
+
+	uk_paging_batch_begin(&batch, kernel->pt);
+	uk_paging_batch_defer(&batch, &calls[0], deferred_release, &probe);
+	uk_paging_batch_defer(&batch, &calls[1], deferred_release, &probe);
+	rc = uk_paging_page_set_attr(kernel->pt, address, 1,
+				     UK_PAGING_PAGE_ATTR_PROT_READ, 0);
+	UK_TEST_EXPECT_ZERO(rc);
+	UK_TEST_EXPECT_ZERO(probe.calls);
+	uk_paging_batch_end(&batch);
+	UK_TEST_EXPECT_ZERO(probe.calls);
+	uk_paging_free_batch_finish(&batch);
+	UK_TEST_EXPECT_SNUM_EQ(probe.calls, 2);
+	UK_TEST_EXPECT(probe.irqs_enabled);
+	UK_TEST_EXPECT(probe.read_only);
+
+	/* A completed batch must not release the same references twice. */
+	uk_paging_free_batch_finish(&batch);
+	UK_TEST_EXPECT_SNUM_EQ(probe.calls, 2);
+
+	rc = uk_vma_unmap(kernel, address, UK_PAGING_PAGE_SIZE, 0);
+	UK_TEST_EXPECT_ZERO(rc);
+}
+
 struct vas_switch_probe {
 	struct uk_vas *vas;
 	__vaddr_t address;
