@@ -9,6 +9,7 @@
 
 #include <fcntl.h>
 #include <limits.h>
+#include <stdint.h>
 #include <string.h>
 #include <unistd.h>
 #include <sys/mount.h>
@@ -1478,7 +1479,10 @@ static const struct ramfs_live_ops ramfs_liveops = {
 
 static int ramfs_node_cmp(struct ramfs_node *a, struct ramfs_node *b)
 {
-	return a - b;
+	const uintptr_t left = (uintptr_t)a;
+	const uintptr_t right = (uintptr_t)b;
+
+	return (left > right) - (left < right);
 }
 
 UK_FS_TMPL_LIVE_GENERATE_STATIC(ramfs, struct ramfs_node *, ramfs_node_cmp,
