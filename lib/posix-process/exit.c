@@ -24,13 +24,6 @@
 	((_pt)->state == POSIX_THREAD_BLOCKED_WAIT &&			\
 	 ((_pt)->wait_pid == (_pid) || (_pt)->wait_pid == -1))
 
-#if CONFIG_LIBPOSIX_PROCESS_SIGNAL
-#define PTHREAD_BLOCKING_ON_SIGNAL(_pt)					\
-	((_pt)->state == POSIX_THREAD_BLOCKED_SIGNAL)
-#else /* !CONFIG_LIBPOSIX_PROCESS_SIGNAL */
-#define PTHREAD_BLOCKING_ON_SIGNAL(_pt)		    0
-#endif /* !CONFIG_LIBPOSIX_PROCESS_SIGNAL */
-
 int pprocess_exit_status = PPROCESS_EXIT_STATUS_UNSET;
 
 #if CONFIG_LIBPOSIX_PROCESS_MULTITHREADING
@@ -165,8 +158,14 @@ bool pprocess_try_exit(struct posix_process *pprocess,
 
 	uk_pr_debug("pid %d: exit process\n", pprocess->pid);
 
-	/* May be NULL if init terminated early */
-	parent_process = pprocess->parent;
+	{
+		unsigned long pflags = pprocess_lock_acquire();
+
+		parent_process = pprocess->parent;
+		if (parent_process)
+			pprocess_get(parent_process);
+		pprocess_lock_release(pflags);
+	}
 
 #if CONFIG_LIBPOSIX_PROCESS_SIGNAL
 	/* As this will be signaling the parent on behalf of the current
@@ -212,12 +211,16 @@ bool pprocess_try_exit(struct posix_process *pprocess,
 	 */
 	UK_ASSERT(uk_list_empty(&pprocess->threads));
 
-	/* Update process state & exit_status*/
-	if (state == POSIX_PROCESS_EXITED)
-		pprocess->exit_status = exit_status & 0xff;
-	else /* POSIX_PROCESS_KILLED */
-		pprocess->exit_status = exit_status;
-	pprocess->state = state;
+	{
+		unsigned long pflags = pprocess_lock_acquire();
+
+		if (state == POSIX_PROCESS_EXITED)
+			pprocess->exit_status = exit_status & 0xff;
+		else
+			pprocess->exit_status = exit_status;
+		pprocess->state = state;
+		pprocess_lock_release(pflags);
+	}
 
 	/* Reparent child processes to init */
 	pprocess_reparent_children(pprocess);
@@ -231,21 +234,18 @@ bool pprocess_try_exit(struct posix_process *pprocess,
 	/* Unblock wait */
 	if (parent_process && !nowait) {
 		unsigned long pflags = pprocess_lock_acquire();
-		bool wake_wait = false;
 
 		uk_pprocess_foreach_pthread(parent_process, pt, ptn) {
-			if (PTHREAD_WAITING_FOR_PID(pt, pprocess->pid) ||
-			    PTHREAD_BLOCKING_ON_SIGNAL(pt)) {
-				wake_wait = true;
-				break;
-			}
+			if (PTHREAD_WAITING_FOR_PID(pt, pprocess->pid))
+				uk_semaphore_up(&pt->wait_semaphore);
 		}
 		pprocess_lock_release(pflags);
-		if (wake_wait)
-			uk_semaphore_up(&parent_process->wait_semaphore);
 	} else if (nowait) { /* release now */
 		pprocess_release(pprocess);
 	}
+	if (parent_process)
+		pprocess_put(parent_process);
+	pprocess_put(pprocess);
 	return true;
 }
 

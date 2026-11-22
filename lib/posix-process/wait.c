@@ -33,12 +33,13 @@ struct posix_process *pprocess_state_changed(struct posix_process *pproc,
 }
 
 static inline
-struct posix_process *pprocess_child_state_changed(int state)
+struct posix_process *pprocess_waitable_child(struct posix_process *parent,
+					      int state)
 {
 	struct posix_process *pchild, *pchildn;
 	struct posix_process *pproc;
 
-	uk_pprocess_foreach_child(uk_pprocess_current(), pchild, pchildn)
+	uk_pprocess_foreach_child(parent, pchild, pchildn)
 		if ((pproc = pprocess_state_changed(pchild, state)))
 			return pproc;
 	return NULL;
@@ -63,7 +64,8 @@ static int pprocess_wait(pid_t pid, siginfo_t *si, int opt)
 	struct posix_process *this_process;
 	struct posix_thread *this_thread;
 	struct posix_process *waitable = NULL;
-	struct posix_process *child = NULL;
+	struct posix_process *child, *reap = NULL;
+	unsigned long flags;
 	int ret;
 
 	UK_ASSERT(pid > 0 || pid == -1);
@@ -75,57 +77,51 @@ static int pprocess_wait(pid_t pid, siginfo_t *si, int opt)
 	this_process = this_thread->process;
 	UK_ASSERT(this_process);
 
-	if (uk_list_empty(&this_process->children))
-		return -ECHILD;
-
-	this_thread->state = POSIX_THREAD_BLOCKED_WAIT;
-
-	if (pid > 0) {
-		child = pid2pprocess(pid);
-		/* Child does not exist or not our child. This also
-		 * covers the case where the process chose to ignore
-		 * SIGCHLD or set SA_NOCLDWAIT and therefore _exit()
-		 * terminated it without further ado.
-		 */
-		if (unlikely(!child || child->parent != this_process)) {
+	for (;;) {
+		flags = pprocess_lock_acquire();
+		this_thread->wait_pid = pid;
+		this_thread->state = POSIX_THREAD_BLOCKED_WAIT;
+		if (uk_list_empty(&this_process->children)) {
 			ret = -ECHILD;
 			goto out;
 		}
-
-		this_thread->wait_pid = pid;
-	} else { /* any */
-		this_thread->wait_pid = -1;
-	}
-
-	for (;;) {
-		/* Find process with changed state. No change means that
-		 * the state change happened to a different child, so we
-		 * loop back to the semaphore.
-		 */
-		if (pid > 0)
+		if (pid > 0) {
+			child = pid2pprocess(pid);
+			if (!child || child->parent != this_process) {
+				ret = -ECHILD;
+				goto out;
+			}
 			waitable = pprocess_state_changed(child, opt);
-		else /* any */
-			waitable = pprocess_child_state_changed(opt);
+		} else {
+			waitable = pprocess_waitable_child(this_process, opt);
+		}
 
 		if (waitable) {
 			ret = waitable->pid;
 			set_siginfo_wait(waitable, si);
-			if (!(opt & WNOWAIT))
-				pprocess_reap(waitable);
-			break;
+			if (!(opt & WNOWAIT)) {
+				/* Claim the child before unlocking. */
+				uk_list_del_init(&waitable->child_list_entry);
+				waitable->parent = NULL;
+				reap = waitable;
+			}
+			goto out;
 		}
 
 		if (opt & WNOHANG) {
 			ret = 0;
-			break;
+			goto out;
 		}
 
-		/* Wait for a state change on one of our children */
-		uk_semaphore_down(&this_thread->process->wait_semaphore);
+		pprocess_lock_release(flags);
+		uk_semaphore_down(&this_thread->wait_semaphore);
 	}
 
 out:
 	this_thread->state = POSIX_THREAD_RUNNING;
+	pprocess_lock_release(flags);
+	if (reap)
+		pprocess_reap(reap);
 	return ret;
 }
 
