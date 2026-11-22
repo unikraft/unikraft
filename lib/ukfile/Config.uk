@@ -20,4 +20,9 @@ config LIBUKFILE_FINALIZERS
 config LIBUKFILE_POLLED
 	bool
 
+config LIBUKFILE_POLLQ_TEST
+	bool "Test poll queue lock reacquisition"
+	select LIBUKTEST
+	default n
+
 endif
