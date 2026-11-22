@@ -6,6 +6,7 @@
 
 #include <uk/essentials.h>
 #include <uk/alloc.h>
+#include <uk/arch/limits.h>
 #include <uk/arch/types.h>
 #include <uk/bitops/bitmap.h>
 #include <uk/list.h>
@@ -81,6 +82,36 @@ __ssz uk_console_out(const char *buf, __sz len)
 	uk_spin_unlock_irqrestore(&cons_dev_list_lock, flags);
 
 	return len;
+}
+
+__ssz uk_console_outv(const struct uk_console_iovec *iov, __sz count)
+{
+	struct uk_console *dev;
+	unsigned long flags;
+	__sz total = 0;
+
+	if (unlikely(!count))
+		return 0;
+	if (unlikely(!iov))
+		return -EINVAL;
+	for (__sz i = 0; i < count; ++i) {
+		if (unlikely(iov[i].len && !iov[i].buf))
+			return -EINVAL;
+		if (unlikely(iov[i].len > (__sz)__SSZ_MAX - total))
+			return -EOVERFLOW;
+		total += iov[i].len;
+	}
+	if (!total)
+		return 0;
+
+	uk_spin_lock_irqsave(&cons_dev_list_lock, flags);
+	uk_list_for_each_entry(dev, &cons_dev_list, _list) {
+		if ((dev->flags & UK_CONSOLE_FLAG_STDOUT) && dev->ops->out)
+			uk_console_out_directv(dev, iov, count);
+	}
+	uk_spin_unlock_irqrestore(&cons_dev_list_lock, flags);
+
+	return (__ssz)total;
 }
 
 __ssz uk_console_in(char *buf, __sz len)
