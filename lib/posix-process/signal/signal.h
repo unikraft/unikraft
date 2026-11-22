@@ -224,6 +224,17 @@ int pprocess_signal_pdesc_init(struct posix_process *proc);
 /* Initialize signal descriptors of a posix thread */
 int pprocess_signal_tdesc_init(struct posix_thread *thread);
 
+#if CONFIG_LIBPOSIX_PROCESS_SIGNAL
+/**
+ * Clone signal state into a child with initialized descriptors, before it runs.
+ * Uses direct object references so preparation does not require public IDs.
+ * Copy the thread mask and dispositions, retaining initialized child queues.
+ * This does not allocate or consume the caller's process/thread references.
+ */
+int pprocess_signal_clone(struct posix_thread *child,
+			  struct posix_thread *parent, __u64 flags);
+#endif
+
 /* Free signal descritors of a posix process
  *
  * This function is safe to call at thread termination as
