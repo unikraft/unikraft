@@ -43,6 +43,9 @@
 #include <uk/plat/time.h>
 #include <uk/print.h>
 #include <uk/spinlock.h>
+#if CONFIG_LIBVIRTIO_PCI_MSIX
+#include <uk/intctlr/msi.h>
+#endif
 #include <virtio/virtio_bus.h>
 #include <virtio/virtio_config.h>
 #include <virtio/virtio_pci.h>
@@ -59,6 +62,19 @@ enum {
 	C_QUEUE_DESC = 32, C_QUEUE_DRIVER = 40, C_QUEUE_DEVICE = 48,
 	COMMON_LENGTH = 56
 };
+
+#define VIRTIO_PCI_NO_VECTOR 0xffff
+
+#if CONFIG_LIBVIRTIO_PCI_MSIX
+enum {
+	PCI_CAP_MSIX = 0x11, MSIX_CONTROL = 2, MSIX_TABLE = 4,
+	MSIX_ENABLE = 1U << 15, MSIX_MASK = 1U << 14, MSIX_SIZE = 0x7ff,
+	MSIX_BIR_MASK = 7, MSIX_ENTRY_SIZE = 16,
+	MSIX_ADDRESS_LOW = 0, MSIX_ADDRESS_HIGH = 4, MSIX_DATA = 8,
+	MSIX_VECTOR_CONTROL = 12, MSIX_VECTOR_MASK = 1,
+	MSIX_QUEUE_VECTOR = 0, MSIX_CONFIG_VECTOR = 1, MSIX_VECTORS = 2,
+};
+#endif
 
 struct modern_region {
 	void *base;
@@ -81,6 +97,13 @@ struct modern_pci {
 	struct modern_queue *queue;
 	int irq_registered;
 	struct uk_spinlock select_lock;
+#if CONFIG_LIBVIRTIO_PCI_MSIX
+	__u16 msix_cap;
+	__u16 msix_saved_control;
+	void *msix_table;
+	unsigned int msix_irq[MSIX_VECTORS];
+	int msix_enabled;
+#endif
 };
 
 #define modern(v) __containerof(v, struct modern_pci, vdev)
@@ -103,12 +126,39 @@ static int cfg_read(struct modern_pci *d, __u16 offset, __u8 width, __u32 *v)
 	return pci_cfg_read(&d->pdev->addr, offset, width, v);
 }
 
+static int map_bar_window(struct modern_pci *d, __u32 bar, __u32 offset,
+			  __u32 length, void **address)
+{
+	struct pci_bar_region *region;
+	__vaddr_t mapped;
+	int rc;
+
+	if (bar >= ARRAY_SIZE(d->bars))
+		return -EINVAL;
+	region = &d->bars[bar];
+	if (!region->size) {
+		rc = pci_bar_get(d->pdev, bar, region);
+		if (rc)
+			return rc;
+	}
+	if (region->io)
+		return 0;
+	if (offset > region->size || length > region->size - offset)
+		return -EINVAL;
+	if (!d->mapped_bar[bar]) {
+		mapped = uk_bus_devmap(region->base, region->size);
+		if (PTRISERR((void *)mapped))
+			return PTR2ERR((void *)mapped);
+		d->mapped_bar[bar] = (void *)mapped;
+	}
+	*address = mmio(d->mapped_bar[bar], offset);
+	return 0;
+}
+
 static int map_capability(struct modern_pci *d, __u32 cap, __u32 kind,
 			  __u32 cap_length)
 {
 	__u32 bar, offset, length, multiplier = 0;
-	struct pci_bar_region *r;
-	__vaddr_t mapped;
 	int rc;
 
 	if (d->region[kind].base)
@@ -134,25 +184,9 @@ static int map_capability(struct modern_pci *d, __u32 cap, __u32 kind,
 		    (multiplier < 2 || (multiplier & (multiplier - 1))))
 			return -EINVAL;
 	}
-	r = &d->bars[bar];
-	if (!r->size) {
-		rc = pci_bar_get(d->pdev, bar, r);
-		if (rc)
-			return rc;
-	}
-	if (r->io) {
-		/* Another capability can offer the MMIO alternative. */
-		return 0;
-	}
-	if (offset > r->size || length > r->size - offset)
-		return -EINVAL;
-	if (!d->mapped_bar[bar]) {
-		mapped = uk_bus_devmap(r->base, r->size);
-		if (PTRISERR((void *)mapped))
-			return PTR2ERR((void *)mapped);
-		d->mapped_bar[bar] = (void *)mapped;
-	}
-	d->region[kind].base = mmio(d->mapped_bar[bar], offset);
+	rc = map_bar_window(d, bar, offset, length, &d->region[kind].base);
+	if (rc || !d->region[kind].base)
+		return rc;
 	d->region[kind].length = length;
 	if (kind == NOTIFY)
 		d->notify_multiplier = multiplier;
@@ -187,6 +221,10 @@ static int discover(struct modern_pci *d)
 			if (rc)
 				return rc;
 		}
+#if CONFIG_LIBVIRTIO_PCI_MSIX
+		if ((head & 255) == PCI_CAP_MSIX && cap <= 0xf4 && !d->msix_cap)
+			d->msix_cap = cap;
+#endif
 		cap = (head >> 8) & 255;
 	}
 	if (!d->region[COMMON].base && !d->region[NOTIFY].base &&
@@ -327,6 +365,159 @@ static int irq_handle(void *arg)
 	return virtio_pci_irq_dispatch(&d->vdev, read8(d->region[ISR].base, 0));
 }
 
+#if CONFIG_LIBVIRTIO_PCI_MSIX
+static int msix_queue_irq(void *arg)
+{
+	struct modern_pci *d = arg;
+
+	return virtio_pci_irq_dispatch(&d->vdev, VIRTIO_PCI_ISR_HAS_INTR);
+}
+
+static int msix_config_irq(void *arg)
+{
+	struct modern_pci *d = arg;
+
+	return virtio_pci_irq_dispatch(&d->vdev, VIRTIO_PCI_ISR_CONFIG);
+}
+
+static const uk_intctlr_irq_handler_func_t msix_handlers[MSIX_VECTORS] = {
+	[MSIX_QUEUE_VECTOR] = msix_queue_irq,
+	[MSIX_CONFIG_VECTOR] = msix_config_irq,
+};
+
+static void map_msix_table(struct modern_pci *d)
+{
+	__u32 control, table;
+
+	if (!d->msix_cap ||
+	    cfg_read(d, d->msix_cap + MSIX_CONTROL, 2, &control) ||
+	    (control & MSIX_ENABLE) ||
+	    (control & MSIX_SIZE) + 1 < MSIX_VECTORS ||
+	    cfg_read(d, d->msix_cap + MSIX_TABLE, 4, &table))
+		return;
+	d->msix_saved_control = control;
+	map_bar_window(d, table & MSIX_BIR_MASK, table & ~MSIX_BIR_MASK,
+		       ((control & MSIX_SIZE) + 1) * MSIX_ENTRY_SIZE,
+		       &d->msix_table);
+}
+
+static int restore_msix(struct modern_pci *d, unsigned int handlers)
+{
+	unsigned int i;
+	int rc;
+
+	for (i = 0; i < MSIX_VECTORS; ++i)
+		write32(d->msix_table,
+			i * MSIX_ENTRY_SIZE + MSIX_VECTOR_CONTROL,
+			MSIX_VECTOR_MASK);
+	rc = pci_cfg_write(&d->pdev->addr, d->msix_cap + MSIX_CONTROL, 2,
+			   d->msix_saved_control);
+	for (i = 0; i < handlers; ++i)
+		uk_intctlr_irq_unregister_arg(d->msix_irq[i],
+					      msix_handlers[i], d);
+	uk_intctlr_irq_free(d->msix_irq, MSIX_VECTORS);
+	d->msix_enabled = 0;
+	return rc;
+}
+
+/* Install the vectors while the device is quiescent, before DRIVER_OK. */
+static int enable_msix(struct modern_pci *d, __u16 count)
+{
+	void *common = d->region[COMMON].base;
+	__u32 data[MSIX_VECTORS], address[MSIX_VECTORS];
+	unsigned int handlers = 0, i;
+	__u32 control;
+	__u16 offset = d->msix_cap + MSIX_CONTROL;
+	int rc;
+
+	if (!d->msix_table || uk_intctlr_irq_alloc(d->msix_irq, MSIX_VECTORS))
+		return 0;
+	for (i = 0; i < MSIX_VECTORS; ++i) {
+		rc = uk_intctlr_xpic_msi_message(d->msix_irq[i],
+						 &address[i], &data[i]);
+		if (!rc)
+			rc = uk_intctlr_irq_register(d->msix_irq[i],
+						     msix_handlers[i], d);
+		if (rc)
+			goto fallback;
+		++handlers;
+	}
+	control = d->msix_saved_control | MSIX_ENABLE;
+	if (pci_cfg_write(&d->pdev->addr, offset, 2, control | MSIX_MASK))
+		goto fallback;
+	for (i = 0; i < MSIX_VECTORS; ++i) {
+		void *entry = mmio(d->msix_table, i * MSIX_ENTRY_SIZE);
+
+		write32(entry, MSIX_VECTOR_CONTROL, MSIX_VECTOR_MASK);
+		write32(entry, MSIX_ADDRESS_LOW, address[i]);
+		write32(entry, MSIX_ADDRESS_HIGH, 0);
+		write32(entry, MSIX_DATA, data[i]);
+		write32(entry, MSIX_VECTOR_CONTROL, 0);
+	}
+	write16(common, C_MSIX, MSIX_CONFIG_VECTOR);
+	if (read16(common, C_MSIX) != MSIX_CONFIG_VECTOR)
+		goto fallback;
+	for (i = 0; i < count && i < d->queues; ++i) {
+		write16(common, C_QUEUE_SELECT, i);
+		if (!read16(common, C_QUEUE_SIZE))
+			continue;
+		write16(common, C_QUEUE_MSIX, MSIX_QUEUE_VECTOR);
+		if (read16(common, C_QUEUE_MSIX) != MSIX_QUEUE_VECTOR)
+			goto fallback;
+	}
+	if (pci_cfg_write(&d->pdev->addr, offset, 2, control & ~MSIX_MASK) ||
+	    cfg_read(d, offset, 2, &control) ||
+	    (control & (MSIX_ENABLE | MSIX_MASK)) != MSIX_ENABLE)
+		goto fallback;
+	d->msix_enabled = 1;
+	return 1;
+
+fallback:
+	return restore_msix(d, handlers);
+}
+#endif
+
+static __u16 interrupt_vector(struct modern_pci *d __unused,
+			      int configuration __unused)
+{
+#if CONFIG_LIBVIRTIO_PCI_MSIX
+	if (d->msix_enabled)
+		return configuration ? MSIX_CONFIG_VECTOR : MSIX_QUEUE_VECTOR;
+#endif
+	return VIRTIO_PCI_NO_VECTOR;
+}
+
+static int register_interrupts(struct modern_pci *d, __u16 count __unused)
+{
+	int rc;
+
+	if (d->irq_registered)
+		return 0;
+#if CONFIG_LIBVIRTIO_PCI_MSIX
+	if (d->msix_enabled)
+		return 0;
+	rc = enable_msix(d, count);
+	if (rc < 0)
+		return rc;
+	if (rc) {
+#if CONFIG_LIBUKDEBUG_ENABLE_ASSERT && !defined(NDEBUG)
+		uk_pr_info("Virtio device %u interrupt mode MSI-X\n",
+			   d->vdev.id.virtio_device_id);
+#endif
+		return 0;
+	}
+#endif
+	rc = uk_intctlr_irq_register(d->pdev->irq, irq_handle, d);
+	if (rc)
+		return rc;
+	d->irq_registered = 1;
+#if CONFIG_LIBUKDEBUG_ENABLE_ASSERT && !defined(NDEBUG)
+	uk_pr_info("Virtio device %u interrupt mode INTx\n",
+		   d->vdev.id.virtio_device_id);
+#endif
+	return 0;
+}
+
 static int notify_host(struct virtio_dev *vdev, __u16 queue)
 {
 	struct modern_pci *d = modern(vdev);
@@ -348,17 +539,18 @@ static int vqs_find(struct virtio_dev *vdev, __u16 count, __u16 *sizes)
 	void *c = d->region[COMMON].base;
 	unsigned long flags;
 	unsigned int i, found = 0;
-	int rc;
+	__u16 vector;
+	int rc = register_interrupts(d, count);
 
-	if (!d->irq_registered) {
-		rc = uk_intctlr_irq_register(d->pdev->irq, irq_handle, d);
-		if (rc)
-			return rc;
-		d->irq_registered = 1;
-	}
+	if (rc)
+		return rc;
+	vector = interrupt_vector(d, 1);
 	uk_spin_lock_irqsave(&d->select_lock, flags);
-	/* Use INTx, not an unconfigured MSI-X vector. */
-	write16(c, C_MSIX, 0xffff);
+	write16(c, C_MSIX, vector);
+	if (vector != VIRTIO_PCI_NO_VECTOR && read16(c, C_MSIX) != vector) {
+		uk_spin_unlock_irqrestore(&d->select_lock, flags);
+		return -EIO;
+	}
 	for (i = 0; i < count; ++i) {
 		sizes[i] = 0;
 		if (i >= d->queues)
@@ -381,6 +573,7 @@ static struct virtqueue *vq_setup(struct virtio_dev *vdev, __u16 queue,
 	struct virtqueue *vq;
 	unsigned long flags;
 	__u64 notify_offset;
+	__u16 vector;
 	int rc = -EINVAL;
 
 	if (queue >= d->queues || !size || (size & (size - 1)))
@@ -396,8 +589,11 @@ static struct virtqueue *vq_setup(struct virtio_dev *vdev, __u16 queue,
 	notify_offset = (__u64)read16(c, C_QUEUE_NOTIFY) * d->notify_multiplier;
 	if (notify_offset > d->region[NOTIFY].length - 2)
 		goto fail;
+	vector = interrupt_vector(d, 0);
+	write16(c, C_QUEUE_MSIX, vector);
+	if (vector != VIRTIO_PCI_NO_VECTOR && read16(c, C_QUEUE_MSIX) != vector)
+		goto fail;
 	write16(c, C_QUEUE_SIZE, size);
-	write16(c, C_QUEUE_MSIX, 0xffff);
 	write64(c, C_QUEUE_DESC, virtqueue_physaddr(vq));
 	write64(c, C_QUEUE_DRIVER, virtqueue_get_avail_addr(vq));
 	write64(c, C_QUEUE_DEVICE, virtqueue_get_used_addr(vq));
@@ -458,6 +654,9 @@ int virtio_pci_modern_add_dev(struct pci_device *pdev, struct uk_alloc *a)
 	rc = discover(d);
 	if (rc)
 		goto fail;
+#if CONFIG_LIBVIRTIO_PCI_MSIX
+	map_msix_table(d);
+#endif
 	d->vdev.id.virtio_device_id = pdev->id.device_id >= 0x1040 ?
 		pdev->id.device_id - 0x1040 : pdev->id.subsystem_device_id;
 	d->vdev.cops = &modern_ops;
@@ -492,6 +691,10 @@ int virtio_pci_modern_add_dev(struct pci_device *pdev, struct uk_alloc *a)
 fail:
 	if (enabled)
 		device_reset(&d->vdev);
+#if CONFIG_LIBVIRTIO_PCI_MSIX
+	if (d->msix_enabled)
+		restore_msix(d, MSIX_VECTORS);
+#endif
 	if (d->irq_registered)
 		uk_intctlr_irq_unregister_arg(pdev->irq, irq_handle, d);
 	UK_TAILQ_FOREACH_SAFE(vq, &d->vdev.vqs, next, next) {
