@@ -193,9 +193,8 @@ bool uk_thread_in_waitq(struct uk_thread *thread)
 #define uk_thread_is_exited(t)   ((t)->flags & UK_THREADF_EXITED)
 #define uk_thread_is_runnable(t) (!uk_thread_is_exited(t) \
 				  && ((t)->flags & UK_THREADF_RUNNABLE))
-#define uk_thread_is_blocked(t)  ((t)->flags &				\
-				  (UK_THREADF_EXITED | UK_THREADF_RUNNABLE) == \
-				  0x0)
+#define uk_thread_is_blocked(t) \
+	(((t)->flags & (UK_THREADF_EXITED | UK_THREADF_RUNNABLE)) == 0x0)
 #define uk_thread_is_queueable(t) ((t)->flags & UK_THREADF_QUEUEABLE)
 
 #define uk_thread_set_runnable(t) \
