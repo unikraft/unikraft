@@ -39,6 +39,16 @@ config LIBUKVMEM_PROCESS_VAS
 	select LIBUKVMEM_VAS_BOUNDS
 	default n
 
+config LIBUKVMEM_PROCESS_VAS_TEST
+	bool "Test process address space creation and cloning"
+	depends on LIBUKVMEM_THREAD_VAS && LIBUKPAGING_DIRECTMAP
+	depends on LIBUKPLAT_NATIVE_PAGING
+	select LIBUKVMEM_PROCESS_VAS
+	select LIBUKVMEM_VAS_ACCESS
+	select LIBUKPAGING_STATS
+	select LIBUKTEST
+	default n
+
 config LIBUKVMEM_COW_VMA
 	bool
 	depends on LIBUKVMEM_THREAD_VAS && LIBUKPAGING_DIRECTMAP
