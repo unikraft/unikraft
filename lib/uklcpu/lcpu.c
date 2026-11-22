@@ -12,6 +12,7 @@
 
 #include <uk/essentials.h>
 #include <uk/arch.h>
+#include <uk/arch/ctx.h>
 #include <uk/assert.h>
 #include <uk/atomic.h>
 #if CONFIG_HAVE_SMP
@@ -47,6 +48,17 @@ unsigned int uk_lcpu_discovered_count(void)
 	return count;
 }
 
+
+void uk_lcpu_init_auxsp(__uptr auxsp, __uptr uktlsp)
+{
+	struct ukarch_auxspcb *auxspcb;
+
+	ukarch_auxsp_init(auxsp);
+	auxspcb = ukarch_auxsp_get_cb(auxsp);
+	UK_ASSERT(auxspcb);
+	ukarch_auxspcb_set_uktlsp(auxspcb, uktlsp);
+	uk_lcpu_set_auxsp(auxsp);
+}
 
 int uk_lcpu_pm_ops_register(const struct uk_lcpu_pm_ops *ops)
 {

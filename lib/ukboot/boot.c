@@ -269,7 +269,6 @@ void uk_boot_entry(void)
 	struct uk_alloc *a = NULL, *sa = NULL, *auxsa = NULL;
 #endif
 #if CONFIG_LIBUKBOOT_INITALLOC
-	struct ukarch_auxspcb *auxspcb;
 	__uptr auxsp, uktlsp;
 	void *tls = NULL;
 	void *auxstack;
@@ -356,11 +355,7 @@ void uk_boot_entry(void)
 
 	/* Activate auxiliary stack */
 	auxsp = ukarch_gen_sp(auxstack, AUXSTACK_SIZE);
-	ukarch_auxsp_init(auxsp);
-	auxspcb = ukarch_auxsp_get_cb(auxsp);
-	UK_ASSERT(auxspcb);
-	ukarch_auxspcb_set_uktlsp(auxspcb, uktlsp);
-	uk_lcpu_set_auxsp(auxsp);
+	uk_lcpu_init_auxsp(auxsp, uktlsp);
 #endif /* CONFIG_LIBUKBOOT_INITALLOC */
 
 #if CONFIG_LIBUKINTCTLR

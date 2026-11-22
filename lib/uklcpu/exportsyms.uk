@@ -11,6 +11,7 @@ uk_lcpu_irqs_handle_pending
 uk_lcpu_restore_irqf
 uk_lcpu_save_irqf
 uk_lcpu_set_auxsp
+uk_lcpu_init_auxsp
 uk_lcpu_tlsp_get
 uk_lcpu_tlsp_set
 uk_lcpus
