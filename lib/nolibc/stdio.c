@@ -91,10 +91,13 @@ static inline __ssz _console_out(const char *buf, __sz len)
 	while (l > 0) {
 		next_nl = memchr(buf, '\n', l);
 		if (next_nl) {
+			const struct uk_console_iovec iov[] = {
+				{ .buf = buf, .len = next_nl - buf },
+				{ .buf = "\r\n", .len = 2 }
+			};
+
 			off = next_nl - buf;
-			if ((rc = uk_console_out(buf, off)) < 0)
-				return rc;
-			if ((rc = uk_console_out("\r\n", 2)) < 0)
+			if ((rc = uk_console_outv(iov, ARRAY_SIZE(iov))) < 0)
 				return rc;
 			buf = next_nl + 1;
 			l -= off + 1;
