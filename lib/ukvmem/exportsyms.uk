@@ -13,6 +13,7 @@ uk_vma_find
 uk_vma_map
 uk_vma_unmap
 uk_vma_unmap_at
+uk_vma_unmap_at_exact
 uk_vma_set_attr
 uk_vma_advise
 uk_vma_sync
@@ -43,6 +44,9 @@ uk_vas_create_process
 uk_vas_clone_process
 uk_vma_cow_anon_ops
 uk_vma_shared_anon_ops
+uk_vma_shared_anon_create
+uk_vma_shared_anon_release
+uk_vma_shared_anon_attachment_ops
 uk_vas_get_shared_ref
 uk_vma_shared_ref_get
 uk_vma_shared_ref_put

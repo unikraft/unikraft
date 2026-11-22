@@ -836,6 +836,10 @@ int uk_vma_unmap(struct uk_vas *vas, __vaddr_t vaddr, __sz len,
 
 int uk_vma_unmap_at(struct uk_vas *vas, __vaddr_t vaddr);
 
+/* Atomically unmap the VMA starting at vaddr if its backend matches. */
+int uk_vma_unmap_at_exact(struct uk_vas *vas, __vaddr_t vaddr,
+			  const struct uk_vma_ops *ops);
+
 /**
  * Changes the paging attributes in the specified virtual address range.
  *
