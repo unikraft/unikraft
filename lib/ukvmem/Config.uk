@@ -56,6 +56,15 @@ config LIBUKVMEM_COW_VMA
 	select LIBUKVMEM_VAS_REFCOUNT
 	default n
 
+config LIBUKVMEM_SHARED_REF_TEST
+	bool "Test shared mapping identity and fault-free word loads"
+	depends on LIBUKVMEM_THREAD_VAS && LIBUKPAGING_DIRECTMAP
+	depends on LIBUKPLAT_NATIVE_PAGING
+	select LIBUKVMEM_PROCESS_VAS
+	select LIBUKVMEM_VAS_ACCESS
+	select LIBUKTEST
+	default n
+
 config LIBUKVMEM_COW_VMA_TEST
 	bool "Test private anonymous COW address space cloning"
 	depends on LIBUKVMEM_THREAD_VAS && LIBUKPAGING_DIRECTMAP
