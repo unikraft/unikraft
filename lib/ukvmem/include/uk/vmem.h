@@ -87,6 +87,9 @@ struct uk_vas {
 	/** List of VMAs, sorted by address */
 	struct uk_list_head vma_list;
 
+	/** Unmapped ranges awaiting TLB completion, protected by lock. */
+	struct uk_list_head unmap_ranges;
+
 	/** VAS flags */
 #define UK_VAS_FLAG_NO_PAGING		0x1 /* On-demand paging disabled */
 	unsigned long flags;
