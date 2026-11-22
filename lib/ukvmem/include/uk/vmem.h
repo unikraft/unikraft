@@ -35,6 +35,7 @@
  */
 
 #include <uk/config.h>
+#include <uk/arch/spinlock.h>
 #include <uk/arch/types.h>
 #include <uk/list.h>
 #include <uk/alloc.h>
@@ -70,39 +71,20 @@ struct uk_vas {
 	/** VAS flags */
 #define UK_VAS_FLAG_NO_PAGING		0x1 /* On-demand paging disabled */
 	unsigned long flags;
+
+	/** Serializes VMA list and page-table mutations across CPUs/IRQs */
+	struct __spinlock lock;
 };
 
 /**
- * Returns the current paging flag and temporarily disables demand-paging for
- * the address space.
+ * Suspend demand paging for this VAS on the executing CPU. Do not
+ * yield while a saved state is outstanding. Restore in reverse order.
  *
- * @param vas
- *   The address space to disable paging for
- *
- * @return
- *   The current paging flag
+ * @return An opaque state for uk_vas_paging_restoref().
  */
-static inline unsigned long uk_vas_paging_savef(struct uk_vas *vas)
-{
-	unsigned long saved_flags = vas->flags;
-
-	vas->flags |= UK_VAS_FLAG_NO_PAGING;
-	return saved_flags & UK_VAS_FLAG_NO_PAGING;
-}
-
-/**
- * Restores the paging flag
- *
- * @param vas
- *   The address space to restore the paging flag for
- * @param flag
- *   The paging flag to restore
- */
-static inline void uk_vas_paging_restoref(struct uk_vas *vas,
-					  unsigned long flag)
-{
-	vas->flags = (vas->flags & ~UK_VAS_FLAG_NO_PAGING) | flag;
-}
+unsigned long uk_vas_paging_savef(struct uk_vas *vas);
+void uk_vas_paging_restoref(struct uk_vas *vas, unsigned long state);
+int uk_vas_paging_enabled(struct uk_vas *vas);
 
 /** Virtual memory area (VMA) */
 struct uk_vma {
@@ -123,6 +105,9 @@ struct uk_vma {
 
 	/** Desired page level (-1 = no preference) */
 	int page_lvl;
+
+	/** Active unlocked sync invocations pinning this VMA against destroy */
+	__u32 sync_inflight;
 
 	/** Optional name of the VMA */
 	const char *name;
@@ -609,6 +594,8 @@ int uk_vma_map(struct uk_vas *vas, __vaddr_t *vaddr, __sz len,
  */
 int uk_vma_unmap(struct uk_vas *vas, __vaddr_t vaddr, __sz len,
 		 unsigned long flags);
+
+int uk_vma_unmap_at(struct uk_vas *vas, __vaddr_t vaddr);
 
 /**
  * Changes the paging attributes in the specified virtual address range.

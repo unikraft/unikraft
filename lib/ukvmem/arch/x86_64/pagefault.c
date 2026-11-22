@@ -47,7 +47,7 @@ static int vmem_arch_pagefault(void *data)
 			    uk_lcpu_except_err_ctx_get_regs(ctx));
 	if (rc < 0) {
 		vas = uk_vas_get_active();
-		if (unlikely(vas && !(vas->flags & UK_VAS_FLAG_NO_PAGING)))
+		if (unlikely(uk_vas_paging_enabled(vas)))
 			uk_pr_debug("Cannot handle %s page fault at 0x%"
 				    __PRIvaddr " (ec: 0x%lx): %s (%d).\n",
 				    faultstr[faulttype &

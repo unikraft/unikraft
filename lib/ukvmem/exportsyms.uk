@@ -2,10 +2,14 @@ uk_vas_get_active
 uk_vas_set_active
 uk_vas_init
 uk_vas_destroy
+uk_vas_paging_savef
+uk_vas_paging_restoref
+uk_vas_paging_enabled
 
 uk_vma_find
 uk_vma_map
 uk_vma_unmap
+uk_vma_unmap_at
 uk_vma_set_attr
 uk_vma_advise
 uk_vma_sync
