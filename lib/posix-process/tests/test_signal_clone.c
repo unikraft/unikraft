@@ -290,6 +290,48 @@ free_allocator:
 	uk_free(sched->a, a);
 }
 
+UK_TESTCASE(signal_clone, coalesced_standard_signal_releases_storage)
+{
+	struct uk_alloc *real = uk_sched_current()->a;
+	struct uk_alloc *a = clone_probe_allocator(real);
+	struct clone_alloc_probe *p = (void *)a->priv;
+	struct clone_state state;
+	struct uk_signal_queue *queue;
+	struct uk_signal *first;
+	siginfo_t info = { .si_code = SI_QUEUE };
+	unsigned int resident;
+	int rc;
+
+	clone_state_init(&state, a, 2);
+	queue = &state.process.signal->sigqueue;
+	resident = p->allocated;
+	for (unsigned int i = 0; i < 64; i++) {
+		info.si_value.sival_int = i + 17;
+		rc = pprocess_signal_send(&state.process, SIGUSR1, &info);
+		UK_TEST_EXPECT_ZERO(rc);
+		UK_TEST_EXPECT_SNUM_EQ(state.process.signal->queued_count, 1);
+		UK_TEST_EXPECT_SNUM_EQ(p->allocated - p->freed, resident + 1);
+		first = uk_list_first_entry(&queue->list_head[SIGUSR1],
+					    struct uk_signal, list_head);
+		UK_TEST_EXPECT_SNUM_EQ(first->siginfo.si_value.sival_int, 17);
+	}
+	/* Real-time signals retain separate queue entries. */
+	for (unsigned int i = 0; i < 2; i++) {
+		rc = pprocess_signal_send(&state.process, SIGRTMIN, &info);
+		UK_TEST_EXPECT_ZERO(rc);
+	}
+	UK_TEST_EXPECT_SNUM_EQ(state.process.signal->queued_count, 3);
+	UK_TEST_EXPECT_SNUM_EQ(p->allocated - p->freed, resident + 3);
+	state.process.signal->queued_max = 3;
+	rc = pprocess_signal_send(&state.process, SIGUSR2, &info);
+	UK_TEST_EXPECT_SNUM_EQ(rc, -EAGAIN);
+	UK_TEST_EXPECT_SNUM_EQ(p->allocated - p->freed, resident + 3);
+	clone_state_free(&state);
+	UK_TEST_EXPECT_SNUM_EQ(p->allocated, p->freed);
+	uk_free(real, a);
+	uk_pr_info("SIGNAL_COALESCE_PASS repeats=64 realtime=2\n");
+}
+
 _UK_TESTSUITE(signal_clone, NULL);
 
 static void __constructor run_signal_clone(void)
