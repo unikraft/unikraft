@@ -54,6 +54,7 @@ struct uk_pagetable;
 
 struct uk_vma;
 struct uk_vma_ops;
+struct vmem_cow_vas;
 #if CONFIG_LIBUKVMEM_COW
 struct vmem_vas_transition;
 #endif
@@ -88,6 +89,10 @@ struct uk_vas {
 #if CONFIG_LIBUKVMEM_COW
 	/** Mapping transition awaiting completion outside the VAS lock. */
 	struct vmem_vas_transition *transition;
+#endif
+#if CONFIG_LIBUKVMEM_COW_VMA
+	/** Private mapping references; shared metadata outlives all clones. */
+	struct vmem_cow_vas *cow;
 #endif
 };
 
@@ -440,6 +445,26 @@ void uk_vas_set_kernel(struct uk_vas *vas);
  *   0 on success, a negative errno error otherwise
  */
 int uk_vas_set_active(struct uk_vas *vas);
+
+#if CONFIG_LIBUKVMEM_COW_VMA
+/**
+ * Enable private anonymous COW mappings in an empty, unpublished owned VAS.
+ * The allocator supplies resident malloc/free and palloc/pfree operations
+ * that cannot fault, block or yield, and outlives this VAS and all its clones.
+ * VMA allocators of cloned address spaces have the same context constraints.
+ */
+int uk_vas_enable_cow(struct uk_vas *vas, struct uk_alloc *resident);
+
+/**
+ * Clone supported mappings into an empty, unpublished owned destination VAS.
+ * Both page tables already map the shared kernel. Their application branches
+ * are private, and the destination has no application PTEs. The caller holds
+ * both objects live, permits interrupts, and does not access private source
+ * mappings while the operation is running. Failure leaves the destination
+ * empty; harmless source write protection may remain until the next fault.
+ */
+int uk_vas_clone_cow(struct uk_vas *dst, struct uk_vas *src);
+#endif
 
 #if CONFIG_LIBUKVMEM_VAS_ACCESS
 /**

@@ -17,6 +17,11 @@ struct vmem_cow_page {
 	__paddr_t paddr;
 };
 
+__sz vmem_cow_page_metadata_size(void)
+{
+	return sizeof(struct vmem_cow_page);
+}
+
 static void cow_page_put(struct vmem_cow_page *page)
 {
 	if (!uk_refcount_release(&page->refs))
