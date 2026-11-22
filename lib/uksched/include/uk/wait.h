@@ -287,18 +287,31 @@ void uk_waitq_wake_up_one(struct uk_waitq *wq)
 	_uk_waitq_unlock(wq, flags);
 }
 
-#define _uk_waitq_wake_up_if_then(wq, ticket, condition, aftermath)	\
+/**
+ * Visit tickets while holding the wait queue lock.
+ *
+ * The action must not block, change queue membership or re-enter a waitq API.
+ * A consumer may inspect/update its cookie under this lock.  break stops the
+ * traversal.  Ticket lifetime remains owned by the waitq implementation.
+ */
+#define uk_waitq_visit(wq, ticket, action)				\
 do {									\
 	unsigned long _uk_waitq_flags;					\
 									\
 	_uk_waitq_lock((wq), _uk_waitq_flags);				\
-	uk_list_for_each_entry((ticket), &(wq)->waiters, link)		\
+	uk_list_for_each_entry((ticket), &(wq)->waiters, link) {		\
+		action;							\
+	}								\
+	_uk_waitq_unlock((wq), _uk_waitq_flags);				\
+} while (0)
+
+#define _uk_waitq_wake_up_if_then(wq, ticket, condition, aftermath)	\
+	uk_waitq_visit((wq), (ticket), {					\
 		if ((condition)) {					\
 			_uk_waitq_wake((wq), (ticket));			\
 			aftermath;					\
 		}							\
-	_uk_waitq_unlock((wq), _uk_waitq_flags);			\
-} while (0)
+	})
 
 #define uk_waitq_wake_up_if(wq, ticket, condition) \
 	_uk_waitq_wake_up_if_then((wq), (ticket), (condition), (void)0)
