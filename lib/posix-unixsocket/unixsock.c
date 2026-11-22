@@ -15,6 +15,7 @@
 #include <uk/file/pollqueue.h>
 
 #include "unixsock-bind.h"
+#include "unixsock-rights.h"
 
 
 struct unix_listenmsg {
@@ -218,7 +219,7 @@ void *unix_socket_create(struct posix_socket_driver *d,
 		if (type == SOCK_DGRAM) {
 			/* Create rpipe */
 			struct uk_file *pipes[2];
-			int r = uk_pipefile_create(pipes);
+			int r = uk_pipefile_create_msg(pipes);
 			if (unlikely(r)) {
 				uk_free(d->allocator, data);
 				data = ERR2PTR(r);
@@ -301,10 +302,10 @@ int unix_socket_socketpair(struct posix_socket_driver *d,
 		goto err_free0;
 	}
 
-	ret = uk_pipefile_create(pipes[0]);
+	ret = uk_pipefile_create_msg(pipes[0]);
 	if (unlikely(ret))
 		goto err_free;
-	ret = uk_pipefile_create(pipes[1]);
+	ret = uk_pipefile_create_msg(pipes[1]);
 	if (unlikely(ret))
 		goto err_release;
 
@@ -602,10 +603,10 @@ int unix_sock_connect_stream(posix_sock *file, posix_sock *target)
 		goto err_out;
 	}
 	/* Create pipes */
-	err = uk_pipefile_create(pipes[0]);
+	err = uk_pipefile_create_msg(pipes[0]);
 	if (unlikely(err))
 		goto err_out;
-	err = uk_pipefile_create(pipes[1]);
+	err = uk_pipefile_create_msg(pipes[1]);
 	if (unlikely(err))
 		goto err_release;
 
@@ -735,10 +736,12 @@ static
 ssize_t unix_socket_recvmsg(posix_sock *file, struct msghdr *msg, int flags)
 {
 	struct unix_sock_data *data = posix_sock_get_data(file);
-	int supported_flags = MSG_DONTWAIT;
+	int supported_flags = MSG_DONTWAIT | MSG_CMSG_CLOEXEC;
+	bool packet = data->type != SOCK_STREAM;
+	struct uk_pipe_control *control;
 	ssize_t ret;
 
-	if (data->type != SOCK_STREAM)
+	if (packet)
 		supported_flags |= MSG_TRUNC;
 	if (unlikely(flags & ~supported_flags)) {
 		uk_pr_warn("Unsupported recv flags: %x\n", flags);
@@ -751,21 +754,14 @@ ssize_t unix_socket_recvmsg(posix_sock *file, struct msghdr *msg, int flags)
 			return -EINVAL;
 	}
 
-	if (data->type == SOCK_STREAM) {
-		uk_file_rlock(data->rpipe);
-		ret = uk_file_read(data->rpipe, msg->msg_iov, msg->msg_iovlen,
-				   0, 0);
-		uk_file_runlock(data->rpipe);
-	} else {
-		ret = uk_pipefile_recv_packet(data->rpipe, msg->msg_iov,
-					      msg->msg_iovlen);
-	}
+	ret = uk_pipefile_recv_msg(data->rpipe, msg->msg_iov, msg->msg_iovlen,
+				   packet, &control);
 	if (ret < 0)
 		return ret;
 
 	msg->msg_flags = 0;
-	msg->msg_controllen = 0;
-	if (data->type != SOCK_STREAM) {
+	unix_rights_receive(msg, flags, control);
+	if (packet) {
 		size_t capacity = uk_iov_len(msg->msg_iov, msg->msg_iovlen);
 
 		if ((size_t)ret > capacity) {
@@ -818,6 +814,8 @@ ssize_t unix_socket_sendmsg(posix_sock *file,
 	struct unix_sock_data *data = posix_sock_get_data(file);
 	posix_sock *remote = NULL;
 	const struct uk_file *wpipe;
+	struct uk_pipe_control *control;
+	bool packet = data->type != SOCK_STREAM;
 	ssize_t ret;
 
 	if (unlikely(flags & ~(MSG_NOSIGNAL | MSG_DONTWAIT))) {
@@ -867,15 +865,16 @@ ssize_t unix_socket_sendmsg(posix_sock *file,
 			: (msg->msg_name
 				? -ECONNREFUSED : -ENOTCONN);
 
-	if (data->type == SOCK_STREAM) {
-		uk_file_wlock(wpipe);
-		ret = uk_file_write(wpipe, msg->msg_iov, msg->msg_iovlen, 0, 0);
-		uk_file_wunlock(wpipe);
-	} else {
-		ret = uk_pipefile_send_packet(wpipe, msg->msg_iov,
-					      msg->msg_iovlen);
-	}
+	ret = unix_rights_prepare(posix_sock_get_driver(file)->allocator,
+				  msg, &control);
+	if (ret)
+		goto release_pipe;
+	ret = uk_pipefile_send_msg(wpipe, msg->msg_iov, msg->msg_iovlen,
+				   packet, control);
+	if (control && (ret < 0 || (!packet && !ret)))
+		control->release(control);
 
+release_pipe:
 	if (!_SOCK_CONNECTION(data->type) && remote) {
 		uk_file_release(wpipe);
 		if (ret == -EPIPE)
