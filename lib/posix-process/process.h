@@ -296,6 +296,28 @@ int pprocess_clone_prepared_vas(struct posix_process *process,
 #endif /* CONFIG_LIBPOSIX_PROCESS_PREPARE */
 
 #if CONFIG_LIBPOSIX_PROCESS_FORK
+#define PPROCESS_EXEC_ARG_MAX (128 * 1024)
+
+struct pprocess_exec_args {
+	struct uk_alloc *_a;
+	const char *pathname;
+	const char **argv;
+	const char **envp;
+	unsigned int argc;
+	unsigned int envc;
+};
+
+/* Copy path, strings and pointer vectors into one resident allocation before
+ * changing address spaces. The caller retains the owned source VAS and uses
+ * a resident kernel allocator, with IRQs enabled outside locks. The combined
+ * payload and pointer vectors are bounded by PPROCESS_EXEC_ARG_MAX. NULL argv
+ * or envp becomes an empty terminated vector. Failure leaves *out NULL.
+ */
+int pprocess_exec_args_copy(struct uk_alloc *a, struct uk_vas *vas,
+			    __vaddr_t pathname, __vaddr_t argv, __vaddr_t envp,
+			    struct pprocess_exec_args **out);
+void pprocess_exec_args_free(struct pprocess_exec_args *args);
+
 int pprocess_fork(struct clone_args *args, size_t args_len,
 		  struct ukarch_execenv *execenv);
 #endif
