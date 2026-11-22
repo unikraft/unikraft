@@ -42,6 +42,7 @@
 #include <uk/allocpool.h>
 #include <uk/list.h>
 #include <uk/plat/spinlock.h>
+#include <stdbool.h>
 #include <string.h>
 #include <errno.h>
 
