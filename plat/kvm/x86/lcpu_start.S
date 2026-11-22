@@ -371,6 +371,24 @@ no_pku:
 no_avx512:
 #endif /* !__AVX512F__ */
 
+#if CONFIG_LIBUKPLAT_NATIVE_PAGING
+	/* Runtime tables use architectural attributes such as NX. Initialize
+	 * this CPU before an entry function can install those tables. The
+	 * shared BSP geometry is already published; NULL keeps it untouched.
+	 * Use the caller-owned startup stack and preserve the boot argument.
+	 */
+	movq	UK_PCPUVAR_X86_64_GSREL(UK_LCPU_SSTACKP_SYM), %rsp
+	andq	$~0xf, %rsp
+	pushq	%rsi
+	subq	$0x8, %rsp
+	xorl	%edi, %edi
+	call	uk_plat_native_paging_init_cpu
+	addq	$0x8, %rsp
+	popq	%rsi
+	testl	%eax, %eax
+	jnz	fail
+#endif /* CONFIG_LIBUKPLAT_NATIVE_PAGING */
+
 	movq	UK_PCPUVAR_X86_64_GSREL(UK_LCPU_SARG_SYM), %rdi
 	movq	UK_PCPUVAR_X86_64_GSREL(UK_LCPU_SENTRY_SYM), %rax
 	movq	UK_PCPUVAR_X86_64_GSREL(UK_LCPU_SSTACKP_SYM), %rsp

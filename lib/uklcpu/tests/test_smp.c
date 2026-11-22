@@ -26,6 +26,7 @@ struct cpu_probe_slot {
 	__uptr observed_tlsp;
 	__uptr observed_auxsp;
 	__paddr_t observed_page_table_root;
+	__u64 observed_efer;
 	unsigned long tls_marker;
 	unsigned int context_ready;
 	unsigned int startup_stack_checked;
@@ -74,10 +75,12 @@ static __noinline int record_context(__u64 index, unsigned long marker)
 {
 	const __uptr tlsp = uk_lcpu_tlsp_get();
 	const __paddr_t root = uk_pal_pt_read_base();
+	const __u64 efer = uk_arch_x86_64_rdmsrl(UK_ARCH_X86_64_MSR_EFER);
 	const __uptr auxsp = uk_pcpuvar_current_get(UK_LCPU_AUXSP_SYM);
 	struct ukarch_auxspcb *cb;
 
-	if (!probe_vas || uk_vas_get_active() != probe_vas ||
+	if (!(efer & UK_ARCH_X86_64_EFER_NXE) ||
+	    !probe_vas || uk_vas_get_active() != probe_vas ||
 	    uk_paging_pt_get_active() != probe_vas->pt ||
 	    root != probe_vas->pt->pt_pbase ||
 	    !tlsp || !auxsp || tlsp != slots[index].expected_tlsp ||
@@ -87,6 +90,7 @@ static __noinline int record_context(__u64 index, unsigned long marker)
 	if (ukarch_auxspcb_get_uktlsp(cb) != tlsp || probe_tls_marker != marker)
 		return -EIO;
 	slots[index].observed_page_table_root = root;
+	slots[index].observed_efer = efer;
 	slots[index].observed_tlsp = tlsp;
 	slots[index].observed_auxsp = auxsp;
 	slots[index].tls_marker = probe_tls_marker;
@@ -346,8 +350,9 @@ finish:
 	if (!rc) {
 		uk_pr_info("SMP_PROBE discovered_count=%u\n", cpu_count);
 		for (unsigned int i = 0; i < cpu_count; i++) {
-			uk_pr_info("SMP_ADDRESS cpu=%u root=%lx\n", i,
-				   (unsigned long)slots[i].observed_page_table_root);
+			uk_pr_info("SMP_ADDRESS cpu=%u root=%lx efer=%llx\n", i,
+				   (unsigned long)slots[i].observed_page_table_root,
+				   (unsigned long long)slots[i].observed_efer);
 			uk_pr_info("SMP_CONTEXT cpu=%u tls=%lx aux=%lx marker=%lu ready=%u startup_stack_checked=%u\n",
 				   i, (unsigned long)slots[i].observed_tlsp,
 				   (unsigned long)slots[i].observed_auxsp,
