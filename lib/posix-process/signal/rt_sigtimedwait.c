@@ -9,11 +9,11 @@
 #include <sys/time.h>
 
 #include <uk/essentials.h>
+#include <uk/plat/time.h>
 #include <uk/syscall.h>
 #include <uk/timeutil.h>
 
 #if !CONFIG_LIBPOSIX_PROCESS_SIGNAL
-#include <uk/plat/time.h>
 #include <uk/sched.h>
 #endif /* !CONFIG_LIBPOSIX_PROCESS_SIGNAL */
 
@@ -28,43 +28,33 @@ UK_LLSYSCALL_R_DEFINE(int, rt_sigtimedwait,
 		      size_t, sigsetsize)
 {
 	struct posix_thread *pthread;
-	struct uk_signal *sig;
+	__snsec deadline = 0;
 
-	if (unlikely(!set))
+	if (unlikely(!set || sigsetsize != sizeof(*set)))
 		return -EINVAL;
-
-	if (unlikely(sigsetsize != sizeof(sigset_t)))
-		return -EINVAL;
-
-	pthread = uk_pthread_current();
-	UK_ASSERT(pthread);
-
-	/* TODO protect concurrent access by deliver_pending_proc() */
-	uk_sigcopyset(&pthread->signal->sigwait_set, set);
-
-	/* If a signal in the set is already pending return immediately */
-	if ((sig = pprocess_signal_next_pending_t(pthread)))
-		goto out;
-
 	if (timeout) {
+		__nsec now = ukplat_monotonic_clock();
+		__nsec remaining = __SNSEC_MAX - now;
+		__nsec seconds = timeout->tv_sec;
+		__nsec interval;
+
 		if (unlikely(!(uk_time_spec_canonical(timeout) &&
 			       uk_time_spec_positive(timeout))))
 			return -EINVAL;
-		uk_semaphore_down_to(&pthread->signal->pending_semaphore,
-				     uk_time_spec_to_nsec(timeout));
-	} else {
-		uk_semaphore_down(&pthread->signal->pending_semaphore);
+		if (seconds > remaining / UKARCH_NSEC_PER_SEC) {
+			deadline = __SNSEC_MAX;
+		} else {
+			interval = ukarch_time_sec_to_nsec(seconds);
+			interval += timeout->tv_nsec;
+			deadline = now + MIN(remaining, interval);
+			if (!deadline)
+				deadline = 1;
+		}
 	}
 
-	if ((sig = pprocess_signal_next_pending_t(pthread)))
-		goto out;
-
-	return -EAGAIN;
-out:
-	if (info)
-		*info = sig->siginfo;
-	uk_sigemptyset(&pthread->signal->sigwait_set);
-	return sig->siginfo.si_signo;
+	pthread = uk_pthread_current();
+	UK_ASSERT(pthread);
+	return pprocess_signal_wait_set(pthread, *set, deadline, info);
 }
 #else /* !CONFIG_LIBPOSIX_PROCESS_SIGNAL */
 UK_LLSYSCALL_R_DEFINE(int, rt_sigtimedwait,

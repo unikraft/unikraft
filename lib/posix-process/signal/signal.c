@@ -4,8 +4,10 @@
  * You may not use this file except in compliance with the License.
  */
 
+#include <uk/plat/time.h>
 #include <uk/process.h>
 #include <uk/refcount.h>
+#include <uk/sched.h>
 #include <uk/semaphore.h>
 
 #include "process.h"
@@ -24,9 +26,16 @@
 
 static void signal_wake_waiter(struct posix_thread *thread, int signum)
 {
-	if (thread->state == POSIX_THREAD_BLOCKED_SIGNAL &&
-	    !IS_MASKED(thread, signum) && !IS_IGNORED(thread->process, signum))
+	if (thread->state == POSIX_THREAD_BLOCKED_SIGWAIT) {
+		if (uk_sigismember(&thread->signal->sigwait_set, signum) ||
+		    (!IS_MASKED(thread, signum) &&
+		     !IS_IGNORED(thread->process, signum)))
+			uk_thread_wake(thread->thread);
+	} else if (thread->state == POSIX_THREAD_BLOCKED_SIGNAL &&
+		   !IS_MASKED(thread, signum) &&
+		   !IS_IGNORED(thread->process, signum)) {
 		uk_semaphore_up(&thread->signal->deliver_semaphore);
+	}
 }
 
 /* Enqueue signal for a thread or a process
@@ -88,13 +97,12 @@ static int pprocess_signal_enqueue(struct posix_process *pproc,
 	return rc;
 }
 
-struct uk_signal *pprocess_signal_dequeue(struct posix_process *pproc,
-					  struct posix_thread *pthread,
-					  int signum)
+static struct uk_signal *signal_dequeue_locked(struct posix_process *pproc,
+					       struct posix_thread *pthread,
+					       int signum)
 {
 	struct uk_signal_queue *sigqueue;
 	struct uk_signal *sig;
-	unsigned long pflags;
 
 	UK_ASSERT(pproc);
 
@@ -105,14 +113,11 @@ struct uk_signal *pprocess_signal_dequeue(struct posix_process *pproc,
 		sigqueue = &pproc->signal->sigqueue;
 	}
 
-	pflags = pprocess_lock_acquire();
 	sig = uk_list_first_entry_or_null(&sigqueue->list_head[signum],
 					  struct uk_signal,
 					  list_head);
-	if (!sig) {
-		pprocess_lock_release(pflags);
+	if (!sig)
 		return NULL;
-	}
 
 	uk_list_del(&sig->list_head);
 
@@ -127,30 +132,35 @@ struct uk_signal *pprocess_signal_dequeue(struct posix_process *pproc,
 	if (!pthread && signum == SIGALRM)
 		pprocess_itimer_dequeued_locked(pproc);
 #endif
-	pprocess_lock_release(pflags);
-
 	return sig;
 }
 
-struct uk_signal *pprocess_signal_next_pending_t(struct posix_thread *pthread)
+struct uk_signal *
+pprocess_signal_dequeue(struct posix_process *pproc,
+			struct posix_thread *pthread, int signum)
 {
-	struct posix_process *pproc;
+	unsigned long flags = pprocess_lock_acquire();
 	struct uk_signal *sig;
-	int signum;
 
-	pproc = tid2pprocess(pthread->tid);
-	UK_ASSERT(pproc);
+	sig = signal_dequeue_locked(pproc, pthread, signum);
+	pprocess_lock_release(flags);
+	return sig;
+}
 
-	pprocess_signal_foreach(signum) {
-		if (!pprocess_signal_is_deliverable(pthread, signum))
-			continue;
+static struct uk_signal *signal_dequeue_set_locked(struct posix_thread *thread,
+						   uk_sigset_t set)
+{
+	struct posix_process *proc = thread->process;
+	uk_sigset_t pending = thread->signal->sigqueue.pending & set;
 
-		sig = pprocess_signal_dequeue(pproc, pthread, signum);
-		if (sig)
-			return sig;
+	if (!pending) {
+		pending = proc->signal->sigqueue.pending & set;
+		thread = NULL;
 	}
+	if (!pending)
+		return NULL;
 
-	return NULL;
+	return signal_dequeue_locked(proc, thread, __builtin_ctzl(pending) + 1);
 }
 
 static void detach_pending_queue(struct posix_process *proc,
@@ -260,22 +270,32 @@ int pprocess_signal_send(struct posix_process *proc, int signum,
 	return 0;
 }
 
-void pprocess_signal_wait(struct posix_thread *thread)
+static bool signal_unmasked_pending_locked(struct posix_thread *thread)
 {
 	struct posix_process *proc = thread->process;
+	uk_sigset_t pending = (thread->signal->sigqueue.pending |
+			      proc->signal->sigqueue.pending);
 	int signum;
 
+	pending &= ~thread->signal->mask;
+	while (pending) {
+		signum = __builtin_ctzl(pending) + 1;
+		if (!IS_IGNORED(proc, signum))
+			return true;
+		uk_sigdelset(&pending, signum);
+	}
+	return false;
+}
+
+void pprocess_signal_wait(struct posix_thread *thread)
+{
 	for (;;) {
 		unsigned long pflags = pprocess_lock_acquire();
 
-		pprocess_signal_foreach(signum) {
-			if ((IS_PENDING(thread->signal->sigqueue, signum) ||
-			     IS_PENDING(proc->signal->sigqueue, signum)) &&
-			    !IS_MASKED(thread, signum) && !IS_IGNORED(proc, signum)) {
-				thread->state = POSIX_THREAD_RUNNING;
-				pprocess_lock_release(pflags);
-				return;
-			}
+		if (signal_unmasked_pending_locked(thread)) {
+			thread->state = POSIX_THREAD_RUNNING;
+			pprocess_lock_release(pflags);
+			return;
 		}
 
 		/* Publish the waiter under the same lock used to enqueue. */
@@ -283,6 +303,51 @@ void pprocess_signal_wait(struct posix_thread *thread)
 		pprocess_lock_release(pflags);
 		uk_semaphore_down(&thread->signal->deliver_semaphore);
 	}
+}
+
+int pprocess_signal_wait_set(struct posix_thread *thread, uk_sigset_t set,
+			     __snsec deadline, siginfo_t *info)
+{
+	unsigned long flags;
+	struct uk_signal *sig;
+	int ret;
+
+	uk_sigdelset(&set, SIGSTOP);
+	uk_sigdelset(&set, SIGKILL);
+
+	for (;;) {
+		flags = pprocess_lock_acquire();
+		sig = signal_dequeue_set_locked(thread, set);
+		if (sig) {
+			ret = sig->siginfo.si_signo;
+			break;
+		}
+		if (signal_unmasked_pending_locked(thread)) {
+			ret = -EINTR;
+			break;
+		}
+		if (deadline && ukplat_monotonic_clock() >= (__nsec)deadline) {
+			ret = -EAGAIN;
+			break;
+		}
+
+		/* Publish and block under the lock used by signal enqueue. */
+		thread->signal->sigwait_set = set;
+		thread->state = POSIX_THREAD_BLOCKED_SIGWAIT;
+		uk_thread_block_until(thread->thread, deadline);
+		pprocess_lock_release(flags);
+		uk_sched_yield();
+	}
+
+	thread->state = POSIX_THREAD_RUNNING;
+	uk_sigemptyset(&thread->signal->sigwait_set);
+	pprocess_lock_release(flags);
+	if (sig) {
+		if (info)
+			*info = sig->siginfo;
+		uk_signal_free(sig->alloc, sig);
+	}
+	return ret;
 }
 
 /* The selected process pin covers allocation, enqueue and FD notification. */
@@ -510,7 +575,7 @@ int pprocess_signal_tdesc_init(struct posix_thread *thread)
 	pprocess_signal_foreach(signum)
 		UK_INIT_LIST_HEAD(&td->sigqueue.list_head[signum]);
 
-	uk_semaphore_init(&thread->signal->pending_semaphore, 0);
+	uk_sigemptyset(&td->sigwait_set);
 	uk_semaphore_init(&thread->signal->deliver_semaphore, 0);
 
 	return 0;
