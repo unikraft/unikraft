@@ -103,6 +103,12 @@ config LIBPOSIX_PROCESS_SIGNALFD
 	depends on LIBPOSIX_PROCESS_SIGNAL
 	select LIBUKFILE_POLLED
 
+config LIBPOSIX_PROCESS_SIGNAL_CLONE_TEST
+	bool "Test signal clone ownership and descriptor lifetime"
+	depends on LIBPOSIX_PROCESS_SIGNAL && HAVE_SCHED
+	select LIBUKTEST
+	default n
+
 config LIBPOSIX_PROCESS_DEBUG
 	bool "Enable debug messages"
 
