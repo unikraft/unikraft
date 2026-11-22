@@ -30,6 +30,10 @@
 int vmem_pagefault(__vaddr_t vaddr, unsigned int type,
 		   struct uk_lcpu_regs *regs);
 
+/** Complete deferred work after dropping the VAS and paging locks. */
+void vmem_arch_pagefault_finish(struct uk_paging_free_batch *batch,
+				struct uk_lcpu_regs *regs);
+
 /**
  * Computes the number of pages depending on the VMA's configured page size.
  *

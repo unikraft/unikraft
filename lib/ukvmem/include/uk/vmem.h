@@ -161,6 +161,8 @@ struct uk_vm_fault {
 #define UK_VMA_FAULT_MISCONFIG		0x08 /* Misconfiguration in PT */
 
 #define UK_VMA_FAULT_SOFT		0x10 /* Software-generated fault */
+/* The interrupted context permits maskable interrupts during completion. */
+#define UK_VMA_FAULT_IRQS_ENABLED	0x20
 	const unsigned int type;
 
 	/**
