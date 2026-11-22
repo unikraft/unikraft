@@ -60,6 +60,8 @@ struct pipe_node {
 	struct pipe_msg *tail;
 	struct pipe_msg *free;
 	unsigned int flags;
+	size_t packet_bytes;
+	pipeidx packet_pos;
 	struct pipe_msg msgs[PIPE_MSGCOUNT];
 	char buf[PIPE_SIZE];
 };
@@ -286,6 +288,93 @@ out_full:
 	return -EAGAIN;
 }
 
+ssize_t uk_pipefile_send_packet(const struct uk_file *f,
+				const struct iovec *iov, size_t iovcnt)
+{
+	struct pipe_node *d = (struct pipe_node *)f->node;
+	size_t len = 0;
+	struct pipe_msg *msg;
+	ssize_t ret;
+
+	UK_ASSERT(f->vol == PIPE_VOLID);
+	for (size_t i = 0; i < iovcnt; i++) {
+		if (unlikely(iov[i].iov_len > PIPE_SIZE - len))
+			return -EMSGSIZE;
+		len += iov[i].iov_len;
+	}
+
+	uk_file_wlock(f);
+	if (unlikely(UK_READ_ONCE(d->flags) & PIPE_HUP)) {
+		ret = -EPIPE;
+		goto out;
+	}
+	msg = d->free;
+	if (!msg || len > PIPE_SIZE - d->packet_bytes) {
+		uk_file_event_clear(f, UKFD_POLLOUT);
+		ret = -EAGAIN;
+		goto out;
+	}
+
+	d->free = msg->next;
+	msg->next = NULL;
+	msg->start = d->packet_pos;
+	msg->end = len;
+	if (len) {
+		pipebuf_iovwrite(d->buf, msg->start, len, iov, iovcnt);
+		d->packet_pos = PIPE_IDX(d->packet_pos + len);
+		d->packet_bytes += len;
+	}
+	if (d->tail)
+		d->tail->next = msg;
+	else
+		d->head = msg;
+	d->tail = msg;
+	if (!d->free || d->packet_bytes == PIPE_SIZE)
+		uk_file_event_clear(f, UKFD_POLLOUT);
+	uk_file_event_set(f, UKFD_POLLIN);
+	ret = len;
+out:
+	uk_file_wunlock(f);
+	return ret;
+}
+
+ssize_t uk_pipefile_recv_packet(const struct uk_file *f,
+				const struct iovec *iov, size_t iovcnt)
+{
+	struct pipe_node *d = (struct pipe_node *)f->node;
+	size_t capacity = uk_iov_len(iov, iovcnt);
+	struct pipe_msg *msg;
+	size_t len, copied;
+	ssize_t ret;
+
+	UK_ASSERT(f->vol == PIPE_VOLID);
+	uk_file_wlock(f);
+	msg = d->head;
+	if (!msg) {
+		uk_file_event_clear(f, UKFD_POLLIN);
+		ret = (UK_READ_ONCE(d->flags) & PIPE_HUP) ? 0 : -EAGAIN;
+		goto out;
+	}
+
+	len = msg->end;
+	copied = MIN(capacity, len);
+	if (copied)
+		pipebuf_iovread(d->buf, msg->start, copied, iov, iovcnt);
+	d->packet_bytes -= len;
+	d->head = msg->next;
+	if (!d->head) {
+		d->tail = NULL;
+		uk_file_event_clear(f, UKFD_POLLIN);
+	}
+	msg->next = d->free;
+	d->free = msg;
+	uk_file_event_set(f, UKFD_POLLOUT);
+	ret = len;
+out:
+	uk_file_wunlock(f);
+	return ret;
+}
+
 static int pipe_getstat(const struct uk_file *f, unsigned mask __unused,
 			struct uk_statx *arg)
 {
@@ -360,6 +449,8 @@ int uk_pipefile_create(struct uk_file *pipes[2])
 	al->node.head = NULL;
 	al->node.tail = NULL;
 	al->node.flags = 0;
+	al->node.packet_bytes = 0;
+	al->node.packet_pos = 0;
 	al->node.free = &al->node.msgs[0];
 	for (int i = 0; i < PIPE_MSGCOUNT - 1; i++)
 		al->node.msgs[i].next = &al->node.msgs[i + 1];

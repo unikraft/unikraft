@@ -14,6 +14,14 @@
 /* File creation */
 int uk_pipefile_create(struct uk_file *pipes[2]);
 
+/* Packet operations use a pipe exclusively in packet mode. A receive returns
+ * the packet length, even when the supplied buffers hold fewer bytes.
+ */
+ssize_t uk_pipefile_send_packet(const struct uk_file *f,
+				const struct iovec *iov, size_t iovcnt);
+ssize_t uk_pipefile_recv_packet(const struct uk_file *f,
+				const struct iovec *iov, size_t iovcnt);
+
 /* Internal syscalls */
 #if CONFIG_LIBPOSIX_FDTAB
 int uk_sys_pipe(int pipefd[2], int flags);
