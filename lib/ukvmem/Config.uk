@@ -101,4 +101,11 @@ config LIBUKVMEM_SYNC_TEST
 	default n
 	select LIBUKTEST
 
+config LIBUKVMEM_NESTED_FAULT_TEST
+	bool "Test nested native x86 page faults"
+	depends on ARCH_X86_64 && LIBUKPLAT_NATIVE_EXCEPT && HAVE_SCHED
+	depends on LIBUKVMEM_PAGEFAULT_HANDLER_PRIO > 0
+	depends on LIBUKLOCK_SEMAPHORE
+	select LIBUKTEST
+
 endif
