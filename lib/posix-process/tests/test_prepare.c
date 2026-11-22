@@ -441,6 +441,87 @@ put_vas:
 	UK_TEST_EXPECT_SNUM_EQ(kernel->pt->shared_users, users);
 }
 
+UK_TESTCASE(process_prepare, pid_survives_thread_descriptor_release)
+{
+	struct uk_alloc *a = prepare_allocator();
+	struct prepare_alloc *alloc;
+	struct uk_thread *parent = uk_thread_current();
+	struct uk_thread *held_thread = NULL, *other_thread = NULL;
+	struct posix_process *held = NULL, *other;
+	struct posix_thread *pt;
+	unsigned int before = prepare_processes();
+	unsigned int rounds = CONFIG_LIBPOSIX_PROCESS_MAX_PID + 1;
+	pid_t held_pid;
+	bool complete = false, reused = false;
+	int rc;
+
+	UK_TEST_EXPECT_NOT_NULL(a);
+	if (!a)
+		return;
+	alloc = (void *)a->priv;
+	held_thread = prepare_raw_thread();
+	other_thread = prepare_raw_thread();
+	UK_TEST_EXPECT(held_thread && other_thread);
+	if (!held_thread || !other_thread)
+		goto release_threads;
+	held = pprocess_prepare(a, held_thread, parent);
+	UK_TEST_EXPECT(!PTRISERR(held));
+	if (PTRISERR(held)) {
+		held = NULL;
+		goto release_threads;
+	}
+	held_pid = held->pid;
+	rc = pprocess_publish(held);
+	UK_TEST_EXPECT_ZERO(rc);
+	if (rc) {
+		pprocess_abort(held);
+		held = NULL;
+		goto release_threads;
+	}
+	pt = uk_thread_uktls_var(held_thread, pthread_self);
+	pprocess_release_pthread(pt);
+	/* The PID stays visible until reaping after its leader TID is gone. */
+	UK_TEST_EXPECT_NULL(tid2pthread(held_pid));
+	UK_TEST_EXPECT_PTR_EQ(pid2pprocess(held_pid), held);
+	for (unsigned int round = 0; round < rounds; round++) {
+		other = pprocess_prepare(a, other_thread, parent);
+		UK_TEST_EXPECT(!PTRISERR(other));
+		if (PTRISERR(other))
+			goto release_held;
+		UK_TEST_EXPECT(other->pid != held_pid);
+		UK_TEST_EXPECT_PTR_EQ(pid2pprocess(held_pid), held);
+		pprocess_abort(other);
+	}
+	complete = true;
+release_held:
+	pprocess_release(held);
+	held = NULL;
+	UK_TEST_EXPECT_NULL(pid2pprocess(held_pid));
+	if (complete) {
+		for (unsigned int round = 0; round < rounds; round++) {
+			other = pprocess_prepare(a, other_thread, parent);
+			UK_TEST_EXPECT(!PTRISERR(other));
+			if (PTRISERR(other))
+				break;
+			reused = other->pid == held_pid;
+			pprocess_abort(other);
+			if (reused)
+				break;
+		}
+		UK_TEST_EXPECT(reused);
+		uk_pr_info("PROCESS_PREPARE_PASS pid_retention rounds=%u reused=%u\n",
+			   rounds, reused);
+	}
+release_threads:
+	if (other_thread)
+		uk_thread_release(other_thread);
+	if (held_thread)
+		uk_thread_release(held_thread);
+	UK_TEST_EXPECT_SNUM_EQ(alloc->allocated, alloc->freed);
+	UK_TEST_EXPECT_SNUM_EQ(prepare_processes(), before);
+	uk_free(uk_sched_current()->a, a);
+}
+
 _UK_TESTSUITE(process_prepare, NULL);
 
 static void __constructor run_process_prepare(void)
