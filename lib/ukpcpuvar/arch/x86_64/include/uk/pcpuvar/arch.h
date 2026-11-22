@@ -91,9 +91,9 @@ extern "C" {
 		__typeof__(_sym) _##_sym##_val;				\
 									\
 		asm volatile (						\
-			"mov	" UK_PCPUVAR_X86_64_GSREL(_sym) ", %0"	\
+			"mov	%%gs:%1, %0"	\
 			: "=r" (_##_sym##_val)				\
-			:						\
+			: "m" (_sym)					\
 			: "memory"					\
 		);							\
 		_##_sym##_val;						\
@@ -112,8 +112,8 @@ extern "C" {
 		__typeof__(_sym) _##_sym##_tmp = (_val);		\
 									\
 		asm volatile (						\
-			"mov	%0, " UK_PCPUVAR_X86_64_GSREL(_sym)	\
-			:						\
+			"mov	%1, %%gs:%0"	\
+			: "=m" (_sym)					\
 			: "r" (_##_sym##_tmp)				\
 			: "memory"					\
 		);							\
@@ -134,9 +134,10 @@ extern "C" {
 		__typeof__((((__typeof__(_sym) *)0)->_member)) _val;	\
 									\
 		asm volatile (						\
-			"mov	%%gs:" STRINGIFY(_sym) "+%c1(%%rip), %0"\
+			"mov	%%gs:%1, %0"\
 			: "=r" (_val)					\
-			: "i" (__offsetof(__typeof__(_sym), _member))	\
+			: "m" ((_sym)._member)				\
+			/* C operand keeps private member storage live. */	\
 			: "memory"					\
 		);							\
 		_val;							\
@@ -157,10 +158,9 @@ extern "C" {
 		__typeof__((((__typeof__(_sym) *)0)->_member))		\
 			_tmp = (_val);					\
 		asm volatile (						\
-			"mov	%0, %%gs:" STRINGIFY(_sym) "+%c1(%%rip)"\
-			:						\
-			: "r" (_tmp),					\
-			  "i" (__offsetof(__typeof__(_sym), _member))	\
+			"mov	%1, %%gs:%0"\
+			: "=m" ((_sym)._member)				\
+			: "r" (_tmp)	\
 			: "memory"					\
 		);							\
 	} while (0)
@@ -181,10 +181,10 @@ extern "C" {
 									\
 		asm volatile (						\
 			"rdgsbase %0\n\t"				\
-			"lea	" STRINGIFY(_sym) "(%%rip), %1\n\t"	\
+			"lea	%2, %1\n\t"	\
 			"add	%1, %0"					\
 			: "=&r" (_ptr), "=&r" (_symaddr)		\
-			:						\
+			: "m" (_sym)					\
 			: "memory"					\
 		);							\
 		_ptr;							\
@@ -203,10 +203,10 @@ extern "C" {
 				UK_PCPUVAR_X86_64_GSREL(uk_pcpuvar_cpu_idx)\
 				", %0\n\t"				\
 			/* Add template address of _sym */		\
-			"lea	" STRINGIFY(_sym) "(%%rip), %1\n\t"	\
+			"lea	%2, %1\n\t"	\
 			"add	%1, %0\n\t"				\
 			: "=&r" (_ptr), "=&r" (_idx)			\
-			:						\
+			: "m" (_sym)					\
 			: "memory"					\
 		);							\
 		_ptr;							\
