@@ -159,10 +159,10 @@ UK_SYSCALL_R_DEFINE(pid_t, wait4, pid_t, pid,
 	ret = pprocess_wait(pid, &si, options | WEXITED);
 
 	if (ret > 0 && wstatus) {
-		if (si.si_status == CLD_KILLED)
-			*wstatus = si.si_code;
+		if (si.si_code == CLD_KILLED)
+			*wstatus = si.si_status;
 		else /* CLD_EXITED */
-			*wstatus = si.si_code << 8;
+			*wstatus = si.si_status << 8;
 	}
 
 	return ret;
