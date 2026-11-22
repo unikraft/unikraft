@@ -1299,8 +1299,10 @@ ssize_t virtiofs_live_fs_listdir(struct viofs_node *n, size_t *curp,
 		goto out;
 	}
 
-	/* Convert FUSE output to dirent64 */
-	*curp = cur + r;
+	/* Convert FUSE output to dirent64. FUSE_READDIR offsets are the
+	 * opaque d_off cookies of the returned entries, not byte positions;
+	 * the next request continues after the last converted entry.
+	 */
 	rem = r;
 	fuse_dent = tmp;
 	fs_dent = buf;
@@ -1321,12 +1323,14 @@ ssize_t virtiofs_live_fs_listdir(struct viofs_node *n, size_t *curp,
 		fs_dent->d_type = fuse_dent->type;
 		memcpy(fs_dent->d_name, fuse_dent->name, namelen);
 		fs_dent->d_name[namelen] = '\0';
+		cur = fuse_dent->off;
 
 		r += reclen;
 		rem -= fuselen;
 		fs_dent = UKFS_DIRENT_NEXT(fs_dent, reclen);
 		fuse_dent = (struct fuse_dirent *)((char *)fuse_dent + fuselen);
 	}
+	*curp = cur;
 out:
 	if (!use_stack)
 		uk_free(virtiofs_alloc, tmp);
