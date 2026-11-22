@@ -41,3 +41,7 @@ uk_vas_create_process
 uk_vas_clone_process
 uk_vma_cow_anon_ops
 uk_vma_shared_anon_ops
+uk_vas_get_shared_ref
+uk_vma_shared_ref_get
+uk_vma_shared_ref_put
+uk_vas_load_u32_try

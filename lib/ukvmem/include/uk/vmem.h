@@ -469,6 +469,30 @@ int uk_vas_enable_cow(struct uk_vas *vas, struct uk_alloc *resident);
  * empty; harmless source write protection may remain until the next fault.
  */
 int uk_vas_clone_cow(struct uk_vas *dst, struct uk_vas *src);
+
+/** A pinned shared mapping identity. Compare object and byte offset only. */
+struct uk_vma_shared_ref {
+	const void *object;
+	__sz offset;
+	void (*get)(const void *object);
+	void (*put)(const void *object);
+};
+
+/**
+ * Pin the shared backing at a byte range in a live VAS. Never faults, waits
+ * for a VAS transition or allocates. Returns -EAGAIN during a transition,
+ * -EFAULT for an unmapped range, or -ENOTSUP for a non-shared backend.
+ * The output is unchanged on failure. The caller retains the VAS while
+ * looking up the range; the returned pin can outlive every mapping of it.
+ */
+int uk_vas_get_shared_ref(struct uk_vas *vas, __vaddr_t addr, __sz len,
+			  struct uk_vma_shared_ref *out);
+
+/** Acquire another pin before copying a live reference. */
+void uk_vma_shared_ref_get(const struct uk_vma_shared_ref *ref);
+
+/** Release and clear a pin outside locks, with IRQs enabled. */
+void uk_vma_shared_ref_put(struct uk_vma_shared_ref *ref);
 #endif
 
 #if CONFIG_LIBUKVMEM_VAS_ACCESS
@@ -478,6 +502,15 @@ int uk_vas_clone_cow(struct uk_vas *dst, struct uk_vas *src);
  * allocate and finish remote TLB invalidations. Returns 0 or a negative errno.
  */
 int uk_vas_fault(struct uk_vas *vas, __vaddr_t vaddr, unsigned int access);
+
+/**
+ * Read an aligned word without faulting, allocating or waiting for a VAS
+ * transition. Retains the owning VAS lock through the direct-map load.
+ * Returns -EAGAIN for an absent PTE or an ongoing transition; other access
+ * failures return a negative errno. The output is unchanged on failure.
+ * The caller holds the VAS live; the function is safe with IRQs disabled.
+ */
+int uk_vas_load_u32_try(struct uk_vas *vas, __vaddr_t addr, __u32 *out);
 
 /**
  * Store an aligned 32-bit value in an explicit VAS, without activating it.
