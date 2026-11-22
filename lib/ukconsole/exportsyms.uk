@@ -3,6 +3,7 @@ uk_console_out
 uk_console_in
 uk_console_emerg_out
 uk_console_out_direct
+uk_console_out_directv
 uk_console_in_direct
 uk_console_emerg_out_direct
 uk_console_out_direct_all

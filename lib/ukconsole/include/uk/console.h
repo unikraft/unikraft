@@ -113,6 +113,19 @@ __isr __ssz uk_console_emerg_out(const char *buf, __sz len);
  */
 __ssz uk_console_out_direct(struct uk_console *dev, const char *buf, __sz len);
 
+struct uk_console_iovec {
+	const char *buf;
+	__sz len;
+};
+
+/**
+ * Send one record in consecutive buffers to a console device.
+ * Concurrent writes to this device cannot interleave with the buffers.
+ * Returns the number of bytes accepted or the first driver error.
+ */
+__ssz uk_console_out_directv(struct uk_console *dev,
+			     const struct uk_console_iovec *iov, __sz count);
+
 /**
  * Read bytes from the given console device. If it's not possible to read
  * into the entire buffer, the number of bytes that were managed to be read

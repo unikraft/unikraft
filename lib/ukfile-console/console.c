@@ -119,7 +119,6 @@ static inline __ssz _console_out(struct uk_console *cons,
 {
 	const char *next_nl = NULL;
 	__sz l = len;
-	__sz off = 0;
 	__ssz rc = 0;
 
 	if (unlikely(!len))
@@ -130,11 +129,13 @@ static inline __ssz _console_out(struct uk_console *cons,
 	while (l > 0) {
 		next_nl = memchr(buf, '\n', l);
 		if (next_nl) {
-			off = next_nl - buf;
+			const __sz off = next_nl - buf;
+			const struct uk_console_iovec line[] = {
+				{ .buf = buf, .len = off },
+				{ .buf = "\r\n", .len = 2 },
+			};
 
-			if ((rc = uk_console_out_direct(cons, buf, off)) < 0)
-				return rc;
-			if ((rc = uk_console_out_direct(cons, "\r\n", 2)) < 0)
+			if ((rc = uk_console_out_directv(cons, line, ARRAY_SIZE(line))) < 0)
 				return rc;
 			buf = next_nl + 1;
 			l -= off + 1;
