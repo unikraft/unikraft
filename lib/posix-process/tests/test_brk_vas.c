@@ -3,7 +3,9 @@
 #include <errno.h>
 #include <stdbool.h>
 #include <stddef.h>
+#include <uk/alloc_impl.h>
 #include <uk/crash.h>
+#include <uk/falloc.h>
 #include <uk/errptr.h>
 #include <uk/isr/string.h>
 #include <uk/lcpu.h>
@@ -15,6 +17,7 @@
 #include <uk/sched.h>
 #include <uk/test.h>
 #include <uk/vmem/process.h>
+#include <uk/vmem/vma_types.h>
 
 #include "../process.h"
 
@@ -299,6 +302,154 @@ out:
 	if (complete)
 		uk_pr_info("PROCESS_BRK_VAS_PASS clone=1 fresh_mutex=1 remote=%u\n",
 			   remote != s);
+}
+
+struct brk_snapshot_alloc {
+	struct uk_alloc *real;
+	unsigned long live;
+	unsigned int calls;
+	unsigned int fail_at;
+};
+
+static void *brk_snapshot_palloc(struct uk_alloc *a, unsigned long pages)
+{
+	struct brk_snapshot_alloc *f = (void *)a->priv;
+	void *ptr;
+
+	if (++f->calls == f->fail_at)
+		return NULL;
+	ptr = uk_palloc(f->real, pages);
+	if (ptr)
+		f->live += pages;
+	return ptr;
+}
+
+static void brk_snapshot_pfree(struct uk_alloc *a, void *ptr,
+			       unsigned long pages)
+{
+	struct brk_snapshot_alloc *f = (void *)a->priv;
+
+	f->live -= pages;
+	uk_pfree(f->real, ptr, pages);
+}
+
+UK_TESTCASE(process_brk_vas, clone_allocation_rollback)
+{
+	struct uk_vas *kernel = uk_vas_get_kernel(), *vas = NULL;
+	struct uk_alloc *a = NULL;
+	struct brk_snapshot_alloc *f = NULL;
+	struct posix_process *parent = NULL, *child = NULL;
+	struct uk_thread *source = NULL, *target = NULL;
+	struct uk_vas *old_binding;
+	unsigned int users = kernel->pt->shared_users, total = 0, cycle;
+	unsigned int failure;
+	unsigned long free_bytes = 0, live = 0;
+	__vaddr_t base = UK_VAS_PROCESS_BASE;
+	int rc;
+
+	a = uk_malloc(kernel->a, sizeof(*a) + sizeof(*f));
+	UK_TEST_EXPECT_NOT_NULL(a);
+	if (!a)
+		return;
+	memset_isr(a, 0, sizeof(*a) + sizeof(*f));
+	f = (void *)a->priv;
+	f->real = kernel->a;
+	a->malloc = uk_malloc_ifpages;
+	a->free = uk_free_ifpages;
+	a->palloc = brk_snapshot_palloc;
+	a->pfree = brk_snapshot_pfree;
+	rc = uk_vas_create_process(a, &vas);
+	UK_TEST_EXPECT_ZERO(rc);
+	if (rc)
+		goto out;
+	rc = uk_vma_map_anon(vas, &base, 3 * UK_PAGING_PAGE_SIZE,
+			     UK_PAGING_PAGE_ATTR_PROT_RW, 0, NULL);
+	if (!rc)
+		rc = uk_vas_store_u32(vas, base, 0x62726bU);
+	UK_TEST_EXPECT_ZERO(rc);
+	if (rc)
+		goto out;
+	source = brk_snapshot_raw_thread();
+	UK_TEST_EXPECT_NOT_NULL(source);
+	if (!source)
+		goto out;
+	parent = pprocess_prepare(uk_sched_current()->a, source,
+				  uk_thread_current());
+	UK_TEST_EXPECT(!PTRISERR(parent));
+	if (PTRISERR(parent)) {
+		parent = NULL;
+		goto out;
+	}
+	rc = pprocess_bind_prepared_vas(parent, vas);
+	UK_TEST_EXPECT_ZERO(rc);
+	if (rc)
+		goto out;
+	/* Use a small anonymous heap for metadata rollback. */
+	parent->brk_ctx.base = (void *)base;
+	parent->brk_ctx.pos = UK_PAGING_PAGE_SIZE + 17;
+	uk_mutex_init_config(&parent->brk_ctx.mtx, UK_MUTEX_CONFIG_RECURSE);
+	for (cycle = 0; cycle <= 64; cycle++) {
+		target = brk_snapshot_raw_thread();
+		UK_TEST_EXPECT_NOT_NULL(target);
+		if (!target)
+			goto out;
+		child = pprocess_prepare(uk_sched_current()->a, target, source);
+		UK_TEST_EXPECT(!PTRISERR(child));
+		if (PTRISERR(child)) {
+			child = NULL;
+			goto out;
+		}
+		old_binding = target->vas;
+		f->calls = 0;
+		failure = cycle ? 1 + (cycle - 1) % total : 0;
+		f->fail_at = failure;
+		rc = pprocess_clone_prepared_vas(child, parent);
+		f->fail_at = 0;
+		if (!cycle) {
+			total = f->calls;
+			UK_TEST_EXPECT_ZERO(rc);
+			UK_TEST_EXPECT(total > 0 && total <= 64);
+			if (rc || !total || total > 64)
+				goto out;
+		} else {
+			UK_TEST_EXPECT_SNUM_EQ(rc, -ENOMEM);
+			UK_TEST_EXPECT_SNUM_EQ(f->calls, failure);
+			UK_TEST_EXPECT_PTR_EQ(child->vas, vas);
+			UK_TEST_EXPECT_PTR_EQ(target->vas, old_binding);
+			UK_TEST_EXPECT_NULL(child->brk_ctx.base);
+			UK_TEST_EXPECT_ZERO(child->brk_ctx.pos);
+		}
+		pprocess_abort(child);
+		child = NULL;
+		uk_thread_release(target);
+		target = NULL;
+		if (!cycle) {
+			free_bytes = kernel->pt->fa->free_memory;
+			live = f->live;
+		} else {
+			UK_TEST_EXPECT_SNUM_EQ(kernel->pt->fa->free_memory,
+					       free_bytes);
+			UK_TEST_EXPECT_SNUM_EQ(kernel->pt->shared_users,
+					       users + 1);
+			UK_TEST_EXPECT_SNUM_EQ(f->live, live);
+			uk_pr_info("PROCESS_BRK_SNAPSHOT_CYCLE cycle=%u fail_at=%u allocations=%u free_bytes=%lu live_pages=%lu\n",
+				   cycle, failure, total,
+				   free_bytes, live);
+		}
+	}
+	uk_pr_info("PROCESS_BRK_VAS_PASS rollback cycles=64 allocations=%u\n",
+		   total);
+out:
+	pprocess_abort(child);
+	if (target)
+		uk_thread_release(target);
+	pprocess_abort(parent);
+	if (source)
+		uk_thread_release(source);
+	uk_vas_put(vas);
+	UK_TEST_EXPECT_SNUM_EQ(kernel->pt->shared_users, users);
+	UK_TEST_EXPECT_ZERO(f->live);
+	uk_free(kernel->a, a);
 }
 
 _UK_TESTSUITE(process_brk_vas, NULL);
