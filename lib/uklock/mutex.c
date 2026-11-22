@@ -1,4 +1,5 @@
 #include <uk/mutex.h>
+#include "mutex_test.h"
 
 #ifdef CONFIG_LIBUKLOCK_MUTEX_METRICS
 #include <uk/init.h>
@@ -63,6 +64,7 @@ void _uk_mutex_lock_wait(struct uk_mutex *m, __uptr tid, __uptr v)
 		 * waitq condition is checked.
 		 */
 		v |= _UK_MUTEX_CONTESTED;
+		uk_mutex_test_after_mark(m);
 
 		/* From this point, we know that the other side will also go
 		 * through the waitq spinlock.

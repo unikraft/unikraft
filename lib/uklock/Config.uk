@@ -49,6 +49,14 @@ if LIBUKLOCK
 			objects, as well as number of successful/failed locking attempts
 			since startup.
 
+	config LIBUKLOCK_MUTEX_ABA_TEST
+		bool "Test a mutex owner release and reacquisition during contention"
+		depends on LIBUKLOCK_MUTEX && LIBUKLOCK_SEMAPHORE && HAVE_SCHED
+		default n
+		help
+			Force a matching owner cycle between marking contention and
+			testing the wait condition. Includes bounded progress checks.
+
 	config LIBUKLOCK_RWLOCK
 		bool "Reader-Writer lock"
 		select LIBUKSCHED
