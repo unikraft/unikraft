@@ -20,6 +20,7 @@
 #include <uk/alloc.h>
 #include <uk/assert.h>
 #include <uk/crash.h>
+#include <uk/isr/string.h>
 #if CONFIG_LIBUKVMEM_VAS_ACCESS
 #include <uk/atomic.h>
 #endif
@@ -1811,7 +1812,10 @@ out:
 #endif
 
 #if CONFIG_LIBUKVMEM_VAS_ACCESS
-int uk_vas_load_u32_try(struct uk_vas *vas, __vaddr_t addr, __u32 *out)
+struct uk_vma_shared_ref;
+
+static int vmem_load_u32_try(struct uk_vas *vas, __vaddr_t addr, __u32 *out,
+			     struct uk_vma_shared_ref *ref __maybe_unused)
 {
 	struct uk_vma *vma;
 	__vaddr_t mapped;
@@ -1861,12 +1865,34 @@ int uk_vas_load_u32_try(struct uk_vas *vas, __vaddr_t addr, __u32 *out)
 		goto unlock;
 	}
 	*out = uk_load_n((__u32 *)(mapped + paddr - page));
+#if CONFIG_LIBUKVMEM_COW_VMA
+	if (ref) {
+		memset_isr(ref, 0, sizeof(*ref));
+		if (vma->ops == &uk_vma_shared_anon_ops)
+			vmem_shared_anon_ref(vma, addr, ref);
+	}
+#endif
 	uk_paging_page_kunmap(vas->pt, mapped, 1, 0);
 	rc = 0;
 unlock:
 	ukplat_spin_unlock_irqrestore(&vas->lock, irqf);
 	return rc;
 }
+
+int uk_vas_load_u32_try(struct uk_vas *vas, __vaddr_t addr, __u32 *out)
+{
+	return vmem_load_u32_try(vas, addr, out, NULL);
+}
+
+#if CONFIG_LIBUKVMEM_COW_VMA
+int uk_vas_load_u32_shared_try(struct uk_vas *vas, __vaddr_t addr,
+			       __u32 *out, struct uk_vma_shared_ref *ref)
+{
+	if (!ref)
+		return -EINVAL;
+	return vmem_load_u32_try(vas, addr, out, ref);
+}
+#endif
 
 int uk_vas_fault(struct uk_vas *vas, __vaddr_t vaddr, unsigned int access)
 {
