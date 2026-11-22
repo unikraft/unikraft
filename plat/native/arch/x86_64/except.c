@@ -135,7 +135,7 @@ void uk_plat_native_except_push_nested(void)
 	disable_nesting = &idt_ist_disable_nesting[idx];
 	UK_ASSERT(*disable_nesting < __U8_MAX);
 
-	if (*disable_nesting++)
+	if ((*disable_nesting)++)
 		return;
 
 	idt = cpu_idt[idx];
@@ -161,7 +161,7 @@ void uk_plat_native_except_pop_nested(void)
 	idx = uk_lcpu_get_current_idx_in_except();
 
 	disable_nesting = &idt_ist_disable_nesting[idx];
-	UK_ASSERT(*disable_nesting > 1);
+	UK_ASSERT(*disable_nesting > 0);
 
 	if (--*disable_nesting != 0)
 		return;
