@@ -68,6 +68,16 @@ config LIBUKVMEM_FAULT_RESULT_TEST
 	select LIBUKTEST
 	default n
 
+config LIBUKVMEM_TRANSITION_TEST
+	bool "Test VAS transition exclusion and fault completion IPIs"
+	depends on LIBUKVMEM_THREAD_VAS && LIBUKPAGING_DIRECTMAP
+	depends on LIBUKLOCK_SEMAPHORE
+	depends on LIBUKVMEM_PAGEFAULT_HANDLER_PRIO > 0
+	select LIBUKVMEM_COW
+	select LIBUKVMEM_VAS_ACCESS
+	select LIBUKTEST
+	default n
+
 config LIBUKVMEM_TRACE_PAGEFAULTS
 	bool "Expose per-thread minor fault count for development measurements"
 	depends on ARCH_X86_64 && HAVE_SCHED && LIBPOSIX_PROCESS
