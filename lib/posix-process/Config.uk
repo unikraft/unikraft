@@ -21,6 +21,12 @@ config LIBPOSIX_PROCESS_CREATE_TEST
 	select LIBUKTEST
 	default n
 
+config LIBPOSIX_PROCESS_VAS_TEST
+	bool "Test owned process address space references"
+	depends on LIBPOSIX_PROCESS_SIGNAL && LIBUKVMEM_VAS_REFCOUNT
+	select LIBUKTEST
+	default n
+
 menuconfig LIBPOSIX_PROCESS_BRK
 	bool "brk() system call and sbrk() libc function"
 	select LIBUKALLOC
