@@ -1381,6 +1381,15 @@ int vmem_pagefault(__vaddr_t vaddr, unsigned int type,
 	if (unlikely(!uk_vas_paging_enabled(vas)))
 		return -EFAULT;
 
+#if CONFIG_LIBUKVMEM_THREAD_VAS
+	/* Shared kernel branches retain their VMA and frame ownership in the
+	 * kernel VAS, including pages first touched after a process clone.
+	 */
+	if (uk_vas_get_kernel() &&
+	    uk_paging_pt_get_owner(vas->pt, vaddr) == uk_vas_get_kernel()->pt)
+		vas = uk_vas_get_kernel();
+#endif
+
 	ukplat_spin_lock_irqsave(&vas->lock, irqf);
 	if (unlikely(!uk_vas_paging_enabled(vas))) {
 		ukplat_spin_unlock_irqrestore(&vas->lock, irqf);

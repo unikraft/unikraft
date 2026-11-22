@@ -12,8 +12,10 @@ uk_paging_page_set_attr
 uk_paging_page_unmap
 uk_paging_pt_add_mem
 uk_paging_pt_clone
+uk_paging_pt_clone_shared
 uk_paging_pt_free
 uk_paging_pt_get_active
+uk_paging_pt_get_owner
 uk_paging_pt_init
 uk_paging_pt_set_active
 uk_paging_pt_walk

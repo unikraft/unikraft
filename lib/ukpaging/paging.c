@@ -90,8 +90,55 @@ int uk_paging_pt_set_active(struct uk_pagetable *pt)
 	return 0;
 }
 
+#if CONFIG_LIBUKPAGING_SHARED
+static bool pg_index_shared(struct uk_pagetable *pt, unsigned int index)
+{
+	return pt->shared_parent && index >= pt->shared_first &&
+	       index - pt->shared_first < pt->shared_count;
+}
+
+struct uk_pagetable *uk_paging_pt_get_owner(struct uk_pagetable *pt,
+					    __vaddr_t vaddr)
+{
+	unsigned int index = UK_PAL_PT_Lx_IDX(vaddr, UK_PAL_PT_LEVELS - 1);
+
+	while (pg_index_shared(pt, index))
+		pt = pt->shared_parent;
+	return pt;
+}
+
+static bool pg_range_shared(struct uk_pagetable *pt, __vaddr_t start, __sz len)
+{
+	unsigned int first, last;
+
+	if (!pt->shared_parent)
+		return false;
+	if (start == UK_PAL_VADDR_INV || len == __SZ_MAX)
+		return true;
+	first = UK_PAL_PT_Lx_IDX(start, UK_PAL_PT_LEVELS - 1);
+	last = UK_PAL_PT_Lx_IDX(start + len - 1, UK_PAL_PT_LEVELS - 1);
+	return first < pt->shared_first + pt->shared_count &&
+	       last >= pt->shared_first;
+}
+
+static bool pg_uses_shared(struct uk_pagetable *pt, struct uk_pagetable *owner)
+{
+	while (pt) {
+		if (pt == owner)
+			return true;
+		pt = pt->shared_parent;
+	}
+	return false;
+}
+
+#endif
 static int pg_pt_clone(struct uk_pagetable *pt_dst, struct uk_pagetable *pt_src,
+#if CONFIG_LIBUKPAGING_SHARED
+		       unsigned long flags, unsigned int first,
+		       unsigned int count)
+#else
 		       unsigned long flags)
+#endif
 {
 	unsigned int lvl = UK_PAL_PT_LEVELS - 1;
 	__vaddr_t pt_vaddr_scache[UK_PAL_PT_LEVELS];
@@ -113,6 +160,13 @@ static int pg_pt_clone(struct uk_pagetable *pt_dst, struct uk_pagetable *pt_src,
 
 	/* Use the same frame allocator for the new page table */
 	pt_dst->fa = pt_src->fa;
+#if CONFIG_LIBUKPAGING_SHARED
+	if (count) {
+		pt_dst->shared_parent = pt_src;
+		pt_dst->shared_first = first;
+		pt_dst->shared_count = count;
+	}
+#endif
 
 	pt_svaddr = uk_pt_vbase(&pt_src->pt);
 	pt_vaddr_scache[lvl] = pt_svaddr;
@@ -139,8 +193,15 @@ static int pg_pt_clone(struct uk_pagetable *pt_dst, struct uk_pagetable *pt_src,
 			goto EXIT_FREE;
 
 		/* This is a page table. Copy it and descent. */
+#if CONFIG_LIBUKPAGING_SHARED
+		if (UK_PAL_PT_Lx_PTE_PRESENT(pte, lvl) &&
+		    !UK_PAL_PAGE_Lx_IS(pte, lvl) &&
+		    !(lvl == UK_PAL_PT_LEVELS - 1 &&
+		      pg_index_shared(pt_dst, pte_idx))) {
+#else
 		if (UK_PAL_PT_Lx_PTE_PRESENT(pte, lvl) &&
 		    !UK_PAL_PAGE_Lx_IS(pte, lvl)) {
+#endif
 			rc = pg_pt_alloc(pt_dst, &pt_dvaddr, &pt_dpaddr,
 					 lvl - 1);
 			if (unlikely(rc))
@@ -175,8 +236,8 @@ static int pg_pt_clone(struct uk_pagetable *pt_dst, struct uk_pagetable *pt_src,
 		}
 
 #ifdef CONFIG_LIBUKPAGING_STATS
-		if (UK_PAL_PT_Lx_PTE_PRESENT(pte, lvl)) {
-			UK_ASSERT(UK_PAL_PAGE_Lx_IS(pte, lvl));
+		if (UK_PAL_PT_Lx_PTE_PRESENT(pte, lvl) &&
+		    UK_PAL_PAGE_Lx_IS(pte, lvl)) {
 			pt_dst->nr_lx_pages[lvl]++;
 		}
 #endif /* CONFIG_LIBUKPAGING_STATS */
@@ -316,7 +377,7 @@ int uk_paging_pt_init(struct uk_pagetable *pt, __paddr_t start, __sz len)
 	/* If we have stats active, we need to discover all mappings etc. We
 	 * simplify this by just cloning the page table hierarchy.
 	 */
-	rc = pg_pt_clone(pt, pt, 0);
+	rc = pg_pt_clone(pt, pt, 0, 0, 0);
 	if (unlikely(rc))
 		return rc;
 #endif
@@ -350,11 +411,79 @@ int uk_paging_pt_clone(struct uk_pagetable *pt, struct uk_pagetable *pt_src,
 	UK_ASSERT(pt != pt_src);
 
 	ukplat_spin_lock_irqsave(&pt_src->lock, irqf);
+#if CONFIG_LIBUKPAGING_SHARED
+	if (pt_src->shared_parent && !(flags & UK_PAGING_PAGE_FLAG_CLONE_NEW))
+		rc = -ENOTSUP;
+	else
+		rc = pg_pt_clone(pt, pt_src, flags, 0, 0);
+#else
 	rc = pg_pt_clone(pt, pt_src, flags);
+#endif
 	ukplat_spin_unlock_irqrestore(&pt_src->lock, irqf);
 	return rc;
 }
 
+#if CONFIG_LIBUKPAGING_SHARED
+int uk_paging_pt_clone_shared(struct uk_pagetable *pt,
+			      struct uk_pagetable *pt_src,
+			      __vaddr_t start, __sz len)
+{
+	const unsigned int level = UK_PAL_PT_LEVELS - 1;
+	const __sz span = UK_PAL_PAGE_Lx_SIZE(level);
+	unsigned int first = UK_PAL_PT_Lx_IDX(start, level);
+	unsigned int count, i;
+	unsigned long irqf;
+	__pte_t pte;
+	int rc = -EINVAL;
+
+	if (pt == pt_src || !len || start > __VADDR_MAX - len ||
+	    !uk_pal_vaddr_range_isvalid(start, len) ||
+	    !UK_PAL_PAGE_Lx_ALIGNED(start, level) || len % span ||
+	    len / span > UK_PAL_PT_Lx_PTES(level) - first)
+		return -EINVAL;
+	count = len / span;
+
+	ukplat_spin_lock_irqsave(&pt_src->lock, irqf);
+	if (pt_src->shared_users == ~0U) {
+		rc = -EOVERFLOW;
+		goto out;
+	}
+	if (pt_src->shared_parent &&
+	    (first != pt_src->shared_first || count != pt_src->shared_count))
+		goto out;
+	for (i = first; i < first + count; i++) {
+		rc = uk_pt_pte_read_at(&pt_src->pt, uk_pt_vbase(&pt_src->pt),
+				       level, i, &pte);
+		if (rc)
+			goto out;
+		if (!UK_PAL_PT_Lx_PTE_PRESENT(pte, level) ||
+		    UK_PAL_PAGE_Lx_IS(pte, level)) {
+			rc = -ENOTSUP;
+			goto out;
+		}
+	}
+	rc = pg_pt_clone(pt, pt_src, 0, first, count);
+	if (!rc)
+		pt_src->shared_users++;
+out:
+	ukplat_spin_unlock_irqrestore(&pt_src->lock, irqf);
+	return rc;
+}
+
+static void pg_shared_parent_release(void *arg)
+{
+	struct uk_pagetable *pt = arg;
+	struct uk_pagetable *parent = pt->shared_parent;
+	unsigned long irqf;
+
+	ukplat_spin_lock_irqsave(&parent->lock, irqf);
+	UK_ASSERT(parent->shared_users);
+	parent->shared_users--;
+	ukplat_spin_unlock_irqrestore(&parent->lock, irqf);
+	pt->shared_parent = __NULL;
+}
+
+#endif
 int uk_paging_pt_free(struct uk_pagetable *pt, unsigned long flags)
 {
 	struct uk_paging_free_batch local_batch;
@@ -367,6 +496,12 @@ int uk_paging_pt_free(struct uk_pagetable *pt, unsigned long flags)
 
 	uk_paging_free_batch_init(&local_batch, pt);
 	ukplat_spin_lock_irqsave(&pt->lock, irqf);
+#if CONFIG_LIBUKPAGING_SHARED
+	if (pt->shared_users) {
+		ukplat_spin_unlock_irqrestore(&pt->lock, irqf);
+		return -EBUSY;
+	}
+#endif
 	batch = uk_pcpuvar_current_get(pg_cpu_defer_batch);
 	if (!batch || batch->pt != pt)
 		batch = &local_batch;
@@ -390,6 +525,11 @@ int uk_paging_pt_free(struct uk_pagetable *pt, unsigned long flags)
 	pg_pt_free(pt, uk_pt_vbase(&pt->pt), UK_PAL_PT_LEVELS - 1, true);
 
 	uk_pt_term(&pt->pt);
+#if CONFIG_LIBUKPAGING_SHARED
+	if (pt->shared_parent)
+		uk_paging_batch_defer(batch, &pt->shared_release,
+				      pg_shared_parent_release, pt);
+#endif
 	pt->defer_batch = __NULL;
 	ukplat_spin_unlock_irqrestore(&pt->lock, irqf);
 
@@ -406,6 +546,9 @@ int uk_paging_pt_walk(struct uk_pagetable *pt, __vaddr_t vaddr,
 	unsigned long irqf;
 	int rc;
 
+#if CONFIG_LIBUKPAGING_SHARED
+	pt = uk_paging_pt_get_owner(pt, vaddr);
+#endif
 	ukplat_spin_lock_irqsave(&pt->lock, irqf);
 	rc = uk_pt_walk(&pt->pt, vaddr, level, pt_vaddr, pte);
 	ukplat_spin_unlock_irqrestore(&pt->lock, irqf);
@@ -601,7 +744,12 @@ static void pg_tlb_shootdown_ipi(struct uk_lcpu_regs *regs __unused, void *arg)
 	const struct pg_tlb_shootdown_req *req = arg;
 	__vaddr_t va;
 
+#if CONFIG_LIBUKPAGING_SHARED
+	if (!uk_pt_isactive(&req->pt->pt) &&
+	    !pg_uses_shared(uk_paging_pt_get_active(), req->pt))
+#else
 	if (!uk_pt_isactive(&req->pt->pt))
+#endif
 		return;
 
 	if (req->full_flush || req->end <= req->start ||
@@ -692,6 +840,12 @@ void uk_paging_free_batch_finish(struct uk_paging_free_batch *batch)
 
 	if (batch->full_flush)
 		uk_pt_flush(&batch->pt->pt);
+#if CONFIG_LIBUKPAGING_SHARED
+	if ((batch->full_flush || batch->has_tlb_range) &&
+	    uk_paging_pt_get_active() != batch->pt &&
+	    pg_uses_shared(uk_paging_pt_get_active(), batch->pt))
+		uk_pal_tlb_flush();
+#endif
 	pg_batch_shootdown_remote_tlbs(batch);
 
 	pt = batch->pt;
@@ -1132,6 +1286,10 @@ int uk_paging_page_mapx(struct uk_pagetable *pt, __vaddr_t vaddr,
 	UK_ASSERT(pages <= (__SZ_MAX / UK_PAL_PAGE_Lx_SIZE(level)));
 
 	len = pages * UK_PAL_PAGE_Lx_SIZE(level);
+#if CONFIG_LIBUKPAGING_SHARED
+	if (pg_range_shared(pt, vaddr, len))
+		return -EACCES;
+#endif
 
 #ifdef CONFIG_LIBUKPAGING_STATS
 	UK_ASSERT(!(flags & UK_PAGING_PAGE_FLAG_INTERN_STATS_KEEP));
@@ -1248,6 +1406,11 @@ static int pg_page_unmap(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 		if (unlikely(rc))
 			return rc;
 
+#if CONFIG_LIBUKPAGING_SHARED
+		if (lvl == UK_PAL_PT_LEVELS - 1 && pg_index_shared(pt, pte_idx))
+			goto next_entry;
+#endif
+
 		if (UK_PAL_PT_Lx_PTE_PRESENT(pte, lvl)) {
 
 			/* There is a page table at this PTE.
@@ -1342,6 +1505,9 @@ static int pg_page_unmap(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 					UK_PAL_PT_Lx_PTE_PADDR(pte, lvl), lvl);
 		}
 
+#if CONFIG_LIBUKPAGING_SHARED
+next_entry:
+#endif
 		/* If this is not the last PTE and there are still pages to
 		 * unmap, we continue to the next PTE in this level
 		 */
@@ -1385,6 +1551,16 @@ static int pg_page_unmap(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 
 			if (skip_pt_free)
 				continue;
+
+#if CONFIG_LIBUKPAGING_SHARED
+			/* Keep shared top-level links valid while their branch
+			 * temporarily contains no mappings.
+			 */
+			if (lvl == UK_PAL_PT_LEVELS - 1 && pt->shared_users) {
+				skip_pt_free = 1;
+				continue;
+			}
+#endif
 
 			/* Check if the PTEs we did not touch are all invalid.
 			 * In that case we can free the page table. We start
@@ -1495,6 +1671,10 @@ int uk_paging_page_unmap(struct uk_pagetable *pt, __vaddr_t vaddr,
 
 		len = pages * UK_PAL_PAGE_Lx_SIZE(level);
 	}
+#if CONFIG_LIBUKPAGING_SHARED
+	if (pg_range_shared(pt, vaddr, len))
+		return -EACCES;
+#endif
 
 #ifdef CONFIG_LIBUKPAGING_STATS
 	UK_ASSERT(!(flags & UK_PAGING_PAGE_FLAG_INTERN_STATS_KEEP));
@@ -1694,6 +1874,10 @@ int uk_paging_page_set_attr(struct uk_pagetable *pt, __vaddr_t vaddr,
 
 		len = pages * UK_PAL_PAGE_Lx_SIZE(level);
 	}
+#if CONFIG_LIBUKPAGING_SHARED
+	if (pg_range_shared(pt, vaddr, len))
+		return -EACCES;
+#endif
 
 #ifdef CONFIG_LIBUKPAGING_STATS
 	UK_ASSERT(!(flags & UK_PAGING_PAGE_FLAG_INTERN_STATS_KEEP));

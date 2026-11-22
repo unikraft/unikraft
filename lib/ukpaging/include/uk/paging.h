@@ -354,6 +354,13 @@ struct uk_pagetable {
 	struct uk_falloc *fa;
 	struct uk_paging_free_batch *defer_batch;
 	struct __spinlock lock;
+#if CONFIG_LIBUKPAGING_SHARED
+	struct uk_pagetable *shared_parent;
+	unsigned int shared_first;
+	unsigned int shared_count;
+	unsigned int shared_users;
+	struct uk_paging_deferred_call shared_release;
+#endif
 
 #ifdef CONFIG_LIBUKPAGING_STATS
 	unsigned long nr_lx_pages[UK_PAL_PT_LEVELS];
@@ -598,6 +605,24 @@ int uk_paging_pt_add_mem(struct uk_pagetable *pt, __paddr_t start, __sz len);
  */
 int uk_paging_pt_clone(struct uk_pagetable *pt, struct uk_pagetable *pt_src,
 		       unsigned long flags);
+
+#if CONFIG_LIBUKPAGING_SHARED
+/**
+ * Clone a page table while sharing the branches covering [start, start+len).
+ * The range must cover complete, present top-level page-table branches.
+ * Other branches are copied as in uk_paging_pt_clone(). Mutations of shared
+ * mappings must use their owner, returned by uk_paging_pt_get_owner().
+ * The source object must remain alive until the clone's free batch finishes;
+ * freeing its page tables is rejected while clones still reference them.
+ */
+int uk_paging_pt_clone_shared(struct uk_pagetable *pt,
+			      struct uk_pagetable *pt_src,
+			      __vaddr_t start, __sz len);
+
+/** Return the page table owning the branch containing vaddr. */
+struct uk_pagetable *uk_paging_pt_get_owner(struct uk_pagetable *pt,
+					    __vaddr_t vaddr);
+#endif
 
 /**
  * Frees the given page table by recursively releasing the page table hierarchy
