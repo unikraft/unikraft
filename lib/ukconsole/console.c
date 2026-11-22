@@ -35,15 +35,16 @@ static __bool uk_console_set_emerg_stdout_once;
 struct uk_console *uk_console_get(__u16 id)
 {
 	struct uk_console *dev = __NULL;
+	unsigned long flags;
 
-	uk_spin_lock(&cons_dev_list_lock);
+	uk_spin_lock_irqsave(&cons_dev_list_lock, flags);
 	uk_list_for_each_entry(dev, &cons_dev_list, _list) {
 		if (dev->id == id) {
-			uk_spin_unlock(&cons_dev_list_lock);
+			uk_spin_unlock_irqrestore(&cons_dev_list_lock, flags);
 			return dev;
 		}
 	}
-	uk_spin_unlock(&cons_dev_list_lock);
+	uk_spin_unlock_irqrestore(&cons_dev_list_lock, flags);
 
 	return __NULL;
 }
@@ -51,10 +52,11 @@ struct uk_console *uk_console_get(__u16 id)
 __u16 uk_console_count(void)
 {
 	__u16 count;
+	unsigned long flags;
 
-	uk_spin_lock(&cons_dev_list_lock);
+	uk_spin_lock_irqsave(&cons_dev_list_lock, flags);
 	count = cons_dev_count;
-	uk_spin_unlock(&cons_dev_list_lock);
+	uk_spin_unlock_irqrestore(&cons_dev_list_lock, flags);
 
 	return count;
 }
@@ -62,6 +64,7 @@ __u16 uk_console_count(void)
 __ssz uk_console_out(const char *buf, __sz len)
 {
 	struct uk_console *dev = __NULL;
+	unsigned long flags;
 
 	if (unlikely(!len))
 		return 0;
@@ -70,12 +73,12 @@ __ssz uk_console_out(const char *buf, __sz len)
 		return -EINVAL;
 
 	/* Output to all STDOUT devices */
-	uk_spin_lock(&cons_dev_list_lock);
+	uk_spin_lock_irqsave(&cons_dev_list_lock, flags);
 	uk_list_for_each_entry(dev, &cons_dev_list, _list) {
 		if ((dev->flags & UK_CONSOLE_FLAG_STDOUT) && dev->ops->out)
 			uk_console_out_direct(dev, buf, len);
 	}
-	uk_spin_unlock(&cons_dev_list_lock);
+	uk_spin_unlock_irqrestore(&cons_dev_list_lock, flags);
 
 	return len;
 }
@@ -83,6 +86,7 @@ __ssz uk_console_out(const char *buf, __sz len)
 __ssz uk_console_in(char *buf, __sz len)
 {
 	struct uk_console *dev = __NULL;
+	unsigned long flags;
 	__sz leftover = len;
 	__ssz rc = 0;
 
@@ -102,7 +106,7 @@ __ssz uk_console_in(char *buf, __sz len)
 	 *        We could solve this by remembering the iteration
 	 *        point between calls.
 	 */
-	uk_spin_lock(&cons_dev_list_lock);
+	uk_spin_lock_irqsave(&cons_dev_list_lock, flags);
 	uk_list_for_each_entry(dev, &cons_dev_list, _list) {
 		UK_ASSERT(dev->ops);
 		if ((dev->flags & UK_CONSOLE_FLAG_STDIN) && dev->ops->in) {
@@ -115,7 +119,7 @@ __ssz uk_console_in(char *buf, __sz len)
 				break;
 		}
 	}
-	uk_spin_unlock(&cons_dev_list_lock);
+	uk_spin_unlock_irqrestore(&cons_dev_list_lock, flags);
 
 	return len - leftover;
 }
@@ -123,6 +127,7 @@ __ssz uk_console_in(char *buf, __sz len)
 __isr __ssz uk_console_emerg_out(const char *buf, __sz len)
 {
 	struct uk_console *dev = __NULL;
+	unsigned long flags;
 
 	if (unlikely(!len))
 		return 0;
@@ -131,13 +136,13 @@ __isr __ssz uk_console_emerg_out(const char *buf, __sz len)
 		return -EINVAL;
 
 	/* Output to all EMERG_STDOUT devices */
-	uk_spin_lock(&cons_dev_list_lock);
+	uk_spin_lock_irqsave(&cons_dev_list_lock, flags);
 	uk_list_for_each_entry(dev, &cons_dev_list, _list) {
 		if ((dev->flags & UK_CONSOLE_FLAG_EMERG_STDOUT) &&
 		    dev->ops->emerg_out)
 			uk_console_emerg_out_direct(dev, buf, len);
 	}
-	uk_spin_unlock(&cons_dev_list_lock);
+	uk_spin_unlock_irqrestore(&cons_dev_list_lock, flags);
 
 	return len;
 }
@@ -157,11 +162,40 @@ static __isr __ssz console_write(struct uk_console *dev, uk_console_out_func wri
 	return write(dev, buf, len);
 }
 
-__ssz uk_console_out_direct(struct uk_console *dev, const char *buf, __sz len)
+static __isr __ssz console_writev(struct uk_console *dev, uk_console_out_func write,
+				  const struct uk_console_iovec *iov, __sz count)
+{
+	unsigned long flags;
+	__ssz total = 0;
+	__ssz rc = 0;
+
+	uk_spin_lock_irqsave(&dev->_out_lock, flags);
+	for (__sz i = 0; i < count; ++i) {
+		rc = console_write(dev, write, iov[i].buf, iov[i].len);
+		if (unlikely(rc < 0))
+			break;
+		total += rc;
+		if ((__sz)rc < iov[i].len)
+			break;
+	}
+	uk_spin_unlock_irqrestore(&dev->_out_lock, flags);
+	return rc < 0 ? rc : total;
+}
+
+__ssz uk_console_out_directv(struct uk_console *dev,
+			     const struct uk_console_iovec *iov, __sz count)
 {
 	UK_ASSERT(dev && dev->ops);
+	if (unlikely(!iov && count))
+		return -EINVAL;
+	return console_writev(dev, dev->ops->out, iov, count);
+}
 
-	return console_write(dev, dev->ops->out, buf, len);
+__ssz uk_console_out_direct(struct uk_console *dev, const char *buf, __sz len)
+{
+	const struct uk_console_iovec iov = { .buf = buf, .len = len };
+
+	return uk_console_out_directv(dev, &iov, 1);
 }
 
 __ssz uk_console_in_direct(struct uk_console *dev, char *buf, __sz len)
@@ -183,9 +217,11 @@ __ssz uk_console_in_direct(struct uk_console *dev, char *buf, __sz len)
 __isr __ssz uk_console_emerg_out_direct(struct uk_console *dev,
 					const char *buf, __sz len)
 {
+	const struct uk_console_iovec iov = { .buf = buf, .len = len };
+
 	UK_ASSERT(dev && dev->ops);
 
-	return console_write(dev, dev->ops->emerg_out, buf, len);
+	return console_writev(dev, dev->ops->emerg_out, &iov, 1);
 }
 
 int uk_console_out_direct_all(struct uk_console *dev,
@@ -206,7 +242,7 @@ int uk_console_out_direct_all(struct uk_console *dev,
 		return -EIO;
 
 	while (bytes_written < len) {
-		rc = console_write(dev, dev->ops->out, buf + bytes_written, len - bytes_written);
+		rc = uk_console_out_direct(dev, buf + bytes_written, len - bytes_written);
 		if (unlikely(rc < 0))
 			return (int)rc;
 
@@ -263,7 +299,7 @@ __isr int uk_console_emerg_out_direct_all(struct uk_console *dev,
 		return -EIO;
 
 	while (bytes_written < len) {
-		rc = console_write(dev, dev->ops->emerg_out, buf + bytes_written, len - bytes_written);
+		rc = uk_console_emerg_out_direct(dev, buf + bytes_written, len - bytes_written);
 		if (unlikely(rc < 0))
 			return (int)rc;
 
@@ -276,16 +312,16 @@ __isr int uk_console_emerg_out_direct_all(struct uk_console *dev,
 void uk_console_register(struct uk_console *dev)
 {
 	struct uk_console *known_dev __maybe_unused = __NULL;
-	unsigned long id;
+	unsigned long id, flags;
 
 	UK_ASSERT(dev);
 	UK_ASSERT(dev->ops);
 
 #if CONFIG_LIBUKDEBUG_ENABLE_ASSERT
-	uk_spin_lock(&cons_dev_list_lock);
+	uk_spin_lock_irqsave(&cons_dev_list_lock, flags);
 	uk_list_for_each_entry(known_dev, &cons_dev_list, _list)
 		UK_ASSERT(dev != known_dev);
-	uk_spin_unlock(&cons_dev_list_lock);
+	uk_spin_unlock_irqrestore(&cons_dev_list_lock, flags);
 #endif /* CONFIG_LIBUKDEBUG_ENABLE_ASSERT */
 
 	/* We want to make sure that one of the registered devices has the
@@ -327,7 +363,7 @@ void uk_console_register(struct uk_console *dev)
 		dev->flags |= UK_CONSOLE_FLAG_EMERG_STDOUT;
 	}
 
-	uk_spin_lock(&cons_dev_list_lock);
+	uk_spin_lock_irqsave(&cons_dev_list_lock, flags);
 
 	uk_list_add_tail(&dev->_list, &cons_dev_list);
 
@@ -340,7 +376,7 @@ void uk_console_register(struct uk_console *dev)
 	uk_bitmap_set(cons_id_bitmap, (unsigned int)id, 1);
 	cons_dev_count++;
 
-	uk_spin_unlock(&cons_dev_list_lock);
+	uk_spin_unlock_irqrestore(&cons_dev_list_lock, flags);
 
 	UK_ASSERT(id < UK_CONSOLE_MAX_DEVS); /* out of console ID slots */
 	dev->id = (__u16)id;
@@ -378,11 +414,12 @@ void console_async_release_cb(struct uk_console *dev)
 void uk_console_unregister(struct uk_console *dev)
 {
 	struct uk_console *cons;
+	unsigned long flags;
 
 	UK_ASSERT(dev);
 	UK_ASSERT(dev->id < UK_CONSOLE_MAX_DEVS);
 
-	uk_spin_lock(&cons_dev_list_lock);
+	uk_spin_lock_irqsave(&cons_dev_list_lock, flags);
 
 	uk_list_del_init(&dev->_list);
 	uk_bitmap_clear(cons_id_bitmap, dev->id, 1);
@@ -411,7 +448,7 @@ void uk_console_unregister(struct uk_console *dev)
 			uk_console_set_emerg_stdout_once = __true;
 	}
 
-	uk_spin_unlock(&cons_dev_list_lock);
+	uk_spin_unlock_irqrestore(&cons_dev_list_lock, flags);
 }
 
 int uk_console_async_register_callback(struct uk_console *dev,
