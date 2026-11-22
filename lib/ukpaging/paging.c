@@ -46,7 +46,8 @@ static int pg_page_mapx(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 			unsigned int level, __vaddr_t vaddr, __paddr_t paddr,
 			__sz len, unsigned long attr, unsigned long flags,
 			__pte_t tmpl, unsigned int tmpl_level,
-			struct uk_paging_page_mapx *mapx);
+			struct uk_paging_page_mapx *mapx,
+			uk_paging_page_mapx_result_t result);
 
 static int pg_page_unmap(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 			 unsigned int level, __vaddr_t vaddr, __sz len,
@@ -368,7 +369,7 @@ int uk_paging_pt_init(struct uk_pagetable *pt, __paddr_t start, __sz len)
 			  UK_PAL_PAGE_ATTR_PROT_READ | UK_PAL_PAGE_ATTR_PROT_WRITE, /* attr */
 			  0, /* flags */
 			  UK_PAL_PT_Lx_PTE_INVALID(UK_PAL_PAGE_LEVEL),
-			  UK_PAL_PAGE_LEVEL, NULL);
+			  UK_PAL_PAGE_LEVEL, NULL, NULL);
 	if (unlikely(rc))
 		return rc;
 #endif /* CONFIG_LIBUKPAGING_DIRECTMAP */
@@ -971,7 +972,8 @@ static int pg_page_mapx(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 			unsigned int level, __vaddr_t vaddr, __paddr_t paddr,
 			__sz len, unsigned long attr, unsigned long flags,
 			__pte_t tmpl, unsigned int tmpl_level,
-			struct uk_paging_page_mapx *mapx)
+			struct uk_paging_page_mapx *mapx,
+			uk_paging_page_mapx_result_t result)
 {
 	unsigned int to_lvl = UK_PAGING_PAGE_FLAG_SIZE_TO_LEVEL(flags);
 	unsigned int max_lvl = pg_page_largest_level;
@@ -1163,6 +1165,9 @@ TOO_BIG:
 			rc = mapx->map(pt, vaddr, pt_vaddr, lvl, &pte,
 				       mapx->ctx);
 			if (unlikely(rc)) {
+				if (result)
+					result(pt, vaddr, pt_vaddr, lvl, rc,
+					       mapx->ctx);
 				if (alloc_pmem &&
 				    !UK_PAL_PT_Lx_PTE_PRESENT(orig_pte, lvl))
 					pg_ffree(pt, paddr, lvl);
@@ -1185,6 +1190,8 @@ TOO_BIG:
 		rc = uk_pt_pte_write_at(&pt->pt, pt_vaddr, lvl, pte_idx,
 					UK_PAL_VADDR_INV, pte);
 		if (unlikely(rc)) {
+			if (mapx && result)
+				result(pt, vaddr, pt_vaddr, lvl, rc, mapx->ctx);
 			if (alloc_pmem &&
 			    !UK_PAL_PT_Lx_PTE_PRESENT(orig_pte, lvl))
 				pg_ffree(pt, paddr, lvl);
@@ -1202,6 +1209,8 @@ TOO_BIG:
 			uk_pt_flush_entry(&pt->pt, vaddr);
 			pg_batch_record_tlb(pt->defer_batch, vaddr, page_size);
 		}
+		if (mapx && result)
+			result(pt, vaddr, pt_vaddr, lvl, 0, mapx->ctx);
 
 NEXT_PTE:
 		UK_ASSERT(len >= page_size);
@@ -1280,10 +1289,12 @@ NEXT_PTE:
 	return 0;
 }
 
-int uk_paging_page_mapx(struct uk_pagetable *pt, __vaddr_t vaddr,
-			__paddr_t paddr, unsigned long pages,
-			unsigned long attr, unsigned long flags,
-			struct uk_paging_page_mapx *mapx)
+int uk_paging_page_mapx_with_result(struct uk_pagetable *pt,
+				    __vaddr_t vaddr, __paddr_t paddr,
+				    unsigned long pages, unsigned long attr,
+				    unsigned long flags,
+				    struct uk_paging_page_mapx *mapx,
+				    uk_paging_page_mapx_result_t result)
 {
 	unsigned int level = UK_PAGING_PAGE_FLAG_SIZE_TO_LEVEL(flags);
 	struct uk_paging_free_batch local_batch;
@@ -1292,6 +1303,8 @@ int uk_paging_page_mapx(struct uk_pagetable *pt, __vaddr_t vaddr,
 	__sz len;
 	int rc;
 
+	if (result && !mapx)
+		return -EINVAL;
 	if (unlikely(pages == 0))
 		return 0;
 
@@ -1324,7 +1337,7 @@ int uk_paging_page_mapx(struct uk_pagetable *pt, __vaddr_t vaddr,
 	rc = pg_page_mapx(pt, uk_pt_vbase(&pt->pt), UK_PAL_PT_LEVELS - 1, vaddr,
 			  paddr, len, attr, flags,
 			  UK_PAL_PT_Lx_PTE_INVALID(UK_PAL_PAGE_LEVEL),
-			  UK_PAL_PAGE_LEVEL, mapx);
+			  UK_PAL_PAGE_LEVEL, mapx, result);
 
 	pt->defer_batch = __NULL;
 	ukplat_spin_unlock_irqrestore(&pt->lock, irqf);
@@ -1333,6 +1346,15 @@ int uk_paging_page_mapx(struct uk_pagetable *pt, __vaddr_t vaddr,
 		uk_paging_free_batch_finish(&local_batch);
 
 	return rc;
+}
+
+int uk_paging_page_mapx(struct uk_pagetable *pt, __vaddr_t vaddr,
+			__paddr_t paddr, unsigned long pages,
+			unsigned long attr, unsigned long flags,
+			struct uk_paging_page_mapx *mapx)
+{
+	return uk_paging_page_mapx_with_result(pt, vaddr, paddr, pages, attr,
+					     flags, mapx, NULL);
 }
 
 static int pg_page_split(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
