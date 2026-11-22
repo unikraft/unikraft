@@ -292,6 +292,68 @@ int uk_posix_process_create_pthread(struct uk_thread *thread)
 }
 
 /* Create a new posix process for a given thread */
+static struct posix_process *pprocess_alloc(struct uk_alloc *a,
+					    struct posix_process *parent)
+{
+	struct posix_process *pprocess;
+	int ret;
+
+	/* Allocate pprocess structure */
+	pprocess = uk_zalloc(a, sizeof(*pprocess));
+	if (!pprocess) {
+		ret = -ENOMEM;
+		goto err_out;
+	}
+	pprocess->_a = a;
+#if CONFIG_LIBUKVMEM_THREAD_VAS
+	pprocess->vas = parent ? parent->vas : uk_vas_get_active();
+#if CONFIG_LIBUKVMEM_VAS_REFCOUNT
+	uk_vas_get(pprocess->vas);
+#endif
+#endif
+	UK_INIT_LIST_HEAD(&pprocess->threads);
+	UK_INIT_LIST_HEAD(&pprocess->children);
+	UK_INIT_LIST_HEAD(&pprocess->child_list_entry);
+
+	pprocess->state = POSIX_PROCESS_RUNNING;
+
+#if CONFIG_LIBPOSIX_PROCESS_SIGNAL
+	ret = pprocess_signal_pdesc_alloc(pprocess);
+	if (unlikely(ret)) {
+		uk_pr_err("Could not allocate signal descriptor\n");
+		/* Free manually as we can jump to err_free_pprocess
+		 * after this allocation is successful.
+		 */
+#if CONFIG_LIBUKVMEM_VAS_REFCOUNT
+		uk_vas_put(pprocess->vas);
+#endif
+		uk_free(a, pprocess);
+		goto err_out;
+	}
+	ret = pprocess_signal_pdesc_init(pprocess);
+	if (unlikely(ret)) {
+		uk_pr_err("Could not initialize signal descriptor\n");
+		goto err_free_pprocess;
+	}
+#endif /* CONFIG_LIBPOSIX_PROCESS_SIGNAL */
+
+	uk_semaphore_init(&pprocess->wait_semaphore, 0);
+	uk_semaphore_init(&pprocess->exit_semaphore, 0);
+
+	return pprocess;
+
+#if CONFIG_LIBPOSIX_PROCESS_SIGNAL
+err_free_pprocess:
+	pprocess_signal_pdesc_free(pprocess);
+#if CONFIG_LIBUKVMEM_VAS_REFCOUNT
+	uk_vas_put(pprocess->vas);
+#endif
+	uk_free(a, pprocess);
+#endif
+err_out:
+	return ERR2PTR(ret);
+}
+
 struct posix_process *pprocess_create(struct uk_alloc *a,
 				      struct uk_thread *thread,
 				      struct uk_thread *parent)
@@ -320,47 +382,11 @@ struct posix_process *pprocess_create(struct uk_alloc *a,
 		parent_pprocess = parent_pthread->process;
 	}
 
-	/* Allocate pprocess structure */
-	pprocess = uk_zalloc(a, sizeof(*pprocess));
-	if (!pprocess) {
-		ret = -ENOMEM;
+	pprocess = pprocess_alloc(a, parent_pprocess);
+	if (PTRISERR(pprocess)) {
+		ret = PTR2ERR(pprocess);
 		goto err_out;
 	}
-	pprocess->_a = a;
-#if CONFIG_LIBUKVMEM_THREAD_VAS
-	pprocess->vas = parent_pprocess ? parent_pprocess->vas
-					: uk_vas_get_active();
-#if CONFIG_LIBUKVMEM_VAS_REFCOUNT
-	uk_vas_get(pprocess->vas);
-#endif
-#endif
-	UK_INIT_LIST_HEAD(&pprocess->threads);
-	UK_INIT_LIST_HEAD(&pprocess->children);
-
-	pprocess->state = POSIX_PROCESS_RUNNING;
-
-#if CONFIG_LIBPOSIX_PROCESS_SIGNAL
-	ret = pprocess_signal_pdesc_alloc(pprocess);
-	if (unlikely(ret)) {
-		uk_pr_err("Could not allocate signal descriptor\n");
-		/* Free manually as we can jump to err_free_pprocess
-		 * after this allocation is successful.
-		 */
-#if CONFIG_LIBUKVMEM_VAS_REFCOUNT
-		uk_vas_put(pprocess->vas);
-#endif
-		uk_free(a, pprocess);
-		goto err_out;
-	}
-	ret = pprocess_signal_pdesc_init(pprocess);
-	if (unlikely(ret)) {
-		uk_pr_err("Could not initialize signal descriptor\n");
-		goto err_free_pprocess;
-	}
-#endif /* CONFIG_LIBPOSIX_PROCESS_SIGNAL */
-
-	uk_semaphore_init(&pprocess->wait_semaphore, 0);
-	uk_semaphore_init(&pprocess->exit_semaphore, 0);
 
 	/* Check if we have a pthread structure already for this thread
 	 * or if we need to allocate one
