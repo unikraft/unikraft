@@ -184,6 +184,7 @@ bool pprocess_claim_process_exit(struct posix_process *pprocess)
 
 	flags = pprocess_lock_acquire();
 	if (!pprocess->exiting && pprocess->state == POSIX_PROCESS_RUNNING) {
+		pprocess_get(pprocess);
 		pprocess->exiting = true;
 		claimed = true;
 	}
@@ -224,6 +225,7 @@ static struct posix_thread *pprocess_alloc_pthread(struct posix_process *p,
 	pthread->parent = uk_pthread_current();
 	pthread->tid = tid;
 	pthread->thread = th;
+	uk_semaphore_init(&pthread->wait_semaphore, 0);
 
 #if CONFIG_LIBPOSIX_PROCESS_SIGNAL
 	err = pprocess_signal_tdesc_alloc(pthread);
@@ -388,7 +390,6 @@ static struct posix_process *pprocess_new(struct uk_alloc *a,
 	}
 #endif /* CONFIG_LIBPOSIX_PROCESS_SIGNAL */
 
-	uk_semaphore_init(&pprocess->wait_semaphore, 0);
 	uk_semaphore_init(&pprocess->exit_semaphore, 0);
 
 	return pprocess;
@@ -1068,6 +1069,7 @@ static void posix_thread_fini(struct uk_thread *thread)
 	struct posix_process *pprocess;
 	struct posix_thread *pthread;
 	bool became_empty = false;
+	bool init_process;
 
 	pthread = uk_thread_uktls_var(thread, pthread_self);
 
@@ -1082,6 +1084,7 @@ static void posix_thread_fini(struct uk_thread *thread)
 
 	pprocess = pthread->process;
 	UK_ASSERT(pprocess);
+	init_process = pprocess->pid == UK_PID_INIT;
 
 	if (!pprocess_claim_pthread_exit(pthread, &became_empty))
 		return;
@@ -1093,7 +1096,7 @@ static void posix_thread_fini(struct uk_thread *thread)
 	if (became_empty &&
 	    pprocess_try_exit(pprocess, POSIX_PROCESS_EXITED, 0)) {
 		/* UK_PID_INIT cannot be waited, release here */
-		if (pprocess->pid == UK_PID_INIT)
+		if (init_process)
 			pprocess_release(pprocess);
 	}
 }

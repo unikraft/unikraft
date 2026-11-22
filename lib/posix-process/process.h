@@ -76,7 +76,6 @@ struct posix_process {
 #if CONFIG_LIBPOSIX_PROCESS_SIGNAL
 	struct uk_signal_pdesc *signal;
 #endif /* CONFIG_LIBPOSIX_PROCESS_SIGNAL */
-	struct uk_semaphore wait_semaphore;
 	struct uk_semaphore exit_semaphore;
 	enum posix_process_state state;
 	bool exiting;
@@ -101,6 +100,7 @@ struct posix_thread {
 	struct uk_thread *thread;
 	struct uk_alloc *_a;
 	enum posix_thread_state state;
+	struct uk_semaphore wait_semaphore;
 #if CONFIG_LIBPOSIX_PROCESS_SIGNAL
 	struct uk_signal_tdesc *signal;
 #endif /* CONFIG_LIBPOSIX_PROCESS_SIGNAL */
@@ -169,6 +169,7 @@ pid_t ukthread2pid(struct uk_thread *thread);
 
 bool pprocess_claim_pthread_exit(struct posix_thread *pthread,
 				 bool *became_empty);
+/* A successful process-exit claim owns a pin until its completion. */
 bool pprocess_claim_process_exit(struct posix_process *pprocess);
 bool pprocess_try_exit(struct posix_process *process,
 		       enum posix_process_state state,
