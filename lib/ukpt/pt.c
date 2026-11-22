@@ -11,14 +11,6 @@
 #include <uk/essentials.h>
 #include <uk/pt.h>
 
-/* Physical address of the page table hierarchy that is configured in
- * hardware, as far as this library knows. We only perform TLB maintenance
- * for the active hierarchy. If the platform has not told us which hierarchy
- * is active (see uk_pt_init_active(), uk_pt_activate()), we do not touch the
- * TLB at all.
- */
-static __paddr_t pt_active_pbase = UK_PAL_PADDR_INV;
-
 /* The attributes that can be changed on a live mapping without a
  * break-before-make.
  */
@@ -56,42 +48,28 @@ void uk_pt_term(struct uk_pt *pt)
 int uk_pt_init_active(struct uk_pt *pt)
 {
 	__paddr_t pt_pbase;
-	int rc;
 
 	pt_pbase = uk_pal_pt_read_base();
 	if (unlikely(pt_pbase == UK_PAL_PADDR_INV))
 		return -EFAULT;
 
-	rc = uk_pt_init(pt, pt_pbase);
-	if (unlikely(rc))
-		return rc;
-
-	pt_active_pbase = pt_pbase;
-
-	return 0;
+	return uk_pt_init(pt, pt_pbase);
 }
 
 int uk_pt_activate(struct uk_pt *pt)
 {
-	int rc;
-
 	UK_ASSERT(pt);
 	UK_ASSERT(pt->_pbase != UK_PAL_PADDR_INV);
 
-	rc = uk_pal_pt_write_base(pt->_pbase);
-	if (unlikely(rc))
-		return rc;
-
-	pt_active_pbase = pt->_pbase;
-
-	return 0;
+	return uk_pal_pt_write_base(pt->_pbase);
 }
 
 int uk_pt_isactive(struct uk_pt *pt)
 {
 	UK_ASSERT(pt);
 
-	return (pt->_pbase == pt_active_pbase);
+	return pt->_pbase != UK_PAL_PADDR_INV &&
+	       pt->_pbase == uk_pal_pt_read_base();
 }
 
 void uk_pt_flush_entry(struct uk_pt *pt, __vaddr_t vaddr)
