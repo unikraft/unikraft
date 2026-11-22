@@ -867,11 +867,46 @@ close_fds:
 		UK_CRASH("Prepared spawn retained a test file reference\n");
 }
 
+#if CONFIG_LIBPOSIX_PROCESS_FORK
+static bool prepare_kernel_fork_rejected(void)
+{
+	struct ukarch_execenv *env;
+	struct clone_args args = { .exit_signal = SIGCHLD };
+	int rc;
+
+	env = uk_zalloc(uk_sched_current()->a, sizeof(*env));
+	if (!env)
+		return false;
+	uk_lcpu_regs_set(env->regs, SP, (__uptr)(&env));
+	uk_lcpu_sysctx_set(env->sysctx, TLSP, uk_thread_current()->uktlsp);
+	rc = pprocess_fork(&args, sizeof(args), env);
+	uk_free(uk_sched_current()->a, env);
+	return rc == -ENOTSUP;
+}
+
+UK_TESTCASE(process_prepare, fork_rejects_kernel_context)
+{
+	struct posix_process *parent = uk_pprocess_current();
+	unsigned int children = prepare_children(parent);
+	unsigned int processes = prepare_processes();
+	unsigned long aliases = prepare_aliases();
+
+	UK_TEST_EXPECT(prepare_kernel_fork_rejected());
+	UK_TEST_EXPECT_SNUM_EQ(prepare_children(parent), children);
+	UK_TEST_EXPECT_SNUM_EQ(prepare_processes(), processes);
+	UK_TEST_EXPECT_SNUM_EQ(prepare_aliases(), aliases);
+	uk_pr_info("PROCESS_FORK_REJECT_PASS kernel_parent=1\n");
+}
+#endif
+
 struct prepare_pthread_run {
 	struct uk_vas *vas;
 	struct posix_process *process;
 	struct uk_sched *target;
 	struct uk_semaphore child_reaped;
+#if CONFIG_LIBPOSIX_PROCESS_FORK
+	bool kernel_fork_rejected;
+#endif
 	struct uk_semaphore done;
 	struct uk_semaphore finish;
 	struct uk_semaphore reaped;
@@ -932,6 +967,9 @@ static void prepare_pthread_parent(void *arg)
 	pid_t tid;
 	int rc;
 
+#if CONFIG_LIBPOSIX_PROCESS_FORK
+	p->kernel_fork_rejected = prepare_kernel_fork_rejected();
+#endif
 	for (unsigned int i = 0; i < 32; i++) {
 		__atomic_store_n(value, PREPARE_VALUE, __ATOMIC_RELAXED);
 		child = uk_thread_create_fn1(s->a, prepare_pthread_child, p,
@@ -1046,6 +1084,10 @@ UK_TESTCASE(process_prepare, owned_pthread_inherits_vas)
 	UK_TEST_EXPECT(probe.active);
 	UK_TEST_EXPECT(probe.visible);
 	UK_TEST_EXPECT(probe.balanced);
+#if CONFIG_LIBPOSIX_PROCESS_FORK
+	UK_TEST_EXPECT(probe.kernel_fork_rejected);
+	uk_pr_info("PROCESS_FORK_REJECT_PASS private_callback=1\n");
+#endif
 	UK_TEST_EXPECT(probe.remote);
 	UK_TEST_EXPECT((target != local) == (cpus > 1));
 	UK_TEST_EXPECT_NULL(pid2pprocess(pid));
