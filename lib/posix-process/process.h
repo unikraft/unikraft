@@ -319,6 +319,8 @@ int pprocess_exec_args_copy(struct uk_alloc *a, struct uk_vas *vas,
 			    __vaddr_t pathname, __vaddr_t argv, __vaddr_t envp,
 			    struct pprocess_exec_args **out);
 void pprocess_exec_args_free(struct pprocess_exec_args *args);
+int pprocess_execve_owned(struct ukarch_execenv *execenv, const char *pathname,
+			  char *const *argv, char *const *envp);
 
 int pprocess_fork(struct clone_args *args, size_t args_len,
 		  struct ukarch_execenv *execenv);

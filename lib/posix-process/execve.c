@@ -14,6 +14,9 @@
 #include <uk/thread.h>
 
 #include "process.h"
+#if CONFIG_LIBPOSIX_PROCESS_FORK
+#include <uk/vmem.h>
+#endif
 
 void execve_arch_execenv_init(struct ukarch_execenv *execenv_new,
 			      struct ukarch_execenv *execenv,
@@ -93,6 +96,12 @@ UK_SYSCALL_R_E_DEFINE(int, execve, const char *, pathname,
 	void *stack_old;
 	void *stack_new;
 	int rc = 0;
+
+#if CONFIG_LIBPOSIX_PROCESS_FORK
+	if (uk_pprocess_current() &&
+	    uk_vas_is_owned(uk_pprocess_current()->vas))
+		return pprocess_execve_owned(execenv, pathname, argv, envp);
+#endif
 
 	/* Linux deviates from POSIX by treating NULL pointers to
 	 * argv / envp equivalently to passing a list with a single
