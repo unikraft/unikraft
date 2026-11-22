@@ -327,6 +327,12 @@ struct uk_paging_free_entry {
 
 struct uk_paging_free_chunk;
 
+struct uk_paging_deferred_call {
+	struct uk_paging_deferred_call *next;
+	void (*release)(void *arg);
+	void *arg;
+};
+
 struct uk_paging_free_batch {
 	struct uk_pagetable *pt;
 	__vaddr_t min_vaddr;
@@ -336,6 +342,9 @@ struct uk_paging_free_batch {
 	unsigned int inline_count;
 	struct uk_paging_free_entry inline_entries[UK_PAGING_FREE_BATCH_INLINE];
 	struct uk_paging_free_chunk *chunks;
+#if CONFIG_LIBUKPAGING_DEFERRED_RELEASE
+	struct uk_paging_deferred_call *calls;
+#endif
 };
 
 struct uk_pagetable {
@@ -494,6 +503,21 @@ void uk_paging_free_batch_finish(struct uk_paging_free_batch *batch);
 void uk_paging_batch_begin(struct uk_paging_free_batch *batch,
 			   struct uk_pagetable *pt);
 void uk_paging_batch_end(struct uk_paging_free_batch *batch);
+
+#if CONFIG_LIBUKPAGING_DEFERRED_RELEASE
+/**
+ * Queue a release after the batch's local and remote TLB invalidations.
+ *
+ * The caller serializes access to the batch and keeps call and arg alive
+ * until uk_paging_free_batch_finish(). The call may only be queued once
+ * at a time. Its release function may free call and runs after all paging
+ * locks have been dropped. No allocation is required to queue a call.
+ * Callers must finish the batch even if a later page-table operation fails.
+ */
+void uk_paging_batch_defer(struct uk_paging_free_batch *batch,
+			   struct uk_paging_deferred_call *call,
+			   void (*release)(void *arg), void *arg);
+#endif
 
 /**
  * Returns the active page table (the one that defines the virtual address

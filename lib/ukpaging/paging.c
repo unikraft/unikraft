@@ -473,8 +473,27 @@ void uk_paging_free_batch_init(struct uk_paging_free_batch *batch,
 	batch->full_flush = 0;
 	batch->inline_count = 0;
 	batch->chunks = __NULL;
+#if CONFIG_LIBUKPAGING_DEFERRED_RELEASE
+	batch->calls = __NULL;
+#endif
 }
 
+#if CONFIG_LIBUKPAGING_DEFERRED_RELEASE
+void uk_paging_batch_defer(struct uk_paging_free_batch *batch,
+			   struct uk_paging_deferred_call *call,
+			   void (*release)(void *arg), void *arg)
+{
+	UK_ASSERT(batch && batch->pt);
+	UK_ASSERT(call);
+	UK_ASSERT(release);
+
+	call->release = release;
+	call->arg = arg;
+	call->next = batch->calls;
+	batch->calls = call;
+}
+
+#endif
 static inline void pg_batch_record_tlb(struct uk_paging_free_batch *batch,
 				       __vaddr_t vaddr, __sz page_size)
 {
@@ -662,6 +681,9 @@ pg_batch_shootdown_remote_tlbs(struct uk_paging_free_batch *batch __unused)
 void uk_paging_free_batch_finish(struct uk_paging_free_batch *batch)
 {
 	struct uk_paging_free_chunk *chunk, *next;
+#if CONFIG_LIBUKPAGING_DEFERRED_RELEASE
+	struct uk_paging_deferred_call *call, *calls;
+#endif
 	struct uk_pagetable *pt;
 	unsigned int i;
 
@@ -693,6 +715,16 @@ void uk_paging_free_batch_finish(struct uk_paging_free_batch *batch)
 	batch->chunks = __NULL;
 	batch->has_tlb_range = 0;
 	batch->full_flush = 0;
+
+#if CONFIG_LIBUKPAGING_DEFERRED_RELEASE
+	calls = batch->calls;
+	batch->calls = __NULL;
+	while (calls) {
+		call = calls;
+		calls = call->next;
+		call->release(call->arg);
+	}
+#endif
 }
 
 static inline int pg_pt_alloc(struct uk_pagetable *pt, __vaddr_t *pt_vaddr,

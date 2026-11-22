@@ -17,6 +17,13 @@ menuconfig LIBUKPAGING
 		For raw page table operations use libukpt.
 
 if LIBUKPAGING
+config LIBUKPAGING_DEFERRED_RELEASE
+	bool
+	default n
+	help
+		Release optional mapping backing references after local and
+		remote TLB invalidations have completed.
+
 config LIBUKPAGING_DIRECTMAP
 	bool
 	default y if ARCH_ARM_64 || ARCH_X86_64
