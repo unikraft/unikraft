@@ -219,6 +219,11 @@ struct virtqueue *virtqueue_create(__u16 queue_id, __u16 nr_descs, __u16 align,
 int virtqueue_is_full(struct virtqueue *vq);
 
 /**
+ * Return the number of currently available descriptors in the virtqueue.
+ */
+unsigned int virtqueue_desc_avail(struct virtqueue *vq);
+
+/**
  * Check the virtqueue if has any pending responses.
  * @param vq
  *	A reference to the virtqueue.

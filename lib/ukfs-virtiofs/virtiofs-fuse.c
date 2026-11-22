@@ -7,10 +7,12 @@
 #include <errno.h>
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 #include <sys/types.h>
 
 #include <uk/assert.h>
 #include <uk/atomic.h>
+#include <uk/paging.h>
 #include <uk/print.h>
 
 #include "virtiofs-fuse.h"
@@ -629,6 +631,91 @@ int virtiofs_fuse_link(struct virtiofs_fuse_dev *fdev, uint64_t node,
 	return check_reply_payload(rlen, &ohdr, sizeof(struct fuse_entry_out));
 }
 
+#define VIRTIOFS_MAX_DATA_SEGS 256U
+
+static inline
+size_t virtiofs_buf_pages(const void *base, size_t len)
+{
+	const size_t off = (uintptr_t)base & (UK_PAGING_PAGE_SIZE - 1);
+	size_t pages;
+
+	if (!len)
+		return 0;
+	pages = len / UK_PAGING_PAGE_SIZE;
+	pages += (off + (len % UK_PAGING_PAGE_SIZE) +
+		  UK_PAGING_PAGE_SIZE - 1) / UK_PAGING_PAGE_SIZE;
+	return pages;
+}
+
+static inline
+size_t virtiofs_max_bytes_for_segs(const void *base, size_t max_segs)
+{
+	const size_t off = (uintptr_t)base & (UK_PAGING_PAGE_SIZE - 1);
+	const size_t first = UK_PAGING_PAGE_SIZE - off;
+
+	if (!max_segs)
+		return 0;
+	if (max_segs == 1)
+		return first;
+	return first + (max_segs - 1) * UK_PAGING_PAGE_SIZE;
+}
+
+static
+int virtiofs_limit_iov(const struct iovec *iov, size_t iovcnt,
+		       uint32_t req_size, uint32_t byte_limit,
+		       size_t max_segs, bool strict_len,
+		       size_t *out_count, struct iovec *out_tail,
+		       uint32_t *out_size)
+{
+	const uint32_t target = byte_limit ? MIN(req_size, byte_limit) :
+					     req_size;
+	size_t count = 0;
+	size_t rem = target;
+	size_t segs_left = max_segs;
+
+	out_tail->iov_base = NULL;
+	out_tail->iov_len = 0;
+	*out_count = 0;
+	*out_size = 0;
+	if (!target)
+		return 0;
+
+	while (count < iovcnt && rem > 0 && segs_left > 0) {
+		const size_t iov_len = iov[count].iov_len;
+
+		if (!iov_len) {
+			count++;
+			continue;
+		}
+		const size_t take = MIN(iov_len, rem);
+		const size_t pages = virtiofs_buf_pages(iov[count].iov_base,
+							take);
+
+		if (pages <= segs_left && take == iov_len) {
+			rem -= take;
+			segs_left -= pages;
+			count++;
+			continue;
+		}
+		const size_t seg_cap = virtiofs_max_bytes_for_segs(
+			iov[count].iov_base, segs_left);
+		const size_t part = MIN(take, seg_cap);
+
+		if (part > 0) {
+			out_tail->iov_base = iov[count].iov_base;
+			out_tail->iov_len = part;
+			rem -= part;
+		}
+		break;
+	}
+
+	if (strict_len && rem > 0 && count == iovcnt)
+		return -EINVAL;
+	*out_count = count;
+	*out_size = target - (uint32_t)rem;
+	return *out_size ? 0 : -EINVAL;
+}
+
 int virtiofs_fuse_open(struct virtiofs_fuse_dev *fdev, uint64_t node,
 		       uint32_t flags, struct fuse_open_out *out)
 {
@@ -688,7 +775,7 @@ ssize_t virtiofs_fuse_write(struct virtiofs_fuse_dev *fdev, uint64_t node,
 	struct fuse_write_out out;
 	struct fuse_out_header ohdr;
 	struct iovec tail;
-	size_t count = 0, remaining;
+	size_t count = 0;
 	size_t paylen;
 	ssize_t rlen;
 	int err;
@@ -697,18 +784,10 @@ ssize_t virtiofs_fuse_write(struct virtiofs_fuse_dev *fdev, uint64_t node,
 		return 0;
 	if (!fdev->max_write)
 		return -EPROTO;
-	limited.size = MIN(in->size, fdev->max_write);
-	remaining = limited.size;
-	while (count < iovcnt && write_iov[count].iov_len <= remaining) {
-		remaining -= write_iov[count].iov_len;
-		count++;
-	}
-	if (remaining) {
-		if (count == iovcnt)
-			return -EINVAL;
-		tail.iov_base = write_iov[count].iov_base;
-		tail.iov_len = remaining;
-	}
+	err = virtiofs_limit_iov(write_iov, iovcnt, in->size, fdev->max_write,
+				 SIZE_MAX, true, &count, &tail, &limited.size);
+	if (unlikely(err))
+		return err;
 	const struct uk_virtiofs_iovec ihdr_iov[] = {
 		{ &hdr, sizeof(hdr) }, { &limited, sizeof(limited) }
 	};
@@ -718,7 +797,8 @@ ssize_t virtiofs_fuse_write(struct virtiofs_fuse_dev *fdev, uint64_t node,
 	const struct uk_virtiofs_iovecs iovecs[] = {
 		{ ihdr_iov, 2 },
 		{ (const struct uk_virtiofs_iovec *)write_iov, count },
-		{ (const struct uk_virtiofs_iovec *)&tail, remaining ? 1 : 0 },
+		{ (const struct uk_virtiofs_iovec *)&tail,
+		  tail.iov_len ? 1 : 0 },
 		{ ohdr_iov, 2 }
 	};
 
@@ -726,7 +806,7 @@ ssize_t virtiofs_fuse_write(struct virtiofs_fuse_dev *fdev, uint64_t node,
 		return -EDOM;
 	init_hdr(fdev, &hdr, FUSE_WRITE, paylen);
 	rlen = uk_virtiofs_request_vec(fdev->dev, iovecs, 4,
-				       2 + count + (remaining ? 1 : 0), 2);
+				       2 + count + (tail.iov_len ? 1 : 0), 2);
 	if ((err = check_reply_payload(rlen, &ohdr, sizeof(out))))
 		return err;
 	return out.size <= limited.size ? (ssize_t)out.size : -EIO;

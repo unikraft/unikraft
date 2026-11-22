@@ -41,6 +41,7 @@
 #include <uk/config.h>
 #include <uk/errptr.h>
 #include <uk/paging.h>
+#include <uk/plat/spinlock.h>
 #include <uk/print.h>
 #include <uk/sglist.h>
 
@@ -68,6 +69,7 @@ struct virtqueue_vring {
 	struct vring vring;
 	/* Reference to the vring */
 	void   *vring_mem;
+	__spinlock lock;
 	/* Keep track of available descriptors */
 	__u16 desc_avail;
 	/* Index of the next available slot */
@@ -98,6 +100,21 @@ static inline int virtqueue_buffer_enqueue_segments(
 static void virtqueue_vring_init(struct virtqueue_vring *vrq, __u16 nr_desc,
 				 __u16 align);
 
+static inline int virtqueue_hasdata_locked(struct virtqueue_vring *vrq)
+{
+	return (vrq->last_used_desc_idx != UK_READ_ONCE(vrq->vring.used->idx));
+}
+
+static inline void virtqueue_intr_disable_locked(struct virtqueue_vring *vrq)
+{
+	if (vrq->uses_event_idx) {
+		vring_used_event(&vrq->vring) =
+			vrq->last_used_desc_idx - vrq->vring.num - 1;
+		return;
+	}
+	vrq->vring.avail->flags |= (VRING_AVAIL_F_NO_INTERRUPT);
+}
+
 /**
  * Driver implementation
  */
@@ -108,25 +125,15 @@ void virtqueue_intr_disable(struct virtqueue *vq)
 	UK_ASSERT(vq);
 
 	vrq = to_virtqueue_vring(vq);
-
-	if (vrq->uses_event_idx) {
-		vring_used_event(&vrq->vring) =
-			vrq->last_used_desc_idx - vrq->vring.num - 1;
-		return;
-	}
-	vrq->vring.avail->flags |= (VRING_AVAIL_F_NO_INTERRUPT);
+	virtqueue_intr_disable_locked(vrq);
 }
 
-int virtqueue_intr_enable(struct virtqueue *vq)
+static inline int virtqueue_intr_enable_locked(struct virtqueue_vring *vrq)
 {
-	struct virtqueue_vring *vrq;
 	int rc = 0;
 
-	UK_ASSERT(vq);
-
-	vrq = to_virtqueue_vring(vq);
 	/* Check if there are no more packets enabled */
-	if (!virtqueue_hasdata(vq)) {
+	if (!virtqueue_hasdata_locked(vrq)) {
 		if (vrq->uses_event_idx) {
 			/* TODO: This allows delaying the interrupts by a
 			 *       adjustable count of descriptors. This is could
@@ -151,8 +158,8 @@ int virtqueue_intr_enable(struct virtqueue *vq)
 		 */
 		uk_arch_mb();
 		/* Check if there are further descriptors */
-		if (virtqueue_hasdata(vq)) {
-			virtqueue_intr_disable(vq);
+		if (virtqueue_hasdata_locked(vrq)) {
+			virtqueue_intr_disable_locked(vrq);
 			rc = 1;
 		}
 	} else {
@@ -163,6 +170,16 @@ int virtqueue_intr_enable(struct virtqueue *vq)
 		rc = 1;
 	}
 	return rc;
+}
+
+int virtqueue_intr_enable(struct virtqueue *vq)
+{
+	struct virtqueue_vring *vrq;
+
+	UK_ASSERT(vq);
+
+	vrq = to_virtqueue_vring(vq);
+	return virtqueue_intr_enable_locked(vrq);
 }
 
 static inline void virtqueue_ring_update_avail(struct virtqueue_vring *vrq,
@@ -205,13 +222,10 @@ static inline void virtqueue_detach_desc(struct virtqueue_vring *vrq,
 	vrq->head_free_desc = head_idx;
 }
 
-static int virtqueue_notify_enabled(struct virtqueue *vq)
+static inline int virtqueue_notify_enabled_locked(struct virtqueue_vring *vrq)
 {
-	struct virtqueue_vring *vrq;
 	__u16 old, new;
 
-	UK_ASSERT(vq);
-	vrq = to_virtqueue_vring(vq);
 	if (vrq->uses_event_idx) {
 		new = vrq->vring.avail->idx;
 		old = vrq->last_notified_idx;
@@ -238,7 +252,7 @@ void virtqueue_host_notify(struct virtqueue *vq)
 	 */
 	uk_arch_mb();
 
-	if (vq->vq_notify_host && virtqueue_notify_enabled(vq)) {
+	if (vq->vq_notify_host && virtqueue_notify_enabled_locked(vrq)) {
 		uk_pr_debug_isr("notify queue %d\n", vq->queue_id);
 		vrq->last_notified_idx = vrq->vring.avail->idx;
 		vq->vq_notify_host(vq->vdev, vq->queue_id);
@@ -278,7 +292,7 @@ int virtqueue_hasdata(struct virtqueue *vq)
 	UK_ASSERT(vq);
 
 	vring = to_virtqueue_vring(vq);
-	return (vring->last_used_desc_idx != vring->vring.used->idx);
+	return virtqueue_hasdata_locked(vring);
 }
 
 __u64 virtqueue_feature_negotiate(__u64 feature_set)
@@ -353,18 +367,14 @@ unsigned int virtqueue_vring_get_num(struct virtqueue *vq)
 	return vrq->vring.num;
 }
 
-int virtqueue_buffer_dequeue(struct virtqueue *vq, void **cookie, __u32 *len)
+static int virtqueue_buffer_dequeue_locked(struct virtqueue_vring *vrq,
+					   void **cookie, __u32 *len)
 {
-	struct virtqueue_vring *vrq = NULL;
 	__u16 used_idx, head_idx;
 	struct vring_used_elem *elem;
 
-	UK_ASSERT(vq);
-	UK_ASSERT(cookie);
-	vrq = to_virtqueue_vring(vq);
-
 	/* No new descriptor since last dequeue operation */
-	if (!virtqueue_hasdata(vq))
+	if (!virtqueue_hasdata_locked(vrq))
 		return -ENOMSG;
 	used_idx = vrq->last_used_desc_idx++ & (vrq->vring.num - 1);
 	elem = &vrq->vring.used->ring[used_idx];
@@ -382,17 +392,23 @@ int virtqueue_buffer_dequeue(struct virtqueue *vq, void **cookie, __u32 *len)
 	return (vrq->vring.num - vrq->desc_avail);
 }
 
-int virtqueue_buffer_enqueue(struct virtqueue *vq, void *cookie,
-			     struct uk_sglist *sg, __u16 read_bufs,
-			     __u16 write_bufs)
+int virtqueue_buffer_dequeue(struct virtqueue *vq, void **cookie, __u32 *len)
 {
-	__u32 total_desc = 0;
-	__u16 head_idx = 0, idx = 0;
 	struct virtqueue_vring *vrq = NULL;
 
 	UK_ASSERT(vq);
-
+	UK_ASSERT(cookie);
 	vrq = to_virtqueue_vring(vq);
+	return virtqueue_buffer_dequeue_locked(vrq, cookie, len);
+}
+
+static int virtqueue_buffer_enqueue_locked(struct virtqueue_vring *vrq,
+					   void *cookie, struct uk_sglist *sg,
+					   __u16 read_bufs, __u16 write_bufs)
+{
+	__u32 total_desc = 0;
+	__u16 head_idx = 0, idx = 0;
+
 	total_desc = read_bufs + write_bufs;
 	if (unlikely(total_desc < 1 || total_desc > vrq->vring.num)) {
 		uk_pr_err_isr("%"__PRIu32" invalid number of descriptor\n",
@@ -424,6 +440,19 @@ int virtqueue_buffer_enqueue(struct virtqueue *vq, void *cookie,
 
 	virtqueue_ring_update_avail(vrq, head_idx);
 	return vrq->desc_avail;
+}
+
+int virtqueue_buffer_enqueue(struct virtqueue *vq, void *cookie,
+			     struct uk_sglist *sg, __u16 read_bufs,
+			     __u16 write_bufs)
+{
+	struct virtqueue_vring *vrq = NULL;
+
+	UK_ASSERT(vq);
+
+	vrq = to_virtqueue_vring(vq);
+	return virtqueue_buffer_enqueue_locked(vrq, cookie, sg,
+					       read_bufs, write_bufs);
 }
 
 static void virtqueue_vring_init(struct virtqueue_vring *vrq, __u16 nr_desc,
@@ -545,6 +574,7 @@ struct virtqueue *virtqueue_create(__u16 queue_id, __u16 nr_descs, __u16 align,
 		rc = -ENOMEM;
 		goto err_exit;
 	}
+	ukarch_spin_init(&vrq->lock);
 
 	ring_size = vring_size(nr_descs, align);
 	vrq->vring_mem = virtqueue_vring_alloc(a, ring_size);
@@ -596,4 +626,14 @@ int virtqueue_is_full(struct virtqueue *vq)
 
 	vrq = to_virtqueue_vring(vq);
 	return (vrq->desc_avail == 0);
+}
+
+unsigned int virtqueue_desc_avail(struct virtqueue *vq)
+{
+	struct virtqueue_vring *vrq;
+
+	UK_ASSERT(vq);
+
+	vrq = to_virtqueue_vring(vq);
+	return vrq->desc_avail;
 }

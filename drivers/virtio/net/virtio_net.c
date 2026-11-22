@@ -34,6 +34,7 @@
 #include <uk/sglist.h>
 #include <uk/arch/types.h>
 #include <uk/arch/limits.h>
+#include <uk/plat/spinlock.h>
 #include <uk/netbuf.h>
 #include <uk/netdev.h>
 #include <uk/netdev_core.h>
@@ -107,6 +108,7 @@ struct uk_netdev_tx_queue {
 	__u16 nb_desc;
 	/* The flag to interrupt on the transmit queue */
 	__u8 intr_enabled;
+	__spinlock lock;
 	/* Reference to the uk_netdev */
 	struct uk_netdev *ndev;
 	/* The scatter list and its associated fragements */
@@ -130,6 +132,7 @@ struct uk_netdev_rx_queue {
 	__u16 nb_desc;
 	/* The flag to interrupt on the transmit queue */
 	__u8 intr_enabled;
+	__spinlock lock;
 	/* User-provided receive buffer allocation function */
 	uk_netdev_alloc_rxpkts alloc_rxpkts;
 	void *alloc_rxpkts_argp;
@@ -1235,6 +1238,7 @@ static int virtio_netdev_rxtx_alloc(struct virtio_net_device *vndev,
 		 */
 		vndev->rxqs[i].hwvq_id = 2 * i;
 		vndev->rxqs[i].max_nb_desc = qdesc_size[vndev->rxqs[i].hwvq_id];
+		ukarch_spin_init(&vndev->rxqs[i].lock);
 		uk_sglist_init(&vndev->rxqs[i].sg,
 			       (sizeof(vndev->rxqs[i].sgsegs) /
 				sizeof(vndev->rxqs[i].sgsegs[0])),
@@ -1246,6 +1250,7 @@ static int virtio_netdev_rxtx_alloc(struct virtio_net_device *vndev,
 		 */
 		vndev->txqs[i].hwvq_id = (2 * i) + 1;
 		vndev->txqs[i].max_nb_desc = qdesc_size[vndev->txqs[i].hwvq_id];
+		ukarch_spin_init(&vndev->txqs[i].lock);
 		uk_sglist_init(&vndev->txqs[i].sg,
 			       (sizeof(vndev->txqs[i].sgsegs) /
 				sizeof(vndev->txqs[i].sgsegs[0])),
