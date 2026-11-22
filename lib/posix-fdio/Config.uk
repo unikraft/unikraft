@@ -10,6 +10,13 @@ menuconfig LIBPOSIX_FDIO
 
 if LIBPOSIX_FDIO
 
+config LIBPOSIX_FDIO_ASYNC
+	bool
+	depends on LIBPOSIX_PROCESS_SIGNAL && LIBPOSIX_FD_HEAPOFD
+	depends on LIBUKLOCK_SEMAPHORE
+	select LIBUKFILE_CHAINUPDATE
+	default y
+
 config LIBPOSIX_FDIO_VMA
 	bool "File memory mappings"
 	depends on LIBUKVMEM
