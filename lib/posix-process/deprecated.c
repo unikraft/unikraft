@@ -46,6 +46,8 @@
 #include <uk/thread.h>
 #endif
 
+#include "process.h"
+
 #define UNIKRAFT_PGID     0
 #define UNIKRAFT_PROCESS_PRIO 0
 
@@ -308,10 +310,22 @@ int uk_sys_prlimit64(int pid, unsigned int resource,
 	if (!old_limit)
 		return 0;
 	switch (resource) {
-	case RLIMIT_STACK:
-		old_limit->rlim_cur = __STACK_SIZE;
-		old_limit->rlim_max = __STACK_SIZE;
+	case RLIMIT_STACK: {
+		__sz size = 0;
+
+#if CONFIG_LIBPOSIX_PROCESS_MULTITHREADING
+		struct uk_thread *current = uk_thread_current();
+		struct posix_thread *thread = NULL;
+
+		if (current && (current->flags & UK_THREADF_UKTLS))
+			thread = uk_thread_uktls_var(current, pthread_self);
+		if (thread)
+			size = pprocess_program_stack_size(thread->process);
+#endif /* CONFIG_LIBPOSIX_PROCESS_MULTITHREADING */
+		old_limit->rlim_cur = size ? size : __STACK_SIZE;
+		old_limit->rlim_max = old_limit->rlim_cur;
 		break;
+	}
 	case RLIMIT_AS:
 		old_limit->rlim_cur = RLIM_INFINITY;
 		old_limit->rlim_max = RLIM_INFINITY;

@@ -85,6 +85,15 @@ config LIBPOSIX_PROCESS_EXECVE
 	depends on HAVE_VFS
 	select LIBUKBINFMT
 
+config LIBPOSIX_PROCESS_EXEC_STACK_NBPAGES
+	int "Default exec program stack size (number of pages)"
+	depends on LIBPOSIX_PROCESS_EXECVE
+	range 1 2147483647
+	default 2048
+	help
+	  Size of a new program stack when the process has not yet recorded
+	  a program stack. The default is 8 MiB with 4 KiB pages.
+
 endif
 
 config LIBPOSIX_PROCESS_MULTIPROCESS

@@ -52,9 +52,8 @@ static int exec_owned_check(struct posix_thread *self,
 	return rc;
 }
 
-static int exec_owned_stack(struct uk_vas *vas, __vaddr_t *top)
+static int exec_owned_stack(struct uk_vas *vas, __sz size, __vaddr_t *top)
 {
-	const __sz size = STACK_SIZE;
 	__vaddr_t base;
 	int rc;
 
@@ -95,6 +94,7 @@ int pprocess_execve_owned(struct ukarch_execenv *execenv, const char *pathname,
 	struct posix_thread *self = uk_pthread_current();
 	struct posix_process *process = self->process;
 	struct uk_thread *current = self->thread;
+	const __sz stack_size = pprocess_exec_stack_size(process);
 	struct uk_vas *old = process->vas, *vas = NULL;
 	struct uk_alloc *a = uk_vas_get_kernel()->a;
 	struct pprocess_exec_args *args = NULL;
@@ -128,7 +128,7 @@ int pprocess_execve_owned(struct ukarch_execenv *execenv, const char *pathname,
 	if (rc)
 		goto out;
 #endif
-	rc = exec_owned_stack(vas, &top);
+	rc = exec_owned_stack(vas, stack_size, &top);
 	if (rc)
 		goto out;
 	storage = uk_malloc(a, UKARCH_EXECENV_SIZE + UKARCH_EXECENV_END_ALIGN);
@@ -145,7 +145,7 @@ int pprocess_execve_owned(struct ukarch_execenv *execenv, const char *pathname,
 	loader.progname = args->argc ? DECONST(char *, args->argv[0]) : "";
 	loader.argv = args->argv;
 	loader.envp = args->envp;
-	loader.stack_size = STACK_SIZE;
+	loader.stack_size = stack_size;
 	loader.ctx.sp = top;
 	/* Only shared kernel storage is used until the new context is ready. */
 	rc = uk_thread_set_vas(current, vas);
@@ -171,6 +171,7 @@ int pprocess_execve_owned(struct ukarch_execenv *execenv, const char *pathname,
 	}
 	/* Commit: allocation and image preparation have finished. */
 	process->execed = true;
+	pprocess_record_stack_size(process, stack_size);
 	process->vas = vas;
 	vas = NULL; /* Transfer the prepared reference to the process. */
 #if CONFIG_LIBPOSIX_PROCESS_BRK

@@ -80,6 +80,7 @@ int pprocess_fork(struct clone_args *args, size_t args_len,
 		rc = PTR2ERR(process);
 		goto release_child;
 	}
+	process->program_stack_size = pprocess_program_stack_size(parent);
 	/* Only vfork needs a waiter link to the calling thread. */
 	uk_thread_uktls_var(child, pthread_self)->parent = NULL;
 	rc = pprocess_clone_prepared_vas(process, parent);

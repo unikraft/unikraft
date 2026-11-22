@@ -368,6 +368,11 @@ int uk_clone(struct clone_args *cl_args, size_t cl_args_len,
 			goto err_free_child;
 		}
 
+		if (flags & CLONE_VFORK) {
+			__sz size = pprocess_program_stack_size(pprocess);
+
+			pprocess_record_stack_size(child_process, size);
+		}
 		if (cl_args->exit_signal)
 			child_process->exit_signal = cl_args->exit_signal;
 		else

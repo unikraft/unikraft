@@ -67,4 +67,5 @@ uk_posix_process_abort_prepared
 uk_posix_process_create_pthread
 uk_posix_process_prepare_spawn
 uk_posix_process_publish_prepared
+uk_posix_process_set_stack_size
 uk_posix_process_run
