@@ -8,6 +8,9 @@
 #include <errno.h>
 
 #include "vmem.h"
+#if CONFIG_LIBUKVMEM_COW_VMA
+#include "cow_vma.h"
+#endif
 
 #include <uk/essentials.h>
 #include <uk/arch/limits.h>
@@ -212,6 +215,9 @@ int uk_vas_init(struct uk_vas *vas, struct uk_pagetable *pt __maybe_unused,
 #if CONFIG_LIBUKVMEM_COW
 	vas->transition = NULL;
 #endif
+#if CONFIG_LIBUKVMEM_COW_VMA
+	vas->cow = NULL;
+#endif
 
 	UK_INIT_LIST_HEAD(&vas->vma_list);
 
@@ -285,6 +291,9 @@ void uk_vas_destroy(struct uk_vas *vas)
 
 	uk_paging_free_batch_finish(&batch);
 	vmem_vma_destroy_list(&dead_vmas);
+#if CONFIG_LIBUKVMEM_COW_VMA
+	vmem_cow_vas_destroy(vas);
+#endif
 }
 
 static void vmem_vma_destroy(struct uk_vma *vma)

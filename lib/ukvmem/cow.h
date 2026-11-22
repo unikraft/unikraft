@@ -11,6 +11,9 @@ struct uk_alloc;
 struct uk_falloc;
 struct vmem_cow_page;
 
+/* Object size for resident frame-ownership metadata allocators. */
+__sz vmem_cow_page_metadata_size(void);
+
 /*
  * One reference per mapping, including mappings awaiting TLB invalidation.
  * The containing object must outlive retirement. Access to an individual

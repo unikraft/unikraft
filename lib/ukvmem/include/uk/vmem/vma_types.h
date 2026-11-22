@@ -72,6 +72,9 @@ static inline int uk_vma_reserve_ex(struct uk_vas *vas, __vaddr_t *vaddr,
  * contents is lost when the memory is unmapped. Demand paging is supported.
  */
 extern const struct uk_vma_ops uk_vma_anon_ops;
+#if CONFIG_LIBUKVMEM_COW_VMA
+extern const struct uk_vma_ops uk_vma_cow_anon_ops;
+#endif
 
 /**
  * Creates a new anonymous memory mapping. See uk_vma_map() for a description
@@ -81,6 +84,11 @@ static inline int uk_vma_map_anon(struct uk_vas *vas, __vaddr_t *vaddr,
 				  __sz len, unsigned long attr,
 				  unsigned long flags, const char *name)
 {
+#if CONFIG_LIBUKVMEM_COW_VMA
+	if (vas->cow)
+		return uk_vma_map(vas, vaddr, len, attr, flags, name,
+				  &uk_vma_cow_anon_ops, __NULL);
+#endif
 	return uk_vma_map(vas, vaddr, len, attr, flags, name,
 			  &uk_vma_anon_ops, __NULL);
 }
