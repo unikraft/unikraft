@@ -476,6 +476,8 @@ int uk_vas_clone_cow(struct uk_vas *dst, struct uk_vas *src)
 	/* Validate every class before changing source permissions. */
 	uk_list_for_each_entry(vma, &src->vma_list, vma_list) {
 		if (vma->ops != &uk_vma_cow_anon_ops ||
+		    !vmem_vas_range_allowed(dst, vma->start,
+					vma->end - vma->start) ||
 		    vma->page_lvl > UK_PAGING_PAGE_LEVEL ||
 		    uk_paging_pt_get_owner(src->pt, vma->start) != src->pt ||
 		    uk_paging_pt_get_owner(src->pt, vma->end - 1) != src->pt ||

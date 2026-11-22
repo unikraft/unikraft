@@ -3,6 +3,7 @@ uk_vas_get_kernel
 uk_vas_set_kernel
 uk_vas_set_active
 uk_vas_init
+uk_vas_set_bounds
 uk_vas_destroy
 uk_vas_paging_savef
 uk_vas_paging_restoref

@@ -75,6 +75,11 @@ struct uk_vas {
 
 	/** Base address where to start putting new VMAs */
 	__vaddr_t vma_base;
+#if CONFIG_LIBUKVMEM_VAS_BOUNDS
+	/** Optional allocation interval [start, end); zero end is unbounded. */
+	__vaddr_t range_start;
+	__vaddr_t range_end;
+#endif
 #endif /* CONFIG_LIBUKPAGING */
 
 	/** List of VMAs, sorted by address */
@@ -499,6 +504,17 @@ int uk_vas_store_u32(struct uk_vas *vas, __vaddr_t vaddr, __u32 value);
  */
 int uk_vas_init(struct uk_vas *vas, struct uk_pagetable *pt,
 		struct uk_alloc *a);
+
+#if CONFIG_LIBUKVMEM_VAS_BOUNDS
+/**
+ * Limit VMA placement to the page-aligned interval [start, end).
+ * The initialized VAS must be inactive, empty and unpublished; the caller
+ * retains exclusive ownership while configuring it. Existing page-table
+ * mappings are not changed. Fixed and automatic VMA placements both obey
+ * this interval, including replacements.
+ */
+int uk_vas_set_bounds(struct uk_vas *vas, __vaddr_t start, __vaddr_t end);
+#endif
 
 #if CONFIG_LIBUKVMEM_VAS_REFCOUNT
 /**
