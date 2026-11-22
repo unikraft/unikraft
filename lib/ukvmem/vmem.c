@@ -96,6 +96,10 @@ int uk_vas_init(struct uk_vas *vas, struct uk_pagetable *pt __maybe_unused,
 	UK_ASSERT(a);
 
 	vas->a = a;
+#if CONFIG_LIBUKVMEM_VAS_REFCOUNT
+	uk_refcount_init(&vas->refs, 1);
+	vas->release = __NULL;
+#endif
 
 #ifdef CONFIG_LIBUKPAGING
 	vas->pt = pt;
@@ -111,6 +115,37 @@ int uk_vas_init(struct uk_vas *vas, struct uk_pagetable *pt __maybe_unused,
 
 	return 0;
 }
+
+#if CONFIG_LIBUKVMEM_VAS_REFCOUNT
+int uk_vas_init_owned(struct uk_vas *vas, struct uk_pagetable *pt,
+		      struct uk_alloc *a, void (*release)(struct uk_vas *))
+{
+	int rc;
+
+	if (!release)
+		return -EINVAL;
+	rc = uk_vas_init(vas, pt, a);
+	if (!rc)
+		vas->release = release;
+	return rc;
+}
+
+struct uk_vas *uk_vas_get(struct uk_vas *vas)
+{
+	if (uk_vas_is_owned(vas))
+		uk_refcount_acquire(&vas->refs);
+	return vas;
+}
+
+void uk_vas_put(struct uk_vas *vas)
+{
+	if (!uk_vas_is_owned(vas) || !uk_refcount_release(&vas->refs))
+		return;
+	UK_ASSERT(vas != uk_vas_get_active());
+	UK_ASSERT(!uk_lcpu_irqs_disabled());
+	vas->release(vas);
+}
+#endif
 
 void uk_vas_destroy(struct uk_vas *vas)
 {

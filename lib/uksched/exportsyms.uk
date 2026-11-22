@@ -44,3 +44,4 @@ __uk_sched_thread_current
 sched_yield
 sched_getaffinity
 sched_setaffinity
+uk_thread_set_vas

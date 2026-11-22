@@ -27,6 +27,11 @@ config LIBUKVMEM_COW
 	select LIBUKPAGING_DEFERRED_RELEASE
 	default n
 
+config LIBUKVMEM_VAS_REFCOUNT
+	bool
+	depends on LIBUKVMEM_THREAD_VAS
+	default n
+
 config LIBUKVMEM_COW_TEST
 	bool "Test copy-on-write frame lifetime"
 	depends on HAVE_SCHED

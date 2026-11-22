@@ -68,6 +68,11 @@ struct uk_thread {
 #if CONFIG_LIBUKVMEM_THREAD_VAS
 	/** Borrowed address space. NULL selects the kernel address space. */
 	struct uk_vas *vas;
+#if CONFIG_LIBUKVMEM_VAS_REFCOUNT
+	/** Acquired by uk_thread_set_vas; retained through thread release. */
+	struct uk_vas *vas_ref;
+	bool vas_releasing;
+#endif
 #endif
 	struct uk_waitq_ticket wait_ticket;
 
@@ -677,6 +682,18 @@ struct uk_thread *uk_thread_create_fn2(struct uk_alloc *a,
 				       uk_thread_dtor_t dtor);
 
 void uk_thread_release(struct uk_thread *t);
+#if CONFIG_LIBUKVMEM_VAS_REFCOUNT
+/**
+ * Bind a current or unpublished thread to a VAS; NULL selects the kernel VAS.
+ * Caller serializes binding and publication and holds the new VAS live.
+ * An owned VAS is pinned through thread release. The current thread switches
+ * page tables before dropping its old reference. Switching an active VAS or
+ * replacing an owned reference requires IRQs enabled and no caller locks.
+ * Returns -ESRCH for an exiting thread, -EBUSY for a scheduled foreign
+ * thread, -EWOULDBLOCK for an unsafe IRQ state, or the activation error.
+ */
+int uk_thread_set_vas(struct uk_thread *t, struct uk_vas *vas);
+#endif
 void uk_thread_block_until(struct uk_thread *thread, __snsec until);
 void uk_thread_block_timeout(struct uk_thread *thread, __nsec nsec);
 void uk_thread_block(struct uk_thread *thread);

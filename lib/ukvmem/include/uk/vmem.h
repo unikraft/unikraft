@@ -39,6 +39,9 @@
 #include <uk/arch/types.h>
 #include <uk/list.h>
 #include <uk/alloc.h>
+#if CONFIG_LIBUKVMEM_VAS_REFCOUNT
+#include <uk/refcount.h>
+#endif
 #ifdef CONFIG_LIBUKPAGING
 #include <uk/paging.h>
 #endif /* CONFIG_LIBUKPAGING */
@@ -56,6 +59,11 @@ struct uk_vma_ops;
 struct uk_vas {
 	/** Allocator to use for VMAs */
 	struct uk_alloc *a;
+#if CONFIG_LIBUKVMEM_VAS_REFCOUNT
+	/** Present only for address spaces with an explicit final release. */
+	__atomic refs;
+	void (*release)(struct uk_vas *vas);
+#endif
 
 #ifdef CONFIG_LIBUKPAGING
 	/** Page table that represents the virtual address space */
@@ -423,6 +431,28 @@ int uk_vas_set_active(struct uk_vas *vas);
  */
 int uk_vas_init(struct uk_vas *vas, struct uk_pagetable *pt,
 		struct uk_alloc *a);
+
+#if CONFIG_LIBUKVMEM_VAS_REFCOUNT
+/**
+ * Initialize an owned VAS with one caller reference. The final release owns
+ * cleanup of its VMAs, page table and containing object. It runs with IRQs
+ * enabled and after the VAS is no longer active on any CPU. Each activation
+ * and thread binding must retain a reference until leaving that VAS.
+ */
+int uk_vas_init_owned(struct uk_vas *vas, struct uk_pagetable *pt,
+		      struct uk_alloc *a, void (*release)(struct uk_vas *));
+
+/** Acquire a caller-held live reference; unowned VAS and NULL are unchanged. */
+struct uk_vas *uk_vas_get(struct uk_vas *vas);
+
+/** Drop a reference outside locks; a final release requires IRQs enabled. */
+void uk_vas_put(struct uk_vas *vas);
+
+static inline int uk_vas_is_owned(const struct uk_vas *vas)
+{
+	return vas && vas->release;
+}
+#endif
 
 /**
  * Unmaps and frees all VMAs in the virtual address space and finalizes the
