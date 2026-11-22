@@ -55,4 +55,11 @@ if LIBUKLOCK
 		default y
 		help
 			Enable reader-writer based synchronization
+
+	config LIBUKLOCK_RWLOCK_SMP_TEST
+		bool "Test reader-writer lock contention across CPUs"
+		depends on LIBUKLOCK_RWLOCK && HAVE_SMP
+		select LIBUKLOCK_SEMAPHORE
+		select LIBUKTEST
+		default n
 endif
