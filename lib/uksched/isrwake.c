@@ -12,6 +12,7 @@ void uk_thread_wake_isr(struct uk_thread *thread)
 	unsigned long flags;
 
 	flags = uk_lcpu_save_irqf();
-	_uk_thread_wake_transition(thread, false, uk_sched_thread_woken_isr);
+	_uk_thread_wake_transition(thread, UK_THREAD_WAKE_NORMAL,
+				   uk_sched_thread_woken_isr);
 	uk_lcpu_restore_irqf(flags);
 }

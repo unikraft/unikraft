@@ -40,6 +40,8 @@ uk_thread_block_timeout
 uk_thread_block
 uk_thread_block_interruptible
 uk_thread_interrupt_wait
+uk_thread_block_sigintr
+uk_thread_signal_wait
 uk_thread_wake
 uk_thread_wake_isr
 __uk_sched_thread_current

@@ -311,13 +311,18 @@ uk_pollevent _uk_pollq_lock(struct uk_pollq *q, uk_pollevent req,
  */
 static inline
 int _uk_pollq_wait(struct uk_pollq *q, uk_pollevent req, __nsec deadline,
-		   bool interruptible)
+		   int kind)
 {
 	/* Mark request in waitmask */
 	(void)uk_or(&q->waitmask, req);
 	/* Set events as cookie & wait */
 	uk_waitq_set_cookie(req);
-	if (interruptible)
+	if (kind == UK_THREAD_WAIT_SIGINTR)
+		return uk_waitq_wait_sigintr(&q->waitq, deadline,
+					     uk_rwlock_rlock,
+					     uk_rwlock_runlock,
+					     &q->waitlock);
+	if (kind)
 		return uk_waitq_wait_interruptible(&q->waitq, deadline,
 						   uk_rwlock_rlock,
 						   uk_rwlock_runlock,
@@ -369,20 +374,20 @@ uk_pollevent uk_pollq_poll_level(struct uk_pollq *q, uk_pollevent req,
  */
 static inline int
 _uk_pollq_poll_until(struct uk_pollq *q, uk_pollevent req, __nsec deadline,
-		     const struct uk_file *f, bool interruptible,
+		     const struct uk_file *f, int kind,
 		     uk_pollevent *events)
 {
 	uk_pollevent ev = 0;
 	int wait = 0;
 
-	if (interruptible && uk_thread_wait_interrupted(uk_thread_current())) {
+	if (uk_thread_wait_ended(uk_thread_current(), kind)) {
 		wait = -EINTR;
 		goto out;
 	}
 	if ((ev = _uk_pollq_poll_immediate(q, req)) ||
 	    (ev = _uk_pollq_lock(q, req, f)))
 		goto out;
-	while (!(wait = _uk_pollq_wait(q, req, deadline, interruptible))) {
+	while (!(wait = _uk_pollq_wait(q, req, deadline, kind))) {
 		if ((ev = _uk_pollq_poll_locked(q, req, f)))
 			break;
 	}
@@ -399,7 +404,8 @@ uk_pollq_poll_until(struct uk_pollq *q, uk_pollevent req, __nsec deadline,
 {
 	uk_pollevent events;
 
-	(void)_uk_pollq_poll_until(q, req, deadline, f, false, &events);
+	(void)_uk_pollq_poll_until(q, req, deadline, f, UK_THREAD_WAIT_PLAIN,
+				   &events);
 	return events;
 }
 

@@ -127,7 +127,7 @@ int uk_sys_nanosleep(const struct timespec *req, struct timespec *rem)
 	{
 		struct uk_thread *thread = uk_thread_current();
 
-		if (uk_thread_block_interruptible(thread, before + nsec))
+		if (uk_thread_block_sigintr(thread, before + nsec))
 			uk_sched_yield();
 	}
 #else

@@ -10,8 +10,12 @@
 /* Shared transition serialized under the owning scheduler lock when bound.
  * Caller retains its normal/ISR notification path and local IRQ guard.
  */
+#define UK_THREAD_WAKE_NORMAL		0
+#define UK_THREAD_WAKE_INTERRUPT	1
+#define UK_THREAD_WAKE_SIGNAL		2
+
 static inline bool _uk_thread_wake_transition(struct uk_thread *thread,
-					      bool interrupt,
+					      int kind,
 					      void (*notify)(struct uk_thread *))
 {
 	struct uk_sched *s;
@@ -22,13 +26,19 @@ static inline bool _uk_thread_wake_transition(struct uk_thread *thread,
 	if (s)
 		ukarch_spin_lock(&s->lock);
 
-	if (interrupt) {
+	if (kind == UK_THREAD_WAKE_INTERRUPT) {
 		__atomic_store_n(&thread->wait_interrupted, true,
 				 __ATOMIC_RELEASE);
 		if (!thread->wait_interruptible)
 			goto out;
+	} else if (kind == UK_THREAD_WAKE_SIGNAL) {
+		__atomic_store_n(&thread->wait_signalled, true,
+				 __ATOMIC_RELEASE);
+		if (!thread->wait_sigintr)
+			goto out;
 	}
 	thread->wait_interruptible = false;
+	thread->wait_sigintr = false;
 	if (!uk_thread_is_runnable(thread)) {
 		uk_thread_set_runnable(thread);
 		if (s && thread->sched == s) {

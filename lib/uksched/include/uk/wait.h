@@ -152,6 +152,7 @@ void _uk_waitq_block_until(struct uk_thread *thread, __snsec deadline)
  * INTERNAL. Wait exactly once using `wq` until awoken or a deadline.
  *
  * Expression returns 1 if timed out, or -EINTR if interrupted.
+ * `kind` is one of the UK_THREAD_WAIT_* wait kinds.
  *
  * If `deadline` is non-zero, wait at most until that point in time;
  * after wakeup compare `deadline` with the value supplied by `clock_expr` to
@@ -161,7 +162,7 @@ void _uk_waitq_block_until(struct uk_thread *thread, __snsec deadline)
  * `unlock_fn` and re-acquired after wakeup with `lock_fn`.
  */
 #define _uk_waitq_wait(wq, deadline, clock_expr, lock_fn, unlock_fn,	\
-		      lock, interruptible)				\
+		      lock, kind)					\
 ({									\
 	struct uk_thread *_uk_waitq_current = uk_thread_current();	\
 	int _uk_waitq_timedout = 0;					\
@@ -169,12 +170,15 @@ void _uk_waitq_block_until(struct uk_thread *thread, __snsec deadline)
 	struct uk_waitq *_uk_waitq_q = (wq);				\
 	__typeof__(lock) _uk_waitq_outer = (lock);			\
 	__snsec _uk_waitq_deadline = (deadline);			\
-	bool _uk_waitq_intr = (interruptible);				\
+	int _uk_waitq_kind = (kind);					\
 	bool _uk_waitq_sleep = true;					\
 									\
 	_uk_waitq_lock(_uk_waitq_q, _uk_waitq_flags);			\
 	_uk_waitq_add(_uk_waitq_q, _uk_waitq_current);			\
-	if (_uk_waitq_intr)						\
+	if (_uk_waitq_kind == UK_THREAD_WAIT_SIGINTR)			\
+		_uk_waitq_sleep = uk_thread_block_sigintr(		\
+			_uk_waitq_current, _uk_waitq_deadline);		\
+	else if (_uk_waitq_kind)					\
 		_uk_waitq_sleep = uk_thread_block_interruptible(	\
 			_uk_waitq_current, _uk_waitq_deadline);		\
 	else								\
@@ -191,8 +195,7 @@ void _uk_waitq_block_until(struct uk_thread *thread, __snsec deadline)
 	_uk_waitq_unlock(_uk_waitq_q, _uk_waitq_flags);			\
 	if (_uk_waitq_outer)						\
 		lock_fn(_uk_waitq_outer);				\
-	if (_uk_waitq_intr &&						\
-	    uk_thread_wait_interrupted(_uk_waitq_current))		\
+	if (uk_thread_wait_ended(_uk_waitq_current, _uk_waitq_kind))	\
 		_uk_waitq_timedout = -EINTR;				\
 	else if (_uk_waitq_deadline && (clock_expr) >= _uk_waitq_deadline) \
 		_uk_waitq_timedout = 1;					\
@@ -201,15 +204,20 @@ void _uk_waitq_block_until(struct uk_thread *thread, __snsec deadline)
 })
 
 #define uk_waitq_wait_locked(wq, lock_fn, unlock_fn, lock) \
-	_uk_waitq_wait((wq), 0, 0, lock_fn, unlock_fn, (lock), false)
+	_uk_waitq_wait((wq), 0, 0, lock_fn, unlock_fn, (lock),		\
+		       UK_THREAD_WAIT_PLAIN)
 
 #define uk_waitq_wait_deadline_locked(wq, deadline, lock_fn, unlock_fn, lock) \
 	_uk_waitq_wait((wq), deadline, ukplat_monotonic_clock(),	\
-		       lock_fn, unlock_fn, (lock), false)
+		       lock_fn, unlock_fn, (lock), UK_THREAD_WAIT_PLAIN)
 
 #define uk_waitq_wait_interruptible(wq, deadline, lock_fn, unlock_fn, lock) \
 	_uk_waitq_wait((wq), deadline, ukplat_monotonic_clock(),	\
-		       lock_fn, unlock_fn, (lock), true)
+		       lock_fn, unlock_fn, (lock), UK_THREAD_WAIT_TERM)
+
+#define uk_waitq_wait_sigintr(wq, deadline, lock_fn, unlock_fn, lock) \
+	_uk_waitq_wait((wq), deadline, ukplat_monotonic_clock(),	\
+		       lock_fn, unlock_fn, (lock), UK_THREAD_WAIT_SIGINTR)
 
 static inline void _uk_waitq_noplock(int lock __unused) {}
 
