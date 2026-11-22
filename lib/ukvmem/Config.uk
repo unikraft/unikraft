@@ -22,6 +22,17 @@ config LIBUKVMEM_THREAD_VAS
 		address space. All address spaces must map the kernel and its
 		stacks and thread metadata at the same addresses.
 
+config LIBUKVMEM_COW
+	bool
+	select LIBUKPAGING_DEFERRED_RELEASE
+	default n
+
+config LIBUKVMEM_COW_TEST
+	bool "Test copy-on-write frame lifetime"
+	depends on HAVE_SCHED
+	select LIBUKVMEM_COW
+	select LIBUKTEST
+
 config LIBUKVMEM_TRACE_PAGEFAULTS
 	bool "Expose per-thread minor fault count for development measurements"
 	depends on ARCH_X86_64 && HAVE_SCHED && LIBPOSIX_PROCESS
