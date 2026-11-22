@@ -12,6 +12,7 @@
 #include <uk/lcpu.h>
 #include <uk/plat/time.h>
 #include <uk/print.h>
+#include <uk/process.h>
 #include <uk/process/prepared.h>
 #if CONFIG_LIBPOSIX_FDTAB_MULTITAB && !CONFIG_LIBVFSCORE
 #include <fcntl.h>
@@ -864,6 +865,199 @@ close_fds:
 			       UK_FILE_RELEASE_RES | UK_FILE_RELEASE_OBJ);
 	if (file.released != (UK_FILE_RELEASE_RES | UK_FILE_RELEASE_OBJ))
 		UK_CRASH("Prepared spawn retained a test file reference\n");
+}
+
+struct prepare_pthread_run {
+	struct uk_vas *vas;
+	struct posix_process *process;
+	struct uk_sched *target;
+	struct uk_semaphore child_reaped;
+	struct uk_semaphore done;
+	struct uk_semaphore finish;
+	struct uk_semaphore reaped;
+	__vaddr_t address;
+	unsigned int cycles;
+	bool bound;
+	bool active;
+	bool visible;
+	bool balanced;
+	bool remote;
+};
+
+static void prepare_pthread_refs(struct uk_vas *vas, unsigned int refs)
+{
+	__nsec limit = ukplat_monotonic_clock() + PREPARE_TIMEOUT;
+
+	while (uk_refcount_read(&vas->refs) != refs) {
+		if (ukplat_monotonic_clock() >= limit)
+			UK_CRASH("Process pthread retained its VAS\n");
+		uk_sched_yield();
+	}
+}
+
+static void prepare_pthread_child(void *arg)
+{
+	struct prepare_pthread_run *p = arg;
+	struct posix_thread *pt = uk_pthread_current();
+	__u32 *value = (__u32 *)p->address;
+	bool active = uk_vas_get_active() == p->vas;
+
+	p->active = p->active && active;
+	p->visible = p->visible && pt && pt->process == p->process &&
+		pt->tid != p->process->pid && tid2pthread(pt->tid) == pt;
+	p->remote = p->remote && uk_sched_current() == p->target;
+	/* Report an incorrect binding without touching an unmapped address. */
+	if (active) {
+		p->active = p->active &&
+			__atomic_load_n(value, __ATOMIC_RELAXED) ==
+			PREPARE_VALUE;
+		__atomic_store_n(value, PREPARE_VALUE + 1, __ATOMIC_RELAXED);
+	}
+	uk_thread_exit();
+}
+
+static void prepare_pthread_child_reaped(struct uk_thread *thread)
+{
+	struct prepare_pthread_run *p = thread->priv;
+
+	uk_semaphore_up(&p->child_reaped);
+}
+
+static void prepare_pthread_parent(void *arg)
+{
+	struct prepare_pthread_run *p = arg;
+	struct uk_sched *s = p->target;
+	struct uk_thread *child;
+	__u32 *value = (__u32 *)p->address;
+	pid_t tid;
+	int rc;
+
+	for (unsigned int i = 0; i < 32; i++) {
+		__atomic_store_n(value, PREPARE_VALUE, __ATOMIC_RELAXED);
+		child = uk_thread_create_fn1(s->a, prepare_pthread_child, p,
+					     s->a_stack, 0, s->a_auxstack, 0,
+					     s->a_uktls, false, "owned-pthread",
+					     p, prepare_pthread_child_reaped);
+		if (!child)
+			break;
+		rc = uk_posix_process_create_pthread(child);
+		if (rc) {
+			uk_thread_release(child);
+			break;
+		}
+		tid = uk_thread_uktls_var(child, pthread_self)->tid;
+		p->bound = p->bound && child->vas == p->vas &&
+			child->vas_ref == p->vas &&
+			uk_refcount_read(&p->vas->refs) == 4;
+		rc = uk_sched_thread_add(p->target, child);
+		if (rc) {
+			uk_thread_release(child);
+			break;
+		}
+		if (uk_semaphore_down_to(&p->child_reaped,
+					 PREPARE_TIMEOUT) == __NSEC_MAX)
+			UK_CRASH("Process pthread was not reaped\n");
+		prepare_pthread_refs(p->vas, 3);
+		p->balanced = p->balanced && !tid2pthread(tid) &&
+			uk_list_is_singular(&p->process->threads);
+		p->active = p->active &&
+			__atomic_load_n(value, __ATOMIC_RELAXED) ==
+			PREPARE_VALUE + 1;
+		p->cycles++;
+	}
+	uk_semaphore_up(&p->done);
+	uk_semaphore_down(&p->finish);
+	uk_thread_exit();
+}
+
+static void prepare_pthread_parent_reaped(struct uk_thread *thread)
+{
+	struct prepare_pthread_run *p = thread->priv;
+
+	uk_semaphore_up(&p->reaped);
+}
+
+UK_TESTCASE(process_prepare, owned_pthread_inherits_vas)
+{
+	struct uk_sched *local = uk_sched_current(), *target = local;
+	struct prepare_pthread_run probe = {
+		.bound = true, .active = true, .visible = true,
+		.balanced = true, .remote = true
+	};
+	struct uk_vas *kernel = uk_vas_get_kernel(), *vas = NULL;
+	struct uk_thread *parent;
+	struct posix_thread *pt;
+	unsigned int cpus = uk_sched_started_count();
+	unsigned int users = kernel->pt->shared_users;
+	__vaddr_t address = UK_PAGING_VADDR_ANY;
+	pid_t pid;
+	int rc;
+
+	for (unsigned int i = 0; i < cpus && target == local; i++)
+		target = uk_sched_select_round_robin(local);
+	probe.target = target;
+	uk_semaphore_init(&probe.child_reaped, 0);
+	uk_semaphore_init(&probe.done, 0);
+	uk_semaphore_init(&probe.finish, 0);
+	uk_semaphore_init(&probe.reaped, 0);
+	parent = uk_thread_create_fn1(local->a, prepare_pthread_parent, &probe,
+				      local->a_stack, 0, local->a_auxstack, 0,
+				      local->a_uktls, false, "pthread-parent",
+				      &probe, prepare_pthread_parent_reaped);
+	UK_TEST_EXPECT_NOT_NULL(parent);
+	if (!parent)
+		return;
+	uk_thread_set_blocked(parent);
+	pid = uk_posix_process_prepare_spawn(local->a, parent, &vas);
+	UK_TEST_EXPECT(pid > 0);
+	if (pid <= 0)
+		goto release_parent;
+	pt = uk_thread_uktls_var(parent, pthread_self);
+	probe.process = pt->process;
+	probe.vas = vas;
+	rc = uk_vma_map_anon(vas, &address, UK_PAGING_PAGE_SIZE,
+			     UK_PAGING_PAGE_ATTR_PROT_RW, 0, NULL);
+	UK_TEST_EXPECT_ZERO(rc);
+	if (rc)
+		goto abort;
+	probe.address = address;
+	rc = uk_sched_thread_add(local, parent);
+	UK_TEST_EXPECT_ZERO(rc);
+	if (rc)
+		goto abort;
+	rc = uk_posix_process_publish_prepared(parent);
+	UK_TEST_EXPECT_ZERO(rc);
+	if (rc) {
+		UK_TEST_EXPECT_ZERO(uk_sched_thread_remove(parent));
+		goto abort;
+	}
+	uk_thread_wake(parent);
+	if (uk_semaphore_down_to(&probe.done, PREPARE_TIMEOUT) == __NSEC_MAX)
+		UK_CRASH("Process pthread cycles made no progress\n");
+	pprocess_release_pthread(pt);
+	pprocess_release(probe.process);
+	uk_semaphore_up(&probe.finish);
+	if (uk_semaphore_down_to(&probe.reaped, PREPARE_TIMEOUT) == __NSEC_MAX)
+		UK_CRASH("Process pthread parent was not reaped\n");
+	prepare_pthread_refs(vas, 1);
+	uk_vas_put(vas);
+	UK_TEST_EXPECT_SNUM_EQ(probe.cycles, 32);
+	UK_TEST_EXPECT(probe.bound);
+	UK_TEST_EXPECT(probe.active);
+	UK_TEST_EXPECT(probe.visible);
+	UK_TEST_EXPECT(probe.balanced);
+	UK_TEST_EXPECT(probe.remote);
+	UK_TEST_EXPECT((target != local) == (cpus > 1));
+	UK_TEST_EXPECT_NULL(pid2pprocess(pid));
+	UK_TEST_EXPECT_SNUM_EQ(kernel->pt->shared_users, users);
+	uk_pr_info("PROCESS_PTHREAD_VAS_PASS cycles=%u remote=%u\n",
+		   probe.cycles, target != local);
+	return;
+abort:
+	UK_TEST_EXPECT_ZERO(uk_posix_process_abort_prepared(parent));
+release_parent:
+	uk_thread_release(parent);
+	uk_vas_put(vas);
 }
 
 #endif /* CONFIG_LIBPOSIX_FDTAB_MULTITAB && !CONFIG_LIBVFSCORE */
