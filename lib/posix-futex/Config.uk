@@ -10,6 +10,14 @@ menuconfig LIBPOSIX_FUTEX
 		Linux-compatible futex calls
 
 if LIBPOSIX_FUTEX
+config LIBPOSIX_FUTEX_VAS
+	bool
+	depends on LIBUKVMEM_THREAD_VAS && LIBUKPAGING_DIRECTMAP
+	depends on LIBUKPLAT_NATIVE_PAGING
+	select LIBUKVMEM_PROCESS_VAS
+	select LIBUKVMEM_VAS_ACCESS
+	default n
+
 config LIBPOSIX_FUTEX_DEBUG
 	bool "Enable debug messages"
 	default n
