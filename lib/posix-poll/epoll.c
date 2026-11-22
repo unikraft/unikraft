@@ -611,8 +611,8 @@ int uk_sys_epoll_pwait2(const struct uk_file *epf, struct epoll_event *events,
 		int lvlev = 0;
 		int nout = 0;
 
-		rc = uk_file_poll_interruptible(epf, UKFD_POLLIN, deadline,
-						&pending);
+		rc = uk_file_poll_sigintr(epf, UKFD_POLLIN, deadline,
+					  &pending);
 		if (rc || !pending)
 			return rc;
 

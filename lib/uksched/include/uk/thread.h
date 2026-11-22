@@ -65,6 +65,8 @@ struct uk_thread {
 	uint32_t flags;
 	bool wait_interruptible;
 	bool wait_interrupted;
+	bool wait_sigintr;
+	bool wait_signalled;
 	__snsec wakeup_time;
 	struct uk_sched *sched;
 #if CONFIG_LIBUKVMEM_THREAD_VAS
@@ -702,6 +704,14 @@ void uk_thread_block_timeout(struct uk_thread *thread, __nsec nsec);
 void uk_thread_block(struct uk_thread *thread);
 void uk_thread_wake(struct uk_thread *thread);
 
+/* Kinds of waits: plain waits end only when woken or at their deadline,
+ * interruptible waits also end when the thread's process terminates, and
+ * signal-interruptible waits also end when a signal handler is pending.
+ */
+#define UK_THREAD_WAIT_PLAIN	0
+#define UK_THREAD_WAIT_TERM	1
+#define UK_THREAD_WAIT_SIGINTR	2
+
 /* Interruptions are sticky for a thread that is leaving userspace. */
 bool uk_thread_block_interruptible(struct uk_thread *thread, __snsec until);
 void uk_thread_interrupt_wait(struct uk_thread *thread);
@@ -709,6 +719,35 @@ void uk_thread_interrupt_wait(struct uk_thread *thread);
 static inline bool uk_thread_wait_interrupted(const struct uk_thread *thread)
 {
 	return __atomic_load_n(&thread->wait_interrupted, __ATOMIC_ACQUIRE);
+}
+
+/* A pending signal handler ends a signal-interruptible wait, or prevents
+ * one from starting, until the signal delivery clears the mark before it
+ * runs the handlers.
+ */
+bool uk_thread_block_sigintr(struct uk_thread *thread, __snsec until);
+void uk_thread_signal_wait(struct uk_thread *thread);
+
+static inline bool uk_thread_wait_signalled(const struct uk_thread *thread)
+{
+	return __atomic_load_n(&thread->wait_signalled, __ATOMIC_ACQUIRE);
+}
+
+static inline void uk_thread_wait_signal_clear(struct uk_thread *thread)
+{
+	__atomic_store_n(&thread->wait_signalled, false, __ATOMIC_RELEASE);
+}
+
+/* True if a wait of `kind` must end early for `thread` */
+static inline bool uk_thread_wait_ended(const struct uk_thread *thread,
+					int kind)
+{
+	if (kind == UK_THREAD_WAIT_PLAIN)
+		return false;
+	if (uk_thread_wait_interrupted(thread))
+		return true;
+	return kind == UK_THREAD_WAIT_SIGINTR &&
+	       uk_thread_wait_signalled(thread);
 }
 
 /**

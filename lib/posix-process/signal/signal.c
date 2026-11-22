@@ -39,6 +39,24 @@ static void signal_wake_waiter(struct posix_thread *thread, int signum)
 	}
 }
 
+/* A handled signal ends the target's signal-interruptible wait, such as
+ * epoll_wait(2) or nanosleep(2), so that the handler runs when that system
+ * call returns instead of when its timeout expires.
+ */
+static bool signal_interrupt_waiter(struct posix_thread *thread, int signum)
+{
+	const struct kern_sigaction *ks;
+
+	if (thread->state != POSIX_THREAD_RUNNING || !thread->thread ||
+	    IS_MASKED(thread, signum))
+		return false;
+	ks = KERN_SIGACTION(thread->process, signum);
+	if (ks->ks_handler == SIG_DFL || ks->ks_handler == SIG_IGN)
+		return false;
+	uk_thread_signal_wait(thread->thread);
+	return true;
+}
+
 static void signal_request_exit(struct posix_process *process,
 				struct posix_thread *target, int signum)
 {
@@ -101,11 +119,18 @@ notify:
 	/* Keep each waiter linked for the duration of its wakeup. */
 	if (pthread) {
 		signal_wake_waiter(pthread, signum);
+		(void)signal_interrupt_waiter(pthread, signum);
 	} else {
 		struct posix_thread *thread, *threadn;
+		bool interrupted = false;
 
-		uk_pprocess_foreach_pthread(pproc, thread, threadn)
+		/* Like Linux, interrupt only one thread for a process signal */
+		uk_pprocess_foreach_pthread(pproc, thread, threadn) {
 			signal_wake_waiter(thread, signum);
+			if (!interrupted)
+				interrupted = signal_interrupt_waiter(thread,
+								      signum);
+		}
 	}
 	return 0;
 }

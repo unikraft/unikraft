@@ -528,8 +528,19 @@ static inline int
 uk_file_poll_interruptible(const struct uk_file *f, uk_pollevent req,
 			   __nsec deadline, uk_pollevent *events)
 {
-	return _uk_pollq_poll_until(&f->state->pollq, req, deadline, f, true,
-				    events);
+	return _uk_pollq_poll_until(&f->state->pollq, req, deadline, f,
+				    UK_THREAD_WAIT_TERM, events);
+}
+
+/* Like uk_file_poll_interruptible(), but a pending signal handler also ends
+ * the wait with -EINTR, as for epoll_wait(2) on Linux.
+ */
+static inline int
+uk_file_poll_sigintr(const struct uk_file *f, uk_pollevent req,
+		     __nsec deadline, uk_pollevent *events)
+{
+	return _uk_pollq_poll_until(&f->state->pollq, req, deadline, f,
+				    UK_THREAD_WAIT_SIGINTR, events);
 }
 
 static inline int uk_file_wait_interruptible(const struct uk_file *f,
