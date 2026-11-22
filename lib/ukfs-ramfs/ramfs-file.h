@@ -164,6 +164,34 @@ size_t ramfs_file_range_get(struct ramfs_file_data *file_data,
 	return itop;
 }
 
+#if CONFIG_LIBUKPOD_DEFAULT_EAGER
+static
+int ramfs_file_range_can_pin(struct ramfs_file_data *file_data,
+			     size_t off, size_t len)
+{
+	const size_t pgoff = uk_sparsebuf_pgoff(off);
+	const size_t pgend = DIV_ROUND_UP(off + len, UK_PAGING_PAGE_SIZE);
+	struct uk_sparsebuf_cur cur;
+
+	UK_SPARSEBUF_EMBED_HEAD(fhead, file_data);
+
+	if (!uk_sparsebuf_lookup(UK_SPARSEBUF_EMBED_HEADP(fhead, file_data),
+				 pgoff, &cur))
+		return 1;
+	for (; !uk_sparsebuf_finished(&cur); uk_sparsebuf_advance(&cur)) {
+		const struct uk_sparsebuf_slice *slice =
+			uk_sparsebuf_slice_at(&cur);
+
+		if (slice->pgoff >= pgend)
+			break;
+		/* Only pages allocated by eager PoD are known to be pinned. */
+		if (slice->external && uk_sparsebuf_slice_pgend(slice) > pgoff)
+			return 0;
+	}
+	return 1;
+}
+#endif /* CONFIG_LIBUKPOD_DEFAULT_EAGER */
+
 static
 ssize_t ramfs_file_range_acquire(struct ramfs_file_data *file_data,
 				 size_t off, size_t len)
@@ -328,12 +356,35 @@ int ramfs_file_data_punch_hole(struct ramfs_file_data *file_data,
 		UK_SPARSEBUF_EMBED_HEADP(fhead, file_data), off, len);
 }
 
+/* Acquired ranges must remain releasable at their original offsets. */
+static
+int ramfs_file_data_can_shift(struct ramfs_file_data *file_data, size_t pgoff)
+{
+	struct uk_sparsebuf_cur cur;
+
+	UK_SPARSEBUF_EMBED_HEAD(fhead, file_data);
+
+	if (!uk_sparsebuf_lookup(UK_SPARSEBUF_EMBED_HEADP(fhead, file_data),
+				 pgoff, &cur))
+		return 1;
+	for (; !uk_sparsebuf_finished(&cur); uk_sparsebuf_advance(&cur)) {
+		const struct uk_sparsebuf_slice *slice =
+			uk_sparsebuf_slice_at(&cur);
+
+		if (slice->refcnt && uk_sparsebuf_slice_pgend(slice) > pgoff)
+			return 0;
+	}
+	return 1;
+}
+
 static
 int ramfs_file_data_collapse(struct ramfs_file_data *file_data,
 			     unsigned int pgoff, unsigned int npages)
 {
 	UK_SPARSEBUF_EMBED_HEAD(fhead, file_data);
 
+	if (!ramfs_file_data_can_shift(file_data, pgoff))
+		return -EBUSY;
 	return uk_sparsebuf_collapse(&ramfs_sb_ctx,
 				     UK_SPARSEBUF_EMBED_HEADP(fhead, file_data),
 				     pgoff, npages);
@@ -345,6 +396,8 @@ int ramfs_file_data_insert_hole(struct ramfs_file_data *file_data,
 {
 	UK_SPARSEBUF_EMBED_HEAD(fhead, file_data);
 
+	if (!ramfs_file_data_can_shift(file_data, pgoff))
+		return -EBUSY;
 	return uk_sparsebuf_insert(&ramfs_sb_ctx,
 				   UK_SPARSEBUF_EMBED_HEADP(fhead, file_data),
 				   pgoff, npages);
