@@ -168,6 +168,8 @@ UK_TESTCASE(vas_refs, current_binding)
 		       (!previous || previous == kernel));
 	if (kernel != uk_vas_get_kernel() || (previous && previous != kernel))
 		return;
+	UK_TEST_EXPECT_ZERO(uk_thread_set_vas(current, kernel));
+	UK_TEST_EXPECT_PTR_EQ(current->vas, previous);
 	space = vas_ref_create(&probe);
 	UK_TEST_EXPECT_NOT_NULL(space);
 	if (!space)
@@ -247,6 +249,7 @@ UK_TESTCASE(vas_refs, thread_lifetime)
 		uk_thread_release(thread);
 		return;
 	}
+	UK_TEST_EXPECT_ZERO(uk_thread_set_vas(thread, probe.vas));
 	UK_TEST_EXPECT_SNUM_EQ(uk_thread_set_vas(thread, NULL), -EBUSY);
 	uk_semaphore_up(&probe.start);
 	UK_TEST_EXPECT(uk_semaphore_down_to(&probe.reaped, VAS_REF_TIMEOUT)

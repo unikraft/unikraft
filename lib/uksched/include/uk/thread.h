@@ -685,12 +685,14 @@ void uk_thread_release(struct uk_thread *t);
 #if CONFIG_LIBUKVMEM_VAS_REFCOUNT
 /**
  * Bind a current or unpublished thread to a VAS; NULL selects the kernel VAS.
+ * An unchanged effective binding is a no-op, also for a scheduled thread.
+ * NULL and the kernel VAS are equivalent without rewriting the stored pointer.
  * Caller serializes binding and publication and holds the new VAS live.
  * An owned VAS is pinned through thread release. The current thread switches
  * page tables before dropping its old reference. Switching an active VAS or
  * replacing an owned reference requires IRQs enabled and no caller locks.
- * Returns -ESRCH for an exiting thread, -EBUSY for a scheduled foreign
- * thread, -EWOULDBLOCK for an unsafe IRQ state, or the activation error.
+ * Returns -ESRCH for an exiting thread, -EBUSY for a change to a scheduled
+ * foreign thread, -EWOULDBLOCK for an unsafe IRQ state, or an activation error.
  */
 int uk_thread_set_vas(struct uk_thread *t, struct uk_vas *vas);
 #endif

@@ -1016,13 +1016,17 @@ int uk_thread_set_vas(struct uk_thread *t, struct uk_vas *vas)
 	if (!target)
 		return -EINVAL;
 	current = t == uk_thread_current();
-	if (t->sched && !current)
-		return -EBUSY;
 	old = t->vas_ref;
 	held = uk_vas_is_owned(vas) ? vas : __NULL;
 	change = current && target != uk_vas_get_active();
-	if (t->vas == vas && old == held && !change)
+	/* No mutation is needed for an equivalent binding. In particular,
+	 * boot may attach the already scheduled main thread to the kernel VAS.
+	 */
+	if ((t->vas ? t->vas : uk_vas_get_kernel()) == target &&
+	    old == held && !change)
 		return 0;
+	if (t->sched && !current)
+		return -EBUSY;
 	if ((old || change) && uk_lcpu_irqs_disabled())
 		return -EWOULDBLOCK;
 	uk_vas_get(held);
