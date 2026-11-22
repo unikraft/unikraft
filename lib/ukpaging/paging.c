@@ -21,6 +21,7 @@
 #include <uk/falloc.h>
 #include <uk/paging/arch.h>
 #include <uk/paging.h>
+#include <uk/pcpuvar.h>
 #include <uk/pt.h>
 #include <uk/plat/memory.h>
 #include <uk/print.h>
@@ -62,18 +63,12 @@ static inline __vaddr_t pg_pte_to_vaddr(__pte_t pte,
  */
 static unsigned int pg_page_largest_level = UK_PAL_PAGE_LEVEL;
 
-/*
- * Pointer to currently active page table.
- * TODO: With SMP support, this should move to a CPU-local variable or we
- * need a way to derive the struct pagetable pointer from the configured
- * HW page table base pointer.
- */
 static struct uk_pagetable kernel_pt;
-static struct uk_pagetable *pg_active_pt;
+static __uk_pcpuvar struct uk_pagetable *pg_active_pt;
 
 struct uk_pagetable *uk_paging_pt_get_active(void)
 {
-	return pg_active_pt;
+	return uk_pcpuvar_current_get(pg_active_pt);
 }
 
 int uk_paging_pt_set_active(struct uk_pagetable *pt)
@@ -84,7 +79,7 @@ int uk_paging_pt_set_active(struct uk_pagetable *pt)
 	if (rc)
 		return rc;
 
-	pg_active_pt = pt;
+	uk_pcpuvar_current_set(pg_active_pt, pt);
 
 	return 0;
 }

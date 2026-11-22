@@ -17,13 +17,10 @@
 #include <uk/alloc.h>
 #include <uk/assert.h>
 #include <uk/list.h>
+#include <uk/pcpuvar.h>
 #include <uk/config.h>
 
-/*
- * Pointer to currently active virtual address space.
- * TODO: This should move to a CPU-local variable
- */
-static struct uk_vas *vmem_active_vas;
+static __uk_pcpuvar struct uk_vas *vmem_active_vas;
 
 /* Forward declarations */
 static void vmem_vma_unmap(struct uk_vma *vma, __vaddr_t vaddr, __sz len);
@@ -31,7 +28,7 @@ static void vmem_vma_unlink_and_free(struct uk_vma *vma);
 
 struct uk_vas *uk_vas_get_active(void)
 {
-	return vmem_active_vas;
+	return uk_pcpuvar_current_get(vmem_active_vas);
 }
 
 int uk_vas_set_active(struct uk_vas *vas)
@@ -44,7 +41,7 @@ int uk_vas_set_active(struct uk_vas *vas)
 		return rc;
 #endif /* CONFIG_LIBUKPAGING */
 
-	vmem_active_vas = vas;
+	uk_pcpuvar_current_set(vmem_active_vas, vas);
 	return 0;
 }
 
@@ -82,8 +79,8 @@ void uk_vas_destroy(struct uk_vas *vas)
 
 	UK_ASSERT(uk_list_empty(&vas->vma_list));
 
-	if (vmem_active_vas == vas)
-		vmem_active_vas = __NULL;
+	if (uk_vas_get_active() == vas)
+		uk_pcpuvar_current_set(vmem_active_vas, __NULL);
 }
 
 static void vmem_vma_destroy(struct uk_vma *vma)

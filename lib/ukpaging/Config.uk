@@ -4,6 +4,7 @@ menuconfig LIBUKPAGING
 	depends on HAVE_DYNAMIC_MAPPINGS
 	depends on !HAVE_FIXMAP
 	select LIBUKPAL
+	select LIBUKPCPUVAR
 	select LIBUKPT
 	select LIBUKFALLOC
 	select LIBUKFALLOCBUDDY
