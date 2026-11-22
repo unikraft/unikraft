@@ -1,3 +1,7 @@
+uk_paging_batch_begin
+uk_paging_batch_end
+uk_paging_free_batch_finish
+uk_paging_free_batch_init
 uk_paging_init
 uk_paging_page_kmap
 uk_paging_page_kunmap

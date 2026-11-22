@@ -6,6 +6,7 @@ menuconfig LIBUKPAGING
 	select LIBUKPAL
 	select LIBUKPCPUVAR
 	select LIBUKPT
+	select LIBUKLCPU if HAVE_SMP
 	select LIBUKFALLOC
 	select LIBUKFALLOCBUDDY
 	help
