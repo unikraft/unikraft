@@ -353,6 +353,31 @@ void uk_plat_native_ectx_store(struct uk_plat_native_ectx *state)
 	}
 }
 
+void uk_plat_native_ectx_reset(struct uk_plat_native_ectx *state)
+{
+	const __u16 control = 0x037f, empty_tags = 0xffff;
+
+	UK_ASSERT(ectx_align);
+	UK_ASSERT(state);
+	UK_ASSERT(IS_ALIGNED((__uptr)state, ectx_align));
+	memset_isr(state, 0, ectx_size);
+	switch (ectx_method) {
+	case X86_SAVE_FSAVE:
+		memcpy_isr(state, &control, sizeof(control));
+		memcpy_isr((__u8 *)state + 8, &empty_tags, sizeof(empty_tags));
+		break;
+	case X86_SAVE_FXSAVE:
+	case X86_SAVE_XSAVE:
+	case X86_SAVE_XSAVEOPT:
+		memcpy_isr(state, &control, sizeof(control));
+		/* Standard XRSTOR loads MXCSR even with an empty XSTATE_BV. */
+		((struct x86_xsave_ctx *)state)->mxcsr = 0x1f80;
+		break;
+	default:
+		break;
+	}
+}
+
 void uk_plat_native_ectx_init(struct uk_plat_native_ectx *state)
 {
 	UK_ASSERT(ectx_align); /* Do not call when not yet initialized */
