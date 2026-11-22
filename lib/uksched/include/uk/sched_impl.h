@@ -43,6 +43,10 @@
 #define __UK_SCHED_IMPL_H__
 
 #include <uk/sched.h>
+#if CONFIG_LIBUKVMEM_THREAD_VAS
+#include <uk/crash.h>
+#include <uk/vmem.h>
+#endif
 
 #if CONFIG_LIBUKSCHED_STATS
 #include <string.h>
@@ -103,11 +107,23 @@ static inline
 void uk_sched_thread_switch(struct uk_thread *next)
 {
 	struct uk_thread *prev;
+#if CONFIG_LIBUKVMEM_THREAD_VAS
+	struct uk_vas *vas = next->vas ? next->vas : uk_vas_get_kernel();
+	bool switch_vas = vas && vas != uk_vas_get_active();
+	unsigned long irqf = 0;
+#endif
 
 	prev = uk_pcpuvar_current_get(__uk_sched_thread_current);
 
 	UK_ASSERT(prev);
 
+#if CONFIG_LIBUKVMEM_THREAD_VAS
+	if (switch_vas) {
+		irqf = uk_lcpu_save_irqf();
+		if (unlikely(uk_vas_set_active(vas)))
+			UK_CRASH("Cannot switch thread address space\n");
+	}
+#endif
 	uk_pcpuvar_current_set(__uk_sched_thread_current, next);
 
 	prev->tlsp = uk_lcpu_tlsp_get();
@@ -119,6 +135,11 @@ void uk_sched_thread_switch(struct uk_thread *next)
 	uk_lcpu_tlsp_set(next->tlsp);
 
 	uk_lcpu_set_auxsp(next->auxsp);
+
+#if CONFIG_LIBUKVMEM_THREAD_VAS
+	if (switch_vas)
+		uk_lcpu_restore_irqf(irqf);
+#endif
 
 	/**
 	 * NOTE: There is also prev->ectx/next->ectx! Since we only have

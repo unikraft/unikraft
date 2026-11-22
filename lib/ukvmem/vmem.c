@@ -27,6 +27,22 @@
 static __uk_pcpuvar struct uk_vas *vmem_active_vas;
 static __uk_pcpuvar struct uk_vas *vmem_no_paging_vas;
 
+#if CONFIG_LIBUKVMEM_THREAD_VAS
+static struct uk_vas *vmem_kernel_vas;
+
+struct uk_vas *uk_vas_get_kernel(void)
+{
+	return __atomic_load_n(&vmem_kernel_vas, __ATOMIC_ACQUIRE);
+}
+
+void uk_vas_set_kernel(struct uk_vas *vas)
+{
+	UK_ASSERT(vas);
+	UK_ASSERT(!uk_vas_get_kernel());
+	__atomic_store_n(&vmem_kernel_vas, vas, __ATOMIC_RELEASE);
+}
+#endif
+
 /* Forward declarations */
 static void vmem_vma_unmap(struct uk_vma *vma, __vaddr_t vaddr, __sz len);
 

@@ -45,6 +45,7 @@ extern "C" {
 
 struct uk_sched;
 struct uk_thread;
+struct uk_vas;
 
 typedef void (*uk_thread_dtor_t)(struct uk_thread *);
 typedef void (*uk_thread_gc_t)(struct uk_thread *, void *);
@@ -64,6 +65,10 @@ struct uk_thread {
 	uint32_t flags;
 	__snsec wakeup_time;
 	struct uk_sched *sched;
+#if CONFIG_LIBUKVMEM_THREAD_VAS
+	/** Borrowed address space. NULL selects the kernel address space. */
+	struct uk_vas *vas;
+#endif
 	struct uk_waitq_ticket wait_ticket;
 
 	struct {

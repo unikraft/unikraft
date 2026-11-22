@@ -386,6 +386,14 @@ struct uk_vma_ops {
  */
 struct uk_vas *uk_vas_get_active(void);
 
+#if CONFIG_LIBUKVMEM_THREAD_VAS
+/** Return the boot address space used by kernel threads. */
+struct uk_vas *uk_vas_get_kernel(void);
+
+/** Set the kernel address space once, before starting other CPUs. */
+void uk_vas_set_kernel(struct uk_vas *vas);
+#endif
+
 /**
  * Switches the currently active virtual address space.
  *

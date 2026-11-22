@@ -13,6 +13,14 @@ menuconfig LIBUKVMEM
 
 if LIBUKVMEM
 
+config LIBUKVMEM_THREAD_VAS
+	bool "Select the address space on thread switches"
+	depends on HAVE_SCHED
+	help
+		Allow threads to use an address space distinct from the kernel
+		address space. All address spaces must map the kernel and its
+		stacks and thread metadata at the same addresses.
+
 config LIBUKVMEM_TRACE_PAGEFAULTS
 	bool "Expose per-thread minor fault count for development measurements"
 	depends on ARCH_X86_64 && HAVE_SCHED && LIBPOSIX_PROCESS
@@ -95,6 +103,11 @@ config LIBUKVMEM_TEST
 	default n
 	select LIBUKTEST
 	select LIBUKNOFAULT
+
+config LIBUKVMEM_THREAD_VAS_TEST
+	bool "Test address-space switches"
+	depends on LIBUKVMEM_THREAD_VAS
+	select LIBUKTEST
 
 config LIBUKVMEM_SYNC_TEST
 	bool "Test backing-store synchronization contracts"
