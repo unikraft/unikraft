@@ -64,6 +64,9 @@ struct posix_process {
 	/* Namespace ownership plus temporary pins on a published process. */
 	__atomic refs;
 	pid_t pid;
+	pid_t pgid;
+	pid_t sid;
+	bool execed;
 	struct posix_process *parent;
 	struct uk_list_head children; /* child processes */
 	struct uk_list_head child_list_entry;
@@ -115,6 +118,13 @@ struct posix_thread {
 
 extern struct posix_process *pid_process[TIDMAP_SIZE];
 extern __spinlock pprocess_lock;
+
+/* Process, process-group and session identities share the PID namespace.
+ * These helpers require pprocess_lock and never allocate or free objects.
+ */
+void pprocess_id_get_locked(pid_t id);
+void pprocess_id_put_locked(pid_t id);
+void pprocess_groups_init_locked(struct posix_process *process);
 
 static inline unsigned long pprocess_lock_acquire(void)
 {

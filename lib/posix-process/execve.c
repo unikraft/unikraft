@@ -39,6 +39,12 @@ static void __noreturn execve_ctx_switch(long arg0, long arg1)
 
 	pthread = uk_pthread_current();
 	UK_ASSERT(pthread);
+	{
+		unsigned long flags = pprocess_lock_acquire();
+
+		pthread->process->execed = true;
+		pprocess_lock_release(flags);
+	}
 
 	pthread_parent = pthread->parent;
 
