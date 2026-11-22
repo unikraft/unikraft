@@ -167,6 +167,10 @@ static void kernel_vas_pfree(struct uk_alloc *a __unused, void *addr,
 
 static struct uk_alloc kernel_vas_alloc = {
 	.malloc = uk_malloc_ifpages,
+	.calloc = uk_calloc_compat,
+	.realloc = uk_realloc_ifpages,
+	.posix_memalign = uk_posix_memalign_ifpages,
+	.memalign = uk_memalign_compat,
 	.free = uk_free_ifpages,
 	.palloc = kernel_vas_palloc,
 	.pfree = kernel_vas_pfree,
