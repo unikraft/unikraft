@@ -14,6 +14,7 @@ struct uk_mbox *uk_mbox_create(struct uk_alloc *a, size_t size)
 		return NULL;
 
 	m->len = size + 1;
+	uk_spin_init(&m->lock);
 
 	uk_semaphore_init(&m->readsem, 0);
 	m->readpos = 0;
