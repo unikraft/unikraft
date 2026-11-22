@@ -15,6 +15,7 @@
 extern const struct uk_vma_ops uk_fdio_vma_ops;
 #if CONFIG_LIBUKVMEM_COW_VMA
 extern const struct uk_vma_ops uk_fdio_cow_vma_ops;
+extern const struct uk_vma_ops uk_fdio_shared_vma_ops;
 #endif
 
 struct uk_fdio_vma_args {
@@ -45,7 +46,9 @@ int uk_fdio_map_file(struct uk_vas *vas, __vaddr_t *vaddr,
 	const struct uk_vma_ops *ops = &uk_fdio_vma_ops;
 
 #if CONFIG_LIBUKVMEM_COW_VMA
-	if (vas->cow && !(flags & UK_VMA_FILE_SHARED))
+	if (flags & UK_VMA_FILE_SHARED)
+		ops = &uk_fdio_shared_vma_ops;
+	else if (vas->cow)
 		ops = &uk_fdio_cow_vma_ops;
 #endif
 
