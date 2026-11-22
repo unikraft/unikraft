@@ -46,6 +46,9 @@
 #include <uk/paging.h>
 #ifdef CONFIG_LIBUKVMEM
 #include <uk/vmem.h>
+#if CONFIG_LIBUKVMEM_PROCESS_VAS
+#include <uk/vmem/process.h>
+#endif
 #if CONFIG_LIBUKPAGING_DIRECTMAP
 #include <uk/alloc_impl.h>
 #include <uk/paging/arch.h>
@@ -383,6 +386,14 @@ static struct uk_alloc *heap_init()
 	if (unlikely(rc))
 		return NULL;
 
+	/* Keep future kernel VMA allocations in the branch shared by every
+	 * process. Application VMAs occupy separate top-level branches.
+	 */
+#if CONFIG_LIBUKVMEM_PROCESS_VAS
+	rc = uk_vas_set_bounds(&kernel_vas, 0, UK_VAS_PROCESS_BASE);
+	if (unlikely(rc))
+		return NULL;
+#endif
 	rc = uk_vas_set_active(&kernel_vas);
 	if (unlikely(rc))
 		return NULL;
