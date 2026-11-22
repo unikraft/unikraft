@@ -71,6 +71,26 @@ static void pollq_propagate(struct uk_pollq *q,
 }
 #endif /* CONFIG_LIBUKFILE_CHAINUPDATE */
 
+#if CONFIG_LIBUKFILE_POLLED
+void uk_pollq_notify_polled(struct uk_pollq *q, uk_pollevent levels,
+			    uk_pollevent edges)
+{
+	const uk_pollevent notify = levels | edges;
+
+	UK_ASSERT(UK_POLLQ_IS_POLLED(q));
+#if CONFIG_LIBUKFILE_CHAINUPDATE
+	if (q->_tag == uk_thread_current())
+		return;
+#endif /* CONFIG_LIBUKFILE_CHAINUPDATE */
+	if (notify)
+		pollq_notify_n(q, notify, 0);
+#if CONFIG_LIBUKFILE_CHAINUPDATE
+	if (edges)
+		pollq_propagate(q, UK_POLL_CHAINOP_SET, edges);
+#endif /* CONFIG_LIBUKFILE_CHAINUPDATE */
+}
+#endif /* CONFIG_LIBUKFILE_POLLED */
+
 uk_pollevent uk_pollq_clear(struct uk_pollq *q, uk_pollevent clr)
 {
 	uk_pollevent prev;

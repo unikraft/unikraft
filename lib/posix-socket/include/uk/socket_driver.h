@@ -147,6 +147,18 @@ void posix_sock_event_set(posix_sock *sock, unsigned int events)
 	uk_file_event_set(sock, events);
 }
 
+#if CONFIG_LIBPOSIX_SOCKET_POLLED
+/**
+ * Notify direct socket poll waiters of readiness and propagate rising edges.
+ */
+static inline
+void posix_sock_event_notify(posix_sock *sock, unsigned int levels,
+			     unsigned int edges)
+{
+	uk_pollq_notify_polled(&sock->state->pollq, levels, edges);
+}
+#endif /* CONFIG_LIBPOSIX_SOCKET_POLLED */
+
 /**
  * Clear and set the event flags on posix socket object to a specified value.
  */
