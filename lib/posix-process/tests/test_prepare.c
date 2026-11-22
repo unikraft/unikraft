@@ -884,6 +884,87 @@ static bool prepare_kernel_fork_rejected(void)
 	return rc == -ENOTSUP;
 }
 
+static bool prepare_kernel_exec_rejected(void)
+{
+	struct ukarch_execenv *env;
+	int rc;
+
+	env = uk_zalloc(uk_sched_current()->a, sizeof(*env));
+	if (!env)
+		return false;
+	uk_lcpu_regs_set(env->regs, SP, (__uptr)(&env));
+	uk_lcpu_sysctx_set(env->sysctx, TLSP, uk_thread_current()->uktlsp);
+	rc = pprocess_execve_owned(env, NULL, NULL, NULL);
+	uk_free(uk_sched_current()->a, env);
+	return rc == -ENOTSUP;
+}
+
+UK_TESTCASE(process_prepare, resident_exec_allocator)
+{
+	const __sz alignment = 2 * UK_PAGING_PAGE_SIZE;
+	struct uk_vas *kernel = uk_vas_get_kernel();
+	struct uk_alloc *a = kernel->a;
+	unsigned long before = kernel->pt->fa->free_memory;
+	unsigned int cycles = 0;
+	bool zeroed, preserved;
+	unsigned char *p, *next;
+	void *aligned;
+	int rc;
+
+	for (; cycles < 16; cycles++) {
+		p = uk_calloc(a, 32, 1);
+		UK_TEST_EXPECT_NOT_NULL(p);
+		if (!p)
+			break;
+		zeroed = true;
+		for (unsigned int i = 0; i < 32; i++)
+			zeroed &= p[i] == 0;
+		UK_TEST_EXPECT(zeroed);
+		memset(p, 0x5a, 32);
+		next = uk_realloc(a, p, 128);
+		UK_TEST_EXPECT_NOT_NULL(next);
+		if (!next) {
+			uk_free(a, p);
+			break;
+		}
+		preserved = true;
+		for (unsigned int i = 0; i < 32; i++)
+			preserved &= next[i] == 0x5a;
+		UK_TEST_EXPECT(preserved);
+		uk_free(a, next);
+		aligned = NULL;
+		rc = uk_posix_memalign(a, &aligned, alignment, 128);
+		UK_TEST_EXPECT_ZERO(rc);
+		UK_TEST_EXPECT_NOT_NULL(aligned);
+		if (rc || !aligned)
+			break;
+		UK_TEST_EXPECT(IS_ALIGNED((__uptr)aligned, alignment));
+		memset(aligned, 0xa5, 128);
+		uk_free(a, aligned);
+		UK_TEST_EXPECT_SNUM_EQ(kernel->pt->fa->free_memory, before);
+	}
+	UK_TEST_EXPECT_SNUM_EQ(cycles, 16);
+	UK_TEST_EXPECT_SNUM_EQ(kernel->pt->fa->free_memory, before);
+	uk_pr_info("EXEC_ALLOC_PASS cycles=16 zero=1 resize=1 aligned=1\n");
+}
+
+UK_TESTCASE(process_prepare, exec_rejects_kernel_context)
+{
+	struct posix_process *parent = uk_pprocess_current();
+	struct uk_vas *kernel = uk_vas_get_kernel();
+	unsigned int children = prepare_children(parent);
+	unsigned int processes = prepare_processes();
+	unsigned long aliases = prepare_aliases();
+	unsigned long free_bytes = kernel->pt->fa->free_memory;
+
+	UK_TEST_EXPECT(prepare_kernel_exec_rejected());
+	UK_TEST_EXPECT_SNUM_EQ(prepare_children(parent), children);
+	UK_TEST_EXPECT_SNUM_EQ(prepare_processes(), processes);
+	UK_TEST_EXPECT_SNUM_EQ(prepare_aliases(), aliases);
+	UK_TEST_EXPECT_SNUM_EQ(kernel->pt->fa->free_memory, free_bytes);
+	uk_pr_info("PROCESS_EXEC_REJECT_PASS kernel_parent=1\n");
+}
+
 UK_TESTCASE(process_prepare, fork_rejects_kernel_context)
 {
 	struct posix_process *parent = uk_pprocess_current();
@@ -906,6 +987,7 @@ struct prepare_pthread_run {
 	struct uk_semaphore child_reaped;
 #if CONFIG_LIBPOSIX_PROCESS_FORK
 	bool kernel_fork_rejected;
+	bool kernel_exec_rejected;
 #endif
 	struct uk_semaphore done;
 	struct uk_semaphore finish;
@@ -969,6 +1051,7 @@ static void prepare_pthread_parent(void *arg)
 
 #if CONFIG_LIBPOSIX_PROCESS_FORK
 	p->kernel_fork_rejected = prepare_kernel_fork_rejected();
+	p->kernel_exec_rejected = prepare_kernel_exec_rejected();
 #endif
 	for (unsigned int i = 0; i < 32; i++) {
 		__atomic_store_n(value, PREPARE_VALUE, __ATOMIC_RELAXED);
@@ -1087,6 +1170,8 @@ UK_TESTCASE(process_prepare, owned_pthread_inherits_vas)
 #if CONFIG_LIBPOSIX_PROCESS_FORK
 	UK_TEST_EXPECT(probe.kernel_fork_rejected);
 	uk_pr_info("PROCESS_FORK_REJECT_PASS private_callback=1\n");
+	UK_TEST_EXPECT(probe.kernel_exec_rejected);
+	uk_pr_info("PROCESS_EXEC_REJECT_PASS private_callback=1\n");
 #endif
 	UK_TEST_EXPECT(probe.remote);
 	UK_TEST_EXPECT((target != local) == (cpus > 1));
