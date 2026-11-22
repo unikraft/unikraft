@@ -204,6 +204,8 @@ struct uk_signal_pdesc {
 struct uk_signal_tdesc {
 	uk_sigset_t mask;
 	uk_sigset_t sigwait_set;
+	uk_sigset_t suspend_saved_mask;
+	struct uk_signal *suspend_signal;
 	struct uk_signal_queue sigqueue;
 	struct uk_semaphore deliver_semaphore;
 };
@@ -315,6 +317,7 @@ int pprocess_signal_send(struct posix_process *proc, int signum,
 
 /* Wait until an unmasked signal can be delivered to the calling thread. */
 void pprocess_signal_wait(struct posix_thread *thread);
+void pprocess_signal_suspend(struct posix_thread *thread, uk_sigset_t mask);
 
 /* Jump to signal handler
  *
