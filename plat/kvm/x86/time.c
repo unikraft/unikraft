@@ -62,6 +62,8 @@ __nsec ukplat_wall_clock(void)
  */
 static int timer_handler(void *arg __unused)
 {
+	tscclock_timer_irq();
+
 	/* Yes, we handled the irq. */
 	return 1;
 }

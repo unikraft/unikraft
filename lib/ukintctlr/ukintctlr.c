@@ -30,6 +30,7 @@
 #include <uk/atomic.h>
 #include <uk/bitops/bitmap.h>
 #include <uk/lcpu.h>
+#include <uk/pcpuvar.h>
 #include <uk/plat/time.h>
 #include <uk/intctlr.h>
 #include <uk/intctlr/limits.h>
@@ -146,7 +147,7 @@ int uk_intctlr_irq_unregister_arg(unsigned int irq,
  * TODO: This is a temporary solution used to identify non TSC clock
  * interrupts in order to stop waiting for interrupts with deadline.
  */
-extern unsigned long sched_have_pending_events;
+extern __uk_pcpuvar unsigned long sched_have_pending_events;
 
 void uk_intctlr_irq_handle(struct uk_lcpu_except_irq_ctx *ctx)
 {
@@ -172,7 +173,8 @@ void uk_intctlr_irq_handle(struct uk_lcpu_except_irq_ctx *ctx)
 			 * the halting loop, and let it take care of
 			 * that work.
 			 */
-			uk_or_relax(&sched_have_pending_events, 1);
+			uk_or_relax(uk_pcpuvar_current_ptr_get(
+					sched_have_pending_events), 1);
 
 		if (h->func(h->arg) == 1)
 			return;

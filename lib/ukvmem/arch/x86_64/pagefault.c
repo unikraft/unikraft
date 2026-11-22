@@ -6,6 +6,7 @@
 
 #include "../../vmem.h"
 
+#include <uk/arch/util.h>
 #include <uk/arch/x86_64.h>
 #include <uk/assert.h>
 #include <uk/arch/types.h>
@@ -17,6 +18,7 @@
 
 static int vmem_arch_pagefault(void *data)
 {
+	__u64 orig_gsbase = uk_arch_x86_64_enter_kernel_gsbase();
 	struct uk_lcpu_except_err_ctx *ctx = data;
 	__vaddr_t vaddr = (__vaddr_t)uk_lcpu_except_err_ctx_get_fault_addr(ctx);
 	const char *faultstr[] __maybe_unused = {
@@ -54,9 +56,11 @@ static int vmem_arch_pagefault(void *data)
 				    error_code,
 				    strerror(-rc), -rc);
 		uk_lcpu_except_err_ctx_set_handler_err(ctx, rc);
+		uk_arch_x86_64_exit_kernel_gsbase(orig_gsbase);
 		return UK_EVENT_NOT_HANDLED;
 	}
 
+	uk_arch_x86_64_exit_kernel_gsbase(orig_gsbase);
 	return UK_EVENT_HANDLED;
 }
 

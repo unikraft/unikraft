@@ -283,26 +283,31 @@ void uk_plat_native_except_err_handler(int trapnr,
 	};
 
 	rc = uk_raise_event_ptr(trap_event_table[trapnr], &ctx);
-	if (unlikely(rc < 0))
+	if (unlikely(rc < 0)) {
+		(void)uk_arch_x86_64_enter_kernel_gsbase();
 		uk_pr_crit("event handler returned error: %d\n", rc);
-	else if (rc != UK_EVENT_NOT_HANDLED)
+	} else if (rc != UK_EVENT_NOT_HANDLED) {
 		return;
+	}
 
 	if (trap_event_table[trapnr] ==
 		UK_EVENT_PTR(UK_PLAT_NATIVE_EXCEPT_EVENT_UNHANDLED))
 		goto trap_halt;
 
 	rc = uk_raise_event(UK_PLAT_NATIVE_EXCEPT_EVENT_UNHANDLED, &ctx);
-	if (unlikely(rc == UK_EVENT_NOT_HANDLED || rc < 0))
+	if (unlikely(rc == UK_EVENT_NOT_HANDLED || rc < 0)) {
+		(void)uk_arch_x86_64_enter_kernel_gsbase();
 		uk_pr_crit("Unhandled Trap %d (%s), error code=0x%lx\n",
 			   trapnr, x86_exception_table[trapnr],
 			   error_code);
+	}
 
 trap_halt:
 	/* We expect that if there is a handler it won't return,
 	 * but as we can't control that, we place halt outside
 	 * the above conditional.
 	 */
+	(void)uk_arch_x86_64_enter_kernel_gsbase();
 	uk_pm_syscrash();
 }
 
@@ -311,6 +316,7 @@ UK_EVENT(UK_PLAT_NATIVE_EXCEPT_EVENT_IRQ);
 void uk_plat_native_except_irq_handler(struct uk_plat_native_regs *regs,
 				       __u32 irq)
 {
+	__u64 orig_gsbase = uk_arch_x86_64_enter_kernel_gsbase();
 	struct uk_plat_native_except_irq_ctx ctx;
 #if CONFIG_LIBUKPLAT_NATIVE_ECTX_ISR_ASSERTIONS
 	__sz ectx_align = UK_PLAT_NATIVE_ECTX_ALIGN;
@@ -331,6 +337,7 @@ void uk_plat_native_except_irq_handler(struct uk_plat_native_regs *regs,
 #if CONFIG_LIBUKPLAT_NATIVE_ECTX_ISR_ASSERTIONS
 	uk_plat_native_ectx_assert_equal(ectx);
 #endif /* CONFIG_LIBUKPLAT_NATIVE_ECTX_ISR_ASSERTIONS */
+	uk_arch_x86_64_exit_kernel_gsbase(orig_gsbase);
 }
 
 static struct uk_arch_x86_64_desc_table_ptr64 idtptr;

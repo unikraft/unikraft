@@ -54,8 +54,12 @@
 
 #include <stdint.h>
 
+#include <kvm/tscclock.h>
 #include <uk/arch/util.h>
 #include <uk/lcpu.h>
+#include <uk/pcpuvar.h>
+#include <uk/plat/config.h>
+#include <uk/plat/spinlock.h>
 #include <uk/plat/time.h>
 #include <uk/timeconv.h>
 #include <uk/print.h>
@@ -327,6 +331,24 @@ static inline void i8254_oneshot_program(__u64 delta_ns)
 	uk_arch_x86_64_outb(TIMER_CNTR, ticks >> 8);
 }
 
+static __spinlock pit_lock = UKARCH_SPINLOCK_INITIALIZER();
+static __u64 pit_cpu_deadline[CONFIG_UKPLAT_CPU_MAXCOUNT];
+
+void tscclock_timer_irq(void)
+{
+#if CONFIG_HAVE_SMP
+	__u64 targets[CONFIG_UKPLAT_CPU_MAXCOUNT];
+	unsigned int i, n = 0;
+
+	for (i = 1; i < CONFIG_UKPLAT_CPU_MAXCOUNT; i++) {
+		if (UK_READ_ONCE(pit_cpu_deadline[i]) != 0)
+			targets[n++] = i;
+	}
+	if (n > 0)
+		(void)uk_lcpu_wakeup(targets, &n);
+#endif /* CONFIG_HAVE_SMP */
+}
+
 /*
  * Returns early if any interrupts are serviced, or if the requested delay is
  * too short. Must be called with interrupts disabled, will enable interrupts
@@ -340,10 +362,13 @@ static inline void i8254_oneshot_program(__u64 delta_ns)
  */
 static void tscclock_cpu_block(__u64 until)
 {
-	__u64 now, delta_ns;
+	__u64 cpu_idx = uk_pcpuvar_current_get(uk_pcpuvar_cpu_idx);
+	__u64 now, delta_ns, min_until, pit_delta_ns;
 	__u64 delta_ticks;
+	unsigned int i;
 
 	UK_ASSERT(uk_lcpu_irqs_disabled());
+	UK_ASSERT(cpu_idx < CONFIG_UKPLAT_CPU_MAXCOUNT);
 
 	now = ukplat_monotonic_clock();
 	if (until <= now)
@@ -368,29 +393,41 @@ static void tscclock_cpu_block(__u64 until)
 		return;
 	}
 
-	i8254_oneshot_program(delta_ns);
+	ukarch_spin_lock(&pit_lock);
+	UK_WRITE_ONCE(pit_cpu_deadline[cpu_idx], until);
+	min_until = until;
+	for (i = 0; i < CONFIG_UKPLAT_CPU_MAXCOUNT; i++) {
+		__u64 d = UK_READ_ONCE(pit_cpu_deadline[i]);
+
+		if (d != 0 && d < min_until)
+			min_until = d;
+	}
+	pit_delta_ns = (min_until > now) ? (min_until - now) : 0;
+	i8254_oneshot_program(pit_delta_ns);
+	ukarch_spin_unlock(&pit_lock);
 
 	/*
 	 * Wait for any interrupt. If we got an interrupt then just
 	 * return into the scheduler (this func is called _ONLY_ from
 	 * a scheduler, see the note above) which will check if there
 	 * is work to do and call us again here if not.
-	 *
-	 * TODO: It would be more efficient for longer sleeps to be
-	 * able to distinguish if the interrupt was the PIT interrupt
-	 * and no other, but this will do for now.
 	 */
 	uk_lcpu_halt_irq();
+
+	ukarch_spin_lock(&pit_lock);
+	UK_WRITE_ONCE(pit_cpu_deadline[cpu_idx], 0);
+	ukarch_spin_unlock(&pit_lock);
 }
 
-unsigned long sched_have_pending_events;
+__uk_pcpuvar unsigned long sched_have_pending_events;
 
 void time_block_until(__snsec until)
 {
 	while ((__snsec) ukplat_monotonic_clock() < until) {
 		tscclock_cpu_block(until);
 
-		if (uk_and_relax(&sched_have_pending_events, 0))
+		if (uk_and_relax(uk_pcpuvar_current_ptr_get(
+					 sched_have_pending_events), 0))
 			break;
 	}
 }
