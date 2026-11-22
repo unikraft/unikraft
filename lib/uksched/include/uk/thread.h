@@ -63,6 +63,8 @@ struct uk_thread {
 
 	UK_TAILQ_ENTRY(struct uk_thread) queue;
 	uint32_t flags;
+	bool wait_interruptible;
+	bool wait_interrupted;
 	__snsec wakeup_time;
 	struct uk_sched *sched;
 #if CONFIG_LIBUKVMEM_THREAD_VAS
@@ -699,6 +701,15 @@ void uk_thread_block_until(struct uk_thread *thread, __snsec until);
 void uk_thread_block_timeout(struct uk_thread *thread, __nsec nsec);
 void uk_thread_block(struct uk_thread *thread);
 void uk_thread_wake(struct uk_thread *thread);
+
+/* Interruptions are sticky for a thread that is leaving userspace. */
+bool uk_thread_block_interruptible(struct uk_thread *thread, __snsec until);
+void uk_thread_interrupt_wait(struct uk_thread *thread);
+
+static inline bool uk_thread_wait_interrupted(const struct uk_thread *thread)
+{
+	return __atomic_load_n(&thread->wait_interrupted, __ATOMIC_ACQUIRE);
+}
 
 /**
  * Set the wakeup timer state for thread `t`.

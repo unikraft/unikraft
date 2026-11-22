@@ -112,6 +112,7 @@ static int futex_wait_bitset(uint32_t *uaddr, uint32_t val,
 	struct uk_thread *current = uk_thread_current();
 	struct uk_futex f = { .uaddr = uaddr, .bitset = bitset, .woken = 0 };
 	struct futex_guard guard;
+	__snsec deadline = timeout ? *timeout : 0;
 	__uptr previous_cookie;
 	int timedout;
 	int result;
@@ -127,16 +128,19 @@ static int futex_wait_bitset(uint32_t *uaddr, uint32_t val,
 
 	previous_cookie = current->wait_ticket.cookie;
 	uk_waitq_set_cookie((__uptr)&f);
-	timedout = uk_waitq_wait_deadline_locked(&futex_waiters,
-			timeout ? (__snsec)*timeout : 0,
-			futex_guard_lock, futex_guard_unlock, &guard);
+	timedout = uk_waitq_wait_interruptible(&futex_waiters, deadline,
+					       futex_guard_lock,
+					       futex_guard_unlock, &guard);
 
 	/*
 	 * Requeue changes the address cookie, not the registration lifetime.
 	 * Waitq already detached this thread regardless of its current address.
 	 * A committed wake wins over a deadline noticed after rescheduling.
 	 */
-	result = (!f.woken && timedout) ? -ETIMEDOUT : 0;
+	if (timedout < 0)
+		result = timedout;
+	else
+		result = (!f.woken && timedout) ? -ETIMEDOUT : 0;
 	uk_waitq_set_cookie(previous_cookie);
 	futex_guard_unlock(&guard);
 	return result;
@@ -256,10 +260,13 @@ static int futex_vas_wait(__u32 *addr, __u32 val,
 	uk_thread_uktls_var(current, futex_active_wait) = &f;
 	previous_cookie = current->wait_ticket.cookie;
 	uk_waitq_set_cookie((__uptr)&f);
-	timedout = uk_waitq_wait_deadline_locked(&futex_waiters, deadline,
-						 futex_guard_lock,
-						 futex_guard_unlock, &guard);
-	rc = (!f.woken && timedout) ? -ETIMEDOUT : 0;
+	timedout = uk_waitq_wait_interruptible(&futex_waiters, deadline,
+					       futex_guard_lock,
+					       futex_guard_unlock, &guard);
+	if (timedout < 0)
+		rc = timedout;
+	else
+		rc = (!f.woken && timedout) ? -ETIMEDOUT : 0;
 	uk_waitq_set_cookie(previous_cookie);
 	uk_thread_uktls_var(current, futex_active_wait) = NULL;
 	futex_guard_unlock(&guard);

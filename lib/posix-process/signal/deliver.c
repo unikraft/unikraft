@@ -50,8 +50,7 @@ static void uk_sigact_term(int __unused sig)
 
 	uk_pr_info("pid: %d terminated by signal\n", pprocess->pid);
 
-	pprocess_exit(pprocess, POSIX_PROCESS_KILLED, sig);
-	uk_sched_thread_exit(); /* noreturn */
+	pprocess_exit_signalled(sig);
 }
 
 static void uk_sigact_ign(int __unused sig)
@@ -329,6 +328,7 @@ static void uk_signal_deliver(struct uk_syscall_exit_ctx *exit_ctx)
 	struct ukarch_execenv *execenv;
 	struct posix_thread *pthread;
 	struct posix_process *pproc;
+	int sig;
 
 	UK_ASSERT(exit_ctx);
 
@@ -350,6 +350,9 @@ static void uk_signal_deliver(struct uk_syscall_exit_ctx *exit_ctx)
 
 	pproc = pthread->process;
 	UK_ASSERT(pproc);
+	sig = pprocess_terminating_signal(pproc);
+	if (sig)
+		pprocess_exit_signalled(sig);
 
 	/* If there's SIGKILL pending, kill the process right away */
 	if (IS_PENDING(pproc->signal->sigqueue, SIGKILL)) {

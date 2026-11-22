@@ -13,6 +13,7 @@
 #ifndef __UK_SCHED_WAIT_H__
 #define __UK_SCHED_WAIT_H__
 
+#include <errno.h>
 #include <uk/essentials.h>
 #include <uk/lcpu.h>
 #include <uk/plat/time.h>
@@ -150,7 +151,7 @@ void _uk_waitq_block_until(struct uk_thread *thread, __snsec deadline)
 /**
  * INTERNAL. Wait exactly once using `wq` until awoken or a deadline.
  *
- * Expression returns non-zero if timed out.
+ * Expression returns 1 if timed out, or -EINTR if interrupted.
  *
  * If `deadline` is non-zero, wait at most until that point in time;
  * after wakeup compare `deadline` with the value supplied by `clock_expr` to
@@ -159,37 +160,56 @@ void _uk_waitq_block_until(struct uk_thread *thread, __snsec deadline)
  * If `lock` evaluates true, it will be released before sleeping with
  * `unlock_fn` and re-acquired after wakeup with `lock_fn`.
  */
-#define _uk_waitq_wait(wq, deadline, clock_expr, lock_fn, unlock_fn, lock)\
+#define _uk_waitq_wait(wq, deadline, clock_expr, lock_fn, unlock_fn,	\
+		      lock, interruptible)				\
 ({									\
 	struct uk_thread *_uk_waitq_current = uk_thread_current();	\
 	int _uk_waitq_timedout = 0;					\
 	unsigned long _uk_waitq_flags;					\
+	struct uk_waitq *_uk_waitq_q = (wq);				\
+	__typeof__(lock) _uk_waitq_outer = (lock);			\
+	__snsec _uk_waitq_deadline = (deadline);			\
+	bool _uk_waitq_intr = (interruptible);				\
+	bool _uk_waitq_sleep = true;					\
 									\
-	_uk_waitq_lock((wq), _uk_waitq_flags);				\
-	_uk_waitq_add((wq), _uk_waitq_current);				\
-	_uk_waitq_block_until(_uk_waitq_current, (deadline));		\
-	_uk_waitq_unlock((wq), _uk_waitq_flags);			\
-	if ((lock))							\
-		unlock_fn((lock));					\
-	uk_sched_yield();						\
+	_uk_waitq_lock(_uk_waitq_q, _uk_waitq_flags);			\
+	_uk_waitq_add(_uk_waitq_q, _uk_waitq_current);			\
+	if (_uk_waitq_intr)						\
+		_uk_waitq_sleep = uk_thread_block_interruptible(	\
+			_uk_waitq_current, _uk_waitq_deadline);		\
+	else								\
+		_uk_waitq_block_until(_uk_waitq_current,		\
+				      _uk_waitq_deadline);		\
+	_uk_waitq_unlock(_uk_waitq_q, _uk_waitq_flags);			\
+	if (_uk_waitq_outer)						\
+		unlock_fn(_uk_waitq_outer);				\
+	if (_uk_waitq_sleep)						\
+		uk_sched_yield();					\
 	/* Detach before taking an outer lock that may itself block. */	\
-	_uk_waitq_lock((wq), _uk_waitq_flags);				\
+	_uk_waitq_lock(_uk_waitq_q, _uk_waitq_flags);			\
 	_uk_waitq_remove(_uk_waitq_current);				\
-	_uk_waitq_unlock((wq), _uk_waitq_flags);			\
-	if ((lock))							\
-		lock_fn((lock));					\
-	if ((deadline) && ((clock_expr) >= (deadline)))			\
+	_uk_waitq_unlock(_uk_waitq_q, _uk_waitq_flags);			\
+	if (_uk_waitq_outer)						\
+		lock_fn(_uk_waitq_outer);				\
+	if (_uk_waitq_intr &&						\
+	    uk_thread_wait_interrupted(_uk_waitq_current))		\
+		_uk_waitq_timedout = -EINTR;				\
+	else if (_uk_waitq_deadline && (clock_expr) >= _uk_waitq_deadline) \
 		_uk_waitq_timedout = 1;					\
 									\
 	_uk_waitq_timedout;						\
 })
 
 #define uk_waitq_wait_locked(wq, lock_fn, unlock_fn, lock) \
-	_uk_waitq_wait((wq), 0, 0, lock_fn, unlock_fn, (lock))
+	_uk_waitq_wait((wq), 0, 0, lock_fn, unlock_fn, (lock), false)
 
 #define uk_waitq_wait_deadline_locked(wq, deadline, lock_fn, unlock_fn, lock) \
 	_uk_waitq_wait((wq), deadline, ukplat_monotonic_clock(),	\
-		       lock_fn, unlock_fn, (lock))
+		       lock_fn, unlock_fn, (lock), false)
+
+#define uk_waitq_wait_interruptible(wq, deadline, lock_fn, unlock_fn, lock) \
+	_uk_waitq_wait((wq), deadline, ukplat_monotonic_clock(),	\
+		       lock_fn, unlock_fn, (lock), true)
 
 static inline void _uk_waitq_noplock(int lock __unused) {}
 

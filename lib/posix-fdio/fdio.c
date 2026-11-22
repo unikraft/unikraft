@@ -82,7 +82,10 @@ ssize_t uk_sys_preadv(struct uk_ofile *of, const struct iovec *iov, int iovcnt,
 			uk_file_runlock(f);
 		if (!_SHOULD_BLOCK(r, mode))
 			break;
-		uk_file_poll(f, UKFD_POLLIN|UKFD_POLL_ALWAYS);
+		r = uk_file_wait_interruptible(f, UKFD_POLLIN |
+					       UKFD_POLL_ALWAYS);
+		if (r)
+			return r;
 	}
 	return r;
 }
@@ -131,7 +134,10 @@ ssize_t uk_sys_readv(struct uk_ofile *of, const struct iovec *iov, int iovcnt)
 			break;
 		if (seekable)
 			_of_unlock(of);
-		uk_file_poll(f, UKFD_POLLIN|UKFD_POLL_ALWAYS);
+		r = uk_file_wait_interruptible(f, UKFD_POLLIN |
+					       UKFD_POLL_ALWAYS);
+		if (r)
+			return r;
 	}
 
 	if (seekable) {
@@ -199,7 +205,10 @@ ssize_t uk_sys_preadv2(struct uk_ofile *of, const struct iovec *iov, int iovcnt,
 			break;
 		if (use_pos)
 			_of_unlock(of);
-		uk_file_poll(f, UKFD_POLLIN|UKFD_POLL_ALWAYS);
+		r = uk_file_wait_interruptible(f, UKFD_POLLIN |
+					       UKFD_POLL_ALWAYS);
+		if (r)
+			return r;
 	}
 
 	if (use_pos) {
@@ -242,7 +251,10 @@ ssize_t uk_sys_pwritev(struct uk_ofile *of, const struct iovec *iov, int iovcnt,
 			uk_file_wunlock(f);
 		if (!_SHOULD_BLOCK(r, mode))
 			break;
-		uk_file_poll(f, UKFD_POLLOUT|UKFD_POLL_ALWAYS);
+		r = uk_file_wait_interruptible(f, UKFD_POLLOUT |
+					       UKFD_POLL_ALWAYS);
+		if (r)
+			return r;
 	}
 
 	return r;
@@ -302,7 +314,10 @@ ssize_t uk_sys_writev(struct uk_ofile *of, const struct iovec *iov, int iovcnt)
 			break;
 		if (seekable)
 			_of_unlock(of);
-		uk_file_poll(f, UKFD_POLLOUT|UKFD_POLL_ALWAYS);
+		r = uk_file_wait_interruptible(f, UKFD_POLLOUT |
+					       UKFD_POLL_ALWAYS);
+		if (r)
+			return r;
 	}
 
 	if (seekable) {
@@ -382,7 +397,10 @@ ssize_t uk_sys_pwritev2(struct uk_ofile *of, const struct iovec *iov,
 			break;
 		if (use_pos)
 			_of_unlock(of);
-		uk_file_poll(f, UKFD_POLLOUT|UKFD_POLL_ALWAYS);
+		r = uk_file_wait_interruptible(f, UKFD_POLLOUT |
+					       UKFD_POLL_ALWAYS);
+		if (r)
+			return r;
 	}
 
 	if (use_pos) {

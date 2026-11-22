@@ -100,6 +100,7 @@ struct posix_process {
 	bool orphaned;
 	__u64 exit_signal;
 	int exit_status;
+	int terminating_signal;
 #if CONFIG_LIBPOSIX_PROCESS_BRK
 	struct {
 		struct uk_mutex mtx;
@@ -204,6 +205,15 @@ struct posix_thread *pprocess_claim_pthread_exit(struct uk_thread *thread,
 void pprocess_complete_pthread_exit(struct posix_process *process);
 /* A successful process-exit claim owns a pin until its completion. */
 bool pprocess_claim_process_exit(struct posix_process *pprocess);
+
+static inline int pprocess_terminating_signal(struct posix_process *process)
+{
+	return __atomic_load_n(&process->terminating_signal, __ATOMIC_ACQUIRE);
+}
+
+/* Caller holds pprocess_lock. */
+void pprocess_mark_signal_exit_locked(struct posix_process *process, int sig);
+void __noreturn pprocess_exit_signalled(int sig);
 bool pprocess_try_exit(struct posix_process *process,
 		       enum posix_process_state state,
 		       int exit_status);

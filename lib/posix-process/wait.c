@@ -69,6 +69,10 @@ static int pprocess_wait(pid_t pid, pid_t pgid, siginfo_t *si, int opt)
 
 	for (;;) {
 		flags = pprocess_lock_acquire();
+		if (pprocess_terminating_signal(this_process)) {
+			ret = -EINTR;
+			goto out;
+		}
 		this_thread->wait_pid = pid;
 		this_thread->wait_pgid = pgid;
 		this_thread->state = POSIX_THREAD_BLOCKED_WAIT;

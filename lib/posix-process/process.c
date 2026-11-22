@@ -293,6 +293,16 @@ static struct posix_thread *pprocess_alloc_pthread(struct posix_process *p,
 	{
 		unsigned long flags = pprocess_lock_acquire();
 
+		if (pprocess_terminating_signal(p)) {
+			pprocess_lock_release(flags);
+#if CONFIG_LIBPOSIX_PROCESS_SIGNAL
+			pprocess_signal_tdesc_free(pthread);
+#endif /* CONFIG_LIBPOSIX_PROCESS_SIGNAL */
+			uk_free(a, pthread);
+			err = -ESRCH;
+			goto err_free_tid;
+		}
+
 #if CONFIG_LIBUKVMEM_THREAD_VAS && !CONFIG_LIBUKVMEM_VAS_REFCOUNT
 		th->vas = p->vas;
 #endif
@@ -503,6 +513,7 @@ int pprocess_publish(struct posix_process *p)
 	} else if (p->exiting || p->state != POSIX_PROCESS_RUNNING) {
 		rc = -ESRCH;
 	} else if (p->parent && (p->parent->exiting ||
+				pprocess_terminating_signal(p->parent) ||
 				p->parent->state != POSIX_PROCESS_RUNNING)) {
 		rc = -ESRCH;
 	} else {
