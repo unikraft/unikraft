@@ -60,19 +60,25 @@ UK_TESTCASE(lcpu_smp, bootstrap_and_overlap)
 {
 	__u64 indices[CONFIG_UKPLAT_CPU_MAXCOUNT - 1];
 	__u64 stack_pointers[CONFIG_UKPLAT_CPU_MAXCOUNT - 1];
-	const unsigned int remote_count = CONFIG_UKPLAT_CPU_MAXCOUNT - 1;
-	const __u64 expected_mask = ~0ULL >> (64 - CONFIG_UKPLAT_CPU_MAXCOUNT);
+	const unsigned int cpu_count = uk_lcpu_discovered_count();
+	const unsigned int remote_count = cpu_count - 1;
+	__u64 expected_mask = 0;
 	const struct uk_lcpu_func function = { .fn = remote_probe, .user = NULL };
 	unsigned int started = remote_count, ready, queued = 0, participants = 0;
 	__u64 mask = 0, progress_mask = 0;
 	__nsec deadline;
 	int rc = 0, wait_rc;
 
+	if (!cpu_count || cpu_count > CONFIG_UKPLAT_CPU_MAXCOUNT || cpu_count > 64) {
+		rc = -EINVAL;
+		goto finish;
+	}
+	expected_mask = ~0ULL >> (64 - cpu_count);
 	if (uk_pcpuvar_current_get(uk_pcpuvar_cpu_idx) != 0) {
 		rc = -EINVAL;
 		goto finish;
 	}
-	for (unsigned int i = 1; i < CONFIG_UKPLAT_CPU_MAXCOUNT; i++) {
+	for (unsigned int i = 1; i < cpu_count; i++) {
 		if (uk_pcpuvar_lval(i, uk_pcpuvar_cpu_idx) != i) {
 			rc = -ENODEV;
 			goto finish;
@@ -84,6 +90,10 @@ UK_TESTCASE(lcpu_smp, bootstrap_and_overlap)
 	slots[0].hardware_id = observed_hardware_id();
 	slots[0].progress = 1;
 	slots[0].entered = 1;
+	if (!remote_count) {
+		mask = 1;
+		goto finish;
+	}
 	rc = uk_lcpu_start(indices, &started, stack_pointers, NULL, 0);
 	if (rc || started != remote_count) {
 		if (!rc)
@@ -107,7 +117,7 @@ UK_TESTCASE(lcpu_smp, bootstrap_and_overlap)
 	deadline = ukplat_monotonic_clock() + PROBE_TIMEOUT_NS;
 	for (;;) {
 		mask = 0;
-		for (unsigned int i = 0; i < CONFIG_UKPLAT_CPU_MAXCOUNT; i++)
+		for (unsigned int i = 0; i < cpu_count; i++)
 			if (__atomic_load_n(&slots[i].entered, __ATOMIC_ACQUIRE))
 				mask |= 1ULL << i;
 		if (mask == expected_mask)
@@ -132,7 +142,7 @@ finish:
 			rc = wait_rc ? wait_rc : -ETIMEDOUT;
 	}
 	if (!rc) {
-		for (unsigned int i = 0; i < CONFIG_UKPLAT_CPU_MAXCOUNT; i++) {
+		for (unsigned int i = 0; i < cpu_count; i++) {
 			if (slots[i].hardware_id !=
 			    uk_pcpuvar_lval(i, uk_pcpuvar_cpu_id))
 				rc = -EIO;
@@ -149,12 +159,14 @@ finish:
 	}
 	UK_TEST_EXPECT_ZERO(rc);
 	if (!rc) {
-		for (unsigned int i = 0; i < CONFIG_UKPLAT_CPU_MAXCOUNT; i++)
+		uk_pr_info("SMP_PROBE discovered_count=%u\n", cpu_count);
+		for (unsigned int i = 0; i < cpu_count; i++)
 			uk_pr_info("SMP_PROBE cpu=%u hw=%llu progress=%lu\n", i,
 				   (unsigned long long)slots[i].hardware_id,
 				   slots[i].progress);
-		uk_pr_info("SMP_PROBE overlap=1 participants=%u mask=%llx progress_mask=%llx\n",
-			   participants, (unsigned long long)mask,
+		uk_pr_info("SMP_PROBE overlap=%u participants=%u mask=%llx progress_mask=%llx\n",
+			   (unsigned int)(cpu_count > 1), participants,
+			   (unsigned long long)mask,
 			   (unsigned long long)progress_mask);
 	}
 	/* CPU stacks remain live until this isolated test guest shuts down. */

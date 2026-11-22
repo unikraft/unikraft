@@ -37,6 +37,17 @@ __uk_pcpuvar struct uk_lcpu uk_lcpus;
 
 static const struct uk_lcpu_pm_ops *pm_ops;
 
+unsigned int uk_lcpu_discovered_count(void)
+{
+	unsigned int count = 1;
+
+	while (count < CONFIG_UKPLAT_CPU_MAXCOUNT &&
+	       uk_pcpuvar_lval(count, uk_pcpuvar_cpu_idx) == count)
+		count++;
+	return count;
+}
+
+
 int uk_lcpu_pm_ops_register(const struct uk_lcpu_pm_ops *ops)
 {
 	if (unlikely(!ops))

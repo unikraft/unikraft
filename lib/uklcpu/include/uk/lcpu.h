@@ -131,6 +131,15 @@ UK_CTASSERT(UK_LCPU_MEMBERS_SIZE <= UK_LCPU_SIZE);
  */
 struct uk_lcpu *uk_lcpu_get_current(void);
 
+/**
+ * Number of firmware-recorded CPUs admitted by the kernel capacity, including
+ * BSP. This is not a count of CPUs currently online.
+ * Platform enumerators fill a contiguous linear index map. Unused secondary
+ * slots retain index zero from the per-CPU template. Read that authoritative
+ * map rather than keeping a second topology count.
+ */
+unsigned int uk_lcpu_discovered_count(void);
+
 extern __uk_pcpuvar struct uk_lcpu uk_lcpus;
 
 /**
