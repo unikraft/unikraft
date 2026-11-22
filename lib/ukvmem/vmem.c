@@ -1966,5 +1966,97 @@ unlock:
 		return rc;
 	}
 }
+
+static int vmem_copy(struct uk_vas *vas, __vaddr_t addr, void *buffer,
+		     __sz len, unsigned int access)
+{
+	struct uk_vas *owner;
+	struct uk_vma *vma;
+	__vaddr_t mapped;
+	__paddr_t paddr, page;
+	__pte_t pte;
+	unsigned long irqf;
+	unsigned int level;
+	void *page_data;
+	__sz chunk;
+	int rc;
+
+	if (!vas || (!buffer && len) ||
+	    (len && len - 1 > __VADDR_MAX - addr))
+		return -EINVAL;
+	if (!len)
+		return 0;
+	if (uk_lcpu_irqs_disabled())
+		return -EWOULDBLOCK;
+	while (len) {
+		rc = uk_vas_fault(vas, addr, access);
+		if (rc)
+			return rc;
+		owner = vas;
+		if (uk_vas_get_kernel() &&
+		    uk_paging_pt_get_owner(vas->pt, addr) ==
+		    uk_vas_get_kernel()->pt)
+			owner = uk_vas_get_kernel();
+#if CONFIG_LIBUKVMEM_COW
+		rc = vmem_vas_lock(owner, &irqf, NULL);
+		if (rc)
+			return rc;
+#else
+		ukplat_spin_lock_irqsave(&owner->lock, irqf);
+#endif
+		vma = vmem_vma_find(owner, addr, 1);
+		if (!vma || addr < vma->start || addr >= vma->end ||
+		    !vmem_access_allowed(vma->attr, access)) {
+			rc = -EFAULT;
+			goto unlock_copy;
+		}
+		level = UK_PAGING_PAGE_LEVEL;
+		rc = uk_paging_pt_walk(owner->pt, addr, &level, NULL, &pte);
+		if (rc)
+			goto unlock_copy;
+		if (!UK_PAGING_PT_Lx_PTE_PRESENT(pte, level) ||
+		    !vmem_access_allowed(uk_paging_attr_from_pte(pte, level),
+					 access)) {
+			ukplat_spin_unlock_irqrestore(&owner->lock, irqf);
+			continue;
+		}
+		paddr = UK_PAGING_PT_Lx_PTE_PADDR(pte, level) +
+			(addr & (UK_PAGING_PAGE_Lx_SIZE(level) - 1));
+		page = UK_PAGING_PAGE_ALIGN_DOWN(paddr);
+		chunk = MIN(len, UK_PAGING_PAGE_SIZE - (paddr - page));
+		chunk = MIN(chunk, vma->end - addr);
+		mapped = uk_paging_page_kmap(owner->pt, page, 1, 0);
+		if (mapped == UK_PAGING_VADDR_INV) {
+			rc = -ENOMEM;
+			goto unlock_copy;
+		}
+		page_data = (void *)(mapped + paddr - page);
+		if (access == UK_VMA_FAULT_WRITE)
+			memcpy_isr(page_data, buffer, chunk);
+		else
+			memcpy_isr(buffer, page_data, chunk);
+		uk_paging_page_kunmap(owner->pt, mapped, 1, 0);
+		ukplat_spin_unlock_irqrestore(&owner->lock, irqf);
+		addr += chunk;
+		buffer = (__u8 *)buffer + chunk;
+		len -= chunk;
+	}
+	return 0;
+unlock_copy:
+	ukplat_spin_unlock_irqrestore(&owner->lock, irqf);
+	return rc;
+}
+
+int uk_vas_copy_from(struct uk_vas *vas, void *dst, __vaddr_t src, __sz len)
+{
+	return vmem_copy(vas, src, dst, len, UK_VMA_FAULT_READ);
+}
+
+int uk_vas_copy_to(struct uk_vas *vas, __vaddr_t dst, const void *src,
+		   __sz len)
+{
+	return vmem_copy(vas, dst, DECONST(void *, src), len,
+			 UK_VMA_FAULT_WRITE);
+}
 #endif
 #endif /* CONFIG_LIBUKPAGING */

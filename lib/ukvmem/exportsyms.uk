@@ -35,6 +35,8 @@ uk_vas_get
 uk_vas_put
 uk_vas_fault
 uk_vas_store_u32
+uk_vas_copy_from
+uk_vas_copy_to
 uk_vas_enable_cow
 uk_vas_clone_cow
 uk_vas_create_process

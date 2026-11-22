@@ -583,6 +583,21 @@ int uk_vas_load_u32_shared_try(struct uk_vas *vas, __vaddr_t addr,
  * calls outside locks. Returns 0 or a negative errno; misalignment is -EINVAL.
  */
 int uk_vas_store_u32(struct uk_vas *vas, __vaddr_t vaddr, __u32 value);
+
+/**
+ * Copy bytes from an explicit VAS into a resident shared kernel buffer.
+ * The caller retains the VAS and buffer, calls outside locks with IRQs enabled,
+ * and ensures the buffer cannot fault. Unaligned ranges are supported. Faults
+ * and COW are resolved outside VAS locks; each guarded copy spans at most one
+ * base page. The VAS is never activated. Returns 0 or a negative errno; an
+ * error may leave a copied prefix. Copies are not atomic against other writers.
+ * A zero-length copy accepts a NULL buffer and performs no access.
+ */
+int uk_vas_copy_from(struct uk_vas *vas, void *dst, __vaddr_t src, __sz len);
+
+/** Same contract as copy_from, copying from the kernel buffer into the VAS. */
+int uk_vas_copy_to(struct uk_vas *vas, __vaddr_t dst, const void *src,
+		   __sz len);
 #endif
 
 /**
