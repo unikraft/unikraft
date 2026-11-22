@@ -27,6 +27,13 @@ struct cpu_probe_slot {
 	__uptr observed_auxsp;
 	__paddr_t observed_page_table_root;
 	__u64 observed_efer;
+#if CONFIG_HAVE_SYSCALL
+	__u64 observed_star;
+	__u64 observed_lstar;
+	__u64 observed_fmask;
+	__u64 observed_gs_base;
+	__u64 observed_kernel_gs_base;
+#endif
 	unsigned long tls_marker;
 	unsigned int context_ready;
 	unsigned int startup_stack_checked;
@@ -79,6 +86,26 @@ static __noinline int record_context(__u64 index, unsigned long marker)
 	const __uptr auxsp = uk_pcpuvar_current_get(UK_LCPU_AUXSP_SYM);
 	struct ukarch_auxspcb *cb;
 
+#if CONFIG_HAVE_SYSCALL
+	{
+		const __u64 star = uk_arch_x86_64_rdmsrl(UK_ARCH_X86_64_MSR_STAR);
+		const __u64 lstar = uk_arch_x86_64_rdmsrl(UK_ARCH_X86_64_MSR_LSTAR);
+		const __u64 fmask =
+			uk_arch_x86_64_rdmsrl(UK_ARCH_X86_64_MSR_SYSCALL_MASK);
+		const __u64 gs = uk_arch_x86_64_rdmsrl(UK_ARCH_X86_64_MSR_GS_BASE);
+		const __u64 kgs =
+			uk_arch_x86_64_rdmsrl(UK_ARCH_X86_64_MSR_KERNEL_GS_BASE);
+
+		if (!(efer & UK_ARCH_X86_64_EFER_SCE) || !star || !lstar ||
+		    !fmask || gs != kgs || (index ? !gs : gs != 0))
+			return -EIO;
+		slots[index].observed_star = star;
+		slots[index].observed_lstar = lstar;
+		slots[index].observed_fmask = fmask;
+		slots[index].observed_gs_base = gs;
+		slots[index].observed_kernel_gs_base = kgs;
+	}
+#endif
 	if (!(efer & UK_ARCH_X86_64_EFER_NXE) ||
 	    !probe_vas || uk_vas_get_active() != probe_vas ||
 	    uk_paging_pt_get_active() != probe_vas->pt ||
@@ -318,6 +345,18 @@ finish:
 				if (slots[i].observed_tlsp == slots[j].observed_tlsp ||
 				    slots[i].observed_auxsp == slots[j].observed_auxsp)
 					rc = -EIO;
+#if CONFIG_HAVE_SYSCALL
+			if (slots[i].observed_star != slots[0].observed_star ||
+			    slots[i].observed_lstar != slots[0].observed_lstar ||
+			    slots[i].observed_fmask != slots[0].observed_fmask ||
+			    slots[i].observed_gs_base !=
+				slots[i].observed_kernel_gs_base)
+				rc = -EIO;
+			for (unsigned int j = 0; j < i; j++)
+				if (slots[i].observed_gs_base ==
+				    slots[j].observed_gs_base)
+					rc = -EIO;
+#endif
 			if (slots[i].hardware_id !=
 			    uk_pcpuvar_lval(i, uk_pcpuvar_cpu_id))
 				rc = -EIO;
@@ -353,6 +392,17 @@ finish:
 			uk_pr_info("SMP_ADDRESS cpu=%u root=%lx efer=%llx\n", i,
 				   (unsigned long)slots[i].observed_page_table_root,
 				   (unsigned long long)slots[i].observed_efer);
+#if CONFIG_HAVE_SYSCALL
+			uk_pr_info("SMP_SYSCALL cpu=%u sce=%u star=%llx lstar=%llx fmask=%llx gs=%llx kgs=%llx\n",
+				   i,
+				   (unsigned int)!!(slots[i].observed_efer &
+						    UK_ARCH_X86_64_EFER_SCE),
+				   (unsigned long long)slots[i].observed_star,
+				   (unsigned long long)slots[i].observed_lstar,
+				   (unsigned long long)slots[i].observed_fmask,
+				   (unsigned long long)slots[i].observed_gs_base,
+				   (unsigned long long)slots[i].observed_kernel_gs_base);
+#endif
 			uk_pr_info("SMP_CONTEXT cpu=%u tls=%lx aux=%lx marker=%lu ready=%u startup_stack_checked=%u\n",
 				   i, (unsigned long)slots[i].observed_tlsp,
 				   (unsigned long)slots[i].observed_auxsp,

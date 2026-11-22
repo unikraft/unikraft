@@ -389,6 +389,22 @@ no_avx512:
 	jnz	fail
 #endif /* CONFIG_LIBUKPLAT_NATIVE_PAGING */
 
+#if CONFIG_HAVE_SYSCALL
+	/* Program this CPU's SYSCALL/SYSRET MSRs before entering the runtime
+	 * entry point. Keep the caller-owned startup stack aligned and preserve
+	 * the boot argument in %rsi.
+	 */
+	movq	UK_PCPUVAR_X86_64_GSREL(UK_LCPU_SSTACKP_SYM), %rsp
+	andq	$~0xf, %rsp
+	pushq	%rsi
+	subq	$0x8, %rsp
+	call	ukplat_x86_64_syscall_init_cpu
+	addq	$0x8, %rsp
+	popq	%rsi
+	testl	%eax, %eax
+	jnz	fail
+#endif /* CONFIG_HAVE_SYSCALL */
+
 	movq	UK_PCPUVAR_X86_64_GSREL(UK_LCPU_SARG_SYM), %rdi
 	movq	UK_PCPUVAR_X86_64_GSREL(UK_LCPU_SENTRY_SYM), %rax
 	movq	UK_PCPUVAR_X86_64_GSREL(UK_LCPU_SSTACKP_SYM), %rsp
