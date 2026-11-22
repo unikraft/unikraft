@@ -34,6 +34,14 @@ config LIBUKVMEM_COW_VMA
 	select LIBUKVMEM_VAS_REFCOUNT
 	default n
 
+config LIBUKVMEM_COW_VMA_TEST
+	bool "Test private anonymous COW address space cloning"
+	depends on LIBUKVMEM_THREAD_VAS && LIBUKPAGING_DIRECTMAP
+	select LIBUKVMEM_COW_VMA
+	select LIBUKVMEM_VAS_ACCESS
+	select LIBUKTEST
+	default n
+
 config LIBUKVMEM_VAS_REFCOUNT
 	bool
 	depends on LIBUKVMEM_THREAD_VAS
