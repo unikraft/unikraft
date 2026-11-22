@@ -1,22 +1,17 @@
 # SPDX-License-Identifier: BSD-3-Clause
-#
-# Tell catalog-core that this pull request changed (or someone commented
-# `recheck`), so it can test the change on the catalog apps. All logic lives in catalog-core; this file
-# is identical in every repository. No PR code is checked out here.
 
 name: catalog-core
 
 on:
-  pull_request_target:  # zizmor: ignore[dangerous-triggers] -- no checkout; only sends the PR number
+  pull_request_target:  # zizmor: ignore[dangerous-triggers]
     types: [opened, synchronize, reopened, edited, ready_for_review]
-  issue_comment:        # `recheck` on a PR re-runs the tests
+  issue_comment:
     types: [created]
 
 permissions: {}
 
 jobs:
   dispatch:
-    # Upstream: unikraft/catalog-core/.github/workflows/dispatch.yml@main
     uses: raresgoidescu/catalog-core/.github/workflows/dispatch.yml@ci/rework
     secrets:
       PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
