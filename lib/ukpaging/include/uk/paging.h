@@ -732,6 +732,17 @@ struct uk_paging_page_mapx {
 };
 
 /**
+ * Result of one mapper invocation, under the same page-table lock. A zero
+ * result means the proposed PTE was written; an error or mapper control code
+ * means it was not. This does not signal completed TLB invalidation. The
+ * callback must not block, yield or recursively modify this page table. It
+ * may append retirement work to the current paging batch.
+ */
+typedef void (*uk_paging_page_mapx_result_t)(struct uk_pagetable *pt,
+		__vaddr_t vaddr, __vaddr_t pt_vaddr, unsigned int level,
+		int result, void *ctx);
+
+/**
  * Creates a mapping from a range of contiguous virtual addresses to a range of
  * physical addresses using the specified attributes.
  *
@@ -799,6 +810,18 @@ int uk_paging_page_mapx(struct uk_pagetable *pt, __vaddr_t vaddr,
 			__paddr_t paddr, unsigned long pages,
 			unsigned long attr, unsigned long flags,
 			struct uk_paging_page_mapx *mapx);
+
+/**
+ * Map as with uk_paging_page_mapx(), reporting each mapper outcome exactly
+ * once. Invocations rejected before the mapper runs have no result callback.
+ * The existing mapper structure and entry point keep their original layout.
+ */
+int uk_paging_page_mapx_with_result(struct uk_pagetable *pt,
+				    __vaddr_t vaddr, __paddr_t paddr,
+				    unsigned long pages, unsigned long attr,
+				    unsigned long flags,
+				    struct uk_paging_page_mapx *mapx,
+				    uk_paging_page_mapx_result_t result);
 
 #define uk_paging_page_map(pt, va, pa, pages, attr, flags)		\
 	uk_paging_page_mapx(pt, va, pa, pages, attr, flags, __NULL)
