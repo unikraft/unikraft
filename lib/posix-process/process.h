@@ -240,6 +240,10 @@ struct posix_process *pprocess_create(struct uk_alloc *a,
 				      struct uk_thread *thread,
 				      struct uk_thread *parent);
 
+#if CONFIG_LIBPOSIX_PROCESS_BRK
+int pprocess_brk_init_space(struct posix_process *process);
+#endif
+
 #if CONFIG_LIBPOSIX_PROCESS_PREPARE
 /**
  * Prepare one unpublished process on a new, unscheduled, blocked UK thread.
