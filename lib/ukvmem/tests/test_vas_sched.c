@@ -275,6 +275,69 @@ static int replace_shared_page(struct uk_pagetable *pt __unused,
 	return 0;
 }
 
+#if CONFIG_LIBUKPAGING_STATS
+UK_TESTCASE(vas_sched, mapped_leaf_count_on_replacement)
+{
+	struct uk_vas *kernel = uk_vas_get_kernel();
+	const __sz shared_len = UK_PAL_PAGE_Lx_SIZE(UK_PAL_PT_LEVELS - 1);
+	const unsigned int level = UK_PAGING_PAGE_LEVEL;
+	const unsigned long flags = UK_PAGING_PAGE_FLAG_FORCE_SIZE |
+		UK_PAGING_PAGE_FLAG_SIZE(UK_PAGING_PAGE_LEVEL);
+	struct uk_pagetable pt;
+	__paddr_t frame = UK_PAGING_PADDR_ANY;
+	struct uk_paging_page_mapx mapx = {
+		.map = replace_shared_page,
+		.ctx = &frame,
+	};
+	unsigned long initial, mapped;
+	unsigned int i;
+	int rc;
+
+	/* This page table is never activated or published to another CPU, so
+	 * unrelated kernel faults cannot change the sampled leaf counts.
+	 */
+	rc = uk_paging_pt_clone_shared(&pt, kernel->pt, 0, shared_len);
+	UK_TEST_EXPECT_ZERO(rc);
+	if (rc)
+		return;
+	initial = pt.nr_lx_pages[level];
+	rc = pt.fa->falloc(pt.fa, &frame, 1, 0);
+	UK_TEST_EXPECT_ZERO(rc);
+	if (rc)
+		goto free_pt;
+	rc = uk_paging_page_map(&pt, shared_len, frame, 1,
+				UK_PAGING_PAGE_ATTR_PROT_RW, flags);
+	UK_TEST_EXPECT_ZERO(rc);
+	if (rc)
+		goto free_frame;
+	mapped = initial + 1;
+	UK_TEST_EXPECT_SNUM_EQ(pt.nr_lx_pages[level], mapped);
+	for (i = 0; i < 64; i++) {
+		rc = uk_paging_page_mapx(&pt, shared_len, frame, 1,
+					 UK_PAGING_PAGE_ATTR_PROT_RW,
+					 flags, &mapx);
+		UK_TEST_EXPECT_ZERO(rc);
+		UK_TEST_EXPECT_SNUM_EQ(pt.nr_lx_pages[level], mapped);
+		if (rc)
+			break;
+	}
+	rc = uk_paging_page_unmap(&pt, shared_len, 1,
+				  UK_PAGING_PAGE_FLAG_KEEP_FRAMES);
+	UK_TEST_EXPECT_ZERO(rc);
+	UK_TEST_EXPECT_SNUM_EQ(pt.nr_lx_pages[level], initial);
+
+free_frame:
+	/* Keep ownership of the explicitly allocated frame on error paths. */
+	rc = uk_paging_pt_free(&pt, UK_PAGING_PAGE_FLAG_KEEP_FRAMES);
+	UK_TEST_EXPECT_ZERO(rc);
+	if (!rc)
+		uk_ffree(kernel->pt->fa, frame, 1);
+	return;
+free_pt:
+	UK_TEST_EXPECT_ZERO(uk_paging_pt_free(&pt, 0));
+}
+#endif /* CONFIG_LIBUKPAGING_STATS */
+
 UK_TESTCASE(vas_sched, invalidate_shared_kernel_tlb)
 {
 	struct uk_vas *kernel = uk_vas_get_kernel();
