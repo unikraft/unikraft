@@ -1,4 +1,6 @@
 uk_lcpu_get_current
+uk_lcpu_discovered_count
+uk_lcpu_idle
 uk_lcpu_get_current_idx_in_except
 uk_lcpu_halt_irq
 uk_lcpu_halt_irq_until

@@ -261,6 +261,31 @@ int uk_lcpu_mp_init(unsigned long run_irq, unsigned long wakeup_irq)
 	return 0;
 }
 
+void __noreturn uk_lcpu_idle(void)
+{
+	struct uk_lcpu *this_lcpu = uk_lcpu_get_current();
+
+	/* We are coming from BUSY0 state and want to transition to
+	 * IDLE state. However, there can be functions queued already
+	 * so we have to use a decrement here.
+	 */
+	uk_dec(&this_lcpu->state);
+
+	/* Enable IRQs. If there are functions queued we will
+	 * immediately jump to the IRQ handler.
+	 */
+	uk_lcpu_enable_irq();
+	while (1) {
+		/* Besides interrupts in general, the halt can be
+		 * interrupted by calls to uk_lcpu_run().
+		 */
+		if (!pm_ops || !pm_ops->halt)
+			uk_arch_spinwait();
+		else
+			pm_ops->halt();
+	}
+}
+
 void __weak __noreturn uk_lcpu_entry_default(struct uk_lcpu *this_lcpu)
 {
 	__uptr sentry, sstackp, sarg;
@@ -282,27 +307,8 @@ void __weak __noreturn uk_lcpu_entry_default(struct uk_lcpu *this_lcpu)
 	if (sentry && sentry != (__uptr)uk_lcpu_entry_default) {
 		/* Does not return */
 		uk_arch_jump_to_with_arg(sstackp, sentry, sarg);
-	} else {
-		/* We are coming from BUSY0 state and want to transition to
-		 * IDLE state. However, there can be functions queued already
-		 * so we have to use a decrement here.
-		 */
-		uk_dec(&this_lcpu->state);
-
-		/* Enable IRQs. If there are functions queued we will
-		 * immediately jump to the IRQ handler.
-		 */
-		uk_lcpu_enable_irq();
-		while (1) {
-			/* Besides interrupts in general, the halt can be
-			 * interrupted by calls to uk_lcpu_run().
-			 */
-			if (!pm_ops || !pm_ops->halt)
-				uk_arch_spinwait();
-			else
-				pm_ops->halt();
-		}
 	}
+	uk_lcpu_idle();
 }
 
 int uk_lcpu_start(const __u64 lcpuidx[], unsigned int *num,

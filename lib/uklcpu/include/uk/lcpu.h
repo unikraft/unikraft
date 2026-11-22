@@ -213,6 +213,16 @@ int uk_lcpu_init(struct uk_lcpu *this_lcpu);
 int uk_lcpu_mp_init(unsigned long run_irq, unsigned long wakeup_irq);
 
 /**
+ * Transfer the initialized current CPU from startup-busy to interrupt-driven
+ * idle. Interrupts must still be disabled. This function does not return and
+ * keeps the current stack and execution context live.
+ *
+ * Custom CPU entries can prepare their own TLS/auxiliary context before this
+ * transfer. The same transition is used by the default startup entry.
+ */
+void __noreturn uk_lcpu_idle(void);
+
+/**
  * Default entry function for secondary logical CPUs. Calls uk_lcpu_init() and
  * if the logical CPU's startup arguments supply an entry function, the
  * original stack pointer is restored and execution continues in the
