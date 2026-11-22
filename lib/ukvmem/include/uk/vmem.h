@@ -55,6 +55,7 @@ struct uk_pagetable;
 struct uk_vma;
 struct uk_vma_ops;
 struct uk_vma_shared_ref;
+struct uk_vma_cow_source;
 struct vmem_cow_vas;
 #if CONFIG_LIBUKVMEM_COW
 struct vmem_vas_transition;
@@ -480,7 +481,8 @@ int uk_vas_set_active(struct uk_vas *vas);
 /**
  * Enable private anonymous COW mappings in an empty, unpublished owned VAS.
  * The allocator supplies resident malloc/free and palloc/pfree operations
- * that cannot fault, block or yield, and outlives this VAS and all its clones.
+ * that cannot fault, block or yield, and outlives this VAS, its clones and
+ * any retained COW sources.
  * VMA allocators of cloned address spaces have the same context constraints.
  */
 int uk_vas_enable_cow(struct uk_vas *vas, struct uk_alloc *resident);
@@ -494,6 +496,32 @@ int uk_vas_enable_cow(struct uk_vas *vas, struct uk_alloc *resident);
  * empty; harmless source write protection may remain until the next fault.
  */
 int uk_vas_clone_cow(struct uk_vas *dst, struct uk_vas *src);
+
+/**
+ * Retain immutable initial contents for a COW backend. The pages must be
+ * distinct, unpublished base frames exclusively owned by the caller and
+ * allocated by vas->pt->fa. After argument validation, every input frame
+ * is consumed, on success or allocation failure, and its array entry is
+ * set to UK_PAGING_PADDR_INV. Validation failure leaves the array unchanged.
+ * The output is NULL on failure. Call with IRQs enabled outside locks,
+ * retaining the VAS and its resident allocator throughout the operation.
+ */
+int uk_vma_cow_source_take(struct uk_vas *vas, __paddr_t *pages, __sz count,
+			   struct uk_vma_cow_source **out);
+
+struct uk_vma_cow_source *uk_vma_cow_source_get(struct uk_vma_cow_source *s);
+/** A final release runs outside locks with IRQs enabled. */
+void uk_vma_cow_source_put(struct uk_vma_cow_source *s);
+
+/**
+ * Resolve a COW fault from an immutable source belonging to the same COW
+ * family. Private writes copy its page; reads retain it read-only. Backend
+ * metadata pins the source and preserves index across split and clone.
+ * Use the anonymous COW operations for unmap, attribute changes and advice
+ * so dropping a private slot allows the initial contents to be restored.
+ */
+int uk_vma_cow_source_fault(struct uk_vma *vma, struct uk_vm_fault *fault,
+			    struct uk_vma_cow_source *s, __sz index);
 
 /** A pinned shared mapping identity. Compare object and byte offset only. */
 struct uk_vma_shared_ref {
