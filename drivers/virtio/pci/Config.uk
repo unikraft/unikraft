@@ -14,3 +14,10 @@ config LIBVIRTIO_PCI_MODERN
 	  Discover generic Virtio PCI capabilities, negotiate 64-bit features,
 	  and operate split queues through modern MMIO registers. Legacy
 	  devices retain their existing transport. Currently validated on x86.
+
+config LIBVIRTIO_PCI_MSIX
+	bool "MSI-X for modern Virtio PCI"
+	depends on LIBVIRTIO_PCI_MODERN && LIBUKINTCTLR_APIC
+	help
+	  Use local APIC messages for queue and configuration interrupts when
+	  the PCI device supports MSI-X. Keep INTx on other devices.
