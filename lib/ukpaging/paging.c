@@ -1180,7 +1180,8 @@ TOO_BIG:
 		}
 
 #ifdef CONFIG_LIBUKPAGING_STATS
-		if (!(flags & UK_PAGING_PAGE_FLAG_INTERN_STATS_KEEP))
+		if (!(flags & UK_PAGING_PAGE_FLAG_INTERN_STATS_KEEP) &&
+		    !UK_PAL_PT_Lx_PTE_PRESENT(orig_pte, lvl))
 			pt->nr_lx_pages[lvl]++;
 #endif /* CONFIG_LIBUKPAGING_STATS */
 
