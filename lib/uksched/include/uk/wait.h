@@ -172,14 +172,14 @@ void _uk_waitq_block_until(struct uk_thread *thread, __snsec deadline)
 	if ((lock))							\
 		unlock_fn((lock));					\
 	uk_sched_yield();						\
-	/* Awoken */							\
-	if ((lock))							\
-		lock_fn((lock));					\
+	/* Detach before taking an outer lock that may itself block. */	\
 	_uk_waitq_lock((wq), _uk_waitq_flags);				\
-	if ((deadline) && ((clock_expr) >= (deadline)))			\
-		_uk_waitq_timedout = 1;					\
 	_uk_waitq_remove(_uk_waitq_current);				\
 	_uk_waitq_unlock((wq), _uk_waitq_flags);			\
+	if ((lock))							\
+		lock_fn((lock));					\
+	if ((deadline) && ((clock_expr) >= (deadline)))			\
+		_uk_waitq_timedout = 1;					\
 									\
 	_uk_waitq_timedout;						\
 })
