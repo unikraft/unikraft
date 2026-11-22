@@ -60,28 +60,9 @@ static inline int pprocess_brk_init_zone(struct posix_process *pprocess)
 }
 #endif /* !CONFIG_LIBUKVMEM */
 
-static int pprocess_brk_init(void *arg)
+int pprocess_brk_init_space(struct posix_process *pprocess)
 {
-	struct posix_process_clone_event_data *event_data;
-	struct posix_process *pprocess;
-	struct posix_thread *pthread;
 	int rc;
-
-	UK_ASSERT(arg);
-
-	event_data = (struct posix_process_clone_event_data *)arg;
-
-	/**
-	 * Handler is meant to just initialize per-process brk once, at the
-	 * beginning. If this is not a process creation-related clone call
-	 * then ignore.
-	 */
-	if (!(event_data->cl_args->flags & CLONE_VFORK))
-		return 0;
-
-	pthread = uk_thread_uktls_var(event_data->child, pthread_self);
-	UK_ASSERT(pthread && pthread->process);
-	pprocess = pthread->process;
 
 	UK_ASSERT(!pprocess->brk_ctx.base);
 
@@ -103,6 +84,31 @@ static int pprocess_brk_init(void *arg)
 		    (__u8 *)pprocess->brk_ctx.base + HEAP_LEN);
 
 	return 0;
+}
+
+static int pprocess_brk_init(void *arg)
+{
+	struct posix_process_clone_event_data *event_data;
+	struct posix_process *pprocess;
+	struct posix_thread *pthread;
+
+	UK_ASSERT(arg);
+
+	event_data = (struct posix_process_clone_event_data *)arg;
+
+	/**
+	 * Handler is meant to just initialize per-process brk once, at the
+	 * beginning. If this is not a process creation-related clone call
+	 * then ignore.
+	 */
+	if (!(event_data->cl_args->flags & CLONE_VFORK))
+		return 0;
+
+	pthread = uk_thread_uktls_var(event_data->child, pthread_self);
+	UK_ASSERT(pthread && pthread->process);
+	pprocess = pthread->process;
+
+	return pprocess_brk_init_space(pprocess);
 }
 
 POSIX_PROCESS_CLONE_HANDLER(CLONE_VFORK, pprocess_brk_init);
