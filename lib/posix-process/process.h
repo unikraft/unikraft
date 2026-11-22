@@ -66,6 +66,9 @@ struct posix_process {
 	struct uk_list_head child_list_entry;
 	struct uk_list_head threads;
 	struct uk_alloc *_a;
+#if CONFIG_LIBUKVMEM_THREAD_VAS
+	struct uk_vas *vas;
+#endif
 #if CONFIG_LIBPOSIX_PROCESS_SIGNAL
 	struct uk_signal_pdesc *signal;
 #endif /* CONFIG_LIBPOSIX_PROCESS_SIGNAL */

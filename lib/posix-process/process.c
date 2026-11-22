@@ -30,6 +30,9 @@ struct uk_thread *pprocess_thread_main;
 #include <uk/essentials.h>
 #include <uk/plat/config.h>
 #include <uk/process.h>
+#if CONFIG_LIBUKVMEM_THREAD_VAS
+#include <uk/vmem.h>
+#endif
 
 #if CONFIG_LIBPOSIX_PROCESS_SIGNAL
 #include "signal/signal.h"
@@ -208,6 +211,9 @@ struct posix_thread *pprocess_create_pthread(struct posix_process *pprocess,
 	{
 		unsigned long flags = pprocess_lock_acquire();
 
+#if CONFIG_LIBUKVMEM_THREAD_VAS
+		th->vas = pprocess->vas;
+#endif
 		__atomic_store_n(&tid_thread[tid], pthread, __ATOMIC_RELEASE);
 		uk_list_add_tail(&pthread->thread_list_entry,
 				 &pprocess->threads);
@@ -310,6 +316,10 @@ struct posix_process *pprocess_create(struct uk_alloc *a,
 		goto err_out;
 	}
 	pprocess->_a = a;
+#if CONFIG_LIBUKVMEM_THREAD_VAS
+	pprocess->vas = parent_pprocess ? parent_pprocess->vas
+					: uk_vas_get_active();
+#endif
 	UK_INIT_LIST_HEAD(&pprocess->threads);
 	UK_INIT_LIST_HEAD(&pprocess->children);
 
@@ -392,6 +402,9 @@ struct posix_process *pprocess_create(struct uk_alloc *a,
 		unsigned long flags = pprocess_lock_acquire();
 
 		pprocess->parent = parent_pprocess;
+#if CONFIG_LIBUKVMEM_THREAD_VAS
+		thread->vas = pprocess->vas;
+#endif
 		if (parent_pprocess) {
 			uk_list_add_tail(&pprocess->child_list_entry,
 					 &parent_pprocess->children);

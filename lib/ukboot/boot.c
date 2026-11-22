@@ -386,6 +386,9 @@ static struct uk_alloc *heap_init()
 	rc = uk_vas_set_active(&kernel_vas);
 	if (unlikely(rc))
 		return NULL;
+#if CONFIG_LIBUKVMEM_THREAD_VAS
+	uk_vas_set_kernel(&kernel_vas);
+#endif
 
 	free_pages  = pt->fa->free_memory >> UK_PAGING_PAGE_SHIFT;
 	alloc_pages = free_pages - UK_PAGING_PT_PAGES(free_pages);

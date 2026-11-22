@@ -1,4 +1,6 @@
 uk_vas_get_active
+uk_vas_get_kernel
+uk_vas_set_kernel
 uk_vas_set_active
 uk_vas_init
 uk_vas_destroy
