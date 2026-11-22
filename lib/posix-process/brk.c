@@ -60,13 +60,17 @@ static inline int pprocess_brk_init_zone(struct posix_process *pprocess)
 }
 #endif /* !CONFIG_LIBUKVMEM */
 
+int pprocess_brk_map_space(struct posix_process *pprocess)
+{
+	UK_ASSERT(!pprocess->brk_ctx.base);
+	return pprocess_brk_init_zone(pprocess);
+}
+
 int pprocess_brk_init_space(struct posix_process *pprocess)
 {
 	int rc;
 
-	UK_ASSERT(!pprocess->brk_ctx.base);
-
-	rc = pprocess_brk_init_zone(pprocess);
+	rc = pprocess_brk_map_space(pprocess);
 	if (unlikely(rc)) {
 		uk_pr_err("Failed to create brk space (%lu KiB).\n",
 			  (__u64)HEAP_LEN / 1024);
