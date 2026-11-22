@@ -5,11 +5,15 @@
  */
 
 #include <errno.h>
+#include <stdbool.h>
 #include <string.h>
 
 #include <uk/config.h>
 #if CONFIG_LIBUKDEBUG_ENABLE_ASSERT
 #include <uk/print.h>
+#endif
+#if CONFIG_LIBUKVMEM_COW_VMA
+#include <uk/isr/string.h>
 #endif
 #include <uk/assert.h>
 #include <uk/falloc.h>
@@ -45,6 +49,10 @@ struct file_vma {
 	__paddr_t *priv_pages;
 	__sz priv_npages;
 	__sz priv_taken;
+#if CONFIG_LIBUKVMEM_COW_VMA
+	struct uk_vma_cow_source *source;
+	__sz source_first;
+#endif
 };
 
 #ifdef CONFIG_LIBUKVMEM_FILE_BASE
@@ -248,9 +256,10 @@ fail:
 }
 
 static
-int file_vma_op_new(struct uk_vas *vas, __vaddr_t vaddr __unused,
-		    __sz len, void *data, unsigned long attr,
-		    unsigned long *flags, struct uk_vma **vma)
+int file_vma_new(struct uk_vas *vas, __vaddr_t vaddr __unused,
+		 __sz len, void *data, unsigned long attr,
+		 unsigned long *flags, struct uk_vma **vma,
+		 bool cow __maybe_unused)
 {
 	struct uk_fdio_vma_args *args = data;
 	struct file_vma *fvma;
@@ -263,6 +272,13 @@ int file_vma_op_new(struct uk_vas *vas, __vaddr_t vaddr __unused,
 	UK_ASSERT(UK_PAGING_PAGE_ALIGNED(args->offset));
 	UK_ASSERT(vma);
 
+#if CONFIG_LIBUKVMEM_COW_VMA
+	if (cow && (!vas->cow || (*flags & UK_VMA_FILE_SHARED)))
+		return -EINVAL;
+	if (cow && UK_VMA_MAP_SIZE_TO_ORDER(*flags) &&
+	    UK_VMA_MAP_SIZE_TO_ORDER(*flags) != UK_PAGING_PAGE_SHIFT)
+		return -ENOTSUP;
+#endif
 	/* File I/O and pin acquisition run in syscall/thread context. Only
 	 * populated, already resident physical pages reach the fault callback.
 	 */
@@ -281,6 +297,10 @@ int file_vma_op_new(struct uk_vas *vas, __vaddr_t vaddr __unused,
 	fvma->priv_pages = __NULL;
 	fvma->priv_npages = 0;
 	fvma->priv_taken = 0;
+#if CONFIG_LIBUKVMEM_COW_VMA
+	fvma->source = NULL;
+	fvma->source_first = 0;
+#endif
 	if (*flags & UK_VMA_FILE_SHARED) {
 		rc = file_backing_new(vas, args->of->file,
 				      args->offset, len, &fvma->shared);
@@ -296,6 +316,23 @@ int file_vma_op_new(struct uk_vas *vas, __vaddr_t vaddr __unused,
 			uk_free(vas->a, fvma);
 			return rc;
 		}
+#if CONFIG_LIBUKVMEM_COW_VMA
+		if (cow) {
+			rc = uk_vma_cow_source_take(vas,
+						    fvma->priv_pages,
+						    fvma->priv_npages,
+						    &fvma->source);
+			/* Free unconsumed frames and the vector. */
+			file_priv_pages_free(vas, fvma->priv_pages,
+					     fvma->priv_npages);
+			fvma->priv_pages = NULL;
+			fvma->priv_npages = 0;
+			if (rc) {
+				uk_free(vas->a, fvma);
+				return rc;
+			}
+		}
+#endif
 	}
 	uk_ofile_acquire(args->of);
 	fvma->of = args->of;
@@ -306,12 +343,31 @@ int file_vma_op_new(struct uk_vas *vas, __vaddr_t vaddr __unused,
 	return 0;
 }
 
+static int file_vma_op_new(struct uk_vas *vas, __vaddr_t addr, __sz len,
+			   void *data, unsigned long attr,
+			   unsigned long *flags, struct uk_vma **out)
+{
+	return file_vma_new(vas, addr, len, data, attr, flags, out, false);
+}
+
+#if CONFIG_LIBUKVMEM_COW_VMA
+static int file_cow_new(struct uk_vas *vas, __vaddr_t addr, __sz len,
+			void *data, unsigned long attr,
+			unsigned long *flags, struct uk_vma **out)
+{
+	return file_vma_new(vas, addr, len, data, attr, flags, out, true);
+}
+#endif
+
 static
 void file_vma_op_destroy(struct uk_vma *vma)
 {
 	struct file_vma *fvma = (struct file_vma *)vma;
 
 	UK_ASSERT(fvma->of);
+#if CONFIG_LIBUKVMEM_COW_VMA
+	uk_vma_cow_source_put(fvma->source);
+#endif
 	if (fvma->priv_pages) {
 		file_priv_pages_free(vma->vas, fvma->priv_pages,
 				     fvma->priv_npages);
@@ -403,6 +459,10 @@ int file_vma_op_split(struct uk_vma *vma, __vaddr_t vaddr,
 	v->priv_pages = __NULL;
 	v->priv_npages = 0;
 	v->priv_taken = 0;
+#if CONFIG_LIBUKVMEM_COW_VMA
+	v->source = uk_vma_cow_source_get(fvma->source);
+	v->source_first = fvma->source_first + off / UK_PAGING_PAGE_SIZE;
+#endif
 	if (v->shared)
 		uk_refcount_acquire(&v->shared->refs);
 
@@ -425,6 +485,12 @@ int file_vma_op_merge(struct uk_vma *vma, struct uk_vma *next)
 	/* Only merge if this is the same open file description ... */
 	if (fvma->of != nvma->of || fvma->shared != nvma->shared)
 		return -EPERM;
+#if CONFIG_LIBUKVMEM_COW_VMA
+	if (fvma->source != nvma->source ||
+	    (fvma->source && fvma->source_first +
+	     uk_vma_len(vma) / UK_PAGING_PAGE_SIZE != nvma->source_first))
+		return -EPERM;
+#endif
 	/* ... and the VMAs map contiguous file ranges */
 	off = next->start - vma->start;
 	if (nvma->offset != fvma->offset + off)
@@ -499,6 +565,73 @@ int file_vma_op_advise(struct uk_vma *vma, __vaddr_t vaddr, __sz len,
 		return 0;
 	return uk_vma_op_advise(vma, vaddr, len, advice);
 }
+
+#if CONFIG_LIBUKVMEM_COW_VMA
+static int file_cow_fault(struct uk_vma *vma, struct uk_vm_fault *fault)
+{
+	struct file_vma *fvma = (struct file_vma *)vma;
+	__sz index;
+
+	if (fault->level != UK_PAGING_PAGE_LEVEL)
+		return -ENOMEM;
+	index = fvma->source_first +
+		(fault->vbase - vma->start) / UK_PAGING_PAGE_SIZE;
+	return uk_vma_cow_source_fault(vma, fault, fvma->source, index);
+}
+
+static int file_cow_clone(struct uk_vma *vma, struct uk_alloc *a,
+			  struct uk_vma **out)
+{
+	struct file_vma *fvma = (struct file_vma *)vma;
+	struct file_vma *copy;
+
+	if (!fvma->source)
+		return -ENOTSUP;
+	copy = uk_malloc(a, sizeof(*copy));
+	if (!copy)
+		return -ENOMEM;
+	memcpy_isr(copy, fvma, sizeof(*copy));
+	uk_ofile_acquire(copy->of);
+	uk_vma_cow_source_get(copy->source);
+	*out = &copy->base;
+	return 0;
+}
+
+static int file_cow_unmap(struct uk_vma *vma, __vaddr_t addr, __sz len)
+{
+	return uk_vma_cow_anon_ops.unmap(vma, addr, len);
+}
+
+static int file_cow_set_attr(struct uk_vma *vma, unsigned long attr)
+{
+	struct file_vma *fvma = (struct file_vma *)vma;
+
+	if ((attr & UK_PAGING_PAGE_ATTR_PROT_READ) &&
+	    !_CAN_READ(fvma->of->mode))
+		return -EACCES;
+	return uk_vma_cow_anon_ops.set_attr(vma, attr);
+}
+
+static int file_cow_advise(struct uk_vma *vma, __vaddr_t addr, __sz len,
+			   unsigned long advice)
+{
+	return uk_vma_cow_anon_ops.advise(vma, addr, len, advice);
+}
+
+const struct uk_vma_ops uk_fdio_cow_vma_ops = {
+	.get_base = file_vma_op_get_base,
+	.new = file_cow_new,
+	.destroy = file_vma_op_destroy,
+	.clone_cow = file_cow_clone,
+	.fault = file_cow_fault,
+	.unmap = file_cow_unmap,
+	.sync = file_vma_op_sync,
+	.split = file_vma_op_split,
+	.merge = file_vma_op_merge,
+	.set_attr = file_cow_set_attr,
+	.advise = file_cow_advise
+};
+#endif
 
 const struct uk_vma_ops uk_fdio_vma_ops = {
 	.get_base	= file_vma_op_get_base,
