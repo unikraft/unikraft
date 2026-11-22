@@ -356,7 +356,7 @@ static inline void bbuddy_trim(struct uk_bbpalloc *b, struct chunk_head *ch,
 	}
 }
 
-static void *bbuddy_palloc(struct uk_alloc *a, unsigned long num_pages)
+static void *bbuddy_palloc_core(struct uk_alloc *a, unsigned long num_pages)
 {
 	struct uk_bbpalloc *const b = (struct uk_bbpalloc *)&a->priv;
 	struct chunk_head *alloc_ch;
@@ -460,7 +460,7 @@ static inline size_t bbuddy_merge(struct uk_bbpalloc *b,
 	return ord;
 }
 
-static void bbuddy_pfree(struct uk_alloc *a, void *obj, unsigned long num_pages)
+static void bbuddy_pfree_core(struct uk_alloc *a, void *obj, unsigned long num_pages)
 {
 	struct uk_bbpalloc *const b = (struct uk_bbpalloc *)&a->priv;
 	char *base = obj;
@@ -505,7 +505,7 @@ static void bbuddy_pfree(struct uk_alloc *a, void *obj, unsigned long num_pages)
 	freelist_sanitycheck(b->free_head);
 }
 
-static long bbuddy_pmaxalloc(struct uk_alloc *a)
+static long bbuddy_pmaxalloc_core(struct uk_alloc *a)
 {
 	struct uk_bbpalloc *b;
 	size_t i, order;
@@ -525,7 +525,7 @@ static long bbuddy_pmaxalloc(struct uk_alloc *a)
 	return (long) (1 << order);
 }
 
-static long bbuddy_pavailmem(struct uk_alloc *a)
+static long bbuddy_pavailmem_core(struct uk_alloc *a)
 {
 	struct uk_bbpalloc *b;
 
@@ -535,7 +535,7 @@ static long bbuddy_pavailmem(struct uk_alloc *a)
 	return (long) b->nr_free_pages;
 }
 
-static int bbuddy_addmem(struct uk_alloc *a, void *base, size_t len)
+static int bbuddy_addmem_core(struct uk_alloc *a, void *base, size_t len)
 {
 	struct uk_bbpalloc *b;
 	struct uk_bbpalloc_memr *memr;
@@ -631,6 +631,32 @@ static int bbuddy_addmem(struct uk_alloc *a, void *base, size_t len)
 	freelist_sanitycheck(b->free_head);
 
 	return 0;
+}
+
+/* Allocator callback boundary, separate from bookkeeping helpers. */
+static void *bbuddy_palloc(struct uk_alloc *a, unsigned long num_pages)
+{
+	return bbuddy_palloc_core(a, num_pages);
+}
+
+static void bbuddy_pfree(struct uk_alloc *a, void *obj, unsigned long num_pages)
+{
+	bbuddy_pfree_core(a, obj, num_pages);
+}
+
+static long bbuddy_pmaxalloc(struct uk_alloc *a)
+{
+	return bbuddy_pmaxalloc_core(a);
+}
+
+static long bbuddy_pavailmem(struct uk_alloc *a)
+{
+	return bbuddy_pavailmem_core(a);
+}
+
+static int bbuddy_addmem(struct uk_alloc *a, void *base, size_t len)
+{
+	return bbuddy_addmem_core(a, base, len);
 }
 
 struct uk_alloc *uk_allocbbuddy_init(void *base, size_t len)
