@@ -448,7 +448,9 @@ void pprocess_signal_pdesc_free(struct posix_process *process)
 		while ((sig = pprocess_signal_dequeue(process, NULL, signum)))
 			uk_signal_free(process->_a, sig);
 
-	pprocess_signal_sigaction_release(process->signal->sigaction);
+	/* Initialization may have failed while allocating the action table. */
+	if (process->signal->sigaction)
+		pprocess_signal_sigaction_release(process->signal->sigaction);
 
 	uk_free(process->_a, process->signal);
 }
