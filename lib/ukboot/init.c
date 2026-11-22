@@ -177,7 +177,15 @@ static __noreturn void init_mainlike(void *argc_arg, void *argv_arg)
 {
 	const int argc = (int)(intptr_t)argc_arg;
 	char **const argv = (char **)argv_arg;
+	sigset_t mask;
 	int r;
+
+	/* Like a process that init starts on Linux, the application begins
+	 * with no blocked signals; do_init() blocks all of them only for
+	 * itself.
+	 */
+	sigemptyset(&mask);
+	sigprocmask(SIG_SETMASK, &mask, NULL);
 
 	r = do_main(argc, argv);
 	/* INIT main should never return; it should call exit() when done */
