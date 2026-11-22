@@ -129,6 +129,17 @@ config LIBPOSIX_PROCESS_SIGNAL
 	select LIBUKLOCK
 	select LIBUKLOCK_SEMAPHORE
 
+config LIBPOSIX_PROCESS_ITIMER
+	bool "Process real-time interval timers"
+	depends on LIBPOSIX_PROCESS_SIGNAL && HAVE_SCHED
+	depends on !LIBPOSIX_PROCESS_SIGNALFD
+	select LIBPOSIX_TIME
+	default n
+	help
+	  Provide per-process ITIMER_REAL, getitimer and alarm using one
+	  shared timer service thread. CPU-time interval timers are unsupported.
+	  This implementation requires signalfd to be disabled.
+
 config LIBPOSIX_PROCESS_ARCH_PRCTL
 	bool "arch_prctl() system call"
 	depends on ARCH_X86_64

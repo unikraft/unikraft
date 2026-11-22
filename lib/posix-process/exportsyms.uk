@@ -1,4 +1,7 @@
 alarm
+uk_process_setitimer
+uk_process_getitimer
+uk_process_alarm
 brk
 sbrk
 execl

@@ -43,6 +43,9 @@
 #include <uk/config.h>
 #include <uk/print.h>
 #include <uk/syscall.h>
+#if CONFIG_LIBPOSIX_PROCESS_ITIMER
+#include <uk/process/itimer.h>
+#endif
 
 #if CONFIG_HAVE_SCHED
 #include <uk/sched.h>
@@ -383,6 +386,19 @@ UK_SYSCALL_R_DEFINE(int, setitimer, int, which,
 		    const struct itimerval *, new_value,
 		    struct itimerval *, old_value)
 {
+#if CONFIG_LIBPOSIX_PROCESS_ITIMER
+	return uk_process_setitimer(which, new_value, old_value);
+#else
 	UK_WARN_STUBBED();
 	return 0;
+#endif
+}
+
+UK_SYSCALL_R_DEFINE(int, getitimer, int, which, struct itimerval *, value)
+{
+#if CONFIG_LIBPOSIX_PROCESS_ITIMER
+	return uk_process_getitimer(which, value);
+#else
+	return -ENOTSUP;
+#endif
 }
