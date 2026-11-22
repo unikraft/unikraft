@@ -14,8 +14,12 @@ struct uk_alloc *uk_pod_eager_init_ctx = __NULL;
 
 int uk_pod_default_init(void)
 {
-	if (unlikely(!uk_pod_eager_init_ctx))
-		uk_pod_eager_init_ctx = uk_alloc_get_default();
+	struct uk_alloc *expected = __NULL;
+
+	if (unlikely(!UK_POD_DEFAULT_CTX))
+		__atomic_compare_exchange_n(&uk_pod_eager_init_ctx, &expected,
+					    uk_alloc_get_default(), 0,
+					    __ATOMIC_RELEASE, __ATOMIC_RELAXED);
 	return 0;
 }
 
