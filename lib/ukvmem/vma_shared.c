@@ -40,6 +40,45 @@ static void shared_anon_put(struct shared_anon *b)
 	uk_free(b->a, b);
 }
 
+static void shared_ref_get(const void *object)
+{
+	struct shared_anon *b = (struct shared_anon *)object;
+
+	uk_refcount_acquire(&b->refs);
+}
+
+static void shared_ref_put(const void *object)
+{
+	shared_anon_put((struct shared_anon *)object);
+}
+
+void vmem_shared_anon_ref(struct uk_vma *vma, __vaddr_t addr,
+			  struct uk_vma_shared_ref *out)
+{
+	struct shared_vma *v = (struct shared_vma *)vma;
+
+	out->object = v->backing;
+	out->offset = v->first * UK_PAGING_PAGE_SIZE + addr - vma->start;
+	out->get = shared_ref_get;
+	out->put = shared_ref_put;
+	shared_ref_get(out->object);
+}
+
+void uk_vma_shared_ref_get(const struct uk_vma_shared_ref *ref)
+{
+	if (ref->object)
+		ref->get(ref->object);
+}
+
+void uk_vma_shared_ref_put(struct uk_vma_shared_ref *ref)
+{
+	struct uk_vma_shared_ref old = *ref;
+
+	memset_isr(ref, 0, sizeof(*ref));
+	if (old.object)
+		old.put(old.object);
+}
+
 static int shared_new(struct uk_vas *vas, __vaddr_t vaddr __unused,
 		      __sz len, void *data __unused,
 		      unsigned long attr __unused, unsigned long *flags,
