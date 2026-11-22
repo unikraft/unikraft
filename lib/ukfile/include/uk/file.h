@@ -191,6 +191,13 @@ typedef int (*uk_file_setstat_func)(const struct uk_file *f,
  */
 #define UKFILE_CTL_FILE_FADVISE 3
 
+/*
+ * IO_TIMEOUT((bool)output, void, void)
+ * Return a positive value if a timeout applies to blocking input or output.
+ * A file that does not implement this control has no timeout to report.
+ */
+#define UKFILE_CTL_FILE_IO_TIMEOUT 4
+
 typedef int (*uk_file_ctl_func)(const struct uk_file *f, int fam, int req,
 				uintptr_t arg1, uintptr_t arg2, uintptr_t arg3);
 

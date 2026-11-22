@@ -15,6 +15,7 @@
 
 #include <uk/atomic.h>
 #include <uk/posix-fdio.h>
+#include <uk/syscall.h>
 #include <uk/print.h>
 
 #include "fdio-impl.h"
@@ -58,6 +59,9 @@ int uk_sys_ioctl(struct uk_ofile *of, int cmd, void *arg)
 	/* Universally return -ENOTTY for unimplemented TTY ioctls */
 	if (unlikely(r == -ENOSYS && IOCTL_CMD_ISTYPE(cmd, IOCTL_CMD_TYPE_TTY)))
 		return -ENOTTY;
+	if (r == -EINTR && !_IS_SEEKABLE(of->mode) &&
+	    uk_thread_wait_signalled(uk_thread_current()))
+		return -UK_SYSCALL_ERESTARTSYS;
 	return r;
 }
 
