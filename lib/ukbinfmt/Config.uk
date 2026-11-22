@@ -3,3 +3,13 @@ menuconfig LIBUKBINFMT
 	help
 		libukbinfmt provides a minimal framework to register loaders of
 		different types of executable files
+
+if LIBUKBINFMT
+
+config LIBUKBINFMT_TEST
+	bool "Test image and loader metadata ownership"
+	depends on LIBUKALLOC && LIBNOLIBC
+	select LIBUKTEST
+	default n
+
+endif
