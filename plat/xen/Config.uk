@@ -101,6 +101,15 @@ config XEN_SHM_REGION_SIZE_MB
 		shared memory mappings, in megabytes. Must be a multiple of 2.
 		This determines the number of L3 page tables pre-allocated
 		in BSS (size_MB / 2).
+
+config XEN_SHM_SEAL
+	bool "Seal shared memory at end of init"
+	default y
+	help
+		Seal shared memory, preventing to change pagetable attributes,
+		when completing system init.
+		When this option is enabled, after init has completed, calling
+		`uk_plat_xen_shm_configure()` is an error.
 endif # XEN_STATIC_SHM
 
 endif # PLAT_XEN

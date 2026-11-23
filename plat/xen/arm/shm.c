@@ -12,6 +12,7 @@
 #include <xen-arm/shm.h>
 #include <uk/arch/types.h>
 #include <uk/essentials.h>
+#include <uk/init.h>
 #include <uk/ofw/fdt.h>
 #include <uk/plat/pal/page.h>
 #include <uk/print.h>
@@ -60,6 +61,17 @@ static struct uk_shm_entry shm_entries[CONFIG_XEN_SHM_MAX_ENTRIES];
 static int shm_count;
 
 static struct uk_spinlock shm_lock = UK_SPINLOCK_INITIALIZER();
+
+static __bool shm_is_sealed;
+
+#if CONFIG_XEN_SHM_SEAL
+static int shm_seal(struct uk_init_ctx *ctx __unused)
+{
+	shm_is_sealed = true;
+	return 0;
+}
+uk_late_initcall_prio(shm_seal, 0, UK_PRIO_LATEST);
+#endif /* CONFIG_XEN_SHM_SEAL */
 
 static inline struct uk_shm_entry *shm_get_entry_by_id(const char *id)
 {
@@ -262,6 +274,9 @@ int uk_plat_xen_shm_configure(const char *id, __bool writeable)
 	unsigned long flags;
 	unsigned long page_attr = writeable ? SHM_PT_ATTR_RW : SHM_PT_ATTR_RO;
 	struct uk_shm_entry *ent;
+
+	if (shm_is_sealed)
+		return -EPERM;
 
 	if (!id)
 		return -EINVAL;

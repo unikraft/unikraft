@@ -40,6 +40,7 @@ void uk_plat_xen_shm_init(void);
  *   -EINVAL if id is NULL
  *   -ENOENT if no region with that id is found
  *   -EIO if setting page attributes fails
+ *   -EPERM if shared memory is sealed, and cannot be configured anymore
  */
 int uk_plat_xen_shm_configure(const char *id, __bool writeable);
 
