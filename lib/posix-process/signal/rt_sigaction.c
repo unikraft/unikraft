@@ -45,6 +45,7 @@ UK_LLSYSCALL_R_DEFINE(int, rt_sigaction, int, signum,
 	flags = pprocess_lock_acquire();
 	if (oldact)
 		previous = *KERN_SIGACTION(proc, signum);
+	/* Preserve SA_NOCLDSTOP for readback. There is no job control. */
 	if (act)
 		*KERN_SIGACTION(proc, signum) = action;
 	if (act && IS_IGNORED(proc, signum))
@@ -53,12 +54,6 @@ UK_LLSYSCALL_R_DEFINE(int, rt_sigaction, int, signum,
 	pprocess_signal_free_list(&discard);
 	if (oldact)
 		*oldact = previous;
-
-	if (!act)
-		return 0;
-
-	if (action.ks_flags & SA_NOCLDSTOP)
-		uk_pr_warn("ks_flags: SA_NOCLDSTOP not supported, ignoring\n");
 
 	return 0;
 }
