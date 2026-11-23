@@ -100,7 +100,7 @@ static __nsec _timerfd_update(const struct uk_file *f)
 	uk_sys_clock_gettime(d->clkid, &t);
 	now = ukplat_monotonic_clock();
 	st = _timerfd_valnext(&set, &t);
-	deadline = now + st.next;
+	deadline = st.next ? now + st.next : 0;
 
 	/* Update val & events */
 	UK_ASSERT(st.exp >= d->total);
