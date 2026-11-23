@@ -38,6 +38,10 @@
 #ifdef CONFIG_ARCH_X86_64
 #include <uk/arch/x86_64.h>
 #endif
+#if CONFIG_LIBUKVMEM_PROCESS_VAS
+#include <uk/vmem/process.h>
+#include <uk/vmem/vma_types.h>
+#endif
 
 __vaddr_t uk_bus_devmap(__paddr_t base, __sz size)
 {
@@ -69,6 +73,31 @@ __vaddr_t uk_bus_devmap(__paddr_t base, __sz size)
 
 	paddr = ALIGN_DOWN(base, __PAGE_SIZE);
 	vaddr = ALIGN_DOWN(base, __PAGE_SIZE);
+
+#if CONFIG_LIBUKVMEM_PROCESS_VAS
+	/* Keep the mapping in the kernel branch shared by all address spaces
+	 * if its physical address cannot be identity-mapped there.
+	 */
+	if (paddr >= UK_VAS_PROCESS_BASE ||
+	    pages > (UK_VAS_PROCESS_BASE - paddr) >> UK_PAGING_PAGE_SHIFT) {
+		struct uk_vas *vas = uk_vas_get_kernel();
+
+		if (!vas)
+			return -ENODEV;
+
+		vaddr = UK_PAGING_VADDR_ANY;
+		rc = uk_vma_map_dma(vas, &vaddr, pages << UK_PAGING_PAGE_SHIFT,
+				    attr, UK_VMA_MAP_POPULATE, "Device MMIO",
+				    paddr);
+		if (unlikely(rc)) {
+			uk_pr_err("Could not map MMIO region at 0x%lx (%d)\n",
+				  base, rc);
+			return rc;
+		}
+
+		return vaddr + (base - paddr);
+	}
+#endif /* CONFIG_LIBUKVMEM_PROCESS_VAS */
 
 	/* We can't use uk_vma_map_dma here as the vmem API is initialized
 	 * way too late for the interrupt controller which is required for

@@ -63,7 +63,7 @@ struct uk_bus {
 /* Returns the number of registered buses */
 unsigned int uk_bus_count(void);
 
-/* Identity-map a device region, or return an encoded negative errno. */
+/* Return the virtual address of a device mapping or an encoded errno. */
 #if CONFIG_LIBUKPAGING
 __vaddr_t uk_bus_devmap(__paddr_t base, __sz size);
 #endif
