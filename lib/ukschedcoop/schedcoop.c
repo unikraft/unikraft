@@ -33,6 +33,7 @@
 #include <uk/lcpu.h>
 #include <uk/plat/memory.h>
 #include <uk/plat/time.h>
+#include <uk/print.h>
 #include <uk/sched_impl.h>
 #include <uk/schedcoop.h>
 #include <uk/essentials.h>
@@ -45,23 +46,21 @@ static void schedcoop_schedule(struct uk_sched *s)
 	__snsec now, min_wakeup_time;
 	unsigned long flags;
 
-	if (unlikely(uk_lcpu_irqs_disabled()))
+	if (unlikely(uk_lcpu_irqs_disabled())) {
+#if CONFIG_LIBUKDEBUG_ENABLE_ASSERT
+		uk_pr_crit_isr("Scheduler IRQ origin caller=%p thread=%p sched=%p\n",
+			       __builtin_extract_return_addr(__builtin_return_address(0)),
+			       uk_thread_current(), s);
+#endif
 		UK_CRASH("Must not call %s with IRQs disabled\n", __func__);
+	}
 
 	now = ukplat_monotonic_clock();
 	prev = uk_thread_current();
-	flags = uk_lcpu_save_irqf();
+	ukplat_spin_lock_irqsave(&s->lock, flags);
+	UK_ASSERT(c->curr_thread == prev);
 
-#if 0 //TODO
-	if (in_callback)
-		UK_CRASH("Must not call %s from a callback\n", __func__);
-#endif
-
-	/* Update execution time of current thread */
-	/* WARNING: We assume here that scheduler `s` is only responsible for
-	 *          the current logical CPU. Otherwise, we would have to store
-	 *          the time of the last context switch per logical core.
-	 */
+	/* Update execution time of current thread (one scheduler per CPU). */
 	prev->exec_time += now - c->ts_prev_switch;
 	c->ts_prev_switch = now;
 
@@ -72,29 +71,30 @@ static void schedcoop_schedule(struct uk_sched *s)
 	UK_TAILQ_FOREACH_SAFE(thread, &c->sleep_queue,
 			      queue, tmp) {
 		if (likely(thread->wakeup_time)) {
-			if (thread->wakeup_time <= now)
-				uk_thread_wake(thread);
-			else if (!min_wakeup_time
-				 || thread->wakeup_time < min_wakeup_time)
+			if (thread->wakeup_time <= now) {
+				uk_thread_set_runnable(thread);
+				thread->wakeup_time = 0LL;
+				schedcoop_wake_locked(c, thread);
+			} else if (!min_wakeup_time
+				   || thread->wakeup_time < min_wakeup_time) {
 				min_wakeup_time = thread->wakeup_time;
+			}
 		}
 	}
 
-	next = UK_TAILQ_FIRST(&c->run_queue);
+	next = schedcoop_runq_pop_first(c);
 	if (next) {
 		UK_ASSERT(next != prev);
 		UK_ASSERT(uk_thread_is_runnable(next));
 		UK_ASSERT(!uk_thread_is_exited(next));
-		UK_TAILQ_REMOVE(&c->run_queue, next,
-				queue);
 
 		/* Put previous thread on the end of the list */
 		if ((prev != &c->idle)
 		    && uk_thread_is_runnable(prev)
 		    && !uk_thread_is_exited(prev))
-			UK_TAILQ_INSERT_TAIL(&c->run_queue, prev,
-					     queue);
-	} else if (uk_thread_is_runnable(prev)
+			schedcoop_runq_push(c, prev);
+	} else if ((prev != &c->idle)
+		   && uk_thread_is_runnable(prev)
 		   && !uk_thread_is_exited(prev)) {
 		next = prev;
 	} else {
@@ -108,19 +108,10 @@ static void schedcoop_schedule(struct uk_sched *s)
 		uk_sched_stats_idle_count_incr(s);
 	}
 
-	if (next != prev) {
-		/*
-		 * Queueable is used to cover the case when during a
-		 * context switch, the thread that is about to be
-		 * evacuated is interrupted and woken up.
-		 */
-		uk_thread_set_queueable(prev);
-		uk_thread_clear_queueable(next);
-	}
-
+	c->curr_thread = next;
 	uk_sched_stats_sched_count_incr(s);
 
-	uk_lcpu_restore_irqf(flags);
+	ukplat_spin_unlock_irqrestore(&s->lock, flags);
 
 	/* Interrupting the switch is equivalent to having the next thread
 	 * interrupted at the return instruction. And therefore at safe point.
@@ -147,7 +138,7 @@ static int schedcoop_thread_add(struct uk_sched *s, struct uk_thread *t)
 
 	/* Add to run queue if runnable */
 	if (uk_thread_is_runnable(t))
-		UK_TAILQ_INSERT_TAIL(&c->run_queue, t, queue);
+		schedcoop_runq_push(c, t);
 
 	return 0;
 }
@@ -156,10 +147,8 @@ static void schedcoop_thread_remove(struct uk_sched *s, struct uk_thread *t)
 {
 	struct schedcoop *c = uksched2schedcoop(s);
 
-	/* Remove from run_queue */
-	if (t != uk_thread_current()
-	    && uk_thread_is_runnable(t))
-		UK_TAILQ_REMOVE(&c->run_queue, t, queue);
+	schedcoop_runq_remove(c, t);
+	schedcoop_sleepq_remove(c, t);
 }
 
 static void schedcoop_thread_blocked(struct uk_sched *s, struct uk_thread *t)
@@ -168,10 +157,12 @@ static void schedcoop_thread_blocked(struct uk_sched *s, struct uk_thread *t)
 
 	UK_ASSERT(uk_lcpu_irqs_disabled());
 
-	if (t != uk_thread_current())
-		UK_TAILQ_REMOVE(&c->run_queue, t, queue);
+	if (t != c->curr_thread)
+		schedcoop_runq_remove(c, t);
 	if (t->wakeup_time > 0)
-		UK_TAILQ_INSERT_TAIL(&c->sleep_queue, t, queue);
+		schedcoop_sleepq_add(c, t);
+	else
+		schedcoop_sleepq_remove(c, t);
 }
 
 static __noreturn void idle_thread_fn(void *argp)
@@ -183,41 +174,27 @@ static __noreturn void idle_thread_fn(void *argp)
 	UK_ASSERT(c);
 
 	for (;;) {
-		flags = uk_lcpu_save_irqf();
-
-		/*
-		 * FIXME: We assume that `uk_sched_thread_gc()` is non-blocking
-		 *        because we implement a cooperative scheduler. However,
-		 *        this assumption may not be true depending on the
-		 *        destructor functions that are assigned to the threads
-		 *        and are called by `uk_sched_thred_gc()`.
-		 *	  Also check if in the meantime we got a runnable
-		 *	  thread.
-		 * NOTE:  This idle thread must be non-blocking so that the
-		 *        scheduler has always something to schedule.
-		 */
-		if (uk_sched_thread_gc(&c->sched) > 0 ||
-		    UK_TAILQ_FIRST(&c->run_queue)) {
-			/* We collected successfully some garbage or there is
-			 * a runnable thread in the queue.
-			 * Check if something else can be scheduled now.
-			 */
-			uk_lcpu_restore_irqf(flags);
-
-			/* Use yield() here instead of schedule(), as the
-			 * latter would cause num_sched to exceed num_yield,
-			 * which would errneously imply a preemption, as
-			 * num_preempt = num_sched - num_yield
-			 */
+		if (uk_sched_thread_gc(&c->sched) > 0) {
 			schedcoop_yield(&c->sched);
-
 			continue;
 		}
 
-		/* Read return time set by last schedule operation */
-		wake_up_time = (volatile __nsec) c->idle_return_time;
-		now = ukplat_monotonic_clock();
+		ukplat_spin_lock_irqsave(&c->sched.lock, flags);
+		if (!UK_TAILQ_EMPTY(&c->run_queue) ||
+		    !UK_TAILQ_EMPTY(&c->sched.exited_threads)) {
+			ukplat_spin_unlock_irqrestore(&c->sched.lock, flags);
+			schedcoop_yield(&c->sched);
+			continue;
+		}
 
+		/* Read return time under sched.lock, then release the spinlock
+		 * while keeping local IRQs disabled until halt atomically re-enables
+		 * them so a remote wakeup IPI cannot pass before hlt.
+		 */
+		wake_up_time = c->idle_return_time;
+		ukarch_spin_unlock(&c->sched.lock);
+
+		now = ukplat_monotonic_clock();
 		if (!wake_up_time || wake_up_time > now) {
 			if (wake_up_time)
 				uk_lcpu_halt_irq_until(wake_up_time);
@@ -230,12 +207,6 @@ static __noreturn void idle_thread_fn(void *argp)
 
 		uk_lcpu_restore_irqf(flags);
 
-		/* Try to schedule a thread that might now be available.
-		 * Use yield() here instead of schedule(), as the
-		 * latter would cause num_sched to exceed num_yield,
-		 * which would errneously imply a preemption, as
-		 * num_preempt = num_sched - num_yield
-		 */
 		schedcoop_yield(&c->sched);
 	}
 }
@@ -250,6 +221,8 @@ static int schedcoop_start(struct uk_sched *s,
 	UK_ASSERT(uk_thread_is_runnable(main_thread));
 	UK_ASSERT(!uk_thread_is_exited(main_thread));
 	UK_ASSERT(uk_thread_current() == main_thread);
+
+	c->curr_thread = main_thread;
 
 	/* Since we are now starting to schedule, we save the current timestamp
 	 * as the start time for the first time slice.

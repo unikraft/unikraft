@@ -35,6 +35,7 @@ static void pollq_propagate(struct uk_pollq *q,
 {
 	uk_mutex_lock(&q->proplock);
 	if (q->propmask & set) {
+		struct uk_poll_chain *exclusive = NULL;
 		struct uk_poll_chain *t;
 		uk_pollevent seen = 0;
 
@@ -58,11 +59,22 @@ static void pollq_propagate(struct uk_pollq *q,
 						break;
 					}
 					break;
+				case UK_POLL_CHAINTYPE_CALLBACK_EXCLUSIVE:
+					if (op != UK_POLL_CHAINOP_SET ||
+					    exclusive)
+						break;
+					exclusive = t;
+					__fallthrough;
 				case UK_POLL_CHAINTYPE_CALLBACK:
 					t->callback(req, op, t);
 					break;
 				}
 			}
+		}
+		if (exclusive && UK_STAILQ_NEXT(exclusive, list_entry)) {
+			UK_STAILQ_REMOVE(&q->prop, exclusive,
+					 struct uk_poll_chain, list_entry);
+			UK_STAILQ_INSERT_TAIL(&q->prop, exclusive, list_entry);
 		}
 		q->propmask = seen; /* Prune propmask */
 		q->_tag = NULL; /* Clear tag */
@@ -70,6 +82,26 @@ static void pollq_propagate(struct uk_pollq *q,
 	uk_mutex_unlock(&q->proplock);
 }
 #endif /* CONFIG_LIBUKFILE_CHAINUPDATE */
+
+#if CONFIG_LIBUKFILE_POLLED
+void uk_pollq_notify_polled(struct uk_pollq *q, uk_pollevent levels,
+			    uk_pollevent edges)
+{
+	const uk_pollevent notify = levels | edges;
+
+	UK_ASSERT(UK_POLLQ_IS_POLLED(q));
+#if CONFIG_LIBUKFILE_CHAINUPDATE
+	if (q->_tag == uk_thread_current())
+		return;
+#endif /* CONFIG_LIBUKFILE_CHAINUPDATE */
+	if (notify)
+		pollq_notify_n(q, notify, 0);
+#if CONFIG_LIBUKFILE_CHAINUPDATE
+	if (edges)
+		pollq_propagate(q, UK_POLL_CHAINOP_SET, edges);
+#endif /* CONFIG_LIBUKFILE_CHAINUPDATE */
+}
+#endif /* CONFIG_LIBUKFILE_POLLED */
 
 uk_pollevent uk_pollq_clear(struct uk_pollq *q, uk_pollevent clr)
 {

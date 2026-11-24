@@ -60,8 +60,10 @@ int uk_binfmt_load(struct uk_binfmt_loader_args *args)
 			UK_ASSERT(!args->user);
 			break; /* Assume one interpreter max */
 		}
-		if (rc == UK_BINFMT_HANDLED)
+		if (rc == UK_BINFMT_HANDLED) {
+			args->loader = ldr;
 			return 0;
+		}
 	}
 
 	uk_binfmt_loader_foreach(ldr, UK_BINFMT_LOADER_TYPE_EXEC) {
@@ -102,5 +104,19 @@ int uk_binfmt_unload(struct uk_binfmt_loader_args *args)
 
 	UK_ASSERT(rc != UK_BINFMT_HANDLED_CONT);
 
+	return 0;
+}
+
+int uk_binfmt_release_metadata(struct uk_binfmt_loader_args *args)
+{
+	if (!args || !args->loader)
+		return -EINVAL;
+	if (args->user) {
+		if (!args->loader->ops.release_metadata)
+			return -ENOTSUP;
+		args->loader->ops.release_metadata(args);
+	}
+	args->user = NULL;
+	args->loader = NULL;
 	return 0;
 }

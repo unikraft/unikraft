@@ -54,6 +54,7 @@
 #include <uk/assert.h>
 #include <uk/list.h>
 #include <uk/paging.h>
+#include <uk/plat/spinlock.h>
 
 struct chunk_head {
 	struct uk_hlist_node link;
@@ -79,6 +80,8 @@ struct uk_bbpalloc_memr {
 };
 
 struct uk_bbpalloc {
+	/* Protect every free-list, bitmap and region-list observation. */
+	__spinlock lock;
 	unsigned long nr_free_pages;
 	struct uk_hlist_head free_head[FREELIST_SIZE];
 	struct uk_bbpalloc_memr *memr_head;
@@ -356,7 +359,7 @@ static inline void bbuddy_trim(struct uk_bbpalloc *b, struct chunk_head *ch,
 	}
 }
 
-static void *bbuddy_palloc(struct uk_alloc *a, unsigned long num_pages)
+static void *bbuddy_palloc_core(struct uk_alloc *a, unsigned long num_pages)
 {
 	struct uk_bbpalloc *const b = (struct uk_bbpalloc *)&a->priv;
 	struct chunk_head *alloc_ch;
@@ -460,7 +463,7 @@ static inline size_t bbuddy_merge(struct uk_bbpalloc *b,
 	return ord;
 }
 
-static void bbuddy_pfree(struct uk_alloc *a, void *obj, unsigned long num_pages)
+static void bbuddy_pfree_core(struct uk_alloc *a, void *obj, unsigned long num_pages)
 {
 	struct uk_bbpalloc *const b = (struct uk_bbpalloc *)&a->priv;
 	char *base = obj;
@@ -505,7 +508,7 @@ static void bbuddy_pfree(struct uk_alloc *a, void *obj, unsigned long num_pages)
 	freelist_sanitycheck(b->free_head);
 }
 
-static long bbuddy_pmaxalloc(struct uk_alloc *a)
+static long bbuddy_pmaxalloc_core(struct uk_alloc *a)
 {
 	struct uk_bbpalloc *b;
 	size_t i, order;
@@ -525,7 +528,7 @@ static long bbuddy_pmaxalloc(struct uk_alloc *a)
 	return (long) (1 << order);
 }
 
-static long bbuddy_pavailmem(struct uk_alloc *a)
+static long bbuddy_pavailmem_core(struct uk_alloc *a)
 {
 	struct uk_bbpalloc *b;
 
@@ -535,7 +538,7 @@ static long bbuddy_pavailmem(struct uk_alloc *a)
 	return (long) b->nr_free_pages;
 }
 
-static int bbuddy_addmem(struct uk_alloc *a, void *base, size_t len)
+static int bbuddy_addmem_core(struct uk_alloc *a, void *base, size_t len)
 {
 	struct uk_bbpalloc *b;
 	struct uk_bbpalloc_memr *memr;
@@ -633,6 +636,73 @@ static int bbuddy_addmem(struct uk_alloc *a, void *base, size_t len)
 	return 0;
 }
 
+static inline unsigned long bbuddy_lock(struct uk_alloc *a)
+{
+	struct uk_bbpalloc *b;
+	unsigned long irqf;
+
+	UK_ASSERT(a);
+	b = (struct uk_bbpalloc *)&a->priv;
+	ukplat_spin_lock_irqsave(&b->lock, irqf);
+	return irqf;
+}
+
+static inline void bbuddy_unlock(struct uk_alloc *a, unsigned long irqf)
+{
+	struct uk_bbpalloc *b = (struct uk_bbpalloc *)&a->priv;
+
+	ukplat_spin_unlock_irqrestore(&b->lock, irqf);
+}
+
+/* Callback boundary: all shared bookkeeping is serialized per allocator. */
+static void *bbuddy_palloc(struct uk_alloc *a, unsigned long num_pages)
+{
+	unsigned long irqf = bbuddy_lock(a);
+	void *result;
+
+	result = bbuddy_palloc_core(a, num_pages);
+	bbuddy_unlock(a, irqf);
+	return result;
+}
+
+static void bbuddy_pfree(struct uk_alloc *a, void *obj, unsigned long num_pages)
+{
+	unsigned long irqf = bbuddy_lock(a);
+
+	bbuddy_pfree_core(a, obj, num_pages);
+	bbuddy_unlock(a, irqf);
+}
+
+static long bbuddy_pmaxalloc(struct uk_alloc *a)
+{
+	unsigned long irqf = bbuddy_lock(a);
+	long result;
+
+	result = bbuddy_pmaxalloc_core(a);
+	bbuddy_unlock(a, irqf);
+	return result;
+}
+
+static long bbuddy_pavailmem(struct uk_alloc *a)
+{
+	unsigned long irqf = bbuddy_lock(a);
+	long result;
+
+	result = bbuddy_pavailmem_core(a);
+	bbuddy_unlock(a, irqf);
+	return result;
+}
+
+static int bbuddy_addmem(struct uk_alloc *a, void *base, size_t len)
+{
+	unsigned long irqf = bbuddy_lock(a);
+	int result;
+
+	result = bbuddy_addmem_core(a, base, len);
+	bbuddy_unlock(a, irqf);
+	return result;
+}
+
 struct uk_alloc *uk_allocbbuddy_init(void *base, size_t len)
 {
 	struct uk_alloc *a;
@@ -661,6 +731,7 @@ struct uk_alloc *uk_allocbbuddy_init(void *base, size_t len)
 	min += metalen;
 	memset(a, 0, metalen);
 	b = (struct uk_bbpalloc *)&a->priv;
+	ukarch_spin_init(&b->lock);
 
 	for (i = 0; i < FREELIST_SIZE; i++)
 		UK_INIT_HLIST_HEAD(&b->free_head[i]);

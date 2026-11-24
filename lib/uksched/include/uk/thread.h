@@ -45,6 +45,7 @@ extern "C" {
 
 struct uk_sched;
 struct uk_thread;
+struct uk_vas;
 
 typedef void (*uk_thread_dtor_t)(struct uk_thread *);
 typedef void (*uk_thread_gc_t)(struct uk_thread *, void *);
@@ -62,8 +63,21 @@ struct uk_thread {
 
 	UK_TAILQ_ENTRY(struct uk_thread) queue;
 	uint32_t flags;
+	bool wait_interruptible;
+	bool wait_interrupted;
+	bool wait_sigintr;
+	bool wait_signalled;
 	__snsec wakeup_time;
 	struct uk_sched *sched;
+#if CONFIG_LIBUKVMEM_THREAD_VAS
+	/** Borrowed address space. NULL selects the kernel address space. */
+	struct uk_vas *vas;
+#if CONFIG_LIBUKVMEM_VAS_REFCOUNT
+	/** Acquired by uk_thread_set_vas; retained through thread release. */
+	struct uk_vas *vas_ref;
+	bool vas_releasing;
+#endif
+#endif
 	struct uk_waitq_ticket wait_ticket;
 
 	struct {
@@ -82,6 +96,12 @@ struct uk_thread {
 	void *priv;			/**< Private field, free for use */
 
 	__nsec exec_time;		/**< Time the thread was scheduled */
+#if CONFIG_LIBUKVMEM_TRACE_PAGEFAULTS
+	__u64 vmem_faults;
+	__nsec vmem_fault_time;
+	__nsec vmem_fault_anon_alloc_time;
+	__nsec vmem_fault_anon_zero_time;
+#endif
 	const char *name;		/**< Reference to thread name */
 	UK_TAILQ_ENTRY(struct uk_thread) thread_list;
 };
@@ -177,9 +197,8 @@ bool uk_thread_in_waitq(struct uk_thread *thread)
 #define uk_thread_is_exited(t)   ((t)->flags & UK_THREADF_EXITED)
 #define uk_thread_is_runnable(t) (!uk_thread_is_exited(t) \
 				  && ((t)->flags & UK_THREADF_RUNNABLE))
-#define uk_thread_is_blocked(t)  ((t)->flags &				\
-				  (UK_THREADF_EXITED | UK_THREADF_RUNNABLE) == \
-				  0x0)
+#define uk_thread_is_blocked(t) \
+	(((t)->flags & (UK_THREADF_EXITED | UK_THREADF_RUNNABLE)) == 0x0)
 #define uk_thread_is_queueable(t) ((t)->flags & UK_THREADF_QUEUEABLE)
 
 #define uk_thread_set_runnable(t) \
@@ -666,10 +685,70 @@ struct uk_thread *uk_thread_create_fn2(struct uk_alloc *a,
 				       uk_thread_dtor_t dtor);
 
 void uk_thread_release(struct uk_thread *t);
+#if CONFIG_LIBUKVMEM_VAS_REFCOUNT
+/**
+ * Bind a current or unpublished thread to a VAS; NULL selects the kernel VAS.
+ * An unchanged effective binding is a no-op, also for a scheduled thread.
+ * NULL and the kernel VAS are equivalent without rewriting the stored pointer.
+ * Caller serializes binding and publication and holds the new VAS live.
+ * An owned VAS is pinned through thread release. The current thread switches
+ * page tables before dropping its old reference. Switching an active VAS or
+ * replacing an owned reference requires IRQs enabled and no caller locks.
+ * Returns -ESRCH for an exiting thread, -EBUSY for a change to a scheduled
+ * foreign thread, -EWOULDBLOCK for an unsafe IRQ state, or an activation error.
+ */
+int uk_thread_set_vas(struct uk_thread *t, struct uk_vas *vas);
+#endif
 void uk_thread_block_until(struct uk_thread *thread, __snsec until);
 void uk_thread_block_timeout(struct uk_thread *thread, __nsec nsec);
 void uk_thread_block(struct uk_thread *thread);
 void uk_thread_wake(struct uk_thread *thread);
+
+/* Kinds of waits: plain waits end only when woken or at their deadline,
+ * interruptible waits also end when the thread's process terminates, and
+ * signal-interruptible waits also end when a signal handler is pending.
+ */
+#define UK_THREAD_WAIT_PLAIN	0
+#define UK_THREAD_WAIT_TERM	1
+#define UK_THREAD_WAIT_SIGINTR	2
+
+/* Interruptions are sticky for a thread that is leaving userspace. */
+bool uk_thread_block_interruptible(struct uk_thread *thread, __snsec until);
+void uk_thread_interrupt_wait(struct uk_thread *thread);
+
+static inline bool uk_thread_wait_interrupted(const struct uk_thread *thread)
+{
+	return __atomic_load_n(&thread->wait_interrupted, __ATOMIC_ACQUIRE);
+}
+
+/* A pending signal handler ends a signal-interruptible wait, or prevents
+ * one from starting, until the signal delivery clears the mark before it
+ * runs the handlers.
+ */
+bool uk_thread_block_sigintr(struct uk_thread *thread, __snsec until);
+void uk_thread_signal_wait(struct uk_thread *thread);
+
+static inline bool uk_thread_wait_signalled(const struct uk_thread *thread)
+{
+	return __atomic_load_n(&thread->wait_signalled, __ATOMIC_ACQUIRE);
+}
+
+static inline void uk_thread_wait_signal_clear(struct uk_thread *thread)
+{
+	__atomic_store_n(&thread->wait_signalled, false, __ATOMIC_RELEASE);
+}
+
+/* True if a wait of `kind` must end early for `thread` */
+static inline bool uk_thread_wait_ended(const struct uk_thread *thread,
+					int kind)
+{
+	if (kind == UK_THREAD_WAIT_PLAIN)
+		return false;
+	if (uk_thread_wait_interrupted(thread))
+		return true;
+	return kind == UK_THREAD_WAIT_SIGINTR &&
+	       uk_thread_wait_signalled(thread);
+}
 
 /**
  * Set the wakeup timer state for thread `t`.

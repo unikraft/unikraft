@@ -24,12 +24,22 @@
 	(UK_PAGING_PAGE_SIZE * HEAP_PAGES)
 
 #if CONFIG_LIBUKVMEM
+static struct uk_vas *brk_vas(struct posix_process *p __unused)
+{
+#if CONFIG_LIBUKVMEM_THREAD_VAS
+	UK_ASSERT(p->vas);
+	return p->vas;
+#else
+	return uk_vas_get_active();
+#endif
+}
+
 static inline int pprocess_brk_init_zone(struct posix_process *pprocess)
 {
 	__vaddr_t va = UK_PAGING_VADDR_ANY;
 	int rc;
 
-	rc = uk_vma_map_anon(uk_vas_get_active(), &va, HEAP_LEN,
+	rc = uk_vma_map_anon(brk_vas(pprocess), &va, HEAP_LEN,
 			     UK_PAGING_PAGE_ATTR_PROT_RW, 0, "brk VMA");
 	if (unlikely(rc))
 		return rc;
@@ -50,29 +60,17 @@ static inline int pprocess_brk_init_zone(struct posix_process *pprocess)
 }
 #endif /* !CONFIG_LIBUKVMEM */
 
-static int pprocess_brk_init(void *arg)
+int pprocess_brk_map_space(struct posix_process *pprocess)
 {
-	struct posix_process_clone_event_data *event_data;
-	struct posix_process *pprocess;
+	UK_ASSERT(!pprocess->brk_ctx.base);
+	return pprocess_brk_init_zone(pprocess);
+}
+
+int pprocess_brk_init_space(struct posix_process *pprocess)
+{
 	int rc;
 
-	UK_ASSERT(arg);
-
-	event_data = (struct posix_process_clone_event_data *)arg;
-
-	/**
-	 * Handler is meant to just initialize per-process brk once, at the
-	 * beginning. If this is not a process creation-related clone call
-	 * then ignore.
-	 */
-	if (!(event_data->cl_args->flags & CLONE_VFORK))
-		return 0;
-
-	pprocess = pid2pprocess(event_data->pid);
-
-	UK_ASSERT(!pprocess->brk_ctx.base);
-
-	rc = pprocess_brk_init_zone(pprocess);
+	rc = pprocess_brk_map_space(pprocess);
 	if (unlikely(rc)) {
 		uk_pr_err("Failed to create brk space (%lu KiB).\n",
 			  (__u64)HEAP_LEN / 1024);
@@ -92,12 +90,37 @@ static int pprocess_brk_init(void *arg)
 	return 0;
 }
 
+static int pprocess_brk_init(void *arg)
+{
+	struct posix_process_clone_event_data *event_data;
+	struct posix_process *pprocess;
+	struct posix_thread *pthread;
+
+	UK_ASSERT(arg);
+
+	event_data = (struct posix_process_clone_event_data *)arg;
+
+	/**
+	 * Handler is meant to just initialize per-process brk once, at the
+	 * beginning. If this is not a process creation-related clone call
+	 * then ignore.
+	 */
+	if (!(event_data->cl_args->flags & CLONE_VFORK))
+		return 0;
+
+	pthread = uk_thread_uktls_var(event_data->child, pthread_self);
+	UK_ASSERT(pthread && pthread->process);
+	pprocess = pthread->process;
+
+	return pprocess_brk_init_space(pprocess);
+}
+
 POSIX_PROCESS_CLONE_HANDLER(CLONE_VFORK, pprocess_brk_init);
 
 #if CONFIG_LIBUKVMEM
 static inline int pprocess_brk_free_zone(struct posix_process *pprocess)
 {
-	return uk_vma_unmap(uk_vas_get_active(),
+	return uk_vma_unmap(brk_vas(pprocess),
 			    (__vaddr_t)pprocess->brk_ctx.base, HEAP_LEN, 0);
 }
 #else /* !CONFIG_LIBUKVMEM */

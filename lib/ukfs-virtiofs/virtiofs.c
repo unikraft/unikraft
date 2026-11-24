@@ -5,6 +5,10 @@
  */
 #define _GNU_SOURCE
 
+#include <uk/config.h>
+#if CONFIG_LIBUKDEBUG_ENABLE_ASSERT
+#include <uk/print.h>
+#endif
 #include <inttypes.h>
 #include <limits.h>
 #include <stdint.h>
@@ -342,8 +346,8 @@ void virtiofs_live_release(struct viofs_node *n)
 static inline
 void virtiofs_commit_open(struct viofs_node *n, struct fuse_open_out *out)
 {
-	uk_store_n(&n->fh, out->fh);
-	uk_or(&n->flags, VIRTIOFS_NODE_OPEN);
+	__atomic_store_n(&n->fh, out->fh, __ATOMIC_RELAXED);
+	__atomic_or_fetch(&n->flags, VIRTIOFS_NODE_OPEN, __ATOMIC_RELEASE);
 }
 
 static inline
@@ -374,10 +378,12 @@ int virtiofs_ensure_open(struct viofs_node *n)
 {
 	int r = 0;
 
-	if (!(n->flags & VIRTIOFS_NODE_OPEN)) {
+	if (!(__atomic_load_n(&n->flags, __ATOMIC_ACQUIRE) &
+	      VIRTIOFS_NODE_OPEN)) {
 		uk_mutex_lock(&n->openlk);
 		/* Re-check flag after acquiring lock */
-		if (!(uk_load_n(&n->flags) & VIRTIOFS_NODE_OPEN))
+		if (!(__atomic_load_n(&n->flags, __ATOMIC_ACQUIRE) &
+		      VIRTIOFS_NODE_OPEN))
 			r = virtiofs_try_open(n);
 		uk_mutex_unlock(&n->openlk);
 	}
@@ -459,8 +465,35 @@ static inline
 ssize_t _do_read(struct viofs_node *n, const struct iovec *iov, size_t iovcnt,
 		 size_t off, long flags)
 {
-	return virtiofs_file_read(n, off, uk_iov_len(iov, iovcnt),
-				  iov, iovcnt, flags);
+	size_t bytes_read = 0;
+	size_t iov_i = 0;
+	size_t iov_off = 0;
+	size_t rem = uk_iov_len(iov, iovcnt);
+	ssize_t r = 0;
+
+	while (rem) {
+		if (iov_off) {
+			const size_t iolen = MIN(iov[iov_i].iov_len - iov_off,
+						 rem);
+			const struct iovec tmp = {
+				.iov_base = ((char *)iov[iov_i].iov_base) +
+					    iov_off,
+				.iov_len = iolen
+			};
+
+			r = virtiofs_file_read(n, off, iolen, &tmp, 1, flags);
+		} else {
+			r = virtiofs_file_read(n, off, rem, &iov[iov_i],
+					       iovcnt - iov_i, flags);
+		}
+		if (unlikely(r <= 0))
+			break;
+		uk_iov_ff(iov, iovcnt, r, &iov_i, &iov_off);
+		bytes_read += r;
+		off += r;
+		rem -= r;
+	}
+	return bytes_read ? (ssize_t)bytes_read : r;
 }
 #endif /* !CONFIG_LIBUKFS_VIRTIOFS_IOMEM */
 
@@ -553,8 +586,35 @@ static inline
 ssize_t _do_write(struct viofs_node *n, const struct iovec *iov, size_t iovcnt,
 		  size_t off, long flags)
 {
-	return virtiofs_file_write(n, off, uk_iov_len(iov, iovcnt),
-				   iov, iovcnt, flags);
+	size_t bytes_written = 0;
+	size_t iov_i = 0;
+	size_t iov_off = 0;
+	size_t rem = uk_iov_len(iov, iovcnt);
+	ssize_t r = 0;
+
+	while (rem) {
+		if (iov_off) {
+			const size_t iolen = MIN(iov[iov_i].iov_len - iov_off,
+						 rem);
+			const struct iovec tmp = {
+				.iov_base = ((char *)iov[iov_i].iov_base) +
+					    iov_off,
+				.iov_len = iolen
+			};
+
+			r = virtiofs_file_write(n, off, iolen, &tmp, 1, flags);
+		} else {
+			r = virtiofs_file_write(n, off, rem, &iov[iov_i],
+						iovcnt - iov_i, flags);
+		}
+		if (unlikely(r <= 0))
+			break;
+		uk_iov_ff(iov, iovcnt, r, &iov_i, &iov_off);
+		bytes_written += r;
+		off += r;
+		rem -= r;
+	}
+	return bytes_written ? (ssize_t)bytes_written : r;
 }
 #endif /* !CONFIG_LIBUKFS_VIRTIOFS_IOMEM */
 
@@ -608,6 +668,7 @@ ssize_t virtiofs_live_mem(struct viofs_node *n,
 		if (unlikely(!iovcnt))
 			return 0;
 		__fallthrough;
+	case UKFILE_MEM_ACQUIRE_PINNED:
 	case UKFILE_MEM_ACQUIRE:
 	case UKFILE_MEM_RELEASE:
 		if (unlikely(off >= n->attr.size))
@@ -618,6 +679,10 @@ ssize_t virtiofs_live_mem(struct viofs_node *n,
 	case UKFILE_MEM_GIFT:
 		return -ENODEV;
 	default:
+#if CONFIG_LIBUKDEBUG_ENABLE_ASSERT
+		uk_pr_err("Unsupported file memory operation %d (off %zu, len %zu)\n",
+			  (int)op, off, len);
+#endif
 		return -EINVAL;
 	}
 
@@ -629,17 +694,36 @@ ssize_t virtiofs_live_mem(struct viofs_node *n,
 
 	r = virtiofs_ensure_open(n);
 	UK_ASSERT(r <= 0);
-	if (unlikely(r))
+	if (unlikely(r)) {
+#if CONFIG_LIBUKDEBUG_ENABLE_ASSERT
+		uk_pr_err("Cannot open file for memory operation: %ld (op %d, off %zu, len %zu)\n",
+			  (long)r, (int)op, off, len);
+#endif
 		return r;
+	}
 
 	switch (op) {
+	case UKFILE_MEM_ACQUIRE_PINNED:
+#if !CONFIG_LIBUKPOD_DEFAULT_EAGER
+		/* Eager PoD never migrates pages. Other backends need an
+		 * explicit pin contract before providing physical aliases.
+		 */
+		return -ENOTSUP;
+#endif
+		__fallthrough;
 	case UKFILE_MEM_ACQUIRE:
 		r = uk_sparsebuf_fill(
 			&ctx, UK_SPARSEBUF_EMBED_HEADP(iohead, &rn->iomem.io),
 			pgoff, npages, 1
 		);
-		if (unlikely(r <= 0))
+		if (unlikely(r <= 0)) {
+#if CONFIG_LIBUKDEBUG_ENABLE_ASSERT
+			uk_pr_err("Cannot fill pinned file pages: %ld (op %d, off %zu, len %zu, pgoff %zu, npages %zu, size %llu)\n",
+				  (long)r, (int)op, off, len, pgoff, npages,
+				  (unsigned long long)n->attr.size);
+#endif
 			return r;
+		}
 		return (pgoff + r) * UK_PAGING_PAGE_SIZE - off;
 	case UKFILE_MEM_RELEASE:
 		r = uk_sparsebuf_ref_release(
@@ -1083,8 +1167,14 @@ struct viofs_node *virtiofs_getnode(struct fuse_entry_out *out,
 		uk_mutex_unlock(&dev->maplk);
 		break;
 	}
-	if (update_attr)
+	if (update_attr) {
 		newnode->attr = out->attr;
+		/* This local node already owns a remote lookup reference. Each
+		 * additional LOOKUP/LINK reply contributes another remote
+		 * reference, which must not leak until session destruction.
+		 */
+		virtiofs_fuse_forget(&dev->fdev, out->nodeid, 1);
+	}
 	return newnode;
 }
 
@@ -1209,8 +1299,10 @@ ssize_t virtiofs_live_fs_listdir(struct viofs_node *n, size_t *curp,
 		goto out;
 	}
 
-	/* Convert FUSE output to dirent64 */
-	*curp = cur + r;
+	/* Convert FUSE output to dirent64. FUSE_READDIR offsets are the
+	 * opaque d_off cookies of the returned entries, not byte positions;
+	 * the next request continues after the last converted entry.
+	 */
 	rem = r;
 	fuse_dent = tmp;
 	fs_dent = buf;
@@ -1231,12 +1323,14 @@ ssize_t virtiofs_live_fs_listdir(struct viofs_node *n, size_t *curp,
 		fs_dent->d_type = fuse_dent->type;
 		memcpy(fs_dent->d_name, fuse_dent->name, namelen);
 		fs_dent->d_name[namelen] = '\0';
+		cur = fuse_dent->off;
 
 		r += reclen;
 		rem -= fuselen;
 		fs_dent = UKFS_DIRENT_NEXT(fs_dent, reclen);
 		fuse_dent = (struct fuse_dirent *)((char *)fuse_dent + fuselen);
 	}
+	*curp = cur;
 out:
 	if (!use_stack)
 		uk_free(virtiofs_alloc, tmp);
@@ -1329,7 +1423,7 @@ struct viofs_node *virtiofs_live_fs_create(struct viofs_node *n,
 
 		virtiofs_live_acquire(n);
 		virtiofs_init_node(newnode, n->dev, entry_out.nodeid, n);
-		UK_ASSERT(virtiofs_node_fmode(n) == S_IFREG);
+		UK_ASSERT(virtiofs_node_fmode(newnode) == S_IFREG);
 		virtiofs_commit_open(newnode, &open_out);
 		uk_mutex_lock(&n->dev->maplk);
 		UK_RB_INSERT(virtiofs_nodemap, &n->dev->nodemap, newnode);
@@ -1344,28 +1438,68 @@ struct viofs_node *virtiofs_live_fs_create(struct viofs_node *n,
 	}
 }
 
+/* Namespace operations refer to names, but the peer may require their
+ * inodes to remain in its lookup table for the whole operation. Keep an exact
+ * remote LOOKUP reference independently of local open-file/node lifetimes.
+ * No symlink following or local node materialization is needed here.
+ */
+struct virtiofs_lookup_ref {
+	struct virtiofs_fuse_dev *dev;
+	uint64_t node;
+};
+
+static
+int virtiofs_lookup_ref_acquire(struct viofs_node *dir,
+				const char *name, size_t len,
+			      struct virtiofs_lookup_ref *ref)
+{
+	struct fuse_entry_out out;
+	const union virtiofs_fuse_entry_outp op = { .full = &out };
+	int r;
+
+	ref->dev = &dir->dev->fdev;
+	ref->node = 0;
+	r = virtiofs_fuse_lookup(ref->dev, dir->inode, name, len, op, NULL);
+	if (r)
+		return r;
+	if (!out.nodeid)
+		return -ENOENT;
+	ref->node = out.nodeid;
+	return 0;
+}
+
+static
+void virtiofs_lookup_ref_release(struct virtiofs_lookup_ref *ref)
+{
+	if (ref->node)
+		virtiofs_fuse_forget(ref->dev, ref->node, 1);
+}
+
 static
 int virtiofs_live_fs_unlink(struct viofs_node *n,
 			    const char *name, size_t len, unsigned int flags,
 			    unsigned long mntflags __unused)
 {
+	struct virtiofs_lookup_ref held;
 	int r;
 
-	/* Refuse to operate on '.' and '..' */
-	if (unlikely(uk_fs_path_isdot(name, len) ||
-		     uk_fs_path_isdotdot(name, len)))
+	if (uk_fs_path_isdot(name, len) || uk_fs_path_isdotdot(name, len))
 		return -EINVAL;
-
-	/* Mux between unlink & rmdir based on flags */
-	if (flags & UKFS_UNLINK_DIR)
-		return virtiofs_fuse_rmdir(&n->dev->fdev, n->inode, name, len);
-	else if (flags & UKFS_UNLINK_NODIR)
-		return virtiofs_fuse_unlink(&n->dev->fdev, n->inode, name, len);
-	/* ... or try both */
-	r = virtiofs_fuse_unlink(&n->dev->fdev, n->inode, name, len);
-	if (r == -EISDIR)
+	r = virtiofs_lookup_ref_acquire(n, name, len, &held);
+	if (r)
+		return r;
+	if (flags & UKFS_UNLINK_DIR) {
 		r = virtiofs_fuse_rmdir(&n->dev->fdev, n->inode,
-					name, len);
+				     name, len);
+	} else if (flags & UKFS_UNLINK_NODIR) {
+		r = virtiofs_fuse_unlink(&n->dev->fdev, n->inode, name, len);
+	} else {
+		r = virtiofs_fuse_unlink(&n->dev->fdev, n->inode, name, len);
+		if (r == -EISDIR)
+			r = virtiofs_fuse_rmdir(&n->dev->fdev, n->inode,
+						name, len);
+	}
+	virtiofs_lookup_ref_release(&held);
 	return r;
 }
 
@@ -1376,15 +1510,30 @@ int virtiofs_live_fs_rename(struct viofs_node *n,
 			    const char *dname, size_t dlen,
 			    unsigned int flags, unsigned long mntflags __unused)
 {
-	/* rename2 is not supported by all devices; use it only when required */
+	struct virtiofs_lookup_ref source, target;
+	int r;
+
+	if (n->dev != dest->dev)
+		return -EXDEV;
+	r = virtiofs_lookup_ref_acquire(n, name, nlen, &source);
+	if (r)
+		return r;
+	r = virtiofs_lookup_ref_acquire(dest, dname, dlen, &target);
+	if (r && r != -ENOENT)
+		goto out_source;
+	/* Missing destinations are valid; an existing destination must remain
+	 * referenced until replacement finishes, just like the source.
+	 */
 	if (flags)
-		return virtiofs_fuse_rename2(&n->dev->fdev,
-					     n->inode, name, nlen,
-					     dest->inode, dname, dlen, flags);
+		r = virtiofs_fuse_rename2(&n->dev->fdev, n->inode, name, nlen,
+					  dest->inode, dname, dlen, flags);
 	else
-		return virtiofs_fuse_rename(&n->dev->fdev,
-					    n->inode, name, nlen,
-					    dest->inode, dname, dlen);
+		r = virtiofs_fuse_rename(&n->dev->fdev, n->inode, name, nlen,
+					 dest->inode, dname, dlen);
+	virtiofs_lookup_ref_release(&target);
+out_source:
+	virtiofs_lookup_ref_release(&source);
+	return r;
 }
 
 static

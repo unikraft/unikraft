@@ -54,8 +54,12 @@
 
 #include <stdint.h>
 
+#include <kvm/tscclock.h>
 #include <uk/arch/util.h>
 #include <uk/lcpu.h>
+#include <uk/pcpuvar.h>
+#include <uk/plat/config.h>
+#include <uk/plat/spinlock.h>
 #include <uk/plat/time.h>
 #include <uk/timeconv.h>
 #include <uk/print.h>
@@ -100,9 +104,8 @@ static __u64 rtc_epochoffset;
  * TSC clock specific.
  */
 
-/* Base time values at the last call to tscclock_monotonic(). */
-static __u64 time_base;
-static __u64 tsc_base;
+/* TSC value recorded at monotonic clock start (immutable after init). */
+static __u64 tsc_boot;
 
 /* Multiplier for converting TSC ticks to nsecs. (0.32) fixed point. */
 static __u32 tsc_mult;
@@ -201,18 +204,17 @@ static __u64 rtc_gettimeofday(void)
 __u64 tscclock_monotonic(void)
 {
 	__u64 tsc_now, tsc_delta;
+	__u32 mult = UK_READ_ONCE(tsc_mult);
 
-	/*
-	 * Update time_base (monotonic time) and tsc_base (TSC time).
-	 */
+	if (unlikely(!mult))
+		return 0;
+
 	tsc_now = uk_arch_x86_64_rdtsc();
-	tsc_delta = tsc_now - tsc_base;
-	if (tsc_delta >= UINT64_MAX / 2)
-		tsc_delta = 1;
-	time_base += uk_arch_x86_64_mul64_32(tsc_delta, tsc_mult);
-	tsc_base = tsc_now;
+	tsc_delta = tsc_now - tsc_boot;
+	if (unlikely(tsc_delta >= UINT64_MAX / 2))
+		tsc_delta = 0;
 
-	return time_base;
+	return (__u64)(((__uint128_t)tsc_delta * mult) >> 32);
 }
 
 /*
@@ -220,7 +222,7 @@ __u64 tscclock_monotonic(void)
  */
 int tscclock_init(void)
 {
-	__u64 tsc_freq = 0, rtc_boot;
+	__u64 tsc_freq = 0, rtc_boot, cal_start;
 	__u32 eax, ebx, ecx, edx;
 
 	/* Initialise i8254 timer channel 0 to mode 2 at CONFIG_HZ frequency */
@@ -230,7 +232,7 @@ int tscclock_init(void)
 	uk_arch_x86_64_outb(TIMER_CNTR, (TIMER_HZ / CONFIG_HZ) >> 8);
 
 	/*
-	 * Read RTC "time at boot". This must be done just before tsc_base is
+	 * Read RTC "time at boot". This must be done just before tsc_boot is
 	 * initialised in order to get a correct offset below.
 	 */
 	rtc_boot = rtc_gettimeofday();
@@ -244,9 +246,9 @@ int tscclock_init(void)
 	uk_arch_x86_64_cpuid(0x40000000, 0, &eax, &ebx, &ecx, &edx);
 	if (eax >= 0x40000010) {
 		uk_pr_info("Retrieving TSC clock frequency from hypervisor\n");
-		tsc_base = uk_arch_x86_64_rdtsc();
+		cal_start = uk_arch_x86_64_rdtsc();
 		uk_arch_x86_64_cpuid(0x40000010, 0, &eax, &ebx, &ecx, &edx);
-		tsc_freq = eax * 1000;
+		tsc_freq = (__u64)eax * 1000;
 	}
 
 	/*
@@ -256,40 +258,32 @@ int tscclock_init(void)
 	 */
 	if (!tsc_freq) {
 		uk_pr_info("Calibrating TSC clock against i8254 timer\n");
-		tsc_base = uk_arch_x86_64_rdtsc();
+		cal_start = uk_arch_x86_64_rdtsc();
 		i8254_delay(100000);
-		tsc_freq = (uk_arch_x86_64_rdtsc() - tsc_base) * 10;
+		tsc_freq = (uk_arch_x86_64_rdtsc() - cal_start) * 10;
 	}
+
+	tsc_boot = cal_start;
+	uk_arch_wmb();
 
 	/*
 	 * Calculate TSC scaling multiplier.
 	 *
 	 * (0.32) tsc_mult = UKARCH_NSEC_PER_SEC (32.32) / tsc_freq (32.0)
 	 *
-	 * Warning, do not print anything between TSC calibration and the
-	 * setting of tsc_mult: if CONFIG_LIBUKDEBUG_PRINT_TIME is enabled
-	 * this will trigger a reset of tsc_base via tscclock_monotonic
-	 * and delay the clock starting point.
-	 *
 	 * FIXME: this will overflow with small TSC frequencies. We should
 	 * probably calculate the TSC shift dynamically like solo5/hvt does.
 	 */
-	tsc_mult = (UKARCH_NSEC_PER_SEC << 32) / tsc_freq;
+	UK_WRITE_ONCE(tsc_mult, (UKARCH_NSEC_PER_SEC << 32) / tsc_freq);
 
 	uk_pr_info("Clock source: TSC, frequency estimate is %llu Hz\n",
 		   (unsigned long long) tsc_freq);
 
 	/*
-	 * Monotonic time begins at tsc_base (first read of TSC before
-	 * calibration).
-	 */
-	tscclock_monotonic();
-
-	/*
-	 * Compute RTC epoch offset by subtracting monotonic time_base from RTC
+	 * Compute RTC epoch offset by subtracting monotonic time from RTC
 	 * time at boot.
 	 */
-	rtc_epochoffset = rtc_boot - time_base;
+	rtc_epochoffset = rtc_boot - tscclock_monotonic();
 
 	/*
 	 * Initialise i8254 timer channel 0 to mode 4 (one shot).
@@ -316,6 +310,45 @@ __u64 tscclock_epochoffset(void)
  */
 #define PIT_MIN_DELTA	16
 
+static inline void i8254_oneshot_program(__u64 delta_ns)
+{
+	__u64 delta_ticks = (__u64)(((__uint128_t)delta_ns * pit_mult) >> 32);
+	unsigned int ticks;
+
+	if (delta_ticks < PIT_MIN_DELTA)
+		ticks = PIT_MIN_DELTA;
+	else if (delta_ticks > 65535)
+		ticks = 65535;
+	else
+		ticks = (unsigned int)delta_ticks;
+
+	/*
+	 * Note that according to the Intel 82C54 datasheet, p12 the
+	 * interrupt is actually delivered in N + 1 ticks.
+	 */
+	ticks -= 1;
+	uk_arch_x86_64_outb(TIMER_CNTR, ticks & 0xff);
+	uk_arch_x86_64_outb(TIMER_CNTR, ticks >> 8);
+}
+
+static __spinlock pit_lock = UKARCH_SPINLOCK_INITIALIZER();
+static __u64 pit_cpu_deadline[CONFIG_UKPLAT_CPU_MAXCOUNT];
+
+void tscclock_timer_irq(void)
+{
+#if CONFIG_HAVE_SMP
+	__u64 targets[CONFIG_UKPLAT_CPU_MAXCOUNT];
+	unsigned int i, n = 0;
+
+	for (i = 1; i < CONFIG_UKPLAT_CPU_MAXCOUNT; i++) {
+		if (UK_READ_ONCE(pit_cpu_deadline[i]) != 0)
+			targets[n++] = i;
+	}
+	if (n > 0)
+		(void)uk_lcpu_wakeup(targets, &n);
+#endif /* CONFIG_HAVE_SMP */
+}
+
 /*
  * Returns early if any interrupts are serviced, or if the requested delay is
  * too short. Must be called with interrupts disabled, will enable interrupts
@@ -329,13 +362,17 @@ __u64 tscclock_epochoffset(void)
  */
 static void tscclock_cpu_block(__u64 until)
 {
-	__u64 now, delta_ns;
+	__u64 cpu_idx = uk_pcpuvar_current_get(uk_pcpuvar_cpu_idx);
+	__u64 now, delta_ns, min_until, pit_delta_ns;
 	__u64 delta_ticks;
-	unsigned int ticks;
+	unsigned int i;
 
 	UK_ASSERT(uk_lcpu_irqs_disabled());
+	UK_ASSERT(cpu_idx < CONFIG_UKPLAT_CPU_MAXCOUNT);
 
 	now = ukplat_monotonic_clock();
+	if (until <= now)
+		return;
 
 	/*
 	 * Compute delta in PIT ticks. Return if it is less than minimum safe
@@ -343,7 +380,7 @@ static void tscclock_cpu_block(__u64 until)
 	 * the timeout.
 	 */
 	delta_ns = until - now;
-	delta_ticks = uk_arch_x86_64_mul64_32(delta_ns, pit_mult);
+	delta_ticks = (__u64)(((__uint128_t)delta_ns * pit_mult) >> 32);
 	if (delta_ticks < PIT_MIN_DELTA) {
 		/*
 		 * Since we are "spinning", quickly enable interrupts in
@@ -356,44 +393,41 @@ static void tscclock_cpu_block(__u64 until)
 		return;
 	}
 
-	/*
-	 * Program the timer to interrupt the CPU after the delay has expired.
-	 * Maximum timer delay is 65535 ticks.
-	 */
-	if (delta_ticks > 65535)
-		ticks = 65535;
-	else
-		ticks = delta_ticks;
+	ukarch_spin_lock(&pit_lock);
+	UK_WRITE_ONCE(pit_cpu_deadline[cpu_idx], until);
+	min_until = until;
+	for (i = 0; i < CONFIG_UKPLAT_CPU_MAXCOUNT; i++) {
+		__u64 d = UK_READ_ONCE(pit_cpu_deadline[i]);
 
-	/*
-	 * Note that according to the Intel 82C54 datasheet, p12 the
-	 * interrupt is actually delivered in N + 1 ticks.
-	 */
-	ticks -= 1;
-	uk_arch_x86_64_outb(TIMER_CNTR, ticks & 0xff);
-	uk_arch_x86_64_outb(TIMER_CNTR, ticks >> 8);
+		if (d != 0 && d < min_until)
+			min_until = d;
+	}
+	pit_delta_ns = (min_until > now) ? (min_until - now) : 0;
+	i8254_oneshot_program(pit_delta_ns);
+	ukarch_spin_unlock(&pit_lock);
 
 	/*
 	 * Wait for any interrupt. If we got an interrupt then just
 	 * return into the scheduler (this func is called _ONLY_ from
 	 * a scheduler, see the note above) which will check if there
 	 * is work to do and call us again here if not.
-	 *
-	 * TODO: It would be more efficient for longer sleeps to be
-	 * able to distinguish if the interrupt was the PIT interrupt
-	 * and no other, but this will do for now.
 	 */
 	uk_lcpu_halt_irq();
+
+	ukarch_spin_lock(&pit_lock);
+	UK_WRITE_ONCE(pit_cpu_deadline[cpu_idx], 0);
+	ukarch_spin_unlock(&pit_lock);
 }
 
-unsigned long sched_have_pending_events;
+__uk_pcpuvar unsigned long sched_have_pending_events;
 
 void time_block_until(__snsec until)
 {
 	while ((__snsec) ukplat_monotonic_clock() < until) {
 		tscclock_cpu_block(until);
 
-		if (uk_and_relax(&sched_have_pending_events, 0))
+		if (uk_and_relax(uk_pcpuvar_current_ptr_get(
+					 sched_have_pending_events), 0))
 			break;
 	}
 }

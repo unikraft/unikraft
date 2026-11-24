@@ -8,9 +8,25 @@ menuconfig LIBPOSIX_MMAP
 
 if LIBPOSIX_MMAP
 
+config LIBPOSIX_MMAP_POPULATE_SMALL_ANON
+	bool "Populate small anonymous read-write allocations in one pass"
+	depends on ARCH_X86_64
+	default n
+	help
+		For plain anonymous private mappings up to one large page,
+		try installing all base-page mappings together when mmap runs.
+		Under memory pressure, fall back to demand paging. This trades
+		early physical memory commitment for fewer page-in operations.
+
 config LIBPOSIX_MMAP_TEST
 	bool "Enable unit tests"
 	default n
 	select LIBUKTEST
+
+config LIBPOSIX_MMAP_COW_TEST
+	bool "Test POSIX anonymous mappings in COW address spaces"
+	depends on LIBUKVMEM_PROCESS_VAS
+	select LIBUKTEST
+	default n
 
 endif

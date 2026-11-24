@@ -60,6 +60,7 @@ struct uk_console {
 	int flags;
 	enum uk_console_devclass dclass;
 	struct uk_list_head _list;
+	struct uk_spinlock _out_lock;
 };
 
 struct uk_console_async {
@@ -97,6 +98,7 @@ static inline void uk_console_init(struct uk_console *dev, const char *name,
 		.dclass = dclass,
 	};
 	UK_INIT_LIST_HEAD(&dev->_list);
+	uk_spin_init(&dev->_out_lock);
 }
 
 /**

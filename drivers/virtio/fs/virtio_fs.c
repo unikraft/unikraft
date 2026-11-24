@@ -10,6 +10,8 @@
 #include <uk/paging.h>
 #include <uk/sched.h>
 #include <uk/thread.h>
+#include <uk/isr/wait.h>
+#include <uk/wait_types.h>
 #include <uk/virtio_fs.h>
 
 #include <virtio/virtio_bus.h>
@@ -32,6 +34,7 @@ struct uk_virtiofs_dev {
 	__u16 vq_len[2];
 	struct virtqueue *vq_prio;
 	struct virtqueue *vq_req;
+	struct uk_waitq space_waitq;
 };
 
 static struct uk_virtiofs_dev *devlist;
@@ -86,6 +89,7 @@ static int virtio_fs_add_dev(struct virtio_dev *dev)
 		return -ENOMEM;
 
 	vfsdev->vdev = dev;
+	uk_waitq_init(&vfsdev->space_waitq);
 	/* Read in filesystem tag from device config space */
 	r = virtio_config_get(dev, __offsetof(struct virtio_fs_config, tag),
 			      vfsdev->tag, sizeof(vfsdev->tag), 1);
@@ -126,26 +130,59 @@ struct uk_virtiofs_dev *uk_virtiofs_dev_lookup(const char *tag)
 	return p;
 }
 
-/* TODO: replace with a waitq-based approach */
 struct virtiofs_thread_cookie {
-	struct uk_thread *thread;
+	__spinlock lock;
+	struct uk_thread *waiter;
 	__u32 rlen;
+	int done;
 };
 
-/* Called when a reply is received; dequeue and wake the target thread */
-static
-int virtiofs_recv(struct virtqueue *vq, void *priv __unused)
+/*
+ * Pair blocking with completion under the cookie lock. Taking the lock
+ * before returning also keeps the stack cookie alive until the ISR is
+ * finished using it.
+ */
+static __ssz virtiofs_wait_reply(struct virtiofs_thread_cookie *cookie)
 {
+	unsigned long flags;
+	__u32 len;
+
+	ukplat_spin_lock_irqsave(&cookie->lock, flags);
+	while (!cookie->done) {
+		cookie->waiter = uk_thread_current();
+		uk_thread_block(cookie->waiter);
+		ukplat_spin_unlock_irqrestore(&cookie->lock, flags);
+		uk_sched_yield();
+		ukplat_spin_lock_irqsave(&cookie->lock, flags);
+	}
+	len = cookie->rlen;
+	ukplat_spin_unlock_irqrestore(&cookie->lock, flags);
+	return len;
+}
+
+/* Drain replies and notify waiters for newly available descriptors. */
+static
+int virtiofs_recv(struct virtqueue *vq, void *priv)
+{
+	struct uk_virtiofs_dev *dev = priv;
 	struct virtiofs_thread_cookie *cookie;
 	__u32 len;
-	int r;
+	int dequeued = 0;
 
-	r = virtqueue_buffer_dequeue(vq, (void **)&cookie, &len);
-	if (unlikely(r < 0))
-		return r;
-	cookie->rlen = len;
-	uk_thread_wake(cookie->thread);
-	return 0;
+	while (virtqueue_buffer_dequeue(vq, (void **)&cookie, &len) >= 0) {
+		unsigned long flags;
+
+		ukplat_spin_lock_irqsave(&cookie->lock, flags);
+		cookie->rlen = len;
+		cookie->done = 1;
+		if (cookie->waiter)
+			uk_thread_wake_isr(cookie->waiter);
+		ukplat_spin_unlock_irqrestore(&cookie->lock, flags);
+		dequeued = 1;
+	}
+	if (dequeued && dev)
+		uk_waitq_wake_up_isr(&dev->space_waitq);
+	return 1;
 }
 
 static
@@ -171,6 +208,7 @@ int virtiofs_dev_vqalloc(struct uk_virtiofs_dev *dev, unsigned int num_req)
 					  virtiofs_recv, virtiofs_alloc);
 	if (unlikely(PTRISERR(dev->vq_req)))
 		return PTR2ERR(dev->vq_req);
+	dev->vq_req->priv = dev;
 
 	/* Set up priority request queue (index 0) */
 	dev->vq_prio = virtio_vqueue_setup(dev->vdev, 0, dev->vq_len[0],
@@ -179,6 +217,7 @@ int virtiofs_dev_vqalloc(struct uk_virtiofs_dev *dev, unsigned int num_req)
 		virtio_vqueue_release(dev->vdev, dev->vq_req, virtiofs_alloc);
 		return PTR2ERR(dev->vq_prio);
 	}
+	dev->vq_prio->priv = dev;
 
 	return 0;
 }
@@ -192,7 +231,7 @@ int virtiofs_dev_vqsetup(struct uk_virtiofs_dev *dev)
 	r = virtio_config_get(dev->vdev,
 			      __offsetof(struct virtio_fs_config,
 					 num_request_queues),
-			      &nq_req, sizeof(nq_req), 1);
+			      &nq_req, sizeof(nq_req), sizeof(nq_req));
 	UK_ASSERT(r <= 0);
 	if (unlikely(r))
 		return r;
@@ -238,9 +277,49 @@ __u16 virtiofs_maxsegs(const struct uk_virtiofs_iovec *iov,
 {
 	__sz segs = 0;
 
-	for (int i = 0; i < iovlen; i++)
-		segs += iov[i].iov_len / UK_PAGING_PAGE_SIZE + 1;
-	return (segs > max) ? max : (__u16)segs;
+	for (int i = 0; i < iovlen; i++) {
+		const __sz len = iov[i].iov_len;
+		const __sz offset = (__uptr)iov[i].iov_base &
+				    (UK_PAGING_PAGE_SIZE - 1);
+		__sz pages;
+
+		if (!len)
+			continue;
+		/* Count every page touched, including an unaligned first and
+		 * last page. Divide before adding to avoid len+offset overflow.
+		 */
+		pages = len / UK_PAGING_PAGE_SIZE;
+		pages += (offset + len % UK_PAGING_PAGE_SIZE +
+			  UK_PAGING_PAGE_SIZE - 1) / UK_PAGING_PAGE_SIZE;
+		if (pages >= (__sz)max - segs)
+			return max;
+		segs += pages;
+	}
+	return (__u16)segs;
+}
+
+/**
+ * Make every page of a request buffer resident before its physical address
+ * is taken. Buffers may lie in demand-paged memory that the CPU has not
+ * touched yet, and buffers the device writes to may still be shared
+ * copy-on-write after fork. A read access maps buffers the device reads; a
+ * write access gives buffers the device writes a private page.
+ */
+static
+void virtiofs_touch_buf(void *base, __sz len, int device_writes)
+{
+	const __vaddr_t end = (__vaddr_t)base + len;
+	__vaddr_t va;
+
+	for (va = (__vaddr_t)base; va < end;
+	     va = UK_PAGING_PAGE_ALIGN_DOWN(va) + UK_PAGING_PAGE_SIZE) {
+		volatile char *p = (volatile char *)va;
+
+		if (device_writes)
+			*p = *p;
+		else
+			(void)*p;
+	}
 }
 
 /**
@@ -248,27 +327,56 @@ __u16 virtiofs_maxsegs(const struct uk_virtiofs_iovec *iov,
  */
 static
 int virtiofs_prep_sglist(struct uk_sglist *sg,
-			 const struct uk_virtiofs_iovec *iov, __u16 iovlen)
+			 const struct uk_virtiofs_iovec *iov, __u16 iovlen,
+			 int device_writes)
 {
 	for (int i = 0; i < iovlen; i++) {
-		int r = uk_sglist_append(sg, iov[i].iov_base, iov[i].iov_len);
+		int r;
 
+		virtiofs_touch_buf(iov[i].iov_base, iov[i].iov_len,
+				   device_writes);
+		r = uk_sglist_append(sg, iov[i].iov_base, iov[i].iov_len);
 		if (unlikely(r))
 			return r;
 	}
 	return 0;
 }
 
+static
+__ssz virtiofs_submit_and_wait(struct uk_virtiofs_dev *dev,
+			       struct virtqueue *vq, struct uk_sglist *sg,
+			       __u16 in_segs, __u16 out_segs)
+{
+	struct virtiofs_thread_cookie cookie = {
+		.lock = UKARCH_SPINLOCK_INITIALIZER(),
+	};
+	const unsigned int total_segs = (unsigned int)in_segs + out_segs;
+	int r;
+
+	for (;;) {
+		r = virtqueue_buffer_enqueue(vq, &cookie, sg,
+					     in_segs, out_segs);
+		if (likely(r >= 0))
+			break;
+		if (r != -ENOSPC)
+			return r;
+		virtqueue_host_notify(vq);
+		uk_waitq_wait_event(&dev->space_waitq,
+				    virtqueue_desc_avail(vq) >= total_segs);
+	}
+	virtqueue_host_notify(vq);
+	return virtiofs_wait_reply(&cookie);
+}
+
 /**
  * Perform a synchronous request on `vq`, as described by iovecs[num_iovec].
  */
 static
-__ssz virtiofs_do_request_vec(struct virtqueue *vq, __u16 vqlen,
+__ssz virtiofs_do_request_vec(struct uk_virtiofs_dev *dev,
+			      struct virtqueue *vq, __u16 vqlen,
 			      const struct uk_virtiofs_iovecs *iovecs,
 			      __sz num_iovec, __sz in_iovcnt, __sz out_iovcnt)
 {
-	struct uk_thread *const current = uk_thread_current();
-	struct virtiofs_thread_cookie cookie = { .thread = current };
 	struct uk_sglist sg;
 	struct uk_sglist sg_out;
 	__u16 nseg;
@@ -305,7 +413,7 @@ __ssz virtiofs_do_request_vec(struct virtqueue *vq, __u16 vqlen,
 		rem = MIN(in_iovcnt, iovecs[ivec].iovcnt - pos);
 		UK_ASSERT(rem);
 
-		r = virtiofs_prep_sglist(&sg, &iovecs[ivec].iov[pos], rem);
+		r = virtiofs_prep_sglist(&sg, &iovecs[ivec].iov[pos], rem, 0);
 		if (unlikely(r))
 			return r;
 
@@ -326,7 +434,7 @@ __ssz virtiofs_do_request_vec(struct virtqueue *vq, __u16 vqlen,
 		rem = MIN(out_iovcnt, iovecs[ivec].iovcnt - pos);
 		UK_ASSERT(rem);
 
-		r = virtiofs_prep_sglist(&sg_out, &iovecs[ivec].iov[pos], rem);
+		r = virtiofs_prep_sglist(&sg_out, &iovecs[ivec].iov[pos], rem, 1);
 		if (unlikely(r))
 			return r;
 
@@ -337,29 +445,18 @@ __ssz virtiofs_do_request_vec(struct virtqueue *vq, __u16 vqlen,
 
 	sg.sg_nseg += out_segs;
 
-	/* Enqueue request */
-	r = virtqueue_buffer_enqueue(vq, &cookie, &sg, in_segs, out_segs);
-	if (unlikely(r < 0))
-		return r;
-	/* Notify the host & block until awoken by request completion */
-	uk_thread_block_until(current, 0);
-	virtqueue_host_notify(vq);
-	uk_sched_yield();
-
-	/* Awoken, request complete; cookie has length of reply from device */
-	return cookie.rlen;
+	return virtiofs_submit_and_wait(dev, vq, &sg, in_segs, out_segs);
 }
 
 /**
  * Perform a synchronous request on `vq`, as described by iov[].
  */
 static
-__ssz virtiofs_do_request(struct virtqueue *vq, __u16 vqlen,
+__ssz virtiofs_do_request(struct uk_virtiofs_dev *dev,
+			  struct virtqueue *vq, __u16 vqlen,
 			  const struct uk_virtiofs_iovec *iov,
 			  __u16 in_iovlen, __u16 out_iovlen)
 {
-	struct uk_thread *const current = uk_thread_current();
-	struct virtiofs_thread_cookie cookie = { .thread = current };
 	const __u16 iovlen = in_iovlen + out_iovlen;
 	const __u16 nseg = virtiofs_maxsegs(iov, iovlen, vqlen);
 	struct uk_sglist sg;
@@ -371,31 +468,21 @@ __ssz virtiofs_do_request(struct virtqueue *vq, __u16 vqlen,
 
 	/* Prepare input iovs/segments */
 	uk_sglist_init(&sg, nseg, sgsegs);
-	r = virtiofs_prep_sglist(&sg, iov, in_iovlen);
+	r = virtiofs_prep_sglist(&sg, iov, in_iovlen, 0);
 	if (unlikely(r))
 		return r;
 	in_segs = sg.sg_nseg;
 
 	/* Prepare output iovs/segments */
 	uk_sglist_init(&sg_out, nseg - in_segs, &sgsegs[in_segs]);
-	r = virtiofs_prep_sglist(&sg_out, &iov[in_iovlen], out_iovlen);
+	r = virtiofs_prep_sglist(&sg_out, &iov[in_iovlen], out_iovlen, 1);
 	if (unlikely(r))
 		return r;
 	out_segs = sg_out.sg_nseg;
 
 	sg.sg_nseg += out_segs;
 
-	/* Enqueue request */
-	r = virtqueue_buffer_enqueue(vq, &cookie, &sg, in_segs, out_segs);
-	if (unlikely(r < 0))
-		return r;
-	/* Notify the host & block until awoken by request completion */
-	uk_thread_block_until(current, 0);
-	virtqueue_host_notify(vq);
-	uk_sched_yield();
-
-	/* Awoken, request complete; cookie has length of reply from device */
-	return cookie.rlen;
+	return virtiofs_submit_and_wait(dev, vq, &sg, in_segs, out_segs);
 }
 
 /* Minimal stub for a fuse header, enough to check length & opcode */
@@ -453,7 +540,7 @@ __ssz uk_virtiofs_request_vec(struct uk_virtiofs_dev *dev,
 		return -EINVAL;
 
 	vq = virtiofs_getvq(dev, iovecs[0].iov[0].iov_base);
-	return virtiofs_do_request_vec(vq.vq, vq.vqlen, iovecs,
+	return virtiofs_do_request_vec(dev, vq.vq, vq.vqlen, iovecs,
 				       num_iovec, in_iovcnt, out_iovcnt);
 }
 
@@ -467,5 +554,37 @@ __ssz uk_virtiofs_request(struct uk_virtiofs_dev *dev,
 		return -EINVAL;
 
 	vq = virtiofs_getvq(dev, iov[0].iov_base);
-	return virtiofs_do_request(vq.vq, vq.vqlen, iov, in_iovcnt, out_iovcnt);
+	return virtiofs_do_request(dev, vq.vq, vq.vqlen, iov,
+				   in_iovcnt, out_iovcnt);
 }
+
+#if CONFIG_LIBVIRTIO_FS_TEST
+#include <uk/test.h>
+
+UK_TESTCASE(virtiofs_transport, scatter_gather_page_budget)
+{
+	struct uk_virtiofs_iovec iov[2] = {
+		{ .iov_base = (void *)0x1000, .iov_len = 16 },
+		{ .iov_base = (void *)0x1ce0, .iov_len = 8191 }
+	};
+
+	/* Regression: header plus an unaligned buffer crossing three pages. */
+	UK_TEST_EXPECT_SNUM_EQ(virtiofs_maxsegs(iov, 2, 128), 4);
+	UK_TEST_EXPECT_SNUM_EQ(virtiofs_maxsegs(iov, 2, 3), 3);
+	UK_TEST_EXPECT_SNUM_EQ(virtiofs_maxsegs(iov, 2, 0), 0);
+	iov[0].iov_len = 0;
+	iov[1].iov_len = 0;
+	UK_TEST_EXPECT_ZERO(virtiofs_maxsegs(iov, 2, 128));
+	iov[0].iov_base = (void *)0x1fff;
+	iov[0].iov_len = 2;
+	UK_TEST_EXPECT_SNUM_EQ(virtiofs_maxsegs(iov, 1, 128), 2);
+	iov[0].iov_base = (void *)0x1000;
+	iov[0].iov_len = UK_PAGING_PAGE_SIZE;
+	UK_TEST_EXPECT_SNUM_EQ(virtiofs_maxsegs(iov, 1, 128), 1);
+	iov[0].iov_len = ~(__sz)0;
+	UK_TEST_EXPECT_SNUM_EQ(virtiofs_maxsegs(iov, 1, 256), 256);
+}
+
+/* Run before the global statistics initcall at late priority nine. */
+uk_testsuite_late_prio(virtiofs_transport, NULL, 8);
+#endif /* CONFIG_LIBVIRTIO_FS_TEST */

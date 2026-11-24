@@ -12,9 +12,14 @@
 #include <uk/config.h>
 
 #if CONFIG_LIBPOSIX_PROCESS_MULTITHREADING
+#include <stdbool.h>
 #include <linux/sched.h>
 #include <uk/arch/ctx.h>
+#include <uk/arch/limits.h>
+#include <uk/arch/time.h>
+#include <uk/plat/spinlock.h>
 #include <uk/process.h>
+#include <uk/refcount.h>
 #include <uk/semaphore.h>
 #include <uk/thread.h>
 #if CONFIG_LIBPOSIX_PROCESS_BRK
@@ -47,6 +52,7 @@ enum posix_thread_state {
 	POSIX_THREAD_BLOCKED_VFORK,  /* waiting for child to call execve */
 	POSIX_THREAD_BLOCKED_WAIT,   /* waiting for process state change */
 	POSIX_THREAD_BLOCKED_SIGNAL, /* waiting for signal */
+	POSIX_THREAD_BLOCKED_SIGWAIT, /* waiting for a set of signals */
 	POSIX_THREAD_EXITED,         /* terminated normally */
 	POSIX_THREAD_KILLED,         /* terminated by signal */
 };
@@ -58,20 +64,45 @@ enum posix_process_state {
 };
 
 struct posix_process {
+	/* Namespace ownership plus temporary pins on a published process. */
+	__atomic refs;
 	pid_t pid;
+	pid_t pgid;
+	pid_t sid;
+	bool execed;
+	__sz program_stack_size;
+#if CONFIG_LIBPOSIX_PROCESS_ITIMER
+	struct {
+		__nsec deadline;
+		__nsec interval;
+		__nsec retry;
+		__u64 generation;
+		bool active;
+		bool pending;
+	} real_timer;
+#endif
 	struct posix_process *parent;
 	struct uk_list_head children; /* child processes */
 	struct uk_list_head child_list_entry;
 	struct uk_list_head threads;
 	struct uk_alloc *_a;
+#if CONFIG_LIBUKVMEM_THREAD_VAS
+	/* One owned reference, independent of pins held by UK threads. */
+	struct uk_vas *vas;
+#endif
 #if CONFIG_LIBPOSIX_PROCESS_SIGNAL
 	struct uk_signal_pdesc *signal;
 #endif /* CONFIG_LIBPOSIX_PROCESS_SIGNAL */
-	struct uk_semaphore wait_semaphore;
 	struct uk_semaphore exit_semaphore;
+	struct uk_semaphore thread_exit_semaphore;
+	unsigned int exiting_threads;
 	enum posix_process_state state;
+	bool exiting;
+	bool reap_claimed;
+	bool orphaned;
 	__u64 exit_signal;
 	int exit_status;
+	int terminating_signal;
 #if CONFIG_LIBPOSIX_PROCESS_BRK
 	struct {
 		struct uk_mutex mtx;
@@ -95,18 +126,46 @@ struct posix_thread {
 	struct uk_signal_tdesc *signal;
 #endif /* CONFIG_LIBPOSIX_PROCESS_SIGNAL */
 	pid_t wait_pid;
+	pid_t wait_pgid;
 
 	/* TODO: Mutex */
 };
 
 extern struct posix_process *pid_process[TIDMAP_SIZE];
+extern __spinlock pprocess_lock;
+
+/* Process, process-group and session identities share the PID namespace.
+ * These helpers require pprocess_lock and never allocate or free objects.
+ */
+void pprocess_id_get_locked(pid_t id);
+void pprocess_id_put_locked(pid_t id);
+void pprocess_groups_init_locked(struct posix_process *process);
+#if CONFIG_LIBPOSIX_PROCESS_ITIMER
+/* Called for SIGALRM dequeued from the shared process queue, under the lock. */
+void pprocess_itimer_dequeued_locked(struct posix_process *process);
+#endif
+
+static inline unsigned long pprocess_lock_acquire(void)
+{
+	unsigned long flags;
+
+	ukplat_spin_lock_irqsave(&pprocess_lock, flags);
+	return flags;
+}
+
+static inline void pprocess_lock_release(unsigned long flags)
+{
+	ukplat_spin_unlock_irqrestore(&pprocess_lock, flags);
+}
 
 extern __uk_tls struct posix_thread *pthread_self;
 
 #define uk_pprocess_foreach(_p)						\
 	for (int _j = 1, _i = 0; _i != ARRAY_SIZE(pid_process);		\
 		_j = !_j, _i++)						\
-			for ((_p) = pid_process[_i]; _j; _j = !_j)	\
+			for ((_p) = __atomic_load_n(&pid_process[_i],	\
+						    __ATOMIC_ACQUIRE);	\
+			     _j; _j = !_j)				\
 				if ((_p))
 
 #define uk_pprocess_foreach_pthread(_proc, _pthread, _pthreadn)		\
@@ -123,12 +182,65 @@ extern __uk_tls struct posix_thread *pthread_self;
 #define uk_pprocess_current()						\
 	uk_pthread_current()->process
 
+static inline
+__sz pprocess_program_stack_size(const struct posix_process *process)
+{
+	return __atomic_load_n(&process->program_stack_size, __ATOMIC_RELAXED);
+}
+
+static inline
+void pprocess_record_stack_size(struct posix_process *process, __sz size)
+{
+	__atomic_store_n(&process->program_stack_size, size, __ATOMIC_RELAXED);
+}
+
+#if CONFIG_LIBPOSIX_PROCESS_EXECVE
+static inline
+__sz pprocess_exec_stack_size(const struct posix_process *process)
+{
+	const __sz size = pprocess_program_stack_size(process);
+
+	return size ? size : (__sz)CONFIG_LIBPOSIX_PROCESS_EXEC_STACK_NBPAGES *
+			     __PAGE_SIZE;
+}
+#endif /* CONFIG_LIBPOSIX_PROCESS_EXECVE */
+
 struct posix_process *pid2pprocess(pid_t pid);
+/* The caller must own a pin or hold pprocess_lock around a live lookup.
+ * Unpublished prepared processes remain owned exclusively by their creator.
+ */
+static inline void pprocess_get(struct posix_process *process)
+{
+	UK_ASSERT(process);
+	UK_ASSERT(uk_refcount_read(&process->refs));
+	uk_refcount_acquire(&process->refs);
+}
+
+void pprocess_put(struct posix_process *process);
 struct uk_thread *tid2ukthread(pid_t tid);
 struct posix_thread *tid2pthread(pid_t tid);
 struct posix_process *tid2pprocess(pid_t tid);
 pid_t ukthread2tid(struct uk_thread *thread);
 pid_t ukthread2pid(struct uk_thread *thread);
+
+/* A successful claim owns the pthread cleanup and a process pin. */
+struct posix_thread *pprocess_claim_pthread_exit(struct uk_thread *thread,
+						 bool *became_empty);
+void pprocess_complete_pthread_exit(struct posix_process *process);
+/* A successful process-exit claim owns a pin until its completion. */
+bool pprocess_claim_process_exit(struct posix_process *pprocess);
+
+static inline int pprocess_terminating_signal(struct posix_process *process)
+{
+	return __atomic_load_n(&process->terminating_signal, __ATOMIC_ACQUIRE);
+}
+
+/* Caller holds pprocess_lock. */
+void pprocess_mark_signal_exit_locked(struct posix_process *process, int sig);
+void __noreturn pprocess_exit_signalled(int sig);
+bool pprocess_try_exit(struct posix_process *process,
+		       enum posix_process_state state,
+		       int exit_status);
 
 /**
  * INTERNAL. Exit and release a pthread
@@ -209,6 +321,92 @@ struct posix_thread *pprocess_create_pthread(struct posix_process *pprocess,
 struct posix_process *pprocess_create(struct uk_alloc *a,
 				      struct uk_thread *thread,
 				      struct uk_thread *parent);
+
+#if CONFIG_LIBPOSIX_PROCESS_BRK
+/* Map a fresh brk region; leave mutex initialization to its owner. */
+int pprocess_brk_map_space(struct posix_process *process);
+int pprocess_brk_init_space(struct posix_process *process);
+#endif
+
+#if CONFIG_LIBPOSIX_PROCESS_PREPARE
+/**
+ * Prepare one unpublished process on a new, unscheduled, blocked UK thread.
+ * The caller exclusively owns the child and keeps the parent alive. An ID
+ * is reserved, but PID/TID lookup and the parent's child list stay unchanged.
+ * The child's UKTLS already provides its initialized POSIX descriptors.
+ * Requires interrupts enabled. Returns an error pointer on failure.
+ */
+struct posix_process *pprocess_prepare(struct uk_alloc *a,
+				       struct uk_thread *thread,
+				       struct uk_thread *parent);
+
+/**
+ * Publish a completely prepared process. The child is still blocked; it may
+ * already be registered with a scheduler. This does not allocate or wake it.
+ * On failure nothing is published. On success the caller may wake the child
+ * and must use normal process exit/reaping instead of pprocess_abort().
+ */
+int pprocess_publish(struct posix_process *process);
+
+/**
+ * Discard an unpublished process and its reserved ID, without exit events.
+ * The child must be unscheduled. Requires interrupts enabled. The caller
+ * releases the backing UK thread afterwards, including its UKTLS resources
+ * and any thread-held VAS reference. NULL is accepted.
+ */
+void pprocess_abort(struct posix_process *process);
+
+#if CONFIG_LIBUKVMEM_VAS_REFCOUNT
+/**
+ * Assign an owned VAS to the unpublished process and its unscheduled thread.
+ * Both take their own references; the caller retains its reference. Requires
+ * interrupts enabled and no caller locks. Failure retains both old bindings.
+ */
+int pprocess_bind_prepared_vas(struct posix_process *process,
+			       struct uk_vas *vas);
+
+#if CONFIG_LIBUKVMEM_PROCESS_VAS
+/**
+ * Clone the parent's owned VAS into an exclusively held prepared process.
+ * The parent and its VAS binding must remain alive and stable. The parent
+ * break position is serialized with the COW snapshot; the child receives a
+ * fresh mutex. No process is published or woken. Requires interrupts enabled
+ * and no caller locks. Failure preserves the child's old VAS and brk state.
+ */
+int pprocess_clone_prepared_vas(struct posix_process *process,
+				struct posix_process *parent);
+#endif
+#endif
+#endif /* CONFIG_LIBPOSIX_PROCESS_PREPARE */
+
+#if CONFIG_LIBPOSIX_PROCESS_FORK
+#define PPROCESS_EXEC_ARG_MAX (128 * 1024)
+
+struct pprocess_exec_args {
+	struct uk_alloc *_a;
+	const char *pathname;
+	const char **argv;
+	const char **envp;
+	unsigned int argc;
+	unsigned int envc;
+};
+
+/* Copy path, strings and pointer vectors into one resident allocation before
+ * changing address spaces. The caller retains the owned source VAS and uses
+ * a resident kernel allocator, with IRQs enabled outside locks. The combined
+ * payload and pointer vectors are bounded by PPROCESS_EXEC_ARG_MAX. NULL argv
+ * or envp becomes an empty terminated vector. Failure leaves *out NULL.
+ */
+int pprocess_exec_args_copy(struct uk_alloc *a, struct uk_vas *vas,
+			    __vaddr_t pathname, __vaddr_t argv, __vaddr_t envp,
+			    struct pprocess_exec_args **out);
+void pprocess_exec_args_free(struct pprocess_exec_args *args);
+int pprocess_execve_owned(struct ukarch_execenv *execenv, const char *pathname,
+			  char *const *argv, char *const *envp);
+
+int pprocess_fork(struct clone_args *args, size_t args_len,
+		  struct ukarch_execenv *execenv);
+#endif
 
 int uk_clone(struct clone_args *cl_args, size_t cl_args_len,
 	     struct ukarch_execenv *execenv);

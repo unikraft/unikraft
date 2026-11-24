@@ -44,6 +44,10 @@
 #include <uk/assert.h>
 #include <uk/arch/tls.h>
 #include <uk/plat/memory.h>
+#include "thread_state.h"
+#if CONFIG_LIBUKVMEM_VAS_REFCOUNT
+#include <uk/vmem.h>
+#endif
 
 #if CONFIG_LIBUKSCHED_TCB_INIT && !CONFIG_UKARCH_TLS_HAVE_TCB
 #error CONFIG_LIBUKSCHED_TCB_INIT requires that a TLS contains reserved space for a TCB
@@ -223,6 +227,9 @@ void uk_thread_set_exited(struct uk_thread *t)
 	if (uk_thread_is_exited(t))
 		return;
 
+#if CONFIG_LIBUKVMEM_VAS_REFCOUNT
+	t->vas_releasing = true;
+#endif
 	_uk_thread_call_termtab(t);
 	t->flags |= UK_THREADF_EXITED;
 }
@@ -249,6 +256,10 @@ static void _uk_thread_struct_init(struct uk_thread *t,
 	t->priv = priv;
 	t->dtor = dtor;
 	t->exec_time = 0;
+#if CONFIG_LIBUKVMEM_TRACE_PAGEFAULTS
+	t->vmem_faults = 0;
+	t->vmem_fault_time = 0;
+#endif
 	t->wait_ticket = UK_WAITQ_TICKET_INIT_VALUE;
 
 	if (auxsp) {
@@ -990,6 +1001,51 @@ err_out:
 	return NULL;
 }
 
+#if CONFIG_LIBUKVMEM_VAS_REFCOUNT
+int uk_thread_set_vas(struct uk_thread *t, struct uk_vas *vas)
+{
+	struct uk_vas *target = vas ? vas : uk_vas_get_kernel();
+	struct uk_vas *old, *held;
+	bool current, change;
+	unsigned long irqf;
+	int rc = 0;
+
+	UK_ASSERT(t);
+	if (t->vas_releasing || uk_thread_is_exited(t))
+		return -ESRCH;
+	if (!target)
+		return -EINVAL;
+	current = t == uk_thread_current();
+	old = t->vas_ref;
+	held = uk_vas_is_owned(vas) ? vas : __NULL;
+	change = current && target != uk_vas_get_active();
+	/* No mutation is needed for an equivalent binding. In particular,
+	 * boot may attach the already scheduled main thread to the kernel VAS.
+	 */
+	if ((t->vas ? t->vas : uk_vas_get_kernel()) == target &&
+	    old == held && !change)
+		return 0;
+	if (t->sched && !current)
+		return -EBUSY;
+	if ((old || change) && uk_lcpu_irqs_disabled())
+		return -EWOULDBLOCK;
+	uk_vas_get(held);
+	irqf = uk_lcpu_save_irqf();
+	if (change)
+		rc = uk_vas_set_active(target);
+	if (!rc) {
+		t->vas = vas;
+		t->vas_ref = held;
+	}
+	uk_lcpu_restore_irqf(irqf);
+	if (rc)
+		uk_vas_put(held);
+	else
+		uk_vas_put(old);
+	return rc;
+}
+#endif
+
 void uk_thread_release(struct uk_thread *t)
 {
 	struct uk_alloc *a;
@@ -999,11 +1055,26 @@ void uk_thread_release(struct uk_thread *t)
 	void *stack;
 	void *auxstack;
 	void *tls;
+#if CONFIG_LIBUKVMEM_VAS_REFCOUNT
+	struct uk_vas *vas_ref;
+#endif
 
 	UK_ASSERT(t);
 	UK_ASSERT(t != uk_thread_current());
 	UK_ASSERT(!t->sched); /* Thread must be disconnected from scheduler */
 
+#if CONFIG_LIBUKVMEM_VAS_REFCOUNT
+	vas_ref = t->vas_ref;
+	t->vas_ref = __NULL;
+	t->vas_releasing = true;
+#endif
+#if CONFIG_LIBUKVMEM_TRACE_PAGEFAULTS
+	uk_pr_info_isr("Thread %p paging: faults=%llu handler_ns=%llu alloc_ns=%llu zero_ns=%llu\n",
+		       (void *)t, (unsigned long long)t->vmem_faults,
+		       (unsigned long long)t->vmem_fault_time,
+		       (unsigned long long)t->vmem_fault_anon_alloc_time,
+		       (unsigned long long)t->vmem_fault_anon_zero_time);
+#endif
 	uk_thread_set_exited(t);
 
 	/* Take copies of associated allocation information.
@@ -1034,22 +1105,57 @@ void uk_thread_release(struct uk_thread *t)
 		uk_free(auxstack_a, auxstack);
 	if (a)
 		uk_free(a, t);
+#if CONFIG_LIBUKVMEM_VAS_REFCOUNT
+	uk_vas_put(vas_ref);
+#endif
+}
+
+static bool thread_block_until(struct uk_thread *thread, __snsec until,
+			       int kind)
+{
+	struct uk_sched *s;
+	unsigned long flags;
+	bool blocked = false;
+
+	UK_ASSERT(thread);
+
+	s = __atomic_load_n(&thread->sched, __ATOMIC_ACQUIRE);
+	if (s)
+		ukplat_spin_lock_irqsave(&s->lock, flags);
+	else
+		flags = uk_lcpu_save_irqf();
+
+	if (uk_thread_wait_ended(thread, kind))
+		goto out;
+	thread->wait_interruptible = kind != UK_THREAD_WAIT_PLAIN;
+	thread->wait_sigintr = kind == UK_THREAD_WAIT_SIGINTR;
+	thread->wakeup_time = until;
+	uk_thread_set_blocked(thread);
+	if (s && thread->sched == s)
+		uk_sched_thread_blocked(thread);
+	blocked = true;
+
+out:
+	if (s)
+		ukplat_spin_unlock_irqrestore(&s->lock, flags);
+	else
+		uk_lcpu_restore_irqf(flags);
+	return blocked;
 }
 
 void uk_thread_block_until(struct uk_thread *thread, __snsec until)
 {
-	unsigned long flags;
+	(void)thread_block_until(thread, until, UK_THREAD_WAIT_PLAIN);
+}
 
-	UK_ASSERT(thread);
+bool uk_thread_block_interruptible(struct uk_thread *thread, __snsec until)
+{
+	return thread_block_until(thread, until, UK_THREAD_WAIT_TERM);
+}
 
-	flags = uk_lcpu_save_irqf();
-	thread->wakeup_time = until;
-	if (uk_thread_is_runnable(thread)) {
-		uk_thread_set_blocked(thread);
-		if (thread->sched)
-			uk_sched_thread_blocked(thread);
-	}
-	uk_lcpu_restore_irqf(flags);
+bool uk_thread_block_sigintr(struct uk_thread *thread, __snsec until)
+{
+	return thread_block_until(thread, until, UK_THREAD_WAIT_SIGINTR);
 }
 
 void uk_thread_block_timeout(struct uk_thread *thread, __nsec nsec)
@@ -1073,11 +1179,25 @@ void uk_thread_wake(struct uk_thread *thread)
 	unsigned long flags;
 
 	flags = uk_lcpu_save_irqf();
-	if (!uk_thread_is_runnable(thread)) {
-		uk_thread_set_runnable(thread);
-		if (thread->sched)
-			uk_sched_thread_woken(thread);
-	}
-	thread->wakeup_time = 0LL;
+	_uk_thread_wake_transition(thread, UK_THREAD_WAKE_NORMAL,
+				   uk_sched_thread_woken);
+	uk_lcpu_restore_irqf(flags);
+}
+
+void uk_thread_interrupt_wait(struct uk_thread *thread)
+{
+	unsigned long flags = uk_lcpu_save_irqf();
+
+	_uk_thread_wake_transition(thread, UK_THREAD_WAKE_INTERRUPT,
+				   uk_sched_thread_woken);
+	uk_lcpu_restore_irqf(flags);
+}
+
+void uk_thread_signal_wait(struct uk_thread *thread)
+{
+	unsigned long flags = uk_lcpu_save_irqf();
+
+	_uk_thread_wake_transition(thread, UK_THREAD_WAKE_SIGNAL,
+				   uk_sched_thread_woken);
 	uk_lcpu_restore_irqf(flags);
 }

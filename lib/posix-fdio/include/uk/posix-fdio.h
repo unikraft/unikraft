@@ -38,6 +38,9 @@ ssize_t uk_sys_readv(struct uk_ofile *of, const struct iovec *iov, int iovcnt);
 
 ssize_t uk_sys_read(struct uk_ofile *of, void *buf, size_t count);
 
+/* Wait for an I/O operation that has made no progress. */
+int uk_sys_wait_io(const struct uk_file *file, uk_pollevent events);
+
 ssize_t uk_sys_preadv2(struct uk_ofile *of, const struct iovec *iov, int iovcnt,
 		       off_t offset, int flags);
 

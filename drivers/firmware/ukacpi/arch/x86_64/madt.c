@@ -29,6 +29,7 @@ int uk_acpi_madt_fill_cpu_idmap(void)
 		struct uk_acpi_subsdt_hdr *h;
 	} m;
 	int bsp_found __maybe_unused = 0;
+	int capacity_exceeded = 0;
 	struct uk_acpi_madt *madt;
 	__sz off, len;
 	__u64 cpu_id;
@@ -74,16 +75,17 @@ int uk_acpi_madt_fill_cpu_idmap(void)
 			continue;
 		}
 
+		/* Check before touching a slot; keep scanning for the BSP. */
+		if (idx >= CONFIG_UKPLAT_CPU_MAXCOUNT) {
+			capacity_exceeded = 1;
+			continue;
+		}
 		uk_pcpuvar_lval(idx, uk_pcpuvar_cpu_id) = cpu_id;
 		uk_pcpuvar_lval(idx, uk_pcpuvar_cpu_idx) = idx;
 		idx++;
-
-		/* Ignore cores that exceed max configured value */
-		if (unlikely(idx == CONFIG_UKPLAT_CPU_MAXCOUNT)) {
-			uk_pr_warn("Maximum number of cores exceeded.\n");
-			break;
-		}
 	}
+	if (capacity_exceeded)
+		uk_pr_warn("Maximum number of cores exceeded.\n");
 	UK_ASSERT(bsp_found);
 
 	return 0;

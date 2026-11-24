@@ -19,6 +19,14 @@
 extern "C" {
 #endif
 
+/**
+ * Initialize and activate the current execution context's auxiliary stack.
+ * The caller owns the aligned stack and keeps it live while it is active.
+ * uktlsp identifies this context's already initialized Unikraft TLS area.
+ * This does not allocate memory or change the current TLS pointer.
+ */
+void uk_lcpu_init_auxsp(__uptr auxsp, __uptr uktlsp);
+
 static inline void uk_lcpu_set_auxsp(__uptr auxsp)
 {
 	uk_pal_set_auxsp(auxsp);

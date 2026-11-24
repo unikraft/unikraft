@@ -71,6 +71,8 @@ typedef long  (*uk_alloc_getpsize_func_t)
 		(struct uk_alloc *a);
 
 #if CONFIG_LIBUKALLOC_IFSTATS
+#include <uk/arch/spinlock.h>
+
 struct uk_alloc_stats {
 	__sz last_alloc_size; /* size of the last allocation */
 	__sz max_alloc_size; /* biggest satisfied allocation size */
@@ -115,6 +117,7 @@ struct uk_alloc {
 
 #if CONFIG_LIBUKALLOC_IFSTATS
 	struct uk_alloc_stats _stats;
+	struct __spinlock _stats_lock;
 #endif
 
 	/* internal */
@@ -125,17 +128,19 @@ struct uk_alloc {
 extern struct uk_alloc *_uk_alloc_head;
 
 /* Iterate over all registered allocators */
-#define uk_alloc_foreach(iter)			\
-	for (iter = _uk_alloc_head;		\
-	     iter != __NULL;			\
-	     iter = iter->next)
+#define uk_alloc_foreach(iter)					\
+	for (iter = __atomic_load_n(&_uk_alloc_head,		\
+				    __ATOMIC_ACQUIRE);		\
+	     iter != __NULL;					\
+	     iter = __atomic_load_n(&(iter)->next,		\
+				    __ATOMIC_ACQUIRE))
 
 #if CONFIG_LIBUKALLOC_IFSTATS_PERLIB
 struct uk_alloc *uk_alloc_get_default(void);
 #else /* !CONFIG_LIBUKALLOC_IFSTATS_PERLIB */
 static inline struct uk_alloc *uk_alloc_get_default(void)
 {
-	return _uk_alloc_head;
+	return __atomic_load_n(&_uk_alloc_head, __ATOMIC_ACQUIRE);
 }
 #endif /* !CONFIG_LIBUKALLOC_IFSTATS_PERLIB */
 

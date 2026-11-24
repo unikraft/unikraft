@@ -13,13 +13,33 @@ if LIBPOSIX_PROCESS_MULTITHREADING
 config LIBPOSIX_PROCESS_MAX_PID
 	int "Largest TID"
 	range 1 32767
-	default 31
+	default 1023
+
+config LIBPOSIX_PROCESS_CREATE_TEST
+	bool "Test process thread allocation rollback"
+	depends on LIBPOSIX_PROCESS_SIGNAL && HAVE_SCHED
+	select LIBUKTEST
+	default n
+
+config LIBPOSIX_PROCESS_VAS_TEST
+	bool "Test owned process address space references"
+	depends on LIBPOSIX_PROCESS_SIGNAL && LIBUKVMEM_VAS_REFCOUNT
+	select LIBUKTEST
+	default n
 
 menuconfig LIBPOSIX_PROCESS_BRK
 	bool "brk() system call and sbrk() libc function"
 	select LIBUKALLOC
 
 if LIBPOSIX_PROCESS_BRK
+
+config LIBPOSIX_PROCESS_BRK_VAS_TEST
+	bool "Test brk state in separate process address spaces"
+	depends on LIBUKLOCK_SEMAPHORE
+	depends on LIBPOSIX_PROCESS_PREPARE && LIBPOSIX_PROCESS_SIGNAL
+	depends on LIBUKVMEM_PROCESS_VAS
+	select LIBUKTEST
+	default n
 
 config LIBPOSIX_PROCESS_BRK_PAGE_ORDER
 	int "Heap size for brk (page order)"
@@ -65,6 +85,15 @@ config LIBPOSIX_PROCESS_EXECVE
 	depends on HAVE_VFS
 	select LIBUKBINFMT
 
+config LIBPOSIX_PROCESS_EXEC_STACK_NBPAGES
+	int "Default exec program stack size (number of pages)"
+	depends on LIBPOSIX_PROCESS_EXECVE
+	range 1 2147483647
+	default 2048
+	help
+	  Size of a new program stack when the process has not yet recorded
+	  a program stack. The default is 8 MiB with 4 KiB pages.
+
 endif
 
 config LIBPOSIX_PROCESS_MULTIPROCESS
@@ -75,12 +104,61 @@ config LIBPOSIX_PROCESS_MULTIPROCESS
 	select LIBUKLOCK
 	select LIBUKLOCK_SEMAPHORE
 
+config LIBPOSIX_PROCESS_FORK
+	bool "Fork native ELF processes using copy-on-write"
+	depends on ARCH_X86_64 && LIBPOSIX_PROCESS_MULTIPROCESS
+	depends on LIBUKPLAT_NATIVE_PAGING && LIBUKVMEM_THREAD_VAS
+	depends on LIBUKPAGING_DIRECTMAP && LIBPOSIX_FUTEX && LIBSYSCALL_SHIM
+	select LIBPOSIX_PROCESS_PREPARE
+	select LIBPOSIX_FUTEX_VAS
+	default n
+	help
+	  Duplicate a private ELF process address space and resume only its
+	  calling thread in the child. Kernel threads and unsupported clone
+	  flags or mapping classes fail before child publication.
+
+config LIBPOSIX_PROCESS_SYSV_SHM
+	bool "System V shared memory for private ELF processes"
+	depends on ARCH_X86_64 || ARCH_ARM_64
+	depends on LIBUKVMEM_PROCESS_VAS && LIBSYSCALL_SHIM && LIBUKLOCK
+	select LIBPOSIX_USER
+	select LIBUKVMEM_VAS_ACCESS
+	default n
+	help
+	  Provide independently attachable shared memory segments and inherit
+	  their mappings across fork. Support IPC_STAT and IPC_RMID.
+
+config LIBPOSIX_PROCESS_PREPARE
+	bool
+	depends on LIBPOSIX_PROCESS_MULTIPROCESS
+	default n
+
+config LIBPOSIX_PROCESS_PREPARE_TEST
+	bool "Test unpublished process preparation and publication"
+	depends on LIBPOSIX_PROCESS_MULTIPROCESS && LIBPOSIX_PROCESS_SIGNAL
+	depends on LIBUKVMEM_PROCESS_VAS && LIBUKLOCK_SEMAPHORE
+	select LIBPOSIX_PROCESS_PREPARE
+	select LIBUKPAGING_STATS
+	select LIBUKTEST
+	default n
+
 config LIBPOSIX_PROCESS_SIGNAL
 	bool "POSIX signals (EXPERIMENTAL)"
 	select LIBPOSIX_PROCESS_MULTITHREADING
 	select LIBPOSIX_PROCESS_EXECVE
 	select LIBUKLOCK
 	select LIBUKLOCK_SEMAPHORE
+
+config LIBPOSIX_PROCESS_ITIMER
+	bool "Process real-time interval timers"
+	depends on LIBPOSIX_PROCESS_SIGNAL && HAVE_SCHED
+	depends on !LIBPOSIX_PROCESS_SIGNALFD
+	select LIBPOSIX_TIME
+	default n
+	help
+	  Provide per-process ITIMER_REAL, getitimer and alarm using one
+	  shared timer service thread. CPU-time interval timers are unsupported.
+	  This implementation requires signalfd to be disabled.
 
 config LIBPOSIX_PROCESS_ARCH_PRCTL
 	bool "arch_prctl() system call"
@@ -90,6 +168,12 @@ config LIBPOSIX_PROCESS_SIGNALFD
 	bool "signalfd4() and signalfd() syscalls"
 	depends on LIBPOSIX_PROCESS_SIGNAL
 	select LIBUKFILE_POLLED
+
+config LIBPOSIX_PROCESS_SIGNAL_CLONE_TEST
+	bool "Test signal clone ownership and descriptor lifetime"
+	depends on LIBPOSIX_PROCESS_SIGNAL && HAVE_SCHED
+	select LIBUKTEST
+	default n
 
 config LIBPOSIX_PROCESS_DEBUG
 	bool "Enable debug messages"

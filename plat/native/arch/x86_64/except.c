@@ -135,7 +135,7 @@ void uk_plat_native_except_push_nested(void)
 	disable_nesting = &idt_ist_disable_nesting[idx];
 	UK_ASSERT(*disable_nesting < __U8_MAX);
 
-	if (*disable_nesting++)
+	if ((*disable_nesting)++)
 		return;
 
 	idt = cpu_idt[idx];
@@ -161,7 +161,7 @@ void uk_plat_native_except_pop_nested(void)
 	idx = uk_lcpu_get_current_idx_in_except();
 
 	disable_nesting = &idt_ist_disable_nesting[idx];
-	UK_ASSERT(*disable_nesting > 1);
+	UK_ASSERT(*disable_nesting > 0);
 
 	if (--*disable_nesting != 0)
 		return;
@@ -283,26 +283,31 @@ void uk_plat_native_except_err_handler(int trapnr,
 	};
 
 	rc = uk_raise_event_ptr(trap_event_table[trapnr], &ctx);
-	if (unlikely(rc < 0))
+	if (unlikely(rc < 0)) {
+		(void)uk_arch_x86_64_enter_kernel_gsbase();
 		uk_pr_crit("event handler returned error: %d\n", rc);
-	else if (rc != UK_EVENT_NOT_HANDLED)
+	} else if (rc != UK_EVENT_NOT_HANDLED) {
 		return;
+	}
 
 	if (trap_event_table[trapnr] ==
 		UK_EVENT_PTR(UK_PLAT_NATIVE_EXCEPT_EVENT_UNHANDLED))
 		goto trap_halt;
 
 	rc = uk_raise_event(UK_PLAT_NATIVE_EXCEPT_EVENT_UNHANDLED, &ctx);
-	if (unlikely(rc == UK_EVENT_NOT_HANDLED || rc < 0))
+	if (unlikely(rc == UK_EVENT_NOT_HANDLED || rc < 0)) {
+		(void)uk_arch_x86_64_enter_kernel_gsbase();
 		uk_pr_crit("Unhandled Trap %d (%s), error code=0x%lx\n",
 			   trapnr, x86_exception_table[trapnr],
 			   error_code);
+	}
 
 trap_halt:
 	/* We expect that if there is a handler it won't return,
 	 * but as we can't control that, we place halt outside
 	 * the above conditional.
 	 */
+	(void)uk_arch_x86_64_enter_kernel_gsbase();
 	uk_pm_syscrash();
 }
 
@@ -311,6 +316,7 @@ UK_EVENT(UK_PLAT_NATIVE_EXCEPT_EVENT_IRQ);
 void uk_plat_native_except_irq_handler(struct uk_plat_native_regs *regs,
 				       __u32 irq)
 {
+	__u64 orig_gsbase = uk_arch_x86_64_enter_kernel_gsbase();
 	struct uk_plat_native_except_irq_ctx ctx;
 #if CONFIG_LIBUKPLAT_NATIVE_ECTX_ISR_ASSERTIONS
 	__sz ectx_align = UK_PLAT_NATIVE_ECTX_ALIGN;
@@ -331,9 +337,8 @@ void uk_plat_native_except_irq_handler(struct uk_plat_native_regs *regs,
 #if CONFIG_LIBUKPLAT_NATIVE_ECTX_ISR_ASSERTIONS
 	uk_plat_native_ectx_assert_equal(ectx);
 #endif /* CONFIG_LIBUKPLAT_NATIVE_ECTX_ISR_ASSERTIONS */
+	uk_arch_x86_64_exit_kernel_gsbase(orig_gsbase);
 }
-
-static struct uk_arch_x86_64_desc_table_ptr64 idtptr;
 
 static inline void idt_fillgate(unsigned int num, void *fun, unsigned int ist,
 				__u32 idx)
@@ -354,10 +359,12 @@ static inline void idt_fillgate(unsigned int num, void *fun, unsigned int ist,
 	desc->p		= 1;
 }
 
-static void idt_init(void)
+static void idt_init(__u32 idx)
 {
-	/* Ensure that traps_table_init has been called */
-	UK_ASSERT(idtptr.limit != 0);
+	struct uk_arch_x86_64_desc_table_ptr64 idtptr = {
+		.limit = sizeof(cpu_idt[idx]) - 1,
+		.base = (__u64)&cpu_idt[idx],
+	};
 
 	uk_arch_x86_64_lidt(&idtptr);
 }
@@ -634,8 +641,6 @@ static void traps_table_init(__u32 idx)
 	FILL_IRQ_GATE(222, 1);
 	FILL_IRQ_GATE(223, 1);
 
-	idtptr.limit = sizeof(cpu_idt) - 1;
-	idtptr.base = (__u64)&cpu_idt;
 }
 
 static void uk_plat_native_traps_init(void)
@@ -645,7 +650,7 @@ static void uk_plat_native_traps_init(void)
 	traps_table_init(idx);
 	gdt_init(idx);
 	tss_init(idx);
-	idt_init();
+	idt_init(idx);
 }
 
 __isr __uptr uk_plat_native_except_get_except_stack_base(void)

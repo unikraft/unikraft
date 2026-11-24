@@ -53,6 +53,7 @@ enum uk_file_mem_op {
 	UKFILE_MEM_BORROW,
 	UKFILE_MEM_RETRIEVE,
 	UKFILE_MEM_ACQUIRE,
+	UKFILE_MEM_ACQUIRE_PINNED,
 	UKFILE_MEM_RELEASE,
 	UKFILE_MEM_BUFCOUNT,
 	UKFILE_MEM_GIFT
@@ -68,6 +69,12 @@ enum uk_file_mem_op {
  *   - `off` and `len` must be page-aligned
  *   - `iov` and `iovcnt` are ignored
  *   - may not be supported by all files
+ *
+ * - UKFILE_MEM_ACQUIRE_PINNED: Like ACQUIRE, additionally guarantees that
+ *   backing pages remain resident at unchanged physical addresses until
+ *   RELEASE. Required for MMU aliases. Drivers without a pinning mechanism
+ *   must reject this operation. Uses the same locking and return contract
+ *   as ACQUIRE, and the same RELEASE operation.
  *
  * - UKFILE_MEM_RELEASE: Release previously acquired memory region(s)
  *   starting at `off` going for `len` bytes.
@@ -124,7 +131,7 @@ enum uk_file_mem_op {
  *
  * No synchronization is performed by the file driver, callers should ensure
  * mutual exclusion during the call (using e.g., file iolocks) as such:
- * - ACQUIRE/RELEASE/GIFT: exclusive access
+ * - ACQUIRE/ACQUIRE_PINNED/RELEASE/GIFT: exclusive access
  * - RETRIEVE/BORROW/BUFCOUNT: lock out the above + file state change ops
  *   (e.g., write)
  *
@@ -183,6 +190,13 @@ typedef int (*uk_file_setstat_func)(const struct uk_file *f,
  * Linux-compatible fadvise operations.
  */
 #define UKFILE_CTL_FILE_FADVISE 3
+
+/*
+ * IO_TIMEOUT((bool)output, void, void)
+ * Return a positive value if a timeout applies to blocking input or output.
+ * A file that does not implement this control has no timeout to report.
+ */
+#define UKFILE_CTL_FILE_IO_TIMEOUT 4
 
 typedef int (*uk_file_ctl_func)(const struct uk_file *f, int fam, int req,
 				uintptr_t arg1, uintptr_t arg2, uintptr_t arg3);
@@ -326,8 +340,6 @@ typedef struct uk_swrefcount uk_file_refcnt;
 #define UK_FILE_REFCNT_INIT_VALUE_V(name, v) \
 	UK_SWREFCOUNT_INIT_VALUE((v), (v))
 
-#define uk_file_refcnt_finalize(_) do { } while (0)
-
 #define uk_file_refcnt_acquire		uk_swrefcount_acquire
 #define uk_file_refcnt_acquire_weak	uk_swrefcount_acquire_weak
 #define uk_file_refcnt_try_acquire	uk_swrefcount_try_acquire
@@ -434,23 +446,29 @@ int uk_file_try_acquire(const struct uk_file *f)
 }
 
 static inline
-void uk_file_release(const struct uk_file *f)
-{
-	int r = uk_file_refcnt_release(f->refcnt);
-
-	if (r)
-		f->_release(f, r);
-	if (r | UK_SWREFCOUNT_LAST_STRONG)
-		uk_file_refcnt_finalize(f->refcnt);
-}
-
-static inline
 void uk_file_release_weak(const struct uk_file *f)
 {
 	int r = uk_file_refcnt_release_weak(f->refcnt);
 
 	if (r)
 		f->_release(f, r);
+}
+
+static inline
+void uk_file_release(const struct uk_file *f)
+{
+#if CONFIG_LIBUKFILE_FINALIZERS
+	if (uk_file_refcnt_release(f->refcnt)) {
+		f->_release(f, UK_FILE_RELEASE_RES);
+		uk_file_refcnt_finalize(f->refcnt);
+	}
+	uk_file_release_weak(f);
+#else
+	int r = uk_file_refcnt_release(f->refcnt);
+
+	if (r)
+		f->_release(f, r);
+#endif
 }
 
 #if CONFIG_LIBUKFILE_FINALIZERS
@@ -510,6 +528,32 @@ static inline
 uk_pollevent uk_file_poll(const struct uk_file *f, uk_pollevent req)
 {
 	return uk_file_poll_until(f, req, 0);
+}
+
+/* Wait for file readiness. The optional out mask is zero on timeout. */
+static inline int
+uk_file_poll_interruptible(const struct uk_file *f, uk_pollevent req,
+			   __nsec deadline, uk_pollevent *events)
+{
+	return _uk_pollq_poll_until(&f->state->pollq, req, deadline, f,
+				    UK_THREAD_WAIT_TERM, events);
+}
+
+/* Like uk_file_poll_interruptible(), but a pending signal handler also ends
+ * the wait with -EINTR, as for epoll_wait(2) on Linux.
+ */
+static inline int
+uk_file_poll_sigintr(const struct uk_file *f, uk_pollevent req,
+		     __nsec deadline, uk_pollevent *events)
+{
+	return _uk_pollq_poll_until(&f->state->pollq, req, deadline, f,
+				    UK_THREAD_WAIT_SIGINTR, events);
+}
+
+static inline int uk_file_wait_interruptible(const struct uk_file *f,
+					     uk_pollevent req)
+{
+	return uk_file_poll_interruptible(f, req, 0, NULL);
 }
 
 static inline

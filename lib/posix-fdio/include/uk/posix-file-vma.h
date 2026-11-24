@@ -13,6 +13,10 @@
 #include <uk/vmem/vma_types.h>
 
 extern const struct uk_vma_ops uk_fdio_vma_ops;
+#if CONFIG_LIBUKVMEM_COW_VMA
+extern const struct uk_vma_ops uk_fdio_cow_vma_ops;
+extern const struct uk_vma_ops uk_fdio_shared_vma_ops;
+#endif
 
 struct uk_fdio_vma_args {
 	struct uk_ofile *of;
@@ -39,9 +43,17 @@ int uk_fdio_map_file(struct uk_vas *vas, __vaddr_t *vaddr,
 		.of = of,
 		.offset = offset,
 	};
+	const struct uk_vma_ops *ops = &uk_fdio_vma_ops;
+
+#if CONFIG_LIBUKVMEM_COW_VMA
+	if (flags & UK_VMA_FILE_SHARED)
+		ops = &uk_fdio_shared_vma_ops;
+	else if (vas->cow)
+		ops = &uk_fdio_cow_vma_ops;
+#endif
 
 	return uk_vma_map(vas, vaddr, len, attr, flags, __NULL,
-			  &uk_fdio_vma_ops, &args);
+			  ops, &args);
 }
 
 #endif /* __UK_POSIX_FILE_VMA_H__ */

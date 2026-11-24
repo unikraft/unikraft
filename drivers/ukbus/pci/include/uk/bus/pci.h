@@ -204,52 +204,6 @@ static struct pci_bus_handler ph __unused;
 #define PCI_DEV_BIT_NBR			(5)
 #define PCI_FN_BIT_NBR			(3)
 
-#define PCI_BUS_SHIFT               (16)
-#define PCI_DEVICE_SHIFT            (11)
-#define PCI_FUNCTION_SHIFT          (8)
-#define PCI_ENABLE_BIT              (1u << 31)
-
-#define PCI_CONF_CLASS_ID          (0x08)
-#define PCI_CONF_CLASS_ID_SHFT     (16)
-#define PCI_CONF_CLASS_ID_MASK     (0xFF00)
-
-#define PCI_CONF_VENDOR_ID          (0x00)
-#define PCI_CONF_VENDOR_ID_SHFT     (0)
-#define PCI_CONF_VENDOR_ID_MASK     (0x0000FFFF)
-
-#define PCI_CONF_DEVICE_ID          (0x00)
-#define PCI_CONF_DEVICE_ID_SHFT     (16)
-#define PCI_CONF_DEVICE_ID_MASK     (0x0000FFFF)
-
-#define PCI_CONF_SUBSYSVEN_ID          (0x2c)
-#define PCI_CONF_SUBSYSVEN_ID_SHFT     (0)
-#define PCI_CONF_SUBSYSVEN_ID_MASK     (0xFFFF)
-
-#define PCI_CONF_SUBCLASS_ID          (0x08)
-#define PCI_CONF_SUBCLASS_ID_SHFT     (16)
-#define PCI_CONF_SUBCLASS_ID_MASK     (0x00FF)
-
-#define PCI_CONF_SECONDARY_BUS          (0x18)
-#define PCI_CONF_SECONDARY_BUS_SHFT     (0)
-#define PCI_CONF_SECONDARY_BUS_MASK     (0xFF00)
-
-#define PCI_HEADER_TYPE_MSB_MASK   (0x80)
-#define PCI_CONF_HEADER_TYPE       (0x00)
-#define PCI_CONF_HEADER_TYPE_SHFT  (16)
-#define PCI_CONF_HEADER_TYPE_MASK  (0xFF)
-
-#define PCI_CONF_SUBSYS_ID          (0x2c)
-#define PCI_CONF_SUBSYS_ID_SHFT     (16)
-#define PCI_CONF_SUBSYS_ID_MASK     (0xFFFF)
-
-#define PCI_CONF_IRQ                (0X3C)
-#define PCI_CONF_IRQ_SHFT           (0x0)
-#define PCI_CONF_IRQ_MASK           (0XFF)
-
-#define PCI_CONF_IOBAR              (0x10)
-#define PCI_CONF_IOBAR_SHFT         (0x0)
-#define PCI_CONF_IOBAR_MASK         (~0x3)
-
 #define PCI_BASE_ADDRESS_0	0x10	/* 32 bits */
 #define PCI_BASE_ADDRESS_1	0x14	/* 32 bits */
 #define PCI_BASE_ADDRESS_2	0x18	/* 32 bits */
@@ -298,7 +252,27 @@ static struct pci_bus_handler ph __unused;
 #define PCI_MIN_GNT		0x3e	/* 8 bits */
 #define PCI_MAX_LAT		0x3f	/* 8 bits */
 
-struct pci_driver *pci_find_driver(struct pci_device_id *id);
+/* Width-aligned accesses to the PCI configuration space. Architecture code
+ * owns the access mechanism; callers never manipulate configuration ports.
+ * Returns 0 or a negative errno. Read values are zero-extended.
+ */
+int pci_cfg_read(const struct pci_address *addr, __u16 offset, __u8 width,
+		 __u32 *value);
+int pci_cfg_write(const struct pci_address *addr, __u16 offset, __u8 width,
+		  __u32 value);
+
+struct pci_bar_region {
+	__paddr_t base;
+	__u64 size;
+	int io;
+};
+
+/* Probe a BAR only while the device is quiescent, before driver activation.
+ * PCI decode/bus-master enables and original BAR values are restored.
+ */
+int pci_bar_get(struct pci_device *dev, __u8 index, struct pci_bar_region *bar);
+
+struct pci_driver *pci_find_driver(const struct pci_device_id *id);
 
 #ifdef __cplusplus
 }

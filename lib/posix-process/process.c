@@ -28,8 +28,16 @@ struct uk_thread *pprocess_thread_main;
 #include <uk/init.h>
 #include <uk/errptr.h>
 #include <uk/essentials.h>
+#include <uk/lcpu.h>
 #include <uk/plat/config.h>
 #include <uk/process.h>
+#if CONFIG_LIBUKVMEM_THREAD_VAS
+#include <uk/vmem.h>
+#endif
+#if CONFIG_LIBUKVMEM_PROCESS_VAS
+#include <uk/vmem/process.h>
+#include <uk/process/prepared.h>
+#endif
 
 #if CONFIG_LIBPOSIX_PROCESS_SIGNAL
 #include "signal/signal.h"
@@ -43,10 +51,14 @@ struct uk_thread *pprocess_thread_main;
  *       An application should never get PID/TID 0 assigned.
  */
 static struct posix_thread *tid_thread[TIDMAP_SIZE];
+/* Objects retaining an identity, including after namespace removal. */
+static unsigned int pid_users[TIDMAP_SIZE];
+/* Allocation reserves every published or pinned process ID it encounters. */
 static unsigned long tid_map[UK_BITS_TO_LONGS(TIDMAP_SIZE)] = { [0] = 0x01UL };
 
 /* Process Table */
 struct posix_process *pid_process[TIDMAP_SIZE];
+__spinlock pprocess_lock;
 
 /**
  * Thread-local posix_thread reference
@@ -54,9 +66,9 @@ struct posix_process *pid_process[TIDMAP_SIZE];
 __uk_tls struct posix_thread *pthread_self = NULL;
 
 /**
- * Helpers to find and reserve a `pid_t`
+ * Helpers to find and reserve a `pid_t` (caller holds pprocess_lock)
  */
-static inline pid_t find_free_tid(void)
+static inline pid_t find_free_tid_locked(void)
 {
 	static pid_t prev = 0;
 	unsigned long found;
@@ -66,6 +78,16 @@ static inline pid_t find_free_tid(void)
 	if (found == TIDMAP_SIZE) {
 		/* search again starting from the beginning */
 		found = uk_find_first_zero_bit(tid_map, TIDMAP_SIZE);
+	}
+	/* A leader may exit while its process stays published or pinned.
+	 * Reconcile its reservation here so thread release needs no lookup.
+	 */
+	while (found < TIDMAP_SIZE &&
+	       (pid_process[found] || pid_users[found])) {
+		uk_set_bit(found, tid_map);
+		found = uk_find_next_zero_bit(tid_map, TIDMAP_SIZE, found + 1);
+		if (found == TIDMAP_SIZE)
+			found = uk_find_first_zero_bit(tid_map, TIDMAP_SIZE);
 	}
 	if (found == TIDMAP_SIZE) {
 		/* no free PID */
@@ -80,37 +102,139 @@ static inline pid_t find_free_tid(void)
 
 static pid_t find_and_reserve_tid(void)
 {
+	unsigned long flags;
 	pid_t tid;
 
-	/* TODO: Mutex */
-	tid = find_free_tid();
+	flags = pprocess_lock_acquire();
+	tid = find_free_tid_locked();
 	if (tid > 0)
 		uk_set_bit(tid, tid_map);
+	pprocess_lock_release(flags);
 	return tid;
 }
 
 static void release_tid(pid_t tid)
 {
+	unsigned long flags;
+
 	UK_ASSERT(tid > 0 && tid <= CONFIG_LIBPOSIX_PROCESS_MAX_PID);
 
-	/* TODO: Mutex */
-	uk_clear_bit(tid, tid_map);
+	flags = pprocess_lock_acquire();
+	if (!pid_users[tid] && !pid_process[tid] && !tid_thread[tid])
+		uk_clear_bit(tid, tid_map);
+	pprocess_lock_release(flags);
+}
+
+void pprocess_id_get_locked(pid_t id)
+{
+	UK_ASSERT(id > 0 && id <= CONFIG_LIBPOSIX_PROCESS_MAX_PID);
+	UK_ASSERT(pid_users[id] != (unsigned int)-1);
+	/* Thread exit may clear the bitmap before allocation reconciles a
+	 * retained identity. Existing pins still authorize another reference.
+	 */
+	UK_ASSERT(uk_test_bit(id, tid_map) || pid_users[id]);
+	pid_users[id]++;
+}
+
+void pprocess_id_put_locked(pid_t id)
+{
+	UK_ASSERT(id > 0 && id <= CONFIG_LIBPOSIX_PROCESS_MAX_PID);
+	UK_ASSERT(pid_users[id]);
+	if (!--pid_users[id] && !pid_process[id] && !tid_thread[id])
+		uk_clear_bit(id, tid_map);
+}
+
+static void pprocess_assign_pid_locked(struct posix_process *process, pid_t pid)
+{
+	UK_ASSERT(!process->pid);
+	UK_ASSERT(pid > 0 && pid <= CONFIG_LIBPOSIX_PROCESS_MAX_PID);
+	pprocess_id_get_locked(pid);
+	process->pid = pid;
+}
+
+static void pprocess_release_pid(pid_t pid)
+{
+	unsigned long flags;
+
+	if (!pid)
+		return;
+	flags = pprocess_lock_acquire();
+	pprocess_id_put_locked(pid);
+	pprocess_lock_release(flags);
+}
+
+struct posix_thread *pprocess_claim_pthread_exit(struct uk_thread *thread,
+						 bool *became_empty)
+{
+	struct posix_thread *pthread, *claimed = NULL;
+	struct posix_process *pprocess;
+	unsigned long flags;
+	bool empty = false;
+
+	UK_ASSERT(thread);
+	flags = pprocess_lock_acquire();
+	pthread = uk_thread_uktls_var(thread, pthread_self);
+	if (pthread && !uk_list_empty(&pthread->thread_list_entry)) {
+		pprocess = pthread->process;
+		UK_ASSERT(pprocess);
+		pprocess_get(pprocess);
+		pprocess->exiting_threads++;
+		uk_list_del_init(&pthread->thread_list_entry);
+		claimed = pthread;
+		if (!pprocess->exiting &&
+		    pprocess->state == POSIX_PROCESS_RUNNING &&
+		    uk_list_empty(&pprocess->threads))
+			empty = true;
+	}
+	pprocess_lock_release(flags);
+
+	if (became_empty)
+		*became_empty = empty;
+	return claimed;
+}
+
+void pprocess_complete_pthread_exit(struct posix_process *process)
+{
+	unsigned long flags = pprocess_lock_acquire();
+
+	UK_ASSERT(process->exiting_threads);
+	if (!--process->exiting_threads)
+		uk_semaphore_up(&process->thread_exit_semaphore);
+	pprocess_lock_release(flags);
+}
+
+bool pprocess_claim_process_exit(struct posix_process *pprocess)
+{
+	unsigned long flags;
+	bool claimed = false;
+
+	UK_ASSERT(pprocess);
+
+	flags = pprocess_lock_acquire();
+	if (!pprocess->exiting && pprocess->state == POSIX_PROCESS_RUNNING) {
+		pprocess_get(pprocess);
+		pprocess->exiting = true;
+		claimed = true;
+	}
+	pprocess_lock_release(flags);
+	return claimed;
 }
 
 /* Allocate a thread for a process */
-struct posix_thread *pprocess_create_pthread(struct posix_process *pprocess,
-					     struct uk_thread *th)
+static struct posix_thread *pprocess_alloc_pthread(struct posix_process *p,
+						   struct uk_thread *th,
+						   bool publish)
 {
 	struct posix_thread *pthread;
 	struct uk_alloc *a;
 	pid_t tid;
 	int err;
 
-	UK_ASSERT(pprocess);
-	UK_ASSERT(pprocess->_a);
+	UK_ASSERT(p);
+	UK_ASSERT(p->_a);
 
 	/* Take allocator from process */
-	a = pprocess->_a;
+	a = p->_a;
 
 	tid = find_and_reserve_tid();
 	if (unlikely(tid < 0)) {
@@ -125,12 +249,10 @@ struct posix_thread *pprocess_create_pthread(struct posix_process *pprocess,
 	}
 
 	pthread->_a = a;
-	pthread->process = pprocess;
+	pthread->process = p;
 	pthread->parent = uk_pthread_current();
 	pthread->tid = tid;
 	pthread->thread = th;
-
-	uk_thread_uktls_var(th, pthread_self) = pthread;
 
 #if CONFIG_LIBPOSIX_PROCESS_SIGNAL
 	err = pprocess_signal_tdesc_alloc(pthread);
@@ -154,20 +276,58 @@ struct posix_thread *pprocess_create_pthread(struct posix_process *pprocess,
 	}
 #endif /* CONFIG_LIBPOSIX_PROCESS_SIGNAL */
 
-	/* Store reference to pthread with TID */
-	tid_thread[tid] = pthread;
+#if CONFIG_LIBUKVMEM_VAS_REFCOUNT
+	/* Binding may finish paging work; never hold the process lock here. */
+	err = uk_thread_set_vas(th, p->vas);
+	if (unlikely(err)) {
+#if CONFIG_LIBPOSIX_PROCESS_SIGNAL
+		pprocess_signal_tdesc_free(pthread);
+#endif
+		uk_free(a, pthread);
+		goto err_free_tid;
+	}
+#endif
 
-	/* Add to parent's list of threads */
-	uk_list_add_tail(&pthread->thread_list_entry, &pprocess->threads);
+	/* Store reference to pthread with TID and add to process thread list */
+	{
+		unsigned long flags = pprocess_lock_acquire();
+
+		if (pprocess_terminating_signal(p)) {
+			pprocess_lock_release(flags);
+#if CONFIG_LIBPOSIX_PROCESS_SIGNAL
+			pprocess_signal_tdesc_free(pthread);
+#endif /* CONFIG_LIBPOSIX_PROCESS_SIGNAL */
+			uk_free(a, pthread);
+			err = -ESRCH;
+			goto err_free_tid;
+		}
+
+#if CONFIG_LIBUKVMEM_THREAD_VAS && !CONFIG_LIBUKVMEM_VAS_REFCOUNT
+		th->vas = p->vas;
+#endif
+		uk_thread_uktls_var(th, pthread_self) = pthread;
+		if (publish)
+			__atomic_store_n(&tid_thread[tid], pthread,
+					 __ATOMIC_RELEASE);
+		uk_list_add_tail(&pthread->thread_list_entry,
+				 &p->threads);
+		pprocess_lock_release(flags);
+	}
 
 	uk_pr_debug("Process PID %d: New thread TID %d\n",
-		    (int) pprocess->pid, (int) pthread->tid);
+		    (int)p->pid, (int)pthread->tid);
 	return pthread;
 
 err_free_tid:
 	release_tid(tid);
 err_out:
 	return ERR2PTR(err);
+}
+
+struct posix_thread *pprocess_create_pthread(struct posix_process *pprocess,
+					     struct uk_thread *th)
+{
+	return pprocess_alloc_pthread(pprocess, th, true);
 }
 
 /* Free thread that is part of a process
@@ -187,14 +347,18 @@ void pprocess_release_pthread(struct posix_thread *pthread)
 	pprocess_signal_tdesc_free(pthread);
 #endif /* CONFIG_LIBPOSIX_PROCESS_SIGNAL */
 
-	uk_thread_uktls_var(pthread->thread, pthread_self) = NULL;
+	/* remove from process' thread list and release TID atomically */
+	{
+		unsigned long flags = pprocess_lock_acquire();
 
-	/* remove from process' thread list */
-	uk_list_del_init(&pthread->thread_list_entry);
-
-	/* release TID */
-	release_tid(pthread->tid);
-	tid_thread[pthread->tid] = NULL;
+		uk_thread_uktls_var(pthread->thread, pthread_self) = NULL;
+		if (!uk_list_empty(&pthread->thread_list_entry))
+			uk_list_del_init(&pthread->thread_list_entry);
+		__atomic_store_n(&tid_thread[pthread->tid], NULL,
+				 __ATOMIC_RELEASE);
+		uk_clear_bit(pthread->tid, tid_map);
+		pprocess_lock_release(flags);
+	}
 
 	/* release memory */
 	uk_free(pthread->_a, pthread);
@@ -215,7 +379,391 @@ int uk_posix_process_create_pthread(struct uk_thread *thread)
 	return 0;
 }
 
+void uk_posix_process_set_stack_size(struct uk_thread *thread, __sz size)
+{
+	struct posix_thread *pthread;
+
+	UK_ASSERT(thread);
+	UK_ASSERT(thread->flags & UK_THREADF_UKTLS);
+	UK_ASSERT(size);
+	pthread = uk_thread_uktls_var(thread, pthread_self);
+	UK_ASSERT(pthread);
+	pprocess_record_stack_size(pthread->process, size);
+}
+
 /* Create a new posix process for a given thread */
+static struct posix_process *pprocess_new(struct uk_alloc *a,
+					  struct posix_process *parent __unused)
+{
+	struct posix_process *pprocess;
+	int ret;
+
+	/* Allocate pprocess structure */
+	pprocess = uk_zalloc(a, sizeof(*pprocess));
+	if (!pprocess) {
+		ret = -ENOMEM;
+		goto err_out;
+	}
+	pprocess->_a = a;
+	uk_refcount_init(&pprocess->refs, 1);
+#if CONFIG_LIBUKVMEM_THREAD_VAS
+	pprocess->vas = parent ? parent->vas : uk_vas_get_active();
+#if CONFIG_LIBUKVMEM_VAS_REFCOUNT
+	uk_vas_get(pprocess->vas);
+#endif
+#endif
+	UK_INIT_LIST_HEAD(&pprocess->threads);
+	UK_INIT_LIST_HEAD(&pprocess->children);
+	UK_INIT_LIST_HEAD(&pprocess->child_list_entry);
+
+	pprocess->state = POSIX_PROCESS_RUNNING;
+
+#if CONFIG_LIBPOSIX_PROCESS_SIGNAL
+	ret = pprocess_signal_pdesc_alloc(pprocess);
+	if (unlikely(ret)) {
+		uk_pr_err("Could not allocate signal descriptor\n");
+		/* Free manually as we can jump to err_free_pprocess
+		 * after this allocation is successful.
+		 */
+#if CONFIG_LIBUKVMEM_VAS_REFCOUNT
+		uk_vas_put(pprocess->vas);
+#endif
+		uk_free(a, pprocess);
+		goto err_out;
+	}
+	ret = pprocess_signal_pdesc_init(pprocess);
+	if (unlikely(ret)) {
+		uk_pr_err("Could not initialize signal descriptor\n");
+		goto err_free_pprocess;
+	}
+#endif /* CONFIG_LIBPOSIX_PROCESS_SIGNAL */
+
+	uk_semaphore_init(&pprocess->exit_semaphore, 0);
+	uk_semaphore_init(&pprocess->thread_exit_semaphore, 0);
+
+	return pprocess;
+
+#if CONFIG_LIBPOSIX_PROCESS_SIGNAL
+err_free_pprocess:
+	pprocess_signal_pdesc_free(pprocess);
+#if CONFIG_LIBUKVMEM_VAS_REFCOUNT
+	uk_vas_put(pprocess->vas);
+#endif
+	uk_free(a, pprocess);
+#endif
+err_out:
+	return ERR2PTR(ret);
+}
+
+#if CONFIG_LIBPOSIX_PROCESS_PREPARE
+struct posix_process *pprocess_prepare(struct uk_alloc *a,
+				       struct uk_thread *thread,
+				       struct uk_thread *parent)
+{
+	struct posix_thread *parent_thread = NULL, *pt;
+	struct posix_process *p;
+	unsigned long flags;
+	int rc;
+
+	if (!a || !thread || thread == uk_thread_current() || thread->sched ||
+	    !(thread->flags & UK_THREADF_UKTLS) ||
+	    uk_thread_is_exited(thread) || uk_thread_is_runnable(thread))
+		return ERR2PTR(-EINVAL);
+	if (uk_lcpu_irqs_disabled())
+		return ERR2PTR(-EWOULDBLOCK);
+	if (uk_thread_uktls_var(thread, pthread_self))
+		return ERR2PTR(-EBUSY);
+	if (parent) {
+		if (!(parent->flags & UK_THREADF_UKTLS))
+			return ERR2PTR(-EINVAL);
+		parent_thread = uk_thread_uktls_var(parent, pthread_self);
+		if (!parent_thread)
+			return ERR2PTR(-EINVAL);
+	}
+	p = pprocess_new(a, parent_thread ? parent_thread->process : NULL);
+	if (PTRISERR(p))
+		return p;
+	pt = pprocess_alloc_pthread(p, thread, false);
+	if (PTRISERR(pt)) {
+		rc = PTR2ERR(pt);
+#if CONFIG_LIBPOSIX_PROCESS_SIGNAL
+		pprocess_signal_pdesc_free(p);
+#endif
+#if CONFIG_LIBUKVMEM_VAS_REFCOUNT
+		uk_vas_put(p->vas);
+#endif
+		uk_free(a, p);
+		return ERR2PTR(rc);
+	}
+	flags = pprocess_lock_acquire();
+	pprocess_assign_pid_locked(p, pt->tid);
+	pprocess_lock_release(flags);
+	p->parent = parent_thread ? parent_thread->process : NULL;
+	pt->parent = parent_thread;
+	return p;
+}
+
+int pprocess_publish(struct posix_process *p)
+{
+	struct posix_thread *pt;
+	unsigned long flags;
+	int rc = 0;
+
+	if (!p || p->pid <= 0 || (unsigned int)p->pid >= TIDMAP_SIZE)
+		return -EINVAL;
+	pt = uk_list_first_entry_or_null(&p->threads, struct posix_thread,
+					 thread_list_entry);
+	if (!pt || pt->tid != p->pid ||
+	    pt->thread_list_entry.next != &p->threads ||
+	    uk_thread_is_exited(pt->thread) ||
+	    uk_thread_is_runnable(pt->thread))
+		return -EINVAL;
+	flags = pprocess_lock_acquire();
+	if (pid_process[p->pid] || tid_thread[pt->tid]) {
+		rc = -EEXIST;
+	} else if (p->exiting || p->state != POSIX_PROCESS_RUNNING) {
+		rc = -ESRCH;
+	} else if (p->parent && (p->parent->exiting ||
+				pprocess_terminating_signal(p->parent) ||
+				p->parent->state != POSIX_PROCESS_RUNNING)) {
+		rc = -ESRCH;
+	} else {
+		pprocess_groups_init_locked(p);
+		if (p->parent)
+			uk_list_add_tail(&p->child_list_entry,
+					 &p->parent->children);
+		__atomic_store_n(&tid_thread[pt->tid], pt, __ATOMIC_RELEASE);
+		__atomic_store_n(&pid_process[p->pid], p, __ATOMIC_RELEASE);
+	}
+	pprocess_lock_release(flags);
+	return rc;
+}
+
+#if CONFIG_LIBUKVMEM_VAS_REFCOUNT
+int pprocess_bind_prepared_vas(struct posix_process *p, struct uk_vas *vas)
+{
+	struct posix_thread *pt;
+	struct uk_vas *old;
+	unsigned long flags;
+	bool published;
+	int rc;
+
+	if (!p || !vas || !uk_vas_is_owned(vas) || p->pid <= 0 ||
+	    (unsigned int)p->pid >= TIDMAP_SIZE)
+		return -EINVAL;
+	pt = uk_list_first_entry_or_null(&p->threads, struct posix_thread,
+					 thread_list_entry);
+	if (!pt || pt->tid != p->pid ||
+	    pt->thread_list_entry.next != &p->threads || pt->thread->sched)
+		return -EBUSY;
+	flags = pprocess_lock_acquire();
+	published = pid_process[p->pid] || tid_thread[pt->tid];
+	pprocess_lock_release(flags);
+	if (published)
+		return -EBUSY;
+	if (p->vas == vas)
+		return 0;
+	uk_vas_get(vas);
+	rc = uk_thread_set_vas(pt->thread, vas);
+	if (rc) {
+		uk_vas_put(vas);
+		return rc;
+	}
+	old = p->vas;
+	p->vas = vas;
+	uk_vas_put(old);
+	return 0;
+}
+
+#if CONFIG_LIBUKVMEM_PROCESS_VAS
+int pprocess_clone_prepared_vas(struct posix_process *p,
+				struct posix_process *parent)
+{
+	struct uk_vas *vas;
+#if CONFIG_LIBPOSIX_PROCESS_BRK
+	void *base;
+	__sz pos;
+#endif
+	int rc;
+
+	if (!p || !parent || p == parent)
+		return -EINVAL;
+	if (!uk_vas_is_owned(parent->vas))
+		return -ENOTSUP;
+	if (uk_lcpu_irqs_disabled())
+		return -EWOULDBLOCK;
+#if CONFIG_LIBPOSIX_PROCESS_BRK
+	if (p->brk_ctx.base)
+		return -EBUSY;
+	/* Keep the break position and its mapped contents in one snapshot. */
+	base = parent->brk_ctx.base;
+	if (base)
+		uk_mutex_lock(&parent->brk_ctx.mtx);
+	pos = parent->brk_ctx.pos;
+#endif
+	rc = uk_vas_clone_process(parent->vas, &vas);
+#if CONFIG_LIBPOSIX_PROCESS_BRK
+	if (base)
+		uk_mutex_unlock(&parent->brk_ctx.mtx);
+#endif
+	if (rc)
+		return rc;
+	/* Binding may release the previous VAS; hold no parent mutex here. */
+	rc = pprocess_bind_prepared_vas(p, vas);
+#if CONFIG_LIBPOSIX_PROCESS_BRK
+	if (!rc) {
+		p->brk_ctx.base = base;
+		p->brk_ctx.pos = pos;
+		uk_mutex_init_config(&p->brk_ctx.mtx, UK_MUTEX_CONFIG_RECURSE);
+	}
+#endif
+	uk_vas_put(vas);
+	return rc;
+}
+
+/* An unpublished process is reachable only through the caller-owned UKTLS. */
+static struct posix_process *pprocess_prepared_thread(struct uk_thread *thread,
+						      bool unscheduled)
+{
+	struct posix_process *p;
+	struct posix_thread *pt;
+	unsigned long flags;
+	bool published;
+
+	if (!thread || thread == uk_thread_current() ||
+	    !(thread->flags & UK_THREADF_UKTLS))
+		return ERR2PTR(-EINVAL);
+	if (uk_thread_is_exited(thread) || uk_thread_is_runnable(thread) ||
+	    (unscheduled && thread->sched))
+		return ERR2PTR(-EBUSY);
+	pt = uk_thread_uktls_var(thread, pthread_self);
+	if (!pt || !pt->process)
+		return ERR2PTR(-EINVAL);
+	p = pt->process;
+	if (p->pid <= 0 || (unsigned int)p->pid >= TIDMAP_SIZE ||
+	    pt->tid != p->pid || p->threads.next != &pt->thread_list_entry ||
+	    pt->thread_list_entry.next != &p->threads)
+		return ERR2PTR(-EINVAL);
+	flags = pprocess_lock_acquire();
+	published = pid_process[p->pid] || tid_thread[pt->tid];
+	pprocess_lock_release(flags);
+	return published ? ERR2PTR(-EBUSY) : p;
+}
+
+pid_t uk_posix_process_prepare_spawn(struct uk_alloc *a,
+				     struct uk_thread *child,
+				     struct uk_vas **out)
+{
+	struct uk_vas *kernel = uk_vas_get_kernel(), *vas = NULL;
+	struct posix_process *p;
+	struct clone_args args = { 0 };
+	struct posix_process_clone_event_data data;
+	struct posix_process_execve_event_data exec_data;
+	int rc;
+
+	if (!out)
+		return -EINVAL;
+	*out = NULL;
+#if !CONFIG_LIBPOSIX_FDTAB_MULTITAB || CONFIG_LIBVFSCORE
+	return -ENOTSUP;
+#endif
+	if (!kernel)
+		return -ENODEV;
+	p = pprocess_prepare(a, child, uk_thread_current());
+	if (PTRISERR(p))
+		return PTR2ERR(p);
+	rc = uk_vas_create_process(kernel->a, &vas);
+	if (!rc)
+		rc = pprocess_bind_prepared_vas(p, vas);
+#if CONFIG_LIBPOSIX_PROCESS_BRK
+	if (!rc)
+		rc = pprocess_brk_init_space(p);
+#endif
+	if (rc)
+		goto abort;
+#if CONFIG_LIBPOSIX_PROCESS_SIGNAL
+	args.flags = CLONE_CLEAR_SIGHAND;
+#endif
+	data = (struct posix_process_clone_event_data) {
+		.cl_args = &args, .cl_args_len = sizeof(args),
+		.child = child, .parent = uk_thread_current(),
+		.ppid = ukthread2pid(uk_thread_current()),
+		.pid = p->pid, .tid = p->pid
+	};
+	rc = pprocess_raise_clone_event(&data);
+	if (rc < 0)
+		goto abort;
+	exec_data = (struct posix_process_execve_event_data) {
+		.thread = child, .pid = p->pid, .tid = p->pid
+	};
+	rc = pprocess_raise_execve_event(&exec_data);
+	if (rc < 0)
+		goto abort;
+	p->exit_signal = SIGCHLD;
+	*out = vas;
+	return p->pid;
+abort:
+	pprocess_abort(p);
+	uk_vas_put(vas);
+	return rc;
+}
+
+int uk_posix_process_publish_prepared(struct uk_thread *child)
+{
+	struct posix_process *p;
+
+	if (uk_lcpu_irqs_disabled())
+		return -EWOULDBLOCK;
+	p = pprocess_prepared_thread(child, false);
+	return PTRISERR(p) ? PTR2ERR(p) : pprocess_publish(p);
+}
+
+int uk_posix_process_abort_prepared(struct uk_thread *child)
+{
+	struct posix_process *p;
+
+	if (!child)
+		return 0;
+	if (uk_lcpu_irqs_disabled())
+		return -EWOULDBLOCK;
+	p = pprocess_prepared_thread(child, true);
+	if (PTRISERR(p))
+		return PTR2ERR(p);
+	pprocess_abort(p);
+	return 0;
+}
+#endif /* CONFIG_LIBUKVMEM_PROCESS_VAS */
+#endif /* CONFIG_LIBUKVMEM_VAS_REFCOUNT */
+
+void pprocess_abort(struct posix_process *p)
+{
+	struct posix_thread *pt;
+	unsigned long flags;
+
+	if (!p)
+		return;
+	UK_ASSERT(!uk_lcpu_irqs_disabled());
+	UK_ASSERT(uk_list_empty(&p->children));
+	pt = uk_list_first_entry(&p->threads, struct posix_thread,
+				 thread_list_entry);
+	UK_ASSERT(pt->thread_list_entry.next == &p->threads);
+	UK_ASSERT(!pt->thread->sched);
+	flags = pprocess_lock_acquire();
+	UK_ASSERT(!pid_process[p->pid] && !tid_thread[pt->tid]);
+	pprocess_lock_release(flags);
+	pprocess_release_pthread(pt);
+#if CONFIG_LIBPOSIX_PROCESS_SIGNAL
+	pprocess_signal_pdesc_free(p);
+#endif
+#if CONFIG_LIBUKVMEM_VAS_REFCOUNT
+	uk_vas_put(p->vas);
+#endif
+	/* Do not clear a PID table entry when releasing an unpublished ID. */
+	pprocess_release_pid(p->pid);
+	uk_free(p->_a, p);
+}
+#endif /* CONFIG_LIBPOSIX_PROCESS_PREPARE */
+
 struct posix_process *pprocess_create(struct uk_alloc *a,
 				      struct uk_thread *thread,
 				      struct uk_thread *parent)
@@ -244,37 +792,11 @@ struct posix_process *pprocess_create(struct uk_alloc *a,
 		parent_pprocess = parent_pthread->process;
 	}
 
-	/* Allocate pprocess structure */
-	pprocess = uk_zalloc(a, sizeof(*pprocess));
-	if (!pprocess) {
-		ret = -ENOMEM;
+	pprocess = pprocess_new(a, parent_pprocess);
+	if (PTRISERR(pprocess)) {
+		ret = PTR2ERR(pprocess);
 		goto err_out;
 	}
-	pprocess->_a = a;
-	UK_INIT_LIST_HEAD(&pprocess->threads);
-	UK_INIT_LIST_HEAD(&pprocess->children);
-
-	pprocess->state = POSIX_PROCESS_RUNNING;
-
-#if CONFIG_LIBPOSIX_PROCESS_SIGNAL
-	ret = pprocess_signal_pdesc_alloc(pprocess);
-	if (unlikely(ret)) {
-		uk_pr_err("Could not allocate signal descriptor\n");
-		/* Free manually as we can jump to err_free_pprocess
-		 * after this allocation is successful.
-		 */
-		uk_free(a, pprocess);
-		goto err_out;
-	}
-	ret = pprocess_signal_pdesc_init(pprocess);
-	if (unlikely(ret)) {
-		uk_pr_err("Could not initialize signal descriptor\n");
-		goto err_free_pprocess;
-	}
-#endif /* CONFIG_LIBPOSIX_PROCESS_SIGNAL */
-
-	uk_semaphore_init(&pprocess->wait_semaphore, 0);
-	uk_semaphore_init(&pprocess->exit_semaphore, 0);
 
 	/* Check if we have a pthread structure already for this thread
 	 * or if we need to allocate one
@@ -286,36 +808,51 @@ struct posix_process *pprocess_create(struct uk_alloc *a,
 			goto err_free_pprocess;
 		}
 		/* take thread id for process id */
-		pprocess->pid = _pthread->tid;
+		{
+			unsigned long flags = pprocess_lock_acquire();
+
+			pprocess_assign_pid_locked(pprocess, _pthread->tid);
+			pprocess_lock_release(flags);
+		}
 		*pthread = _pthread;
 	} else {
 		/* Re-use existing pthread, re-link it and re-use its TID */
 		UK_ASSERT((*pthread)->thread == thread);
 
-		/* Remove thread from original process */
-		orig_pprocess = (*pthread)->process;
-		uk_list_del(&(*pthread)->thread_list_entry);
-
-		/* Re-assign thread to current process */
-		(*pthread)->process = pprocess;
-		pprocess->pid = (*pthread)->tid;
-		uk_list_add_tail(&(*pthread)->thread_list_entry,
-				 &pprocess->threads);
-
-		/* Update parent */
-		(*pthread)->parent = parent_pthread;
-#if CONFIG_LIBPOSIX_PROCESS_SIGNAL
-		/* Reset signal state of this thread */
-		ret = pprocess_signal_tdesc_init(*pthread);
-		if (unlikely(ret)) {
-			uk_pr_err("Could not initialize signal descriptor\n");
+#if CONFIG_LIBUKVMEM_VAS_REFCOUNT
+		ret = uk_thread_set_vas(thread, pprocess->vas);
+		if (unlikely(ret))
 			goto err_free_pprocess;
-		}
+#endif
+
+		/* Remove thread from original process and re-link */
+		{
+			unsigned long flags = pprocess_lock_acquire();
+			bool empty;
+
+			orig_pprocess = (*pthread)->process;
+			uk_list_del_init(&(*pthread)->thread_list_entry);
+			(*pthread)->process = pprocess;
+			pprocess_assign_pid_locked(pprocess, (*pthread)->tid);
+			uk_list_add_tail(&(*pthread)->thread_list_entry,
+					 &pprocess->threads);
+			(*pthread)->parent = parent_pthread;
+			empty = uk_list_empty(&orig_pprocess->threads);
+			pprocess_lock_release(flags);
+
+#if CONFIG_LIBPOSIX_PROCESS_SIGNAL
+			/* Reset signal state of this thread */
+			ret = pprocess_signal_tdesc_init(*pthread);
+			if (unlikely(ret)) {
+				uk_pr_err("Could not initialize signal descriptor\n");
+				goto err_free_pprocess;
+			}
 #endif /* CONFIG_LIBPOSIX_PROCESS_SIGNAL */
 
-		/* Release original process if it became empty of threads */
-		if (uk_list_empty(&orig_pprocess->threads))
-			pprocess_release(orig_pprocess);
+			/* Release original process if it became empty */
+			if (empty)
+				pprocess_release(orig_pprocess);
+		}
 	}
 
 	/* Add to process table. No failure past this point. */
@@ -325,12 +862,22 @@ struct posix_process *pprocess_create(struct uk_alloc *a,
 		goto err_free_pprocess;
 	}
 
-	pprocess->parent = parent_pprocess;
-	if (parent_pprocess) {
-		uk_list_add_tail(&pprocess->child_list_entry,
-				 &parent_pprocess->children);
+	{
+		unsigned long flags = pprocess_lock_acquire();
+
+		pprocess->parent = parent_pprocess;
+		pprocess_groups_init_locked(pprocess);
+#if CONFIG_LIBUKVMEM_THREAD_VAS && !CONFIG_LIBUKVMEM_VAS_REFCOUNT
+		thread->vas = pprocess->vas;
+#endif
+		if (parent_pprocess) {
+			uk_list_add_tail(&pprocess->child_list_entry,
+					 &parent_pprocess->children);
+		}
+		__atomic_store_n(&pid_process[pprocess->pid], pprocess,
+				 __ATOMIC_RELEASE);
+		pprocess_lock_release(flags);
 	}
-	pid_process[pprocess->pid] = pprocess;
 
 	uk_pr_debug("Process PID %d created (parent PID: %d)\n",
 		    (int) pprocess->pid,
@@ -341,6 +888,10 @@ err_free_pprocess:
 #if CONFIG_LIBPOSIX_PROCESS_SIGNAL
 	pprocess_signal_pdesc_free(pprocess);
 #endif /* CONFIG_LIBPOSIX_PROCESS_SIGNAL */
+#if CONFIG_LIBUKVMEM_VAS_REFCOUNT
+	uk_vas_put(pprocess->vas);
+#endif
+	pprocess_release_pid(pprocess->pid);
 	uk_free(a, pprocess);
 err_out:
 	return ERR2PTR(ret);
@@ -472,34 +1023,66 @@ err_free_thread:
 }
 #endif /* CONFIG_LIBPOSIX_PROCESS_MULTIPROCESS */
 
-/* Releases pprocess memory and other resources.
- * NOTE: All pthreads must be removed already
- *       from this pprocess. All chilren must
- *       be already reparented.
- */
-void pprocess_release(struct posix_process *pprocess)
+void pprocess_put(struct posix_process *pprocess)
 {
-	pid_t pid;
+	pid_t pid, pgid, sid;
+#if CONFIG_LIBUKVMEM_VAS_REFCOUNT
+	struct uk_vas *vas;
+#endif
 
 	UK_ASSERT(pprocess);
+	if (!uk_refcount_release(&pprocess->refs))
+		return;
 	UK_ASSERT(uk_list_empty(&pprocess->threads));
 	UK_ASSERT(uk_list_empty(&pprocess->children));
-
-	/* Unlink this process from its parent */
-	if (pprocess->parent)
-		uk_list_del(&pprocess->child_list_entry);
+	UK_ASSERT(uk_list_empty(&pprocess->child_list_entry));
+	UK_ASSERT(!pprocess->exiting_threads);
+	pid = pprocess->pid;
+	pgid = pprocess->pgid;
+	sid = pprocess->sid;
+	UK_ASSERT(__atomic_load_n(&pid_process[pid], __ATOMIC_ACQUIRE) !=
+		  pprocess);
 
 #if CONFIG_LIBPOSIX_PROCESS_SIGNAL
 	pprocess_signal_pdesc_free(pprocess);
 #endif /* CONFIG_LIBPOSIX_PROCESS_SIGNAL */
 
-	pid = pprocess->pid;
-
-	pid_process[pid] = NULL;
-
+#if CONFIG_LIBUKVMEM_VAS_REFCOUNT
+	vas = pprocess->vas;
+#endif
 	uk_free(pprocess->_a, pprocess);
+#if CONFIG_LIBUKVMEM_VAS_REFCOUNT
+	uk_vas_put(vas);
+#endif
+	/* A pin also protects the identity after removal from the namespace. */
+	pprocess_release_pid(pid);
+	pprocess_release_pid(pgid);
+	pprocess_release_pid(sid);
 
 	uk_pr_debug("pid %d released\n", pid);
+}
+
+/* Remove a published process and drop namespace ownership. Pins retain its
+ * resources and identity until pprocess_put(). All threads and children must
+ * already have been removed. Only the owner of its reap/release may call this.
+ */
+void pprocess_release(struct posix_process *pprocess)
+{
+	unsigned long flags;
+
+	UK_ASSERT(pprocess);
+	UK_ASSERT(uk_list_empty(&pprocess->threads));
+	UK_ASSERT(uk_list_empty(&pprocess->children));
+	flags = pprocess_lock_acquire();
+	pprocess->reap_claimed = true;
+	if (pprocess->parent) {
+		uk_list_del_init(&pprocess->child_list_entry);
+		pprocess->parent = NULL;
+	}
+	UK_ASSERT(pid_process[pprocess->pid] == pprocess);
+	__atomic_store_n(&pid_process[pprocess->pid], NULL, __ATOMIC_RELEASE);
+	pprocess_lock_release(flags);
+	pprocess_put(pprocess);
 }
 
 static int posix_process_init(struct uk_init_ctx *ictx)
@@ -543,47 +1126,46 @@ static void posix_thread_fini(struct uk_thread *thread)
 {
 	struct posix_process *pprocess;
 	struct posix_thread *pthread;
+	bool became_empty = false;
+	bool init_process;
 
-	pthread = uk_thread_uktls_var(thread, pthread_self);
-
-	/* No pthread was ever assigned to this uk_thread,
-	 * or the pthread was already terminated as a result
-	 * to an exit syscall or a signal.
-	 *
-	 * If the pthread exists, this is its return path.
-	 */
+	pthread = pprocess_claim_pthread_exit(thread, &became_empty);
 	if (!pthread)
 		return;
 
 	pprocess = pthread->process;
 	UK_ASSERT(pprocess);
+	init_process = pprocess->pid == UK_PID_INIT;
 
 	/* Terminate and release thread */
-	pprocess_exit_pthread(pthread_self, POSIX_THREAD_EXITED, 0);
+	pprocess_exit_pthread(pthread, POSIX_THREAD_EXITED, 0);
+	pprocess_complete_pthread_exit(pprocess);
 
 	/* If last thread, also release the process */
-	if  (uk_list_empty(&pprocess->threads)) {
-		pprocess_exit(pprocess, POSIX_PROCESS_EXITED, 0);
+	if (became_empty &&
+	    pprocess_try_exit(pprocess, POSIX_PROCESS_EXITED, 0)) {
 		/* UK_PID_INIT cannot be waited, release here */
-		if (pprocess->pid == UK_PID_INIT)
+		if (init_process)
 			pprocess_release(pprocess);
 	}
+	pprocess_put(pprocess);
 }
 
 UK_THREAD_INIT_PRIO(0, posix_thread_fini, UK_PRIO_EARLIEST);
 
 struct posix_process *pid2pprocess(pid_t pid)
 {
-	UK_ASSERT((__sz)pid < ARRAY_SIZE(pid_process));
+	if (unlikely(pid < 0 || (__sz)pid >= ARRAY_SIZE(pid_process)))
+		return NULL;
 
-	return pid_process[pid];
+	return __atomic_load_n(&pid_process[pid], __ATOMIC_ACQUIRE);
 }
 
 struct posix_thread *tid2pthread(pid_t tid)
 {
 	if ((__sz)tid >= ARRAY_SIZE(tid_thread) || tid < 0)
 		return NULL;
-	return tid_thread[tid];
+	return __atomic_load_n(&tid_thread[tid], __ATOMIC_ACQUIRE);
 }
 
 struct posix_process *tid2pprocess(pid_t tid)

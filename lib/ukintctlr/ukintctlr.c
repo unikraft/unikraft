@@ -30,6 +30,7 @@
 #include <uk/atomic.h>
 #include <uk/bitops/bitmap.h>
 #include <uk/lcpu.h>
+#include <uk/pcpuvar.h>
 #include <uk/plat/time.h>
 #include <uk/intctlr.h>
 #include <uk/intctlr/limits.h>
@@ -71,7 +72,7 @@ static struct irq_handler irq_handlers[MAX_IRQ][MAX_HANDLERS_PER_IRQ];
 
 static inline struct irq_handler *allocate_handler(unsigned long irq)
 {
-	UK_ASSERT(irq <= MAX_IRQ);
+	UK_ASSERT(irq < MAX_IRQ);
 
 	for (int i = 0; i < MAX_HANDLERS_PER_IRQ; i++)
 		if (irq_handlers[irq][i].func == NULL)
@@ -85,8 +86,8 @@ int uk_intctlr_irq_register(unsigned int irq,
 	struct irq_handler *h;
 	unsigned long flags;
 
-	UK_ASSERT(func);
-	UK_ASSERT(irq <= MAX_IRQ);
+	if (!func || irq >= MAX_IRQ)
+		return -EINVAL;
 
 	flags = uk_lcpu_save_irqf();
 	h = allocate_handler(irq);
@@ -105,49 +106,48 @@ int uk_intctlr_irq_register(unsigned int irq,
 	return 0;
 }
 
+static int irq_unregister(unsigned int irq, uk_intctlr_irq_handler_func_t func,
+			  void *arg, int match_arg)
+{
+	unsigned long flags;
+	unsigned int read, write = 0;
+	int found = 0;
+
+	if (!func || irq >= MAX_IRQ)
+		return -EINVAL;
+	flags = uk_lcpu_save_irqf();
+	for (read = 0; read < MAX_HANDLERS_PER_IRQ; ++read) {
+		struct irq_handler h = irq_handlers[irq][read];
+
+		if (h.func == func && (!match_arg || h.arg == arg)) {
+			found = 1;
+			continue;
+		}
+		irq_handlers[irq][write++] = h;
+	}
+	while (write < MAX_HANDLERS_PER_IRQ)
+		irq_handlers[irq][write++] = (struct irq_handler){ 0 };
+	uk_lcpu_restore_irqf(flags);
+	return found ? 0 : -ENOENT;
+}
+
 int uk_intctlr_irq_unregister(unsigned int irq,
 			      uk_intctlr_irq_handler_func_t func)
 {
-	struct irq_handler *h = NULL;
-	unsigned long flags;
-	int count;
-	int i;
+	return irq_unregister(irq, func, NULL, 0);
+}
 
-	UK_ASSERT(func);
-	UK_ASSERT(irq <= MAX_IRQ);
-
-	flags = uk_lcpu_save_irqf();
-
-	count = MAX_HANDLERS_PER_IRQ;
-	for (i = 0; i < count; i++) {
-recheck:
-		if (irq_handlers[irq][i].func == func) {
-			h = &irq_handlers[irq][i];
-			h->func = NULL;
-			h->arg = NULL;
-
-			/* Copy all following handlers forward */
-			memmove(h, h + 1, sizeof(*h) * (count - i - 1));
-			goto recheck;
-		}
-	}
-
-	uk_lcpu_restore_irqf(flags);
-
-	/* If `h` is set, then there was at least one instance found */
-	if (unlikely(!h)) {
-		uk_pr_crit("Invalid irq handler %p for irq %u ", func, irq);
-		return -ENOENT;
-	}
-
-	return 0;
+int uk_intctlr_irq_unregister_arg(unsigned int irq,
+				  uk_intctlr_irq_handler_func_t func, void *arg)
+{
+	return irq_unregister(irq, func, arg, 1);
 }
 
 /*
  * TODO: This is a temporary solution used to identify non TSC clock
  * interrupts in order to stop waiting for interrupts with deadline.
  */
-extern unsigned long sched_have_pending_events;
+extern __uk_pcpuvar unsigned long sched_have_pending_events;
 
 void uk_intctlr_irq_handle(struct uk_lcpu_except_irq_ctx *ctx)
 {
@@ -156,7 +156,7 @@ void uk_intctlr_irq_handle(struct uk_lcpu_except_irq_ctx *ctx)
 	int i;
 
 	irq = uk_lcpu_except_irq_ctx_get_irq(ctx);
-	UK_ASSERT(irq <= MAX_IRQ);
+	UK_ASSERT(irq < MAX_IRQ);
 
 	for (i = 0; i < MAX_HANDLERS_PER_IRQ; i++) {
 		if (irq_handlers[irq][i].func == NULL)
@@ -173,7 +173,8 @@ void uk_intctlr_irq_handle(struct uk_lcpu_except_irq_ctx *ctx)
 			 * the halting loop, and let it take care of
 			 * that work.
 			 */
-			uk_or_relax(&sched_have_pending_events, 1);
+			uk_or_relax(uk_pcpuvar_current_ptr_get(
+					sched_have_pending_events), 1);
 
 		if (h->func(h->arg) == 1)
 			return;
@@ -229,11 +230,13 @@ int uk_intctlr_irq_alloc(unsigned int *irqs, __sz count)
 	unsigned long start, idx;
 
 	UK_ASSERT(irqs);
+	if (!count || count > ALLOCABLE_IRQ_COUNT)
+		return -EINVAL;
 
 	start = uk_bitmap_find_next_zero_area(irqs_allocated,
 					      ALLOCABLE_IRQ_COUNT, 0,
 					      count, 0);
-	if (start == ALLOCABLE_IRQ_COUNT)
+	if (start > ALLOCABLE_IRQ_COUNT - count)
 		return -ENOSPC;
 
 	uk_bitmap_set(irqs_allocated, start, count);

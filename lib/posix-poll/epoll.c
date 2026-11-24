@@ -35,6 +35,9 @@ static const char EPOLL_VOLID[] = "epoll_vol";
 #define EPOLL_EVENTS \
 	(UKFD_POLLIN|UKFD_POLLOUT|EPOLLRDHUP|EPOLLPRI|UKFD_POLL_ALWAYS)
 #define EPOLL_OPTS (EPOLLET|EPOLLONESHOT|EPOLLWAKEUP|EPOLLEXCLUSIVE)
+#define EPOLL_EXCLUSIVE_EVENTS \
+	(EPOLLEXCLUSIVE | EPOLLIN | EPOLLOUT | EPOLLERR | EPOLLHUP | \
+	 EPOLLET | EPOLLWAKEUP)
 
 #define events2mask(ev) (((ev) & EPOLL_EVENTS) | UKFD_POLL_ALWAYS)
 
@@ -218,6 +221,7 @@ static struct epoll_entry **epoll_find(const struct uk_file *epf, int fd,
 static void epoll_autodel(void *arg)
 {
 	struct epoll_entry *ent = arg;
+	const struct uk_file *epf = ent->epf;
 	union epoll_shim_file sf;
 	struct epoll_entry **entp;
 
@@ -226,19 +230,19 @@ static void epoll_autodel(void *arg)
 #endif /* CONFIG_LIBVFSCORE */
 
 	sf.file = ent->f;
-	uk_file_wlock(ent->epf);
+	uk_file_wlock(epf);
 
 #if CONFIG_LIBVFSCORE
-	entp = epoll_find(ent->epf, ent->fd, 0, sf);
+	entp = epoll_find(epf, ent->fd, 0, sf);
 #else /* !CONFIG_LIBVFSCORE */
-	entp = epoll_find(ent->epf, ent->fd, sf);
+	entp = epoll_find(epf, ent->fd, sf);
 #endif /* !CONFIG_LIBVFSCORE */
 
 	if (entp) {
 		uk_pr_info("Removing closed file fd:%d (@%p)\n", ent->fd, ent);
-		epoll_entry_del(ent->epf, entp);
+		epoll_entry_del(epf, entp);
 	}
-	uk_file_wunlock(ent->epf);
+	uk_file_wunlock(epf);
 }
 
 static void epoll_register(const struct uk_file *epf, struct epoll_entry *ent,
@@ -295,6 +299,8 @@ static int epoll_add(const struct uk_file *epf, struct epoll_entry **tail,
 			.arg = ent
 		}
 	};
+	if (event->events & EPOLLEXCLUSIVE)
+		ent->tick.type = UK_POLL_CHAINTYPE_CALLBACK_EXCLUSIVE;
 	*tail = ent;
 	/* Poll, register & update if needed */
 	epoll_register(epf, ent, 1);
@@ -470,9 +476,7 @@ int uk_sys_epoll_ctl(const struct uk_file *epf, int op, int fd,
 	union uk_shim_file sf;
 	union epoll_shim_file esf;
 	struct epoll_entry **entp;
-#if CONFIG_LIBVFSCORE
-	int legacy;
-#endif /* CONFIG_LIBVFSCORE */
+	int legacy = 0;
 
 	if (unlikely(epf->vol != EPOLL_VOLID))
 		return -EINVAL;
@@ -494,6 +498,20 @@ int uk_sys_epoll_ctl(const struct uk_file *epf, int op, int fd,
 	esf.file = sf.ofile->file;
 #endif /* !CONFIG_LIBVFSCORE */
 
+	if (op == EPOLL_CTL_ADD || op == EPOLL_CTL_MOD) {
+		if (unlikely(!event)) {
+			ret = -EFAULT;
+			goto out_release;
+		}
+		if ((event->events & EPOLLEXCLUSIVE) &&
+		    (op != EPOLL_CTL_ADD ||
+		     (event->events & ~EPOLL_EXCLUSIVE_EVENTS) ||
+		     (!legacy && esf.file->vol == EPOLL_VOLID))) {
+			ret = -EINVAL;
+			goto out_release;
+		}
+	}
+
 	uk_file_wlock(epf);
 
 #if CONFIG_LIBVFSCORE
@@ -504,9 +522,7 @@ int uk_sys_epoll_ctl(const struct uk_file *epf, int op, int fd,
 
 	switch (op) {
 	case EPOLL_CTL_ADD:
-		if (unlikely(!event))
-			ret = -EFAULT;
-		else if (unlikely(*entp))
+		if (unlikely(*entp))
 			ret = -EEXIST;
 		else
 #if CONFIG_LIBVFSCORE
@@ -519,10 +535,10 @@ int uk_sys_epoll_ctl(const struct uk_file *epf, int op, int fd,
 		break;
 
 	case EPOLL_CTL_MOD:
-		if (unlikely(!event))
-			ret = -EFAULT;
-		else if (unlikely(!*entp))
+		if (unlikely(!*entp))
 			ret = -ENOENT;
+		else if ((*entp)->event.events & EPOLLEXCLUSIVE)
+			ret = -EINVAL;
 		else
 #if CONFIG_LIBVFSCORE
 			if (legacy)
@@ -544,6 +560,7 @@ int uk_sys_epoll_ctl(const struct uk_file *epf, int op, int fd,
 	}
 	uk_file_wunlock(epf);
 
+out_release:
 #if CONFIG_LIBVFSCORE
 	if (legacy)
 		fdrop(sf.vfile);
@@ -588,9 +605,16 @@ int uk_sys_epoll_pwait2(const struct uk_file *epf, struct epoll_event *events,
 	uk_sched_yield();
 #endif /* CONFIG_LIBPOSIX_POLL_YIELD */
 
-	while (uk_file_poll_until(epf, UKFD_POLLIN, deadline)) {
+	for (;;) {
+		uk_pollevent pending;
+		int rc;
 		int lvlev = 0;
 		int nout = 0;
+
+		rc = uk_file_poll_sigintr(epf, UKFD_POLLIN, deadline,
+					  &pending);
+		if (rc || !pending)
+			return rc;
 
 		uk_file_event_clear(epf, UKFD_POLLIN);
 		uk_file_rlock(epf);
@@ -647,8 +671,6 @@ int uk_sys_epoll_pwait2(const struct uk_file *epf, struct epoll_event *events,
 			return nout;
 		/* If nout == 0 loop back around */
 	}
-	/* Timeout */
-	return 0;
 }
 
 /* Userspace Syscalls */

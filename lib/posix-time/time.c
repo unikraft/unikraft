@@ -34,6 +34,7 @@
  */
 
 #include <errno.h>
+#include <stdbool.h>
 #include <time.h>
 #include <unistd.h>
 #include <sys/time.h>
@@ -42,6 +43,9 @@
 #include <uk/config.h>
 #include <uk/print.h>
 #include <uk/syscall.h>
+#if CONFIG_LIBPOSIX_PROCESS_ITIMER
+#include <uk/process/itimer.h>
+#endif
 
 #if CONFIG_HAVE_SCHED
 #include <uk/sched.h>
@@ -66,20 +70,66 @@ static void __spin_wait(__nsec nsec)
 }
 #endif
 
+static bool uk_time_valid_timespec(const struct timespec *ts)
+{
+	return ts && ts->tv_sec >= 0 && ts->tv_nsec >= 0 &&
+	       ts->tv_nsec <= 999999999;
+}
+
+static int uk_time_sleep_clock_now(clockid_t clockid, __nsec *now_out)
+{
+	switch (clockid) {
+	case CLOCK_MONOTONIC:
+	case CLOCK_MONOTONIC_RAW:
+	case CLOCK_MONOTONIC_COARSE:
+	case CLOCK_BOOTTIME:
+		*now_out = ukplat_monotonic_clock();
+		return 0;
+	case CLOCK_REALTIME:
+	case CLOCK_REALTIME_COARSE:
+		*now_out = ukplat_wall_clock();
+		return 0;
+#ifdef CLOCK_PROCESS_CPUTIME_ID
+	case CLOCK_PROCESS_CPUTIME_ID:
+#endif
+#ifdef CLOCK_THREAD_CPUTIME_ID
+	case CLOCK_THREAD_CPUTIME_ID:
+#endif
+		return -EOPNOTSUPP;
+	default:
+		return -EINVAL;
+	}
+}
+
 int uk_sys_nanosleep(const struct timespec *req, struct timespec *rem)
 {
-	__nsec before, after, diff, nsec;
+	__nsec before, after, diff, nsec, max_ns, max_sec;
 
-	if (!req || req->tv_nsec < 0 || req->tv_nsec > 999999999) {
+	if (!uk_time_valid_timespec(req)) {
 		return -EINVAL;
 	}
 
-	nsec = (__nsec) req->tv_sec * 1000000000L;
-	nsec += req->tv_nsec;
 	before = ukplat_monotonic_clock();
+	max_ns = ((__nsec)__SNSEC_MAX > before) ?
+		 ((__nsec)__SNSEC_MAX - before) : 0;
+	max_sec = max_ns / (__nsec)UKARCH_NSEC_PER_SEC;
+	if ((__nsec)req->tv_sec >= max_sec) {
+		nsec = max_ns;
+	} else {
+		__nsec sec_ns = (__nsec)req->tv_sec *
+				(__nsec)UKARCH_NSEC_PER_SEC;
+		__nsec sub_ns = (__nsec)req->tv_nsec;
+
+		nsec = (sub_ns > max_ns - sec_ns) ? max_ns : (sec_ns + sub_ns);
+	}
 
 #if CONFIG_HAVE_SCHED
-	uk_sched_thread_sleep(nsec);
+	{
+		struct uk_thread *thread = uk_thread_current();
+
+		if (uk_thread_block_sigintr(thread, before + nsec))
+			uk_sched_yield();
+	}
 #else
 	__spin_wait(nsec);
 #endif
@@ -271,11 +321,42 @@ int uk_sys_clock_nanosleep(clockid_t clockid, int flags,
 			   const struct timespec *request,
 			   struct timespec *remain)
 {
-	if ((clockid == CLOCK_REALTIME) && !(flags & TIMER_ABSTIME))
+	__nsec now, target, max_ns, max_sec;
+	struct timespec rel;
+	int rc;
+
+	if (flags & ~TIMER_ABSTIME)
+		return -EINVAL;
+
+	rc = uk_time_sleep_clock_now(clockid, &now);
+	if (rc < 0)
+		return rc;
+
+	if (!uk_time_valid_timespec(request))
+		return -EINVAL;
+
+	if (!(flags & TIMER_ABSTIME))
 		return uk_sys_nanosleep(request, remain);
 
-	UK_WARN_STUBBED();
-	return 0;
+	max_ns = (__nsec)__SNSEC_MAX;
+	max_sec = max_ns / (__nsec)UKARCH_NSEC_PER_SEC;
+	if ((__nsec)request->tv_sec >= max_sec) {
+		target = max_ns;
+	} else {
+		__nsec sec_ns = (__nsec)request->tv_sec *
+				(__nsec)UKARCH_NSEC_PER_SEC;
+		__nsec sub_ns = (__nsec)request->tv_nsec;
+
+		target = (sub_ns > max_ns - sec_ns) ?
+			 max_ns : (sec_ns + sub_ns);
+	}
+
+	if (target <= now)
+		return 0;
+
+	rel.tv_sec = ukarch_time_nsec_to_sec(target - now);
+	rel.tv_nsec = ukarch_time_subsec(target - now);
+	return uk_sys_nanosleep(&rel, NULL);
 }
 
 UK_SYSCALL_R_DEFINE(int, clock_nanosleep, clockid_t, clockid, int, flags,
@@ -310,6 +391,19 @@ UK_SYSCALL_R_DEFINE(int, setitimer, int, which,
 		    const struct itimerval *, new_value,
 		    struct itimerval *, old_value)
 {
+#if CONFIG_LIBPOSIX_PROCESS_ITIMER
+	return uk_process_setitimer(which, new_value, old_value);
+#else
 	UK_WARN_STUBBED();
 	return 0;
+#endif
+}
+
+UK_SYSCALL_R_DEFINE(int, getitimer, int, which, struct itimerval *, value)
+{
+#if CONFIG_LIBPOSIX_PROCESS_ITIMER
+	return uk_process_getitimer(which, value);
+#else
+	return -ENOTSUP;
+#endif
 }

@@ -14,6 +14,9 @@
 #include <uk/thread.h>
 
 #include "process.h"
+#if CONFIG_LIBPOSIX_PROCESS_FORK
+#include <uk/vmem.h>
+#endif
 
 void execve_arch_execenv_init(struct ukarch_execenv *execenv_new,
 			      struct ukarch_execenv *execenv,
@@ -36,6 +39,12 @@ static void __noreturn execve_ctx_switch(long arg0, long arg1)
 
 	pthread = uk_pthread_current();
 	UK_ASSERT(pthread);
+	{
+		unsigned long flags = pprocess_lock_acquire();
+
+		pthread->process->execed = true;
+		pprocess_lock_release(flags);
+	}
 
 	pthread_parent = pthread->parent;
 
@@ -90,9 +99,17 @@ UK_SYSCALL_R_E_DEFINE(int, execve, const char *, pathname,
 	struct ukarch_execenv *execenv_new;
 	struct uk_thread *this_thread;
 	struct ukarch_ctx ctx_old;
+	struct posix_process *process;
+	__sz stack_size, old_stack_size;
 	void *stack_old;
 	void *stack_new;
 	int rc = 0;
+
+#if CONFIG_LIBPOSIX_PROCESS_FORK
+	if (uk_pprocess_current() &&
+	    uk_vas_is_owned(uk_pprocess_current()->vas))
+		return pprocess_execve_owned(execenv, pathname, argv, envp);
+#endif
 
 	/* Linux deviates from POSIX by treating NULL pointers to
 	 * argv / envp equivalently to passing a list with a single
@@ -103,6 +120,9 @@ UK_SYSCALL_R_E_DEFINE(int, execve, const char *, pathname,
 
 	this_thread = uk_thread_current();
 	UK_ASSERT(this_thread);
+
+	process = uk_pprocess_current();
+	stack_size = pprocess_exec_stack_size(process);
 
 	loader_args.argv = (const char **)argv;
 	loader_args.envp = (const char **)envp;
@@ -123,13 +143,13 @@ UK_SYSCALL_R_E_DEFINE(int, execve, const char *, pathname,
 	 * corrupting it or wasting space. Use the threads's
 	 * stack allocator for the new stack.
 	 */
-	stack_new = uk_malloc(this_thread->_mem.stack_a, STACK_SIZE);
+	stack_new = uk_malloc(this_thread->_mem.stack_a, stack_size);
 	if (unlikely(!stack_new)) {
 		uk_pr_err("Could not allocate stack\n");
 		return -ENOMEM;
 	}
 
-	loader_args.stack_size = STACK_SIZE;
+	loader_args.stack_size = stack_size;
 	loader_args.ctx.sp = ukarch_gen_sp((__uptr)stack_new,
 					   loader_args.stack_size);
 
@@ -177,7 +197,7 @@ UK_SYSCALL_R_E_DEFINE(int, execve, const char *, pathname,
 		uk_pr_err("execve event error (%d)\n", rc);
 		goto err_free_stack_new;
 	}
-	pprocess_cleanup(uk_pprocess_current());
+	pprocess_cleanup(process);
 
 	/* Prepare switch to the new context.
 	 *
@@ -188,9 +208,13 @@ UK_SYSCALL_R_E_DEFINE(int, execve, const char *, pathname,
 	 * a context-switch trampoline that we execute on the new stack.
 	 */
 	stack_old = this_thread->_mem.stack;
+	old_stack_size = pprocess_program_stack_size(process);
+	if (!old_stack_size)
+		old_stack_size = STACK_SIZE;
 	uk_pr_debug("%s: Old stack at %p - %p\n", loader_args.progname,
-		    stack_old, (void *)((uintptr_t)stack_old + STACK_SIZE));
+		    stack_old, (void *)((uintptr_t)stack_old + old_stack_size));
 
+	pprocess_record_stack_size(process, stack_size);
 	this_thread->_mem.stack = stack_new;
 	this_thread->ctx = loader_args.ctx;
 

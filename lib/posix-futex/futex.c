@@ -41,6 +41,7 @@
 
 #include <uk/config.h>
 #include <stdio.h>
+#include <stdbool.h>
 #include <errno.h>
 #include <time.h>
 #include <inttypes.h>
@@ -49,221 +50,467 @@
 #include <uk/syscall.h>
 #include <uk/atomic.h>
 #include <uk/thread.h>
-#include <uk/thread.h>
-#include <uk/list.h>
 #if CONFIG_LIBPOSIX_PROCESS_MULTITHREADING
 #include <uk/process.h>
 #endif /* CONFIG_LIBPOSIX_PROCESS_MULTITHREADING */
-#include <uk/sched.h>
-#include <uk/list.h>
+#include <uk/wait.h>
 #include <uk/assert.h>
 #include <uk/print.h>
 #include <uk/spinlock.h>
 #include <uk/lcpu.h>
 #include <uk/plat/time.h>
+#if CONFIG_LIBPOSIX_FUTEX_VAS
+#include <uk/isr/string.h>
+#include "futex_key.h"
+#endif
 
-/** @struct uk_futex
- *  @brief Futex structure.
+/*
+ * Address transactions are serialized separately from waitq membership.
+ * Waitq owns enqueue/block/detach; futex code only owns the address cookie.
+ * Lock order is address lock -> waitq lock -> scheduler transition.
  */
 struct uk_futex {
-	uint32_t *uaddr; /** The futex address. */
-	struct uk_thread *thread; /** The thread waiting on the futex. */
-	struct uk_list_head list_node; /** The list containing all the futexes
-					 * on which the threads are waiting.
-					 */
+#if CONFIG_LIBPOSIX_FUTEX_VAS
+	struct futex_key key;
+#else
+	uint32_t *uaddr;
+#endif
+	uint32_t bitset;
+	int woken;
 };
 
-static UK_LIST_HEAD(futex_list);
-static uk_spinlock futex_list_lock = UK_SPINLOCK_INITIALIZER();
-
-/**
- * Prepare to wait on a futex.
- *
- * Get the futex value atomically and compare it with the expected value. Add
- * the thread to the wait list and then block it if the value is equal to the
- * expected one. If the futex was not removed from the list when the thread was
- * unblocked, then it means that it timed out.
- *
- * @param uaddr		The futex userspace address
- * @param val		The expected value
- * @param timeout	The deadline until the function will block at most.
- * 			If it is NULL, the thread will wait indefinitely.
- *
- * @return
- *	0: uaddr contains val and the thread finished waiting;
- *	<1: -EAGAIN (uaddr does not contain val) or -ETIMEDOUT (the futex timed
- *       out)
- */
-static int futex_wait(uint32_t *uaddr, uint32_t val, const __nsec *timeout)
-{
+struct futex_guard {
 	unsigned long irqf;
-	struct uk_list_head *itr, *tmp;
-	struct uk_futex *f_tmp;
-	struct uk_thread *current = uk_thread_current();
-	struct uk_futex f = {.uaddr = uaddr, .thread = current};
+};
 
+static DEFINE_WAIT_QUEUE(futex_waiters);
+static uk_spinlock futex_address_lock = UK_SPINLOCK_INITIALIZER();
+
+static void futex_guard_lock(struct futex_guard *guard)
+{
+	guard->irqf = uk_lcpu_save_irqf();
+	uk_spin_lock(&futex_address_lock);
+}
+
+static void futex_guard_unlock(struct futex_guard *guard)
+{
+	uk_spin_unlock(&futex_address_lock);
+	uk_lcpu_restore_irqf(guard->irqf);
+}
+
+static int futex_wait_result(struct uk_thread *thread, int wait,
+			     bool woken, bool timed)
+{
+	if (woken)
+		return 0;
+	if (wait == -EINTR && !timed && uk_thread_wait_signalled(thread))
+		return -UK_SYSCALL_ERESTARTSYS;
+	return wait > 0 ? -ETIMEDOUT : wait;
+}
+
+#if !CONFIG_LIBPOSIX_FUTEX_VAS
+/*
+ * Perform the first read before taking the address lock.  The caller must
+ * keep the futex word valid for the operation.
+ * Recheck under the address lock so a concurrent wake cannot pass publication.
+ * The external spinlock is released by waitq only after enqueue AND block,
+ * and re-acquired before detaching the ticket.
+ */
+static int futex_wait_bitset(uint32_t *uaddr, uint32_t val,
+			     const __nsec *timeout, uint32_t bitset)
+{
+	struct uk_thread *current = uk_thread_current();
+	struct uk_futex f = { .uaddr = uaddr, .bitset = bitset, .woken = 0 };
+	struct futex_guard guard;
+	__snsec deadline = timeout ? *timeout : 0;
+	__uptr previous_cookie;
+	int timedout;
+	int result;
+
+	if (uk_load_n(uaddr) != val)
+		return -EAGAIN;
+
+	futex_guard_lock(&guard);
 	if (uk_load_n(uaddr) != val) {
-		uk_pr_debug("FUTEX_WAIT: Condition not met (*uaddr != %"PRIu32", uaddr: %p)\n",
-			    val, uaddr);
+		futex_guard_unlock(&guard);
 		return -EAGAIN;
 	}
 
-	/* Futex word _does_ contain expected val */
-	uk_pr_debug("FUTEX_WAIT: Condition met (*uaddr == %"PRIu32", uaddr: %p)\n",
-			val, uaddr);
+	previous_cookie = current->wait_ticket.cookie;
+	uk_waitq_set_cookie((__uptr)&f);
+	timedout = uk_waitq_wait_sigintr(&futex_waiters, deadline,
+					 futex_guard_lock,
+					 futex_guard_unlock, &guard);
 
-	/* Enqueue thread to wait list */
-	irqf = uk_lcpu_save_irqf();
-	uk_spin_lock(&futex_list_lock);
-	uk_list_add_tail(&f.list_node, &futex_list);
-	uk_spin_unlock(&futex_list_lock);
-	uk_lcpu_restore_irqf(irqf);
+	/*
+	 * Requeue changes the address cookie, not the registration lifetime.
+	 * Waitq already detached this thread regardless of its current address.
+	 * A committed wake wins over a deadline noticed after rescheduling.
+	 */
+	result = futex_wait_result(current, timedout, f.woken, timeout);
+	uk_waitq_set_cookie(previous_cookie);
+	futex_guard_unlock(&guard);
+	return result;
+}
 
-	if (timeout) {
-		/* Block at most until `timeout` nanosecs */
-		uk_pr_debug("FUTEX_WAIT: Wait %"__PRIsnsec" nsec for wake-up\n",
-				(__snsec) (*timeout));
-		uk_thread_block_until(current, (__snsec) (*timeout));
+static int futex_wait(uint32_t *uaddr, uint32_t val, const __nsec *timeout)
+{
+	return futex_wait_bitset(uaddr, val, timeout, FUTEX_BITSET_MATCH_ANY);
+}
+
+struct futex_wake_request {
+	uint32_t *uaddr;
+	uint32_t bitset;
+	uint32_t remaining;
+	uint32_t count;
+};
+
+/* Both the address lock and waitq lock are held by the caller. */
+static int futex_select_wake(struct uk_waitq_ticket *ticket,
+			     struct futex_wake_request *request)
+{
+	struct uk_futex *f = (struct uk_futex *)ticket->cookie;
+
+	if (!request->remaining || f->woken || f->uaddr != request->uaddr)
+		return 0;
+	if (!(f->bitset & request->bitset))
+		return 0;
+
+	f->woken = 1;
+	request->remaining--;
+	request->count++;
+	return 1;
+}
+
+/* The address lock remains held across compare/wake/requeue transactions. */
+static int futex_wake_bitset_locked(uint32_t *uaddr, uint32_t val,
+				    uint32_t bitset)
+{
+	struct uk_waitq_ticket *ticket;
+	struct futex_wake_request request = {
+		.uaddr = uaddr,
+		.bitset = bitset,
+		.remaining = val,
+		.count = 0,
+	};
+
+	if (!val)
+		return 0;
+
+	uk_waitq_wake_up_if(&futex_waiters, ticket,
+			   futex_select_wake(ticket, &request));
+	return (int)request.count;
+}
+
+static int futex_wake_locked(uint32_t *uaddr, uint32_t val)
+{
+	return futex_wake_bitset_locked(uaddr, val, FUTEX_BITSET_MATCH_ANY);
+}
+
+static int futex_wake_bitset(uint32_t *uaddr, uint32_t val, uint32_t bitset)
+{
+	struct futex_guard guard;
+	int count;
+
+	futex_guard_lock(&guard);
+	count = futex_wake_bitset_locked(uaddr, val, bitset);
+	futex_guard_unlock(&guard);
+	return count;
+}
+
+static int futex_wake(uint32_t *uaddr, uint32_t val)
+{
+	return futex_wake_bitset(uaddr, val, FUTEX_BITSET_MATCH_ANY);
+}
+#else
+/* Remains reachable after a wake detaches the waitq ticket, until return. */
+static __uk_tls struct uk_futex *futex_active_wait;
+
+static struct uk_vas *futex_current_vas(void)
+{
+	struct uk_vas *vas = uk_thread_current()->vas;
+
+	return vas ? vas : uk_vas_get_kernel();
+}
+
+static int futex_vas_wait(__u32 *addr, __u32 val,
+			  const __nsec *timeout, __u32 bitset, bool private)
+{
+	struct uk_thread *current = uk_thread_current();
+	struct uk_vas *vas = futex_current_vas();
+	struct uk_futex f = { .bitset = bitset };
+	struct futex_guard guard;
+	__uptr previous_cookie;
+	__snsec deadline = timeout ? (__snsec)(*timeout) : 0;
+	__u32 value;
+	int rc, timedout;
+
+	if (uk_lcpu_irqs_disabled())
+		return -EWOULDBLOCK;
+	for (;;) {
+		futex_guard_lock(&guard);
+		rc = futex_key_read(vas, addr, private, &value, &f.key);
+		if (rc != -EAGAIN)
+			break;
+		futex_guard_unlock(&guard);
+		/* Fault in pages after releasing the guard. */
+		rc = uk_vas_fault(vas, (__vaddr_t)addr, UK_VMA_FAULT_READ);
+		if (rc)
+			return rc;
+	}
+	if (rc || value != val) {
+		futex_guard_unlock(&guard);
+		futex_key_put(&f.key);
+		return rc ? rc : -EAGAIN;
+	}
+	UK_ASSERT(!uk_thread_uktls_var(current, futex_active_wait));
+	uk_thread_uktls_var(current, futex_active_wait) = &f;
+	previous_cookie = current->wait_ticket.cookie;
+	uk_waitq_set_cookie((__uptr)&f);
+	timedout = uk_waitq_wait_sigintr(&futex_waiters, deadline,
+					 futex_guard_lock,
+					 futex_guard_unlock, &guard);
+	rc = futex_wait_result(current, timedout, f.woken, timeout);
+	uk_waitq_set_cookie(previous_cookie);
+	uk_thread_uktls_var(current, futex_active_wait) = NULL;
+	futex_guard_unlock(&guard);
+	futex_key_put(&f.key);
+	return rc;
+}
+
+struct futex_vas_wake_request {
+	const struct futex_key *key;
+	__u32 bitset;
+	__u32 remaining;
+	__u32 count;
+};
+
+static int futex_vas_select(struct uk_waitq_ticket *ticket,
+			    struct futex_vas_wake_request *request)
+{
+	struct uk_futex *f = (struct uk_futex *)ticket->cookie;
+
+	if (!request->remaining || f->woken ||
+	    !futex_key_equal(&f->key, request->key) ||
+	    !(f->bitset & request->bitset))
+		return 0;
+	f->woken = 1;
+	request->remaining--;
+	request->count++;
+	return 1;
+}
+
+static int futex_vas_wake_locked(const struct futex_key *key, __u32 val,
+				 __u32 bitset)
+{
+	struct uk_waitq_ticket *ticket;
+	struct futex_vas_wake_request request = {
+		.key = key, .remaining = val, .bitset = bitset
+	};
+
+	if (val)
+		uk_waitq_wake_up_if(&futex_waiters, ticket,
+				    futex_vas_select(ticket, &request));
+	return (int)request.count;
+}
+
+static int futex_vas_wake(struct uk_vas *vas, __u32 *addr, __u32 val,
+			  __u32 bitset, bool private)
+{
+	struct futex_key key = { 0 };
+	struct futex_guard guard;
+	int rc;
+
+	if (uk_lcpu_irqs_disabled())
+		return -EWOULDBLOCK;
+	for (;;) {
+		futex_guard_lock(&guard);
+		rc = futex_key_lookup(vas, addr, private, &key);
+		if (rc != -EAGAIN)
+			break;
+		futex_guard_unlock(&guard);
+		uk_arch_spinwait();
+	}
+	if (!rc)
+		rc = futex_vas_wake_locked(&key, val, bitset);
+	futex_guard_unlock(&guard);
+	futex_key_put(&key);
+	return rc;
+}
+
+static void futex_vas_retire_wait(struct uk_thread *thread)
+{
+	struct futex_key key = { 0 };
+	struct futex_guard guard;
+	struct uk_futex *f;
+
+	futex_guard_lock(&guard);
+	f = uk_thread_uktls_var(thread, futex_active_wait);
+	if (f) {
+		key = f->key;
+		memset_isr(&f->key, 0, sizeof(f->key));
+		uk_thread_uktls_var(thread, futex_active_wait) = NULL;
+	}
+	if (thread->wait_ticket.wq == &futex_waiters)
+		uk_waitq_cancel(thread);
+	futex_guard_unlock(&guard);
+	futex_key_put(&key);
+}
+
+UK_THREAD_INIT_PRIO_FLAGS(0, futex_vas_retire_wait, UK_PRIO_EARLIEST,
+			  UK_THREAD_INITF_UKTLS);
+#endif
+
+static int futex_timeout_deadline(const struct timespec *timeout,
+				  bool abs_time,
+				  bool realtime_clock,
+				  __nsec *deadline_out)
+{
+	__nsec max_deadline = (__nsec)__SNSEC_MAX;
+	__nsec max_sec = max_deadline / (__nsec)UKARCH_NSEC_PER_SEC;
+	__nsec ts_ns, deadline;
+
+	if (timeout->tv_sec < 0 || timeout->tv_nsec < 0 ||
+	    timeout->tv_nsec >= UKARCH_NSEC_PER_SEC)
+		return -EINVAL;
+
+	if ((__nsec)timeout->tv_sec >= max_sec) {
+		ts_ns = max_deadline;
 	} else {
-		/* Block indefinitely */
-		uk_pr_debug("FUTEX_WAIT: Wait indefinitely for wake-up\n");
-		uk_thread_block(current);
+		__nsec sec_ns = (__nsec)timeout->tv_sec *
+				(__nsec)UKARCH_NSEC_PER_SEC;
+		__nsec sub_ns = (__nsec)timeout->tv_nsec;
+
+		ts_ns = (sub_ns > max_deadline - sec_ns) ?
+			max_deadline : (sec_ns + sub_ns);
 	}
-	uk_sched_yield();
 
-	uk_pr_debug("FUTEX_WAIT: Woke up (uaddr: %p)\n", uaddr);
-	irqf = uk_lcpu_save_irqf();
-	uk_spin_lock(&futex_list_lock);
+	if (!abs_time) {
+		__nsec now_mono = ukplat_monotonic_clock();
 
-	/* If the futex is still in the wait list, then it timed out */
-	uk_list_for_each_safe(itr, tmp, &futex_list) {
-		f_tmp = uk_list_entry(itr, struct uk_futex, list_node);
+		deadline = (ts_ns > max_deadline - now_mono) ?
+			   max_deadline : (now_mono + ts_ns);
+	} else if (realtime_clock) {
+		__nsec now_real = ukplat_wall_clock();
+		__nsec now_mono = ukplat_monotonic_clock();
 
-		if (f_tmp->uaddr == uaddr && f_tmp->thread == current) {
-			/* Remove the thread from the futex list */
-			uk_list_del(&f_tmp->list_node);
-			uk_spin_unlock(&futex_list_lock);
-			uk_lcpu_restore_irqf(irqf);
+		if (ts_ns <= now_real) {
+			deadline = 1;
+		} else {
+			__nsec delta = ts_ns - now_real;
 
-			uk_pr_debug("FUTEX_WAIT: Woke up because of timeout\n");
-			return -ETIMEDOUT;
+			deadline = (delta > max_deadline - now_mono) ?
+				   max_deadline : (now_mono + delta);
 		}
+	} else {
+		deadline = ts_ns;
 	}
-	uk_spin_unlock(&futex_list_lock);
-	uk_lcpu_restore_irqf(irqf);
 
+	if (deadline == 0)
+		deadline = 1;
+	*deadline_out = deadline;
 	return 0;
 }
 
-/**
- * Wake up threads waiting on a futex.
- *
- * Find val threads in the wait list for the futex, remove the futexes from the
- * list and wake up the threads.
- *
- * @param uaddr	The futex userspace address
- * @param val	The number of threads waiting on the futex to be woken up
- *
- * @return
- *	0: no threads were woken up;
- *	>0: the number of threads woken up
- */
-static int futex_wake(uint32_t *uaddr, uint32_t val)
-{
-	unsigned long irqf;
-	struct uk_list_head *itr, *tmp;
-	struct uk_futex *f;
-	uint32_t count = 0;
-
-	irqf = uk_lcpu_save_irqf();
-	uk_spin_lock(&futex_list_lock);
-
-	uk_list_for_each_safe(itr, tmp, &futex_list) {
-		f = uk_list_entry(itr, struct uk_futex, list_node);
-
-		if (f->uaddr == uaddr) {
-			/* Remove the thread from the futex list */
-			uk_list_del(&f->list_node);
-
-			/* TODO: Replace with uk_thread_wakeup when the new
-			 * scheduler API is ready
-			 */
-			uk_thread_wake(f->thread);
-
-			/* Wake at most val threads */
-			if (++count >= val)
-				break;
-		}
-	}
-
-	uk_spin_unlock(&futex_list_lock);
-	uk_lcpu_restore_irqf(irqf);
-
-	return (int) count;
-}
-
-/**
- * Requeue waiters from uaddr to uaddr2.
- *
- * Requeue waiters on uaddr to uaddr2. Wakes up a maximum of val waiters that
- * are waiting on the futex at uaddr.  If there are more than val waiters, then
- * the remaining waiters are removed from the wait queue of the source futex at
- * uaddr and added to the wait queue of the target futex at uaddr2. The val2
- * argument specifies an upper limit on the number of waiters that are requeued
- * to the futex at uaddr2.
- *
- * @param uaddr		Source futex user address
- * @param val		Number of waiters to wake
- * @param val2		Number of waiters to requeue (0-INT_MAX)
- * @param uaddr2	Target futex user address
- * @param val3		uaddr expected value
- *
- * @return
- *	>=0: on success, the number of tasks requeued or woken;
- *	<0: on error
- */
+#if !CONFIG_LIBPOSIX_FUTEX_VAS
 static int futex_cmp_requeue(uint32_t *uaddr, uint32_t val, uint32_t val2,
 			     uint32_t *uaddr2, uint32_t val3)
 {
-	unsigned long irqf;
-	struct uk_list_head *itr, *tmp;
-	struct uk_futex *f;
-	int woken_uaddr1;
-	uint32_t waiters_uaddr2 = 0;
+	struct futex_guard guard;
+	struct uk_waitq_ticket *ticket;
+	uint32_t requeued = 0;
+	int woken;
 
-	if (!((uint32_t)val3 == uk_load_n(uaddr)))
+	if (uk_load_n(uaddr) != val3)
 		return -EAGAIN;
 
-	/* Wake up val waiters on uaddr */
-	woken_uaddr1 = futex_wake(uaddr, val);
-
-	if (!val2)
-		return woken_uaddr1;
-
-	irqf = uk_lcpu_save_irqf();
-	uk_spin_lock(&futex_list_lock);
-
-	/* Requeue val2 waiters on uaddr2 */
-	uk_list_for_each_safe(itr, tmp, &futex_list) {
-		f = uk_list_entry(itr, struct uk_futex, list_node);
-
-		if (f->uaddr == uaddr) {
-			/* Requeue thread to uaddr2 */
-			uk_list_del(&f->list_node);
-			f->uaddr = uaddr2;
-			uk_list_add_tail(&f->list_node, &futex_list);
-
-			/* Requeue at most val2 threads */
-			if (++waiters_uaddr2 >= val2)
-				break;
-		}
+	futex_guard_lock(&guard);
+	if (uk_load_n(uaddr) != val3) {
+		futex_guard_unlock(&guard);
+		return -EAGAIN;
 	}
 
-	uk_spin_unlock(&futex_list_lock);
-	uk_lcpu_restore_irqf(irqf);
+	woken = futex_wake_locked(uaddr, val);
+	if (val2) {
+		uk_waitq_visit(&futex_waiters, ticket, {
+			struct uk_futex *f = (struct uk_futex *)ticket->cookie;
 
-	return woken_uaddr1 + waiters_uaddr2;
+			if (!f->woken && f->uaddr == uaddr) {
+				f->uaddr = uaddr2;
+				if (++requeued >= val2)
+					break;
+			}
+		});
+	}
+	futex_guard_unlock(&guard);
+	return woken + (int)requeued;
 }
+#else
+static int futex_vas_requeue(__u32 *addr, __u32 val, __u32 val2,
+			     __u32 *addr2, __u32 val3, bool private)
+{
+	struct uk_vas *vas = futex_current_vas();
+	struct futex_key source = { 0 }, target = { 0 };
+	struct futex_guard guard;
+	struct uk_waitq_ticket *ticket;
+	__u32 value, requeued = 0;
+	int rc;
+
+	if (uk_lcpu_irqs_disabled())
+		return -EWOULDBLOCK;
+	for (;;) {
+		futex_guard_lock(&guard);
+		rc = futex_key_read(vas, addr, private, &value, &source);
+		if (rc == -EAGAIN) {
+			futex_guard_unlock(&guard);
+			rc = uk_vas_fault(vas, (__vaddr_t)addr,
+					  UK_VMA_FAULT_READ);
+			if (rc)
+				return rc;
+			continue;
+		}
+		if (rc)
+			break;
+		if (value != val3) {
+			rc = -EAGAIN;
+			break;
+		}
+		rc = futex_key_lookup(vas, addr2, private, &target);
+		if (rc != -EAGAIN)
+			break;
+		futex_guard_unlock(&guard);
+		futex_key_put(&source);
+		uk_arch_spinwait();
+	}
+	if (rc)
+		goto unlock;
+	rc = futex_vas_wake_locked(&source, val, FUTEX_BITSET_MATCH_ANY);
+	if (val2) {
+		uk_waitq_visit(&futex_waiters, ticket, {
+			struct uk_futex *f = (struct uk_futex *)ticket->cookie;
+
+			if (!f->woken && futex_key_equal(&f->key, &source)) {
+				/* Retire source pins after unlocking. */
+				futex_key_copy(&f->key, &target);
+				if (++requeued >= val2)
+					break;
+			}
+		});
+	}
+	rc += (int)requeued;
+unlock:
+	futex_guard_unlock(&guard);
+	while (requeued) {
+		struct futex_key old = source;
+
+		futex_key_put(&old);
+		requeued--;
+	}
+	futex_key_put(&source);
+	futex_key_put(&target);
+	return rc;
+}
+#endif
 
 /**
  * According to man pages, there exists no libc wrapper for futex
@@ -302,42 +549,74 @@ UK_LLSYSCALL_R_DEFINE(int, futex, uint32_t *, uaddr, int, futex_op,
 	 */
 	switch (cmd) {
 	case FUTEX_WAIT:
-		/*
-		 * `timeout` is relative to "now" (whenever that is). To
-		 * simplify the implementation regarding overflows, we will only
-		 * honor the nanosecond part of the timespec.
-		 */
-		if (timeout)
-			timeout_ns = ukplat_monotonic_clock() +
-				     ukarch_time_sec_to_nsec(timeout->tv_sec) +
-				     timeout->tv_nsec;
+		if (timeout) {
+			int rc = futex_timeout_deadline(
+				timeout, false,
+				!!(futex_op & FUTEX_CLOCK_REALTIME),
+				&timeout_ns);
+			if (rc < 0)
+				return rc;
+		}
+#if CONFIG_LIBPOSIX_FUTEX_VAS
+		return futex_vas_wait(uaddr, val, timeout ? &timeout_ns : NULL,
+				       FUTEX_BITSET_MATCH_ANY,
+				       !!(futex_op & FUTEX_PRIVATE_FLAG));
+#else
 		return futex_wait(uaddr, val, timeout ? &timeout_ns : NULL);
+#endif
 
 	case FUTEX_WAIT_BITSET:
-		/*
-		 * Special case implementation for cases where the val3/mask has
-		 * all bits set. Some applications do this to use the absolute
-		 * timeout mode. We return ENOSYS for all non-supported calls.
-		 */
-		if (val3 != UINT32_MAX)
-			return -ENOSYS;
+		if (val3 == 0)
+			return -EINVAL;
 
-		if (timeout)
-			timeout_ns = ukarch_time_sec_to_nsec(timeout->tv_sec)
-				     + timeout->tv_nsec;
-
-		return futex_wait(uaddr, val, timeout ? &timeout_ns : NULL);
+		if (timeout) {
+			int rc = futex_timeout_deadline(
+				timeout, true,
+				!!(futex_op & FUTEX_CLOCK_REALTIME),
+				&timeout_ns);
+			if (rc < 0)
+				return rc;
+		}
+#if CONFIG_LIBPOSIX_FUTEX_VAS
+		return futex_vas_wait(uaddr, val, timeout ? &timeout_ns : NULL,
+				       val3, !!(futex_op & FUTEX_PRIVATE_FLAG));
+#else
+		return futex_wait_bitset(uaddr, val,
+					 timeout ? &timeout_ns : NULL, val3);
+#endif
 
 	case FUTEX_WAKE:
+#if CONFIG_LIBPOSIX_FUTEX_VAS
+		return futex_vas_wake(futex_current_vas(), uaddr, val,
+				       FUTEX_BITSET_MATCH_ANY,
+				       !!(futex_op & FUTEX_PRIVATE_FLAG));
+#else
 		return futex_wake(uaddr, val);
+#endif
+
+	case FUTEX_WAKE_BITSET:
+		if (val3 == 0)
+			return -EINVAL;
+#if CONFIG_LIBPOSIX_FUTEX_VAS
+		return futex_vas_wake(futex_current_vas(), uaddr, val, val3,
+				       !!(futex_op & FUTEX_PRIVATE_FLAG));
+#else
+		return futex_wake_bitset(uaddr, val, val3);
+#endif
 
 	case FUTEX_FD:
 	case FUTEX_REQUEUE:
 		return -ENOSYS;
 
 	case FUTEX_CMP_REQUEUE:
+#if CONFIG_LIBPOSIX_FUTEX_VAS
+		return futex_vas_requeue(uaddr, val, (unsigned long)timeout,
+					  uaddr2, val3,
+					  !!(futex_op & FUTEX_PRIVATE_FLAG));
+#else
 		return futex_cmp_requeue(uaddr, val, (unsigned long)timeout,
 					 uaddr2, val3);
+#endif
 
 	default:
 		return -ENOSYS;
@@ -401,32 +680,44 @@ UK_LLSYSCALL_R_DEFINE(pid_t, set_tid_address, pid_t *, tid_ref)
 static int pthread_exit_handler(void *arg)
 {
 	struct posix_process_ptexit_event_data *event_data;
-	struct uk_list_head *itr, *tmp;
 	struct uk_thread *child;
-	struct uk_futex *f;
+	pid_t *clear_ref;
+#if !CONFIG_LIBPOSIX_FUTEX_VAS
+	struct futex_guard guard;
+#endif
 
 	UK_ASSERT(arg);
 
 	event_data = (struct posix_process_ptexit_event_data *)arg;
 	child = event_data->thread;
+	clear_ref = (pid_t *)uk_thread_uktls_var(child, child_tid_clear_ref);
+	uk_thread_uktls_var(child, child_tid_clear_ref) = NULL;
 
-	/* Clear child TID at the stored reference */
-	if (child_tid_clear_ref != NULL) {
-		*((pid_t *)child_tid_clear_ref) = 0;
-		futex_wake((uint32_t *)child_tid_clear_ref, 0);
+#if CONFIG_LIBPOSIX_FUTEX_VAS
+	futex_vas_retire_wait(child);
+	if (clear_ref) {
+		struct uk_vas *vas = uk_vas_get(child->vas ? child->vas :
+					       uk_vas_get_kernel());
+
+		/* The child may use a different VAS from the exiting caller. */
+		if (!uk_vas_store_u32(vas, (__vaddr_t)clear_ref, 0))
+			(void)futex_vas_wake(vas, (__u32 *)clear_ref, 1,
+					    FUTEX_BITSET_MATCH_ANY, false);
+		uk_vas_put(vas);
 	}
+#else
+	/* Retire the old registration before publishing the exit notification. */
+	futex_guard_lock(&guard);
+	if (child->wait_ticket.wq == &futex_waiters)
+		uk_waitq_cancel(child);
 
-	/* Clear this thread's entries from the list */
-	uk_spin_lock(&futex_list_lock);
-	uk_list_for_each_safe(itr, tmp, &futex_list) {
-		f = uk_list_entry(itr, struct uk_futex, list_node);
-		if (f->thread == child) {
-			uk_list_del(&f->list_node);
-			break; /* a thread can wait on one futex */
-		}
+	/* Linux clear-child-tid publishes zero and wakes one join waiter. */
+	if (clear_ref != NULL) {
+		uk_store_n(clear_ref, 0);
+		futex_wake_locked((uint32_t *)clear_ref, 1);
 	}
-	uk_spin_unlock(&futex_list_lock);
-
+	futex_guard_unlock(&guard);
+#endif
 	return 0;
 }
 

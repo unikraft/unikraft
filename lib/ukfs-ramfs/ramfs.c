@@ -9,6 +9,7 @@
 
 #include <fcntl.h>
 #include <limits.h>
+#include <stdint.h>
 #include <string.h>
 #include <unistd.h>
 #include <sys/mount.h>
@@ -627,13 +628,16 @@ ssize_t ramfs_live_mem(struct ramfs_node *n, enum uk_file_mem_op op,
 		if (unlikely(!iovcnt))
 			return 0;
 		__fallthrough;
+	case UKFILE_MEM_ACQUIRE_PINNED:
 	case UKFILE_MEM_ACQUIRE:
-	case UKFILE_MEM_RELEASE:
 	case UKFILE_MEM_BUFCOUNT:
 		if (unlikely(off >= n->statx.stx_size))
 			return 0;
 		if (off + len > n->statx.stx_size)
 			len = n->statx.stx_size - off;
+		break;
+	case UKFILE_MEM_RELEASE:
+		/* Release the original range even if the file was shortened. */
 		break;
 	case UKFILE_MEM_GIFT:
 		if (unlikely(ISROFS(mntflags)))
@@ -662,6 +666,14 @@ ssize_t ramfs_live_mem(struct ramfs_node *n, enum uk_file_mem_op op,
 	switch (op) {
 	case UKFILE_MEM_BUFCOUNT:
 		return ramfs_file_range_bufcount(&n->file_data, off, len);
+	case UKFILE_MEM_ACQUIRE_PINNED:
+#if CONFIG_LIBUKPOD_DEFAULT_EAGER
+		if (!ramfs_file_range_can_pin(&n->file_data, off, len))
+			return -ENOTSUP;
+		__fallthrough;
+#else /* !CONFIG_LIBUKPOD_DEFAULT_EAGER */
+		return -ENOTSUP;
+#endif /* !CONFIG_LIBUKPOD_DEFAULT_EAGER */
 	case UKFILE_MEM_ACQUIRE:
 		return ramfs_file_range_acquire(&n->file_data, off, len);
 	case UKFILE_MEM_RETRIEVE:
@@ -1478,7 +1490,10 @@ static const struct ramfs_live_ops ramfs_liveops = {
 
 static int ramfs_node_cmp(struct ramfs_node *a, struct ramfs_node *b)
 {
-	return a - b;
+	const uintptr_t left = (uintptr_t)a;
+	const uintptr_t right = (uintptr_t)b;
+
+	return (left > right) - (left < right);
 }
 
 UK_FS_TMPL_LIVE_GENERATE_STATIC(ramfs, struct ramfs_node *, ramfs_node_cmp,

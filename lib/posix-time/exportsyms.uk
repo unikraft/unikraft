@@ -15,6 +15,7 @@ gettimeofday
 settimeofday
 nanosleep
 setitimer
+getitimer
 sleep
 timegm
 times

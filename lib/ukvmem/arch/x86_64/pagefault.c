@@ -6,6 +6,8 @@
 
 #include "../../vmem.h"
 
+#include <errno.h>
+#include <uk/arch/util.h>
 #include <uk/arch/x86_64.h>
 #include <uk/assert.h>
 #include <uk/arch/types.h>
@@ -13,10 +15,73 @@
 #include <uk/print.h>
 #include <uk/config.h>
 #include <uk/lcpu.h>
+#include <uk/lcpu/regs.h>
 #include <string.h>
+#if CONFIG_LIBUKVMEM_TRACE_PAGEFAULTS
+#include <uk/plat/time.h>
+#include <uk/thread.h>
+#endif
+
+#if CONFIG_LIBUKVMEM_COW
+int vmem_arch_pagefault_wait(struct uk_vas *vas,
+			     struct uk_lcpu_regs *regs __maybe_unused)
+{
+#if CONFIG_LIBUKPLAT_NATIVE_EXCEPT
+	unsigned long irqf;
+
+	if (!(uk_lcpu_regs_get(regs, RFLAGS) & UK_ARCH_X86_64_RFLAGS_IF))
+		return -EWOULDBLOCK;
+	irqf = uk_lcpu_save_irqf();
+	uk_lcpu_except_push_nested();
+	uk_lcpu_enable_irq();
+	vmem_vas_transition_wait(vas);
+	uk_lcpu_disable_irq();
+	uk_lcpu_except_pop_nested();
+	uk_lcpu_restore_irqf(irqf);
+	return 0;
+#else
+	(void)vas;
+	return -EWOULDBLOCK;
+#endif
+}
+#endif
+
+void vmem_arch_pagefault_finish(struct uk_paging_free_batch *batch,
+				struct uk_lcpu_regs *regs __maybe_unused)
+{
+#if CONFIG_LIBUKPLAT_NATIVE_EXCEPT
+	unsigned long irqf;
+
+	/* The exception gate masks IRQs. Permit shootdown IPIs after dropping
+	 * every paging lock, while nested faults preserve this exception stack.
+	 * Never relax an interrupt mask inherited from the interrupted context.
+	 */
+#if CONFIG_LIBUKPAGING_DEFERRED_RELEASE
+	if ((uk_lcpu_regs_get(regs, RFLAGS) & UK_ARCH_X86_64_RFLAGS_IF) &&
+	    (batch->has_tlb_range || batch->full_flush || batch->calls)) {
+#else
+	if ((uk_lcpu_regs_get(regs, RFLAGS) & UK_ARCH_X86_64_RFLAGS_IF) &&
+	    (batch->has_tlb_range || batch->full_flush)) {
+#endif
+		irqf = uk_lcpu_save_irqf();
+		uk_lcpu_except_push_nested();
+		uk_lcpu_enable_irq();
+		uk_paging_free_batch_finish(batch);
+		uk_lcpu_disable_irq();
+		uk_lcpu_except_pop_nested();
+		uk_lcpu_restore_irqf(irqf);
+		return;
+	}
+#endif
+	uk_paging_free_batch_finish(batch);
+}
 
 static int vmem_arch_pagefault(void *data)
 {
+	__u64 orig_gsbase = uk_arch_x86_64_enter_kernel_gsbase();
+#if CONFIG_LIBUKVMEM_TRACE_PAGEFAULTS
+	const __nsec handler_started = ukplat_monotonic_clock();
+#endif
 	struct uk_lcpu_except_err_ctx *ctx = data;
 	__vaddr_t vaddr = (__vaddr_t)uk_lcpu_except_err_ctx_get_fault_addr(ctx);
 	const char *faultstr[] __maybe_unused = {
@@ -40,12 +105,28 @@ static int vmem_arch_pagefault(void *data)
 	else if (error_code & UK_ARCH_X86_64_PF_EC_RSVD)
 		faulttype |= UK_VMA_FAULT_MISCONFIG;
 
+#if CONFIG_LIBUKPLAT_NATIVE_EXCEPT
+	if (uk_lcpu_regs_get((struct uk_lcpu_regs *)
+			     uk_lcpu_except_err_ctx_get_regs(ctx), RFLAGS) &
+	    UK_ARCH_X86_64_RFLAGS_IF)
+		faulttype |= UK_VMA_FAULT_IRQS_ENABLED;
+#endif
+
+#if CONFIG_LIBUKVMEM_TRACE_PAGEFAULTS
+	struct uk_thread *thread = uk_thread_current();
+#endif
 	rc = vmem_pagefault(vaddr, faulttype,
 			    (struct uk_lcpu_regs *)
 			    uk_lcpu_except_err_ctx_get_regs(ctx));
+#if CONFIG_LIBUKVMEM_TRACE_PAGEFAULTS
+	if (!rc && thread && (faulttype & UK_VMA_FAULT_NONPRESENT)) {
+		thread->vmem_faults++;
+		thread->vmem_fault_time += ukplat_monotonic_clock() - handler_started;
+	}
+#endif
 	if (rc < 0) {
 		vas = uk_vas_get_active();
-		if (unlikely(vas && !(vas->flags & UK_VAS_FLAG_NO_PAGING)))
+		if (unlikely(uk_vas_paging_enabled(vas)))
 			uk_pr_debug("Cannot handle %s page fault at 0x%"
 				    __PRIvaddr " (ec: 0x%lx): %s (%d).\n",
 				    faultstr[faulttype &
@@ -54,9 +135,11 @@ static int vmem_arch_pagefault(void *data)
 				    error_code,
 				    strerror(-rc), -rc);
 		uk_lcpu_except_err_ctx_set_handler_err(ctx, rc);
+		uk_arch_x86_64_exit_kernel_gsbase(orig_gsbase);
 		return UK_EVENT_NOT_HANDLED;
 	}
 
+	uk_arch_x86_64_exit_kernel_gsbase(orig_gsbase);
 	return UK_EVENT_HANDLED;
 }
 

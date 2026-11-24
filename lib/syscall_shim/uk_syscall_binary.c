@@ -65,12 +65,46 @@ struct uk_syscall_ctx {
 	__uptr auxsp;
 };
 
+#define UK_SYSCALL_RESTART_PENDING UK_BIT(1)
+
+struct uk_syscall_binary_exit_ctx {
+	struct uk_syscall_exit_ctx ctx;
+	__uptr restart_value;
+};
+
+void uk_syscall_exit_resolve_restart(struct uk_syscall_exit_ctx *exit_ctx,
+				     bool restart)
+{
+	struct uk_syscall_binary_exit_ctx *binary_exit;
+	struct ukarch_execenv *execenv;
+	__uptr ip;
+
+	if (!exit_ctx || !(exit_ctx->flags & UK_SYSCALL_RESTART_PENDING))
+		return;
+	exit_ctx->flags &= ~UK_SYSCALL_RESTART_PENDING;
+	if (!restart)
+		return;
+
+	binary_exit = __containerof(exit_ctx, struct uk_syscall_binary_exit_ctx,
+				    ctx);
+	execenv = exit_ctx->execenv;
+	ip = _UK_EXECENV_REGS_GET(execenv, __syscall_rip) - __syscall_insn_len;
+	_UK_EXECENV_REGS_SET(execenv, __syscall_rret0,
+			     binary_exit->restart_value);
+	_UK_EXECENV_REGS_SET(execenv, __syscall_rip, ip);
+#ifdef __X86_64__
+	/* This copy of the PC is exposed in the signal's ucontext. */
+	uk_lcpu_regs_set(execenv->regs, RIP, ip);
+#endif /* __X86_64__ */
+}
+
 void ukplat_syscall_handler(struct uk_syscall_ctx *usc)
 {
 	struct uk_syscall_enter_ctx enter_ctx;
-	struct uk_syscall_exit_ctx exit_ctx;
+	struct uk_syscall_binary_exit_ctx binary_exit;
 	struct ukarch_auxspcb *auxspcb;
 	struct ukarch_execenv *execenv;
+	long ret;
 #if CONFIG_LIBSYSCALL_SHIM_HANDLER_ULTLS
 	struct uk_thread *t;
 #endif /* CONFIG_LIBSYSCALL_SHIM_HANDLER_ULTLS */
@@ -103,13 +137,21 @@ void ukplat_syscall_handler(struct uk_syscall_ctx *usc)
 				  UK_SYSCALL_ENTER_CTX_BINARY_SYSCALL);
 	uk_syscall_entertab_run(&enter_ctx);
 
-	_UK_EXECENV_REGS_SET(execenv, __syscall_rret0,
-			     uk_syscall6_do_e(execenv));
-
-	uk_syscall_exit_ctx_init(&exit_ctx,
-				 execenv, uk_syscall_nested_depth,
+	ret = uk_syscall6_do_e(execenv);
+	uk_syscall_exit_ctx_init(&binary_exit.ctx, execenv,
+				 uk_syscall_nested_depth,
 				 UK_SYSCALL_EXIT_CTX_BINARY_SYSCALL);
-	uk_syscall_exittab_run(&exit_ctx);
+	if (unlikely(ret == -UK_SYSCALL_ERESTARTSYS)) {
+		binary_exit.ctx.flags |= UK_SYSCALL_RESTART_PENDING;
+		binary_exit.restart_value =
+			_UK_EXECENV_REGS_GET(execenv, __syscall_rrestart);
+		ret = -EINTR;
+	}
+	_UK_EXECENV_REGS_SET(execenv, __syscall_rret0, ret);
+	uk_syscall_exittab_run(&binary_exit.ctx);
+	/* Resume waits interrupted by a signal that was not delivered. */
+	if (unlikely(binary_exit.ctx.flags & UK_SYSCALL_RESTART_PENDING))
+		uk_syscall_exit_resolve_restart(&binary_exit.ctx, true);
 	uk_syscall_nested_depth--;
 
 #if CONFIG_LIBSYSCALL_SHIM_HANDLER_ULTLS

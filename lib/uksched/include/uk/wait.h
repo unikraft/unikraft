@@ -13,6 +13,7 @@
 #ifndef __UK_SCHED_WAIT_H__
 #define __UK_SCHED_WAIT_H__
 
+#include <errno.h>
 #include <uk/essentials.h>
 #include <uk/lcpu.h>
 #include <uk/plat/time.h>
@@ -75,9 +76,7 @@ void _uk_waitq_remove(struct uk_thread *thread)
 static inline
 void _uk_waitq_block_until(struct uk_thread *thread, __snsec deadline)
 {
-	uk_thread_set_wakeup(thread, deadline);
-	uk_thread_set_blocked(thread);
-	uk_sched_thread_blocked(thread);
+	uk_thread_block_until(thread, deadline);
 }
 
 /**
@@ -152,7 +151,8 @@ void _uk_waitq_block_until(struct uk_thread *thread, __snsec deadline)
 /**
  * INTERNAL. Wait exactly once using `wq` until awoken or a deadline.
  *
- * Expression returns non-zero if timed out.
+ * Expression returns 1 if timed out, or -EINTR if interrupted.
+ * `kind` is one of the UK_THREAD_WAIT_* wait kinds.
  *
  * If `deadline` is non-zero, wait at most until that point in time;
  * after wakeup compare `deadline` with the value supplied by `clock_expr` to
@@ -161,37 +161,63 @@ void _uk_waitq_block_until(struct uk_thread *thread, __snsec deadline)
  * If `lock` evaluates true, it will be released before sleeping with
  * `unlock_fn` and re-acquired after wakeup with `lock_fn`.
  */
-#define _uk_waitq_wait(wq, deadline, clock_expr, lock_fn, unlock_fn, lock)\
+#define _uk_waitq_wait(wq, deadline, clock_expr, lock_fn, unlock_fn,	\
+		      lock, kind)					\
 ({									\
 	struct uk_thread *_uk_waitq_current = uk_thread_current();	\
 	int _uk_waitq_timedout = 0;					\
 	unsigned long _uk_waitq_flags;					\
+	struct uk_waitq *_uk_waitq_q = (wq);				\
+	__typeof__(lock) _uk_waitq_outer = (lock);			\
+	__snsec _uk_waitq_deadline = (deadline);			\
+	int _uk_waitq_kind = (kind);					\
+	bool _uk_waitq_sleep = true;					\
 									\
-	_uk_waitq_lock((wq), _uk_waitq_flags);				\
-	_uk_waitq_add((wq), _uk_waitq_current);				\
-	_uk_waitq_block_until(_uk_waitq_current, (deadline));		\
-	_uk_waitq_unlock((wq), _uk_waitq_flags);			\
-	if ((lock))							\
-		unlock_fn((lock));					\
-	uk_sched_yield();						\
-	/* Awoken */							\
-	if ((lock))							\
-		lock_fn((lock));					\
-	_uk_waitq_lock((wq), _uk_waitq_flags);				\
-	if ((deadline) && ((clock_expr) >= (deadline)))			\
-		_uk_waitq_timedout = 1;					\
+	_uk_waitq_lock(_uk_waitq_q, _uk_waitq_flags);			\
+	_uk_waitq_add(_uk_waitq_q, _uk_waitq_current);			\
+	if (_uk_waitq_kind == UK_THREAD_WAIT_SIGINTR)			\
+		_uk_waitq_sleep = uk_thread_block_sigintr(		\
+			_uk_waitq_current, _uk_waitq_deadline);		\
+	else if (_uk_waitq_kind)					\
+		_uk_waitq_sleep = uk_thread_block_interruptible(	\
+			_uk_waitq_current, _uk_waitq_deadline);		\
+	else								\
+		_uk_waitq_block_until(_uk_waitq_current,		\
+				      _uk_waitq_deadline);		\
+	_uk_waitq_unlock(_uk_waitq_q, _uk_waitq_flags);			\
+	if (_uk_waitq_outer)						\
+		unlock_fn(_uk_waitq_outer);				\
+	if (_uk_waitq_sleep)						\
+		uk_sched_yield();					\
+	/* Detach before taking an outer lock that may itself block. */	\
+	_uk_waitq_lock(_uk_waitq_q, _uk_waitq_flags);			\
 	_uk_waitq_remove(_uk_waitq_current);				\
-	_uk_waitq_unlock((wq), _uk_waitq_flags);			\
+	_uk_waitq_unlock(_uk_waitq_q, _uk_waitq_flags);			\
+	if (_uk_waitq_outer)						\
+		lock_fn(_uk_waitq_outer);				\
+	if (uk_thread_wait_ended(_uk_waitq_current, _uk_waitq_kind))	\
+		_uk_waitq_timedout = -EINTR;				\
+	else if (_uk_waitq_deadline && (clock_expr) >= _uk_waitq_deadline) \
+		_uk_waitq_timedout = 1;					\
 									\
 	_uk_waitq_timedout;						\
 })
 
 #define uk_waitq_wait_locked(wq, lock_fn, unlock_fn, lock) \
-	_uk_waitq_wait((wq), 0, 0, lock_fn, unlock_fn, (lock))
+	_uk_waitq_wait((wq), 0, 0, lock_fn, unlock_fn, (lock),		\
+		       UK_THREAD_WAIT_PLAIN)
 
 #define uk_waitq_wait_deadline_locked(wq, deadline, lock_fn, unlock_fn, lock) \
 	_uk_waitq_wait((wq), deadline, ukplat_monotonic_clock(),	\
-		       lock_fn, unlock_fn, (lock))
+		       lock_fn, unlock_fn, (lock), UK_THREAD_WAIT_PLAIN)
+
+#define uk_waitq_wait_interruptible(wq, deadline, lock_fn, unlock_fn, lock) \
+	_uk_waitq_wait((wq), deadline, ukplat_monotonic_clock(),	\
+		       lock_fn, unlock_fn, (lock), UK_THREAD_WAIT_TERM)
+
+#define uk_waitq_wait_sigintr(wq, deadline, lock_fn, unlock_fn, lock) \
+	_uk_waitq_wait((wq), deadline, ukplat_monotonic_clock(),	\
+		       lock_fn, unlock_fn, (lock), UK_THREAD_WAIT_SIGINTR)
 
 static inline void _uk_waitq_noplock(int lock __unused) {}
 
@@ -287,18 +313,31 @@ void uk_waitq_wake_up_one(struct uk_waitq *wq)
 	_uk_waitq_unlock(wq, flags);
 }
 
-#define _uk_waitq_wake_up_if_then(wq, ticket, condition, aftermath)	\
+/**
+ * Visit tickets while holding the wait queue lock.
+ *
+ * The action must not block, change queue membership or re-enter a waitq API.
+ * A consumer may inspect/update its cookie under this lock.  break stops the
+ * traversal.  Ticket lifetime remains owned by the waitq implementation.
+ */
+#define uk_waitq_visit(wq, ticket, action)				\
 do {									\
 	unsigned long _uk_waitq_flags;					\
 									\
 	_uk_waitq_lock((wq), _uk_waitq_flags);				\
-	uk_list_for_each_entry((ticket), &(wq)->waiters, link)		\
+	uk_list_for_each_entry((ticket), &(wq)->waiters, link) {		\
+		action;							\
+	}								\
+	_uk_waitq_unlock((wq), _uk_waitq_flags);				\
+} while (0)
+
+#define _uk_waitq_wake_up_if_then(wq, ticket, condition, aftermath)	\
+	uk_waitq_visit((wq), (ticket), {					\
 		if ((condition)) {					\
 			_uk_waitq_wake((wq), (ticket));			\
 			aftermath;					\
 		}							\
-	_uk_waitq_unlock((wq), _uk_waitq_flags);			\
-} while (0)
+	})
 
 #define uk_waitq_wake_up_if(wq, ticket, condition) \
 	_uk_waitq_wake_up_if_then((wq), (ticket), (condition), (void)0)

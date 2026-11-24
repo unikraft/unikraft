@@ -280,6 +280,41 @@ static inline void uk_arch_x86_64_wrmsrl(unsigned int msr, __u64 val)
 }
 
 /**
+ * Switch active GS_BASE to this CPU's kernel GS_BASE (MSR_KERNEL_GS_BASE)
+ * while preserving the interrupted GS_BASE for later restoration.
+ *
+ * @return Interrupted MSR_GS_BASE value
+ */
+static inline __u64 uk_arch_x86_64_enter_kernel_gsbase(void)
+{
+	__u64 orig_gsbase = uk_arch_x86_64_rdmsrl(UK_ARCH_X86_64_MSR_GS_BASE);
+	__u64 kgsbase =
+		uk_arch_x86_64_rdmsrl(UK_ARCH_X86_64_MSR_KERNEL_GS_BASE);
+
+	if (orig_gsbase != kgsbase)
+		uk_arch_x86_64_wrmsrl(UK_ARCH_X86_64_MSR_GS_BASE, kgsbase);
+	__barrier();
+	return orig_gsbase;
+}
+
+/**
+ * Restore an interrupted GS_BASE previously saved by
+ * uk_arch_x86_64_enter_kernel_gsbase().
+ *
+ * @param orig_gsbase Previously saved MSR_GS_BASE value
+ */
+static inline void uk_arch_x86_64_exit_kernel_gsbase(__u64 orig_gsbase)
+{
+	__u64 cur_gsbase;
+
+	__barrier();
+	cur_gsbase = uk_arch_x86_64_rdmsrl(UK_ARCH_X86_64_MSR_GS_BASE);
+	if (cur_gsbase != orig_gsbase)
+		uk_arch_x86_64_wrmsrl(UK_ARCH_X86_64_MSR_GS_BASE, orig_gsbase);
+	__barrier();
+}
+
+/**
  * Read timestamp counter
  *
  * @return 64-bit TSC value

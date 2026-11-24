@@ -11,6 +11,27 @@
 #ifndef __UK_PLAT_NATIVE_ARCH_PAGING_H__
 #define __UK_PLAT_NATIVE_ARCH_PAGING_H__
 
-/* No  x86_64 arch defs */
+#include <uk/arch/types.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+#if !__ASSEMBLY__
+
+/**
+ * Initialize this CPU's paging capabilities and architectural prerequisites.
+ *
+ * Does not activate a page table or publish shared paging geometry.
+ * If max_physaddr is non-NULL, writes this CPU's supported physical limit.
+ * May be called before TLS and the runtime address space are available.
+ */
+int uk_plat_native_paging_init_cpu(__paddr_t *max_physaddr);
+
+#endif /* !__ASSEMBLY__ */
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* __UK_PLAT_NATIVE_ARCH_PAGING_H__ */

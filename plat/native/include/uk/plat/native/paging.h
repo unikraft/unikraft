@@ -8,6 +8,7 @@
 #define __UK_PLAT_NATIVE_PAGING_H__
 
 #include <uk/arch/types.h>
+#include <uk/plat/native/arch/paging.h>
 
 #ifdef __cplusplus
 extern "C" {

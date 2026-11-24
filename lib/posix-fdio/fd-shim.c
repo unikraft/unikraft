@@ -560,6 +560,18 @@ int fcntl(int fd, int cmd, ...)
 	intptr_t arg = 0;
 	va_list ap;
 
+#if CONFIG_LIBPOSIX_PROCESS_SIGNAL && CONFIG_LIBPOSIX_FD_HEAPOFD
+	/* A negative process-group ID must not be converted to errno. */
+	if (cmd == F_GETOWN) {
+		struct f_owner_ex owner;
+		int ret = uk_syscall_e_fcntl(fd, F_GETOWN_EX,
+					     (unsigned long)&owner);
+
+		if (ret)
+			return ret;
+		return owner.type == F_OWNER_PGRP ? -owner.pid : owner.pid;
+	}
+#endif /* CONFIG_LIBPOSIX_PROCESS_SIGNAL && CONFIG_LIBPOSIX_FD_HEAPOFD */
 	va_start(ap, cmd);
 	switch (cmd) {
 	case F_DUPFD:

@@ -13,4 +13,11 @@ config LIBUKCONSOLE_DEVICES_MAXCOUNT
 config LIBUKCONSOLE_TEST
 	bool "Enable unit tests"
 	select LIBUKTEST
+
+config LIBUKCONSOLE_SMP_TEST
+	bool "Test concurrent console lines on all CPUs"
+	depends on HAVE_SMP && LIBUKPRINT_KLVL_INFO
+	select LIBUKATOMIC
+	select LIBUKLOCK_SEMAPHORE
+	default n
 endif

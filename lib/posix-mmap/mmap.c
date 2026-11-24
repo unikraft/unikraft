@@ -10,6 +10,9 @@
 #include <errno.h>
 
 #include <uk/config.h>
+#if CONFIG_LIBUKDEBUG_ENABLE_ASSERT
+#include <uk/print.h>
+#endif
 #include <uk/syscall.h>
 #include <uk/essentials.h>
 #include <uk/arch/limits.h>
@@ -104,14 +107,7 @@ static int do_mmap(void **addr, size_t len, int prot, int flags, int fd,
 	}
 
 	if (flags & MAP_ANONYMOUS) {
-		if ((flags & MAP_SHARED) ||
-		    (flags & MAP_SHARED_VALIDATE) == MAP_SHARED_VALIDATE) {
-			/* MAP_SHARED(_VALIDATE): Note, we ignore it for
-			 * anonymous memory since we only have a single
-			 * process. There is no one to share the mapping with.
-			 * It is thus fine to create a private mapping.
-			 */
-		} else if (unlikely(!(flags & MAP_PRIVATE)))
+		if (unlikely(!(flags & (MAP_PRIVATE | MAP_SHARED))))
 			return -EINVAL;
 
 		/* We do not support unrestricted VMAs */
@@ -139,7 +135,13 @@ static int do_mmap(void **addr, size_t len, int prot, int flags, int fd,
 		}
 
 		vargs = NULL;
+#if CONFIG_LIBUKVMEM_COW_VMA
+		vops = vas->cow ? &uk_vma_cow_anon_ops : &uk_vma_anon_ops;
+		if (vas->cow && (flags & MAP_SHARED))
+			vops = &uk_vma_shared_anon_ops;
+#else
 		vops  = &uk_vma_anon_ops;
+#endif
 	} else {
 #if CONFIG_LIBPOSIX_FDTAB
 		union uk_shim_file sf;
@@ -181,6 +183,12 @@ static int do_mmap(void **addr, size_t len, int prot, int flags, int fd,
 			fdio_vma_args.offset = offset;
 			vargs = &fdio_vma_args;
 			vops = &uk_fdio_vma_ops;
+#if CONFIG_LIBUKVMEM_COW_VMA
+			if (vflags & UK_VMA_FILE_SHARED)
+				vops = &uk_fdio_shared_vma_ops;
+			else if (vas->cow)
+				vops = &uk_fdio_cow_vma_ops;
+#endif
 			/* We release the ofile after VMA creation */
 			break;
 #else /* !CONFIG_LIBPOSIX_FDIO */
@@ -206,6 +214,19 @@ static int do_mmap(void **addr, size_t len, int prot, int flags, int fd,
 	/* MAP_NONBLOCKED: Ignored for now */
 	/* MAP_NORESERVE : Ignored for now */
 
+#if CONFIG_LIBPOSIX_MMAP_POPULATE_SMALL_ANON
+	/* Plain allocator mappings have neither stack nor reservation flags. */
+	if (flags == (MAP_PRIVATE | MAP_ANONYMOUS) &&
+	    prot == (PROT_READ | PROT_WRITE) &&
+	    vaddr == UK_PAGING_VADDR_ANY && len <= UK_PAGING_PAGE_LARGE_SIZE) {
+		rc = uk_vma_map(vas, &vaddr, len, vattr,
+				vflags | UK_VMA_MAP_POPULATE, NULL, vops, vargs);
+		if (rc != -ENOMEM) {
+			*addr = (void *)vaddr;
+			return rc;
+		}
+	}
+#endif
 	rc = uk_vma_map(vas, &vaddr, len, vattr, vflags, NULL, vops, vargs);
 	if (unlikely(rc && !(flags & MAP_FIXED) &&
 		     vaddr != UK_PAGING_VADDR_ANY)) {
@@ -234,6 +255,10 @@ UK_SYSCALL_DEFINE(void *, mmap, void *, addr, size_t, len, int, prot,
 
 	rc = do_mmap(&addr, len, prot, flags, fd, offset);
 	if (unlikely(rc)) {
+#if CONFIG_LIBUKDEBUG_ENABLE_ASSERT
+		uk_pr_err("mmap failed: %d (addr %p, len %zu, prot %#x, flags %#x, fd %d, off %lld)\n",
+			  rc, addr, len, prot, flags, fd, (long long)offset);
+#endif
 		errno = -rc;
 		return MAP_FAILED;
 	}
@@ -317,10 +342,23 @@ UK_SYSCALL_R_DEFINE(int, madvise, void *, addr, size_t, len, int, advice)
 
 UK_SYSCALL_R_DEFINE(int, msync, void*, addr, size_t, length, int, flags)
 {
-	/* Since writing mmap memory back to file is not supported,
-	 * this doesn't make sense.
+	__vaddr_t vaddr = (__vaddr_t)addr;
+	int rc;
+
+	if (!UK_PAGING_PAGE_ALIGNED(vaddr) ||
+	    (flags & ~(MS_SYNC | MS_ASYNC | MS_INVALIDATE)) ||
+	    ((flags & MS_SYNC) && (flags & MS_ASYNC)))
+		return -EINVAL;
+	if (length > __SZ_MAX - (UK_PAGING_PAGE_SIZE - 1))
+		return -ENOMEM;
+	/* There is no asynchronous writeback worker yet. Never report a
+	 * queued flush that did not happen.
 	 */
-	return 0;
+	if (flags & MS_ASYNC)
+		return -ENOTSUP;
+	rc = uk_vma_sync(uk_vas_get_active(), vaddr,
+			 UK_PAGING_PAGE_ALIGN_UP(length));
+	return rc == -ENOENT ? -ENOMEM : rc;
 }
 
 UK_SYSCALL_R_DEFINE(int, mlock, const void*, addr, size_t, len)

@@ -408,6 +408,12 @@ int init_vfs_fstab(struct uk_init_ctx *ictx __unused)
 		return r;
 #endif /* CONFIG_LIBPOSIX_VFS_FSTAB_MOUNT_DEV */
 
+#if CONFIG_LIBPOSIX_VFS_FSTAB_MOUNT_SHM
+	r = fstab_mount_special("/dev/shm", "ramfs", "", 0, NULL);
+	if (unlikely(r))
+		return r;
+#endif /* CONFIG_LIBPOSIX_VFS_FSTAB_MOUNT_SHM */
+
 	uk_pr_debug("Mounted %d entries total\n", count);
 	return 0;
 }

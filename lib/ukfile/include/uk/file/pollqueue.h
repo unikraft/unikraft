@@ -65,7 +65,8 @@ typedef uk_pollevent (*uk_poll_func)(const struct uk_file *f,
 
 enum uk_poll_chain_type {
 	UK_POLL_CHAINTYPE_UPDATE,
-	UK_POLL_CHAINTYPE_CALLBACK
+	UK_POLL_CHAINTYPE_CALLBACK,
+	UK_POLL_CHAINTYPE_CALLBACK_EXCLUSIVE
 };
 
 enum uk_poll_chain_op {
@@ -92,7 +93,9 @@ typedef void (*uk_poll_chain_callback_fn)(uk_pollevent ev,
  * If newly modified events overlap with those in `mask`, perform a chain update
  * of these overlapping bits according to `type`:
  *   - UK_POLL_CHAINTYPE_UPDATE: propagate events to `queue`.
- *   - UK_POLL_CHAINTYPE_CALLBACK: call `callback`
+ *   - UK_POLL_CHAINTYPE_CALLBACK: call `callback`.
+ *   - UK_POLL_CHAINTYPE_CALLBACK_EXCLUSIVE: call one matching exclusive
+ *     callback on set, rotating it to the end of the list.
  */
 struct uk_poll_chain {
 	UK_STAILQ_ENTRY(struct uk_poll_chain) list_entry;
@@ -304,20 +307,29 @@ uk_pollevent _uk_pollq_lock(struct uk_pollq *q, uk_pollevent req,
  * @param deadline Max number of nanoseconds to wait or, or 0 if forever
  *
  * @return
- *   0 on timeout
- *   non-zero if awoken
+ *   0 if awoken, 1 on timeout, -EINTR if interrupted
  */
 static inline
-int _uk_pollq_wait(struct uk_pollq *q, uk_pollevent req, __nsec deadline)
+int _uk_pollq_wait(struct uk_pollq *q, uk_pollevent req, __nsec deadline,
+		   int kind)
 {
 	/* Mark request in waitmask */
 	(void)uk_or(&q->waitmask, req);
 	/* Set events as cookie & wait */
 	uk_waitq_set_cookie(req);
-	return !uk_waitq_wait_deadline_locked(&q->waitq, deadline,
-					      uk_rwlock_rlock,
-					      uk_rwlock_runlock,
-					      &q->waitlock);
+	if (kind == UK_THREAD_WAIT_SIGINTR)
+		return uk_waitq_wait_sigintr(&q->waitq, deadline,
+					     uk_rwlock_rlock,
+					     uk_rwlock_runlock,
+					     &q->waitlock);
+	if (kind)
+		return uk_waitq_wait_interruptible(&q->waitq, deadline,
+						   uk_rwlock_rlock,
+						   uk_rwlock_runlock,
+						   &q->waitlock);
+	return uk_waitq_wait_deadline_locked(&q->waitq, deadline,
+					     uk_rwlock_rlock, uk_rwlock_runlock,
+					     &q->waitlock);
 }
 
 /**
@@ -360,22 +372,41 @@ uk_pollevent uk_pollq_poll_level(struct uk_pollq *q, uk_pollevent req,
  * @return
  *   Bitwise AND between `req` and the events set in `q`, or 0 if timed out
  */
-static inline
-uk_pollevent uk_pollq_poll_until(struct uk_pollq *q, uk_pollevent req,
-				 __nsec deadline, const struct uk_file *f)
+static inline int
+_uk_pollq_poll_until(struct uk_pollq *q, uk_pollevent req, __nsec deadline,
+		     const struct uk_file *f, int kind,
+		     uk_pollevent *events)
 {
-	uk_pollevent ev;
+	uk_pollevent ev = 0;
+	int wait = 0;
 
-	if ((ev = _uk_pollq_poll_immediate(q, req)))
-		return ev;
-	if ((ev = _uk_pollq_lock(q, req, f)))
-		return ev;
-	while (_uk_pollq_wait(q, req, deadline)) {
+	if (uk_thread_wait_ended(uk_thread_current(), kind)) {
+		wait = -EINTR;
+		goto out;
+	}
+	if ((ev = _uk_pollq_poll_immediate(q, req)) ||
+	    (ev = _uk_pollq_lock(q, req, f)))
+		goto out;
+	while (!(wait = _uk_pollq_wait(q, req, deadline, kind))) {
 		if ((ev = _uk_pollq_poll_locked(q, req, f)))
 			break;
 	}
 	uk_rwlock_runlock(&q->waitlock);
-	return ev;
+out:
+	if (events)
+		*events = ev;
+	return wait < 0 ? wait : 0;
+}
+
+static inline uk_pollevent
+uk_pollq_poll_until(struct uk_pollq *q, uk_pollevent req, __nsec deadline,
+		    const struct uk_file *f)
+{
+	uk_pollevent events;
+
+	(void)_uk_pollq_poll_until(q, req, deadline, f, UK_THREAD_WAIT_PLAIN,
+				   &events);
+	return events;
 }
 
 /**
@@ -481,6 +512,19 @@ out:
  *   The previous event set.
  */
 uk_pollevent uk_pollq_set_n(struct uk_pollq *q, uk_pollevent set, int one);
+
+#if CONFIG_LIBUKFILE_POLLED
+/**
+ * Notify waiters of an externally polled queue.
+ *
+ * Direct waiters recheck readiness for the sampled levels and rising edges.
+ * Only rising edges are propagated to poll chains. The driver retains
+ * ownership of the current levels and must notify when they may become ready,
+ * even without a new edge in its callback stream. May block.
+ */
+void uk_pollq_notify_polled(struct uk_pollq *q, uk_pollevent levels,
+			    uk_pollevent edges);
+#endif /* CONFIG_LIBUKFILE_POLLED */
 
 /**
  * Update events, clearing those in `clr`.

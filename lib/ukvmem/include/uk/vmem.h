@@ -35,9 +35,13 @@
  */
 
 #include <uk/config.h>
+#include <uk/arch/spinlock.h>
 #include <uk/arch/types.h>
 #include <uk/list.h>
 #include <uk/alloc.h>
+#if CONFIG_LIBUKVMEM_VAS_REFCOUNT
+#include <uk/refcount.h>
+#endif
 #ifdef CONFIG_LIBUKPAGING
 #include <uk/paging.h>
 #endif /* CONFIG_LIBUKPAGING */
@@ -50,11 +54,22 @@ struct uk_pagetable;
 
 struct uk_vma;
 struct uk_vma_ops;
+struct uk_vma_shared_ref;
+struct uk_vma_cow_source;
+struct vmem_cow_vas;
+#if CONFIG_LIBUKVMEM_COW
+struct vmem_vas_transition;
+#endif
 
 /** Virtual address space (VAS) */
 struct uk_vas {
 	/** Allocator to use for VMAs */
 	struct uk_alloc *a;
+#if CONFIG_LIBUKVMEM_VAS_REFCOUNT
+	/** Present only for address spaces with an explicit final release. */
+	__atomic refs;
+	void (*release)(struct uk_vas *vas);
+#endif
 
 #ifdef CONFIG_LIBUKPAGING
 	/** Page table that represents the virtual address space */
@@ -62,47 +77,44 @@ struct uk_vas {
 
 	/** Base address where to start putting new VMAs */
 	__vaddr_t vma_base;
+#if CONFIG_LIBUKVMEM_VAS_BOUNDS
+	/** Optional allocation interval [start, end); zero end is unbounded. */
+	__vaddr_t range_start;
+	__vaddr_t range_end;
+#endif
 #endif /* CONFIG_LIBUKPAGING */
 
 	/** List of VMAs, sorted by address */
 	struct uk_list_head vma_list;
 
+	/** Unmapped ranges awaiting TLB completion, protected by lock. */
+	struct uk_list_head unmap_ranges;
+
 	/** VAS flags */
 #define UK_VAS_FLAG_NO_PAGING		0x1 /* On-demand paging disabled */
 	unsigned long flags;
+
+	/** Serializes VMA list and page-table mutations across CPUs/IRQs */
+	struct __spinlock lock;
+#if CONFIG_LIBUKVMEM_COW
+	/** Mapping transition awaiting completion outside the VAS lock. */
+	struct vmem_vas_transition *transition;
+#endif
+#if CONFIG_LIBUKVMEM_COW_VMA
+	/** Private mapping references; shared metadata outlives all clones. */
+	struct vmem_cow_vas *cow;
+#endif
 };
 
 /**
- * Returns the current paging flag and temporarily disables demand-paging for
- * the address space.
+ * Suspend demand paging for this VAS on the executing CPU. Do not
+ * yield while a saved state is outstanding. Restore in reverse order.
  *
- * @param vas
- *   The address space to disable paging for
- *
- * @return
- *   The current paging flag
+ * @return An opaque state for uk_vas_paging_restoref().
  */
-static inline unsigned long uk_vas_paging_savef(struct uk_vas *vas)
-{
-	unsigned long saved_flags = vas->flags;
-
-	vas->flags |= UK_VAS_FLAG_NO_PAGING;
-	return saved_flags & UK_VAS_FLAG_NO_PAGING;
-}
-
-/**
- * Restores the paging flag
- *
- * @param vas
- *   The address space to restore the paging flag for
- * @param flag
- *   The paging flag to restore
- */
-static inline void uk_vas_paging_restoref(struct uk_vas *vas,
-					  unsigned long flag)
-{
-	vas->flags = (vas->flags & ~UK_VAS_FLAG_NO_PAGING) | flag;
-}
+unsigned long uk_vas_paging_savef(struct uk_vas *vas);
+void uk_vas_paging_restoref(struct uk_vas *vas, unsigned long state);
+int uk_vas_paging_enabled(struct uk_vas *vas);
 
 /** Virtual memory area (VMA) */
 struct uk_vma {
@@ -124,6 +136,9 @@ struct uk_vma {
 	/** Desired page level (-1 = no preference) */
 	int page_lvl;
 
+	/** Active unlocked sync invocations pinning this VMA against destroy */
+	__u32 sync_inflight;
+
 	/** Optional name of the VMA */
 	const char *name;
 };
@@ -137,6 +152,21 @@ static inline __sz uk_vma_len(struct uk_vma *vma)
 
 	return vma->end - vma->start;
 }
+
+#if CONFIG_LIBUKVMEM_COW
+/**
+ * Staged fault ownership. The result callback runs exactly once after the
+ * mapper outcome, under VAS and paging locks with IRQs masked. A zero result
+ * commits ownership; other values discard it. Retirement of replaced frames
+ * still belongs to the supplied TLB batch. Do not block, yield or reenter
+ * VAS/paging operations here; enqueue later work in the batch instead. The
+ * descriptor must outlive the fault callback and may be freed by result().
+ */
+struct uk_vm_fault_op {
+	void (*result)(struct uk_vm_fault_op *op, int status,
+		       struct uk_paging_free_batch *batch);
+};
+#endif
 
 /** Page fault context */
 struct uk_vm_fault {
@@ -176,6 +206,8 @@ struct uk_vm_fault {
 #define UK_VMA_FAULT_MISCONFIG		0x08 /* Misconfiguration in PT */
 
 #define UK_VMA_FAULT_SOFT		0x10 /* Software-generated fault */
+/* The interrupted context permits maskable interrupts during completion. */
+#define UK_VMA_FAULT_IRQS_ENABLED	0x20
 	const unsigned int type;
 
 	/**
@@ -190,6 +222,10 @@ struct uk_vm_fault {
 
 	/** Trap frame */
 	struct uk_lcpu_regs *regs;
+#if CONFIG_LIBUKVMEM_COW
+	/** Optional staged ownership result, set by the backend. */
+	struct uk_vm_fault_op **operation;
+#endif
 #endif /* CONFIG_LIBUKPAGING */
 };
 
@@ -262,6 +298,30 @@ struct uk_vma_ops {
 	 */
 	void (*destroy)(struct uk_vma *vma);
 
+#if CONFIG_LIBUKVMEM_COW_VMA
+	/**
+	 * Copy backend state for a COW clone. Called with the source VAS lock
+	 * held and IRQs disabled: allocation must use the resident allocator
+	 * supplied in a, without faults, blocking or yielding. Return an
+	 * extended VMA, or NULL to request allocation of a plain VMA. The
+	 * caller initializes its generic fields and clones private frame
+	 * references from the VAS COW slots. Shared frames remain owned by
+	 * the backend. Failure must release acquired backend state; success
+	 * transfers it to the new VMA and its destroy callback.
+	 */
+	int (*clone_cow)(struct uk_vma *vma, struct uk_alloc *a,
+			 struct uk_vma **out);
+
+	/**
+	 * Pin a shared identity at addr under the VAS lock. The caller has
+	 * validated the range. This callback cannot allocate, fault, block
+	 * or yield. Equal identities must retain the same object using the
+	 * same reference operations, including for independent mappings.
+	 */
+	void (*shared_ref)(struct uk_vma *vma, __vaddr_t addr,
+			   struct uk_vma_shared_ref *out);
+#endif
+
 	/**
 	 * The fault handler is called whenever a page fault is raised for an
 	 * address in the VMA. This may happen, for instance, due to a failed
@@ -305,6 +365,12 @@ struct uk_vma_ops {
 	 *   0 on success, a negative errno error otherwise
 	 */
 	int (*unmap)(struct uk_vma *vma, __vaddr_t vaddr, __sz len);
+
+	/** Synchronize backing storage for a mapped range. May block in normal
+	 * thread context. Return 0 or a negative errno; no callback means that
+	 * the mapping has no backing storage requiring synchronization.
+	 */
+	int (*sync)(struct uk_vma *vma, __vaddr_t vaddr, __sz len);
 
 	/**
 	 * Allocates a new VMA and configures its VMA-type specific properties
@@ -395,6 +461,14 @@ struct uk_vma_ops {
  */
 struct uk_vas *uk_vas_get_active(void);
 
+#if CONFIG_LIBUKVMEM_THREAD_VAS
+/** Return the boot address space used by kernel threads. */
+struct uk_vas *uk_vas_get_kernel(void);
+
+/** Set the kernel address space once, before starting other CPUs. */
+void uk_vas_set_kernel(struct uk_vas *vas);
+#endif
+
 /**
  * Switches the currently active virtual address space.
  *
@@ -406,6 +480,129 @@ struct uk_vas *uk_vas_get_active(void);
  */
 int uk_vas_set_active(struct uk_vas *vas);
 
+#if CONFIG_LIBUKVMEM_COW_VMA
+/**
+ * Enable private anonymous COW mappings in an empty, unpublished owned VAS.
+ * The allocator supplies resident malloc/free and palloc/pfree operations
+ * that cannot fault, block or yield, and outlives this VAS, its clones and
+ * any retained COW sources.
+ * VMA allocators of cloned address spaces have the same context constraints.
+ */
+int uk_vas_enable_cow(struct uk_vas *vas, struct uk_alloc *resident);
+
+/**
+ * Clone supported mappings into an empty, unpublished owned destination VAS.
+ * Both page tables already map the shared kernel. Their application branches
+ * are private, and the destination has no application PTEs. The caller holds
+ * both objects live, permits interrupts, and does not access private source
+ * mappings while the operation is running. Failure leaves the destination
+ * empty; harmless source write protection may remain until the next fault.
+ */
+int uk_vas_clone_cow(struct uk_vas *dst, struct uk_vas *src);
+
+/**
+ * Retain immutable initial contents for a COW backend. The pages must be
+ * distinct, unpublished base frames exclusively owned by the caller and
+ * allocated by vas->pt->fa. After argument validation, every input frame
+ * is consumed, on success or allocation failure, and its array entry is
+ * set to UK_PAGING_PADDR_INV. Validation failure leaves the array unchanged.
+ * The output is NULL on failure. Call with IRQs enabled outside locks,
+ * retaining the VAS and its resident allocator throughout the operation.
+ */
+int uk_vma_cow_source_take(struct uk_vas *vas, __paddr_t *pages, __sz count,
+			   struct uk_vma_cow_source **out);
+
+struct uk_vma_cow_source *uk_vma_cow_source_get(struct uk_vma_cow_source *s);
+/** A final release runs outside locks with IRQs enabled. */
+void uk_vma_cow_source_put(struct uk_vma_cow_source *s);
+
+/**
+ * Resolve a COW fault from an immutable source belonging to the same COW
+ * family. Private writes copy its page; reads retain it read-only. Backend
+ * metadata pins the source and preserves index across split and clone.
+ * Use the anonymous COW operations for unmap, attribute changes and advice
+ * so dropping a private slot allows the initial contents to be restored.
+ */
+int uk_vma_cow_source_fault(struct uk_vma *vma, struct uk_vm_fault *fault,
+			    struct uk_vma_cow_source *s, __sz index);
+
+/** A pinned shared mapping identity. Compare object and byte offset only. */
+struct uk_vma_shared_ref {
+	const void *object;
+	__sz offset;
+	void (*get)(const void *object);
+	void (*put)(const void *object);
+};
+
+/**
+ * Pin the shared backing at a byte range in a live VAS. Never faults, waits
+ * for a VAS transition or allocates. Returns -EAGAIN during a transition,
+ * -EFAULT for an unmapped range, or -ENOTSUP for a non-shared backend.
+ * The output is unchanged on failure. The caller retains the VAS while
+ * looking up the range; the returned pin can outlive every mapping of it.
+ */
+int uk_vas_get_shared_ref(struct uk_vas *vas, __vaddr_t addr, __sz len,
+			  struct uk_vma_shared_ref *out);
+
+/** Acquire another pin before copying a live reference. */
+void uk_vma_shared_ref_get(const struct uk_vma_shared_ref *ref);
+
+/** Release and clear a pin outside locks, with IRQs enabled. */
+void uk_vma_shared_ref_put(struct uk_vma_shared_ref *ref);
+#endif
+
+#if CONFIG_LIBUKVMEM_VAS_ACCESS
+/**
+ * Resolve a read, write or execute access in an explicit VAS. The caller holds
+ * the VAS live and calls with IRQs enabled outside locks. Software faults may
+ * allocate and finish remote TLB invalidations. Returns 0 or a negative errno.
+ */
+int uk_vas_fault(struct uk_vas *vas, __vaddr_t vaddr, unsigned int access);
+
+/**
+ * Read an aligned word without faulting, allocating or waiting for a VAS
+ * transition. Retains the owning VAS lock through the direct-map load.
+ * Returns -EAGAIN for an absent PTE or an ongoing transition; other access
+ * failures return a negative errno. The output is unchanged on failure.
+ * The caller holds the VAS live; the function is safe with IRQs disabled.
+ */
+int uk_vas_load_u32_try(struct uk_vas *vas, __vaddr_t addr, __u32 *out);
+
+#if CONFIG_LIBUKVMEM_COW_VMA
+/**
+ * Read a word and pin its shared identity in the same VAS transaction.
+ * A private mapping returns an empty reference. The reference output must
+ * be empty on entry to a successful call. Both outputs stay unchanged on
+ * failure; other constraints match uk_vas_load_u32_try().
+ */
+int uk_vas_load_u32_shared_try(struct uk_vas *vas, __vaddr_t addr,
+			       __u32 *out, struct uk_vma_shared_ref *ref);
+#endif
+
+/**
+ * Store an aligned 32-bit value in an explicit VAS, without activating it.
+ * Resolve a writable mapping with IRQs enabled, then recheck and store through
+ * the direct map under the owning VAS lock. The caller holds the VAS live and
+ * calls outside locks. Returns 0 or a negative errno; misalignment is -EINVAL.
+ */
+int uk_vas_store_u32(struct uk_vas *vas, __vaddr_t vaddr, __u32 value);
+
+/**
+ * Copy bytes from an explicit VAS into a resident shared kernel buffer.
+ * The caller retains the VAS and buffer, calls outside locks with IRQs enabled,
+ * and ensures the buffer cannot fault. Unaligned ranges are supported. Faults
+ * and COW are resolved outside VAS locks; each guarded copy spans at most one
+ * base page. The VAS is never activated. Returns 0 or a negative errno; an
+ * error may leave a copied prefix. Copies are not atomic against other writers.
+ * A zero-length copy accepts a NULL buffer and performs no access.
+ */
+int uk_vas_copy_from(struct uk_vas *vas, void *dst, __vaddr_t src, __sz len);
+
+/** Same contract as copy_from, copying from the kernel buffer into the VAS. */
+int uk_vas_copy_to(struct uk_vas *vas, __vaddr_t dst, const void *src,
+		   __sz len);
+#endif
+
 /**
  * Initializes a new virtual address space using the provided page table.
  *
@@ -414,13 +611,47 @@ int uk_vas_set_active(struct uk_vas *vas);
  * @param pt
  *   The page table to use for the address space
  * @param a
- *   Pointer to an allocator that should be used to allocate VMA metadata
+ *   Allocator for VMA metadata. Allocation and free must not fault into
+ *   this address space while its lock is held.
  *
  * @return
  *   0 on success, a negative errno error otherwise
  */
 int uk_vas_init(struct uk_vas *vas, struct uk_pagetable *pt,
 		struct uk_alloc *a);
+
+#if CONFIG_LIBUKVMEM_VAS_BOUNDS
+/**
+ * Limit VMA placement to the page-aligned interval [start, end).
+ * The initialized VAS must be inactive, empty and unpublished; the caller
+ * retains exclusive ownership while configuring it. Existing page-table
+ * mappings are not changed. Fixed and automatic VMA placements both obey
+ * this interval, including replacements.
+ */
+int uk_vas_set_bounds(struct uk_vas *vas, __vaddr_t start, __vaddr_t end);
+#endif
+
+#if CONFIG_LIBUKVMEM_VAS_REFCOUNT
+/**
+ * Initialize an owned VAS with one caller reference. The final release owns
+ * cleanup of its VMAs, page table and containing object. It runs with IRQs
+ * enabled and after the VAS is no longer active on any CPU. Each activation
+ * and thread binding must retain a reference until leaving that VAS.
+ */
+int uk_vas_init_owned(struct uk_vas *vas, struct uk_pagetable *pt,
+		      struct uk_alloc *a, void (*release)(struct uk_vas *));
+
+/** Acquire a caller-held live reference; unowned VAS and NULL are unchanged. */
+struct uk_vas *uk_vas_get(struct uk_vas *vas);
+
+/** Drop a reference outside locks; a final release requires IRQs enabled. */
+void uk_vas_put(struct uk_vas *vas);
+
+static inline int uk_vas_is_owned(const struct uk_vas *vas)
+{
+	return vas && vas->release;
+}
+#endif
 
 /**
  * Unmaps and frees all VMAs in the virtual address space and finalizes the
@@ -603,6 +834,12 @@ int uk_vma_map(struct uk_vas *vas, __vaddr_t *vaddr, __sz len,
 int uk_vma_unmap(struct uk_vas *vas, __vaddr_t vaddr, __sz len,
 		 unsigned long flags);
 
+int uk_vma_unmap_at(struct uk_vas *vas, __vaddr_t vaddr);
+
+/* Atomically unmap the VMA starting at vaddr if its backend matches. */
+int uk_vma_unmap_at_exact(struct uk_vas *vas, __vaddr_t vaddr,
+			  const struct uk_vma_ops *ops);
+
 /**
  * Changes the paging attributes in the specified virtual address range.
  *
@@ -673,6 +910,12 @@ int uk_vma_set_attr(struct uk_vas *vas, __vaddr_t vaddr, __sz len,
  */
 int uk_vma_advise(struct uk_vas *vas, __vaddr_t vaddr, __sz len,
 		  unsigned long advice, unsigned long flags);
+
+/** Synchronize a fully mapped, page-aligned range without changing VMAs.
+ * Returns -ENOENT for holes and propagates backing-store errors. No disk or
+ * file knowledge belongs in the VMA walker; each mapping owns its callback.
+ */
+int uk_vma_sync(struct uk_vas *vas, __vaddr_t vaddr, __sz len);
 
 #ifdef __cplusplus
 }

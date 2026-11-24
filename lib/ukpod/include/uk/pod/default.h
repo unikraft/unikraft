@@ -20,7 +20,8 @@
 extern struct uk_alloc *uk_pod_eager_init_ctx;
 
 #define UK_POD_DEFAULT_TYPE eager
-#define UK_POD_DEFAULT_CTX (uk_pod_eager_init_ctx)
+#define UK_POD_DEFAULT_CTX						\
+	__atomic_load_n(&uk_pod_eager_init_ctx, __ATOMIC_ACQUIRE)
 
 #elif CONFIG_LIBUKPOD_DEFAULT_EXTERNAL
 

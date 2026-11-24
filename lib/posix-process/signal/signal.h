@@ -70,14 +70,6 @@
 	 (KERN_SIGACTION(_pproc, _signum)->ks_handler == SIG_DFL &&	\
 	  UK_BIT(_signum) & SIGACT_IGN_MASK))
 
-/* Allocate and return `struct uk_signal` or NULL */
-#define uk_signal_alloc(_alloc)						\
-	uk_zalloc(_alloc, sizeof(struct uk_signal))
-
-/* Free a previously allocated `struct uk_signal` */
-#define uk_signal_free(_alloc, _sig)					\
-	uk_free(_alloc, _sig)
-
 /* Helper to get pointer to kern_sigaction from process,
  * for a given signal
  */
@@ -126,7 +118,19 @@ struct uk_sigaction {
 struct uk_signal {
 	siginfo_t siginfo;
 	struct uk_list_head list_head;
+	struct uk_alloc *alloc;
 };
+
+static inline struct uk_signal *uk_signal_alloc(struct uk_alloc *alloc)
+{
+	struct uk_signal *sig = uk_zalloc(alloc, sizeof(*sig));
+
+	if (sig)
+		sig->alloc = alloc;
+	return sig;
+}
+
+#define uk_signal_free(_alloc, _sig) uk_free((_alloc), (_sig))
 
 /* Descriptor of a signal queue.
  *
@@ -200,9 +204,10 @@ struct uk_signal_pdesc {
 struct uk_signal_tdesc {
 	uk_sigset_t mask;
 	uk_sigset_t sigwait_set;
+	uk_sigset_t suspend_saved_mask;
+	struct uk_signal *suspend_signal;
 	struct uk_signal_queue sigqueue;
 	struct uk_semaphore deliver_semaphore;
-	struct uk_semaphore pending_semaphore;
 };
 
 /* System error descriptor passed to handler */
@@ -223,6 +228,17 @@ int pprocess_signal_pdesc_init(struct posix_process *proc);
 
 /* Initialize signal descriptors of a posix thread */
 int pprocess_signal_tdesc_init(struct posix_thread *thread);
+
+#if CONFIG_LIBPOSIX_PROCESS_SIGNAL
+/**
+ * Clone signal state into a child with initialized descriptors, before it runs.
+ * Uses direct object references so preparation does not require public IDs.
+ * Copy the thread mask and dispositions, retaining initialized child queues.
+ * This does not allocate or consume the caller's process/thread references.
+ */
+int pprocess_signal_clone(struct posix_thread *child,
+			  struct posix_thread *parent, __u64 flags);
+#endif
 
 /* Free signal descritors of a posix process
  *
@@ -273,9 +289,21 @@ void pprocess_signal_sigaction_clear(struct kern_sigaction *ks);
  * the queue.
  */
 void pprocess_signal_clear_pending(struct posix_process *proc, int signum);
+/* Caller holds pprocess_lock; detached nodes are freed after unlocking. */
+void pprocess_signal_clear_pending_locked(struct posix_process *proc,
+					  int signum,
+					  struct uk_list_head *discard);
+void pprocess_signal_free_list(struct uk_list_head *discard);
+/* No allocation/free: queued is false for a coalesced standard signal. */
+int pprocess_signal_queue_locked(struct posix_process *proc,
+				 struct posix_thread *thread,
+				 struct uk_signal *sig, bool *queued);
 
-/* Get next pending signal of a given thread */
-struct uk_signal *pprocess_signal_next_pending_t(struct posix_thread *pthread);
+/* Consume a matching thread or process signal, or wait until deadline.
+ * A deadline of zero means no timeout.
+ */
+int pprocess_signal_wait_set(struct posix_thread *thread, uk_sigset_t set,
+			     __snsec deadline, siginfo_t *info);
 
 /* Signal a process (abstraction for kill / sigqueueinfo) */
 int pprocess_signal_process_do(pid_t pid, int signum, siginfo_t *siginfo);
@@ -286,6 +314,13 @@ int pprocess_signal_thread_do(int tid, int signum, siginfo_t *siginfo);
 /* Signal a process */
 int pprocess_signal_send(struct posix_process *proc, int signum,
 			 siginfo_t *siginfo);
+
+/* Wait until an unmasked signal can be delivered to the calling thread. */
+void pprocess_signal_wait(struct posix_thread *thread);
+void pprocess_signal_suspend(struct posix_thread *thread, uk_sigset_t mask);
+
+/* Caller holds pprocess_lock. */
+int signal_unmasked_pending_locked(struct posix_thread *thread);
 
 /* Jump to signal handler
  *

@@ -25,6 +25,8 @@
 
 #define __syscall_rret0		RAX
 #define __syscall_rret1		RDX
+#define __syscall_rrestart	ORIG_RAX
+#define __syscall_insn_len	2
 
 #elif (defined __ARM_64__)
 #define __syscall_rip		ELR_EL1
@@ -38,6 +40,8 @@
 
 #define __syscall_rret0		X0
 #define __syscall_rret1		X1
+#define __syscall_rrestart	X0
+#define __syscall_insn_len	4
 
 #else
 #error "Missing register mappings for selected target architecture"

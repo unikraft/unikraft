@@ -6,6 +6,7 @@
 
 #include "../../vmem.h"
 
+#include <errno.h>
 #include <uk/assert.h>
 #include <uk/arch/types.h>
 #include <uk/config.h>
@@ -14,6 +15,21 @@
 #include <uk/print.h>
 
 #include <string.h>
+
+#if CONFIG_LIBUKVMEM_COW
+int vmem_arch_pagefault_wait(struct uk_vas *vas __unused,
+			     struct uk_lcpu_regs *regs __unused)
+{
+	/* COW transition waits currently support x86 exception stacks only. */
+	return -EWOULDBLOCK;
+}
+#endif
+
+void vmem_arch_pagefault_finish(struct uk_paging_free_batch *batch,
+				struct uk_lcpu_regs *regs __unused)
+{
+	uk_paging_free_batch_finish(batch);
+}
 
 static int vmem_arch_pagefault(void *data)
 {
@@ -53,7 +69,7 @@ static int vmem_arch_pagefault(void *data)
 			    uk_lcpu_except_err_ctx_get_regs(ctx));
 	if (rc < 0) {
 		vas = uk_vas_get_active();
-		if (unlikely(vas && !(vas->flags & UK_VAS_FLAG_NO_PAGING)))
+		if (unlikely(uk_vas_paging_enabled(vas)))
 			uk_pr_debug("Cannot handle %s page fault at 0x%"
 				    __PRIvaddr " (ec: 0x%lx): %s (%d).\n",
 				    faultstr[faulttype & UK_VMA_FAULT_ACCESSTYPE],

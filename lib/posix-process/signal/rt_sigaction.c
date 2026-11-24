@@ -23,6 +23,9 @@ UK_LLSYSCALL_R_DEFINE(int, rt_sigaction, int, signum,
 		      size_t, sigsetsize)
 {
 	struct posix_process *proc;
+	struct kern_sigaction action, previous;
+	struct uk_list_head discard;
+	unsigned long flags;
 
 	if (unlikely(!IS_VALID(signum)))
 		return -EINVAL;
@@ -36,27 +39,21 @@ UK_LLSYSCALL_R_DEFINE(int, rt_sigaction, int, signum,
 	proc = uk_pprocess_current();
 	UK_ASSERT(proc);
 
+	UK_INIT_LIST_HEAD(&discard);
+	if (act)
+		action = *act;
+	flags = pprocess_lock_acquire();
 	if (oldact)
-		memcpy(oldact, KERN_SIGACTION(proc, signum),
-		       sizeof(struct kern_sigaction));
-
-	if (!act)
-		return 0;
-
-	if (act->ks_flags & SA_NOCLDSTOP)
-		uk_pr_warn("ks_flags: SA_NOCLDSTOP not supported, ignoring\n");
-
-	if (act->ks_flags & SA_RESTART)
-		uk_pr_warn("ks_flags: SA_RESTART not supported, ignoring\n");
-
-	/* TODO Don't update sigaction while executing a signal handler */
-
-	memcpy(KERN_SIGACTION(proc, signum), act,
-	       sizeof(struct kern_sigaction));
-
-	/* Clear pending signals if the action has been changed to SIG_IGN */
-	if (IS_IGNORED(proc, signum))
-		pprocess_signal_clear_pending(proc, signum);
+		previous = *KERN_SIGACTION(proc, signum);
+	/* Preserve SA_NOCLDSTOP for readback. There is no job control. */
+	if (act)
+		*KERN_SIGACTION(proc, signum) = action;
+	if (act && IS_IGNORED(proc, signum))
+		pprocess_signal_clear_pending_locked(proc, signum, &discard);
+	pprocess_lock_release(flags);
+	pprocess_signal_free_list(&discard);
+	if (oldact)
+		*oldact = previous;
 
 	return 0;
 }

@@ -55,9 +55,11 @@
 #include <sys/types.h>
 #include <uk/allocregion.h>
 #include <uk/alloc_impl.h>
+#include <uk/plat/spinlock.h>
 
 struct uk_allocregion {
 	struct uk_alloc a;
+	struct __spinlock lock;
 	void *heap_pos;
 	void *heap_base;
 };
@@ -78,33 +80,48 @@ void allocregion_do_bump(struct uk_allocregion *ar, size_t size, size_t align)
 					  (uintptr_t)align);
 }
 
+static inline size_t allocregion_availmem_locked(const struct uk_allocregion *ar)
+{
+	return (uintptr_t)ar->heap_pos - (uintptr_t)ar->heap_base;
+}
+
 void *uk_allocregion_bump(struct uk_allocregion *ar, size_t size)
 {
+	unsigned long irqf;
+	void *ret;
+
 	UK_ASSERT(ar);
 
 	if (unlikely(!size))
 		return NULL;
 
-	if (unlikely(uk_allocregion_availmem(ar) < size)) {
+	ukplat_spin_lock_irqsave(&ar->lock, irqf);
+	if (unlikely(allocregion_availmem_locked(ar) < size)) {
+		ukplat_spin_unlock_irqrestore(&ar->lock, irqf);
 		uk_alloc_stats_count_enomem(&ar->a, size);
 		return NULL;
 	}
 
 	allocregion_do_bump(ar, size, sizeof(void *));
-	uk_alloc_stats_count_alloc(&ar->a, ar->heap_pos, size);
-	return ar->heap_pos;
+	ret = ar->heap_pos;
+	ukplat_spin_unlock_irqrestore(&ar->lock, irqf);
+
+	uk_alloc_stats_count_alloc(&ar->a, ret, size);
+	return ret;
 }
 
 static void *allocregion_malloc(struct uk_alloc *a, size_t size)
 {
 	UK_ASSERT(a);
-	return uk_allocregion_bump((struct uk_allocregion *)&a->priv, size);
+	return uk_allocregion_bump(ukalloc2allocregion(a), size);
 }
 
 static int allocregion_posix_memalign(struct uk_alloc *a, void **memptr,
 				      size_t align, size_t size)
 {
 	struct uk_allocregion *ar = ukalloc2allocregion(a);
+	unsigned long irqf;
+	void *ret;
 
 	UK_ASSERT(a);
 
@@ -119,16 +136,20 @@ static int allocregion_posix_memalign(struct uk_alloc *a, void **memptr,
 		return EINVAL;
 	}
 
-	if (unlikely(uk_allocregion_availmem(ar) < size)) {
+	ukplat_spin_lock_irqsave(&ar->lock, irqf);
+	if (unlikely(allocregion_availmem_locked(ar) < size)) {
+		ukplat_spin_unlock_irqrestore(&ar->lock, irqf);
 		uk_alloc_stats_count_enomem(&ar->a, size);
 		*memptr = NULL;
 		return ENOMEM;
 	}
 
 	allocregion_do_bump(ar, size, align);
-	*memptr = ar->heap_pos;
+	ret = ar->heap_pos;
+	ukplat_spin_unlock_irqrestore(&ar->lock, irqf);
 
-	uk_alloc_stats_count_alloc(&ar->a, ar->heap_pos, size);
+	*memptr = ret;
+	uk_alloc_stats_count_alloc(&ar->a, ret, size);
 	return 0;
 }
 
@@ -147,8 +168,14 @@ static void allocregion_free(struct uk_alloc *a __maybe_unused,
  */
 size_t uk_allocregion_availmem(const struct uk_allocregion *ar)
 {
+	unsigned long irqf;
+	size_t avail;
+
 	UK_ASSERT(ar);
-	return (uintptr_t)ar->heap_pos - (uintptr_t)ar->heap_base;
+	ukplat_spin_lock_irqsave((struct __spinlock *)&ar->lock, irqf);
+	avail = allocregion_availmem_locked(ar);
+	ukplat_spin_unlock_irqrestore((struct __spinlock *)&ar->lock, irqf);
+	return avail;
 }
 
 static ssize_t allocregion_availmem(struct uk_alloc *a)
@@ -182,6 +209,7 @@ struct uk_allocregion *uk_allocregion_init(void *base, size_t len)
 	}
 
 	ar = (struct uk_allocregion *)base;
+	ukarch_spin_init(&ar->lock);
 
 	uk_pr_info("Initialize allocregion allocator @ %p, len %lu\n", ar, len);
 

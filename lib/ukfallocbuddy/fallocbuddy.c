@@ -42,6 +42,7 @@
 #include <uk/atomic.h>
 #include <uk/list.h>
 #include <uk/paging.h>
+#include <uk/plat/spinlock.h>
 #include <uk/print.h>
 
 #include <string.h>
@@ -161,6 +162,7 @@ struct bfa_memblock {
  */
 struct buddy_framealloc {
 	struct uk_falloc fa;
+	struct __spinlock lock;
 
 	/* Circular singly-linked zone list. Head is moved to last used zone. */
 	struct bfa_zone *zones;
@@ -1201,11 +1203,25 @@ static int bfa_do_alloc_any(struct buddy_framealloc *bfa, __paddr_t *paddr,
 	return 0;
 }
 
+static int bfa_alloc_core(struct buddy_framealloc *bfa, __paddr_t *paddr,
+			  __sz len)
+{
+	/* If a physical address is given, the caller wants to allocate this
+	 * exact memory range. Otherwise, just take a free one from the list.
+	 */
+	if (*paddr == UK_PAGING_PADDR_ANY)
+		return bfa_do_alloc_any(bfa, paddr, len);
+	else
+		return bfa_do_alloc(bfa, *paddr, len);
+}
+
 static int bfa_alloc(struct uk_falloc *fa, __paddr_t *paddr,
 		     unsigned long frames, unsigned long flags __unused)
 {
 	struct buddy_framealloc *bfa = (struct buddy_framealloc *)fa;
+	unsigned long irqf;
 	__sz len;
+	int rc;
 
 	UK_ASSERT(frames > 0);
 	UK_ASSERT(frames <= (__SZ_MAX / UK_PAGING_PAGE_SIZE));
@@ -1215,13 +1231,10 @@ static int bfa_alloc(struct uk_falloc *fa, __paddr_t *paddr,
 	/* There is only FALLOC_FLAG_ALIGNED which we implicitly fulfill */
 	UK_ASSERT((flags == 0) || (flags == FALLOC_FLAG_ALIGNED));
 
-	/* If a physical address is given, the caller wants to allocate this
-	 * exact memory range. Otherwise, just take a free one from the list.
-	 */
-	if (*paddr == UK_PAGING_PADDR_ANY)
-		return bfa_do_alloc_any(bfa, paddr, len);
-	else
-		return bfa_do_alloc(bfa, *paddr, len);
+	ukplat_spin_lock_irqsave(&bfa->lock, irqf);
+	rc = bfa_alloc_core(bfa, paddr, len);
+	ukplat_spin_unlock_irqrestore(&bfa->lock, irqf);
+	return rc;
 }
 
 static int bfa_do_alloc_any_in_range(struct buddy_framealloc *bfa,
@@ -1282,7 +1295,9 @@ static int bfa_alloc_from_range(struct uk_falloc *fa, __paddr_t *paddr,
 				__paddr_t min, __paddr_t max)
 {
 	struct buddy_framealloc *bfa = (struct buddy_framealloc *)fa;
+	unsigned long irqf;
 	__sz len;
+	int rc;
 
 	UK_ASSERT(frames > 0);
 	UK_ASSERT(frames <= (__SZ_MAX / UK_PAGING_PAGE_SIZE));
@@ -1294,7 +1309,10 @@ static int bfa_alloc_from_range(struct uk_falloc *fa, __paddr_t *paddr,
 
 	UK_ASSERT(min <= max);
 
-	return bfa_do_alloc_any_in_range(bfa, paddr, len, min, max);
+	ukplat_spin_lock_irqsave(&bfa->lock, irqf);
+	rc = bfa_do_alloc_any_in_range(bfa, paddr, len, min, max);
+	ukplat_spin_unlock_irqrestore(&bfa->lock, irqf);
+	return rc;
 }
 
 static struct bfa_memblock *bfa_try_merge(struct buddy_framealloc *bfa,
@@ -1428,7 +1446,9 @@ static int bfa_free(struct uk_falloc *fa, __paddr_t paddr,
 		    unsigned long frames)
 {
 	struct buddy_framealloc *bfa = (struct buddy_framealloc *)fa;
+	unsigned long irqf;
 	__sz len;
+	int rc;
 
 	if (unlikely(frames == 0))
 		return 0;
@@ -1437,7 +1457,10 @@ static int bfa_free(struct uk_falloc *fa, __paddr_t paddr,
 
 	len = frames * UK_PAGING_PAGE_SIZE;
 
-	return bfa_do_free(bfa, paddr, len);
+	ukplat_spin_lock_irqsave(&bfa->lock, irqf);
+	rc = bfa_do_free(bfa, paddr, len);
+	ukplat_spin_unlock_irqrestore(&bfa->lock, irqf);
+	return rc;
 }
 
 static int bfa_do_addmem(struct buddy_framealloc *bfa, void *metadata,
@@ -1470,7 +1493,9 @@ static int bfa_addmem(struct uk_falloc *fa, void *metadata, __paddr_t paddr,
 		      unsigned long frames, __vaddr_t dm_off)
 {
 	struct buddy_framealloc *bfa = (struct buddy_framealloc *)fa;
+	unsigned long irqf;
 	__sz len;
+	int rc;
 
 	if (unlikely(frames == 0))
 		return 0;
@@ -1479,7 +1504,10 @@ static int bfa_addmem(struct uk_falloc *fa, void *metadata, __paddr_t paddr,
 
 	len = frames * UK_PAGING_PAGE_SIZE;
 
-	return bfa_do_addmem(bfa, metadata, paddr, len, dm_off);
+	ukplat_spin_lock_irqsave(&bfa->lock, irqf);
+	rc = bfa_do_addmem(bfa, metadata, paddr, len, dm_off);
+	ukplat_spin_unlock_irqrestore(&bfa->lock, irqf);
+	return rc;
 }
 
 int uk_fallocbuddy_init(struct uk_falloc *fa)
@@ -1490,6 +1518,7 @@ int uk_fallocbuddy_init(struct uk_falloc *fa)
 
 	rc = uk_falloc_init(fa, bfa_alloc, bfa_alloc_from_range,
 			    bfa_free, bfa_addmem);
+	ukarch_spin_init(&bfa->lock);
 
 	for (i = 0; i < BFA_LEVELS; i++)
 		UK_INIT_LIST_HEAD(&bfa->free_list[i]);

@@ -4,9 +4,12 @@
  * You may not use this file except in compliance with the License.
  */
 
+#include <uk/plat/time.h>
 #include <uk/process.h>
 #include <uk/refcount.h>
+#include <uk/sched.h>
 #include <uk/semaphore.h>
+#include <uk/process/sigowner.h>
 
 #include "process.h"
 #include "sigset.h"
@@ -22,60 +25,137 @@
  */
 #define signal_check_perm(_target_process) true
 
+static void signal_wake_waiter(struct posix_thread *thread, int signum)
+{
+	if (thread->state == POSIX_THREAD_BLOCKED_SIGWAIT) {
+		if (uk_sigismember(&thread->signal->sigwait_set, signum) ||
+		    (!IS_MASKED(thread, signum) &&
+		     !IS_IGNORED(thread->process, signum)))
+			uk_thread_wake(thread->thread);
+	} else if (thread->state == POSIX_THREAD_BLOCKED_SIGNAL &&
+		   !IS_MASKED(thread, signum) &&
+		   !IS_IGNORED(thread->process, signum)) {
+		uk_semaphore_up(&thread->signal->deliver_semaphore);
+	}
+}
+
+/* A handled signal ends the target's signal-interruptible wait, such as
+ * epoll_wait(2) or nanosleep(2), so that the handler runs when that system
+ * call returns instead of when its timeout expires.
+ */
+static bool signal_interrupt_waiter(struct posix_thread *thread, int signum)
+{
+	const struct kern_sigaction *ks;
+
+	if ((thread->state != POSIX_THREAD_RUNNING &&
+	     thread->state != POSIX_THREAD_BLOCKED_WAIT) || !thread->thread ||
+	    IS_MASKED(thread, signum))
+		return false;
+	ks = KERN_SIGACTION(thread->process, signum);
+	if (ks->ks_handler == SIG_DFL || ks->ks_handler == SIG_IGN)
+		return false;
+	uk_thread_signal_wait(thread->thread);
+	return true;
+}
+
+static void signal_request_exit(struct posix_process *process,
+				struct posix_thread *target, int signum)
+{
+	struct posix_thread *thread, *next;
+
+	if (signum == SIGKILL) {
+		pprocess_mark_signal_exit_locked(process, signum);
+		return;
+	}
+	if (KERN_SIGACTION(process, signum)->ks_handler != SIG_DFL ||
+	    (signum < SIGRTMIN &&
+	     !(UK_BIT(signum) & (SIGACT_TERM_MASK | SIGACT_CORE_MASK))))
+		return;
+	if (target) {
+		if (!IS_MASKED(target, signum))
+			pprocess_mark_signal_exit_locked(process, signum);
+		return;
+	}
+	uk_pprocess_foreach_pthread(process, thread, next) {
+		if (!IS_MASKED(thread, signum)) {
+			pprocess_mark_signal_exit_locked(process, signum);
+			break;
+		}
+	}
+}
+
 /* Enqueue signal for a thread or a process
  *
  * Setting pthread to NULL signifies that the signal
- * targets the process.
+ * targets the process. Success consumes sig, including coalesced signals;
+ * on error the caller retains ownership.
  */
+int pprocess_signal_queue_locked(struct posix_process *pproc,
+				 struct posix_thread *pthread,
+				 struct uk_signal *sig, bool *queued)
+{
+	struct uk_signal_queue *queue;
+	int signum;
+
+	UK_ASSERT(sig && pproc && queued);
+	if (pthread)
+		UK_ASSERT(pthread->process == pproc);
+	*queued = false;
+	signum = sig->siginfo.si_signo;
+	queue = pthread ? &pthread->signal->sigqueue : &pproc->signal->sigqueue;
+	/* Coalescing needs no capacity, even when real-time queues are full. */
+	if (signum < SIGRTMIN && IS_PENDING(*queue, signum))
+		goto notify;
+	if (unlikely(pproc->signal->queued_count >= pproc->signal->queued_max))
+		return -EAGAIN;
+	uk_list_add_tail(&sig->list_head, &queue->list_head[signum]);
+	__atomic_or_fetch(&queue->pending, (1UL << (signum - 1)),
+			  __ATOMIC_RELEASE);
+	pproc->signal->queued_count++;
+	*queued = true;
+notify:
+	signal_request_exit(pproc, pthread, signum);
+	if (pprocess_terminating_signal(pproc))
+		return 0;
+	/* Keep each waiter linked for the duration of its wakeup. */
+	if (pthread) {
+		signal_wake_waiter(pthread, signum);
+		(void)signal_interrupt_waiter(pthread, signum);
+	} else {
+		struct posix_thread *thread, *threadn;
+		bool interrupted = false;
+
+		/* Like Linux, interrupt only one thread for a process signal */
+		uk_pprocess_foreach_pthread(pproc, thread, threadn) {
+			signal_wake_waiter(thread, signum);
+			if (!interrupted)
+				interrupted = signal_interrupt_waiter(thread,
+								      signum);
+		}
+	}
+	return 0;
+}
+
+/* Success consumes sig, including a coalesced signal; error retains it. */
 static int pprocess_signal_enqueue(struct posix_process *pproc,
 				   struct posix_thread *pthread,
 				   struct uk_signal *sig)
 {
-	int signum;
+	unsigned long flags;
+	bool queued;
+	int rc;
 
-	UK_ASSERT(sig);
-	UK_ASSERT(pproc);
-
-	if (pthread)
-		UK_ASSERT(pthread->process == pproc);
-
-	if (unlikely(pproc->signal->queued_count >= pproc->signal->queued_max))
-		return -EAGAIN;
-
-	signum = sig->siginfo.si_signo;
-
-	if (pthread) {
-		/* Standard signals can be queued once */
-		if (signum < SIGRTMIN && IS_PENDING(pthread->signal->sigqueue, signum))
-			return 0;
-
-		uk_pr_debug("Queueing signal %d for tid %d (pid %d)\n",
-			    signum, pthread->tid, pproc->pid);
-
-		uk_list_add_tail(&sig->list_head,
-				 &pthread->signal->sigqueue.list_head[signum]);
-		SET_PENDING(pproc->signal->sigqueue, signum);
-	} else {
-		/* Standard signals can be queued once */
-		if (signum < SIGRTMIN && IS_PENDING(pproc->signal->sigqueue, signum))
-			return 0;
-
-		uk_pr_debug("Queueing signal %d for pid %d\n",
-			    signum, pproc->pid);
-
-		uk_list_add_tail(&sig->list_head,
-				 &pproc->signal->sigqueue.list_head[signum]);
-		SET_PENDING(pproc->signal->sigqueue, signum);
-	}
-
-	pproc->signal->queued_count++;
-
-	return 0;
+	flags = pprocess_lock_acquire();
+	rc = pprocess_signal_queue_locked(pproc, pthread, sig, &queued);
+	pprocess_lock_release(flags);
+	if (!rc && !queued)
+		uk_signal_free(sig->alloc, sig);
+	return rc;
 }
 
-struct uk_signal *pprocess_signal_dequeue(struct posix_process *pproc,
-					  struct posix_thread *pthread,
-					  int signum)
+static struct uk_signal *signal_dequeue_locked(struct posix_process *pproc,
+					       struct posix_thread *pthread,
+					       int signum)
 {
 	struct uk_signal_queue *sigqueue;
 	struct uk_signal *sig;
@@ -93,60 +173,103 @@ struct uk_signal *pprocess_signal_dequeue(struct posix_process *pproc,
 					  struct uk_signal,
 					  list_head);
 	if (!sig)
-		return sig;
+		return NULL;
 
 	uk_list_del(&sig->list_head);
 
 	/* Reset pending bit if the signal queue is empty */
 	if (uk_list_empty(&sigqueue->list_head[signum])) {
-		if (pthread)
-			RESET_PENDING(pthread->signal->sigqueue, signum);
-		else
-			RESET_PENDING(pproc->signal->sigqueue, signum);
+		__atomic_and_fetch(&sigqueue->pending,
+				   ~(1UL << (signum - 1)), __ATOMIC_RELEASE);
 	}
 
 	pproc->signal->queued_count--;
-
+#if CONFIG_LIBPOSIX_PROCESS_ITIMER
+	if (!pthread && signum == SIGALRM)
+		pprocess_itimer_dequeued_locked(pproc);
+#endif
 	return sig;
 }
 
-struct uk_signal *pprocess_signal_next_pending_t(struct posix_thread *pthread)
+struct uk_signal *
+pprocess_signal_dequeue(struct posix_process *pproc,
+			struct posix_thread *pthread, int signum)
 {
-	struct posix_process *pproc;
+	unsigned long flags = pprocess_lock_acquire();
 	struct uk_signal *sig;
-	int signum;
 
-	pproc = tid2pprocess(pthread->tid);
-	UK_ASSERT(pproc);
+	sig = signal_dequeue_locked(pproc, pthread, signum);
+	pprocess_lock_release(flags);
+	return sig;
+}
 
-	pprocess_signal_foreach(signum) {
-		if (!pprocess_signal_is_deliverable(pthread, signum))
-			continue;
+static struct uk_signal *signal_dequeue_set_locked(struct posix_thread *thread,
+						   uk_sigset_t set)
+{
+	struct posix_process *proc = thread->process;
+	uk_sigset_t pending = thread->signal->sigqueue.pending & set;
 
-		sig = pprocess_signal_dequeue(pproc, pthread, signum);
-		if (sig)
-			return sig;
+	if (!pending) {
+		pending = proc->signal->sigqueue.pending & set;
+		thread = NULL;
 	}
+	if (!pending)
+		return NULL;
 
-	return NULL;
+	return signal_dequeue_locked(proc, thread, __builtin_ctzl(pending) + 1);
+}
+
+static void detach_pending_queue(struct posix_process *proc,
+				 struct uk_signal_queue *queue, int signum,
+				 struct uk_list_head *discard)
+{
+	struct uk_signal *sig;
+
+	while (!uk_list_empty(&queue->list_head[signum])) {
+		sig = uk_list_first_entry(&queue->list_head[signum],
+					  struct uk_signal, list_head);
+		uk_list_del(&sig->list_head);
+		uk_list_add_tail(&sig->list_head, discard);
+		UK_ASSERT(proc->signal->queued_count);
+		proc->signal->queued_count--;
+	}
+	__atomic_and_fetch(&queue->pending, ~(1UL << (signum - 1)),
+			   __ATOMIC_RELEASE);
+}
+
+void pprocess_signal_clear_pending_locked(struct posix_process *proc,
+					  int signum,
+					  struct uk_list_head *discard)
+{
+	struct posix_thread *thread, *next;
+
+	detach_pending_queue(proc, &proc->signal->sigqueue, signum, discard);
+	uk_pprocess_foreach_pthread(proc, thread, next)
+		detach_pending_queue(proc, &thread->signal->sigqueue, signum,
+				     discard);
+}
+
+void pprocess_signal_free_list(struct uk_list_head *discard)
+{
+	struct uk_signal *sig;
+
+	while (!uk_list_empty(discard)) {
+		sig = uk_list_first_entry(discard, struct uk_signal, list_head);
+		uk_list_del(&sig->list_head);
+		uk_signal_free(sig->alloc, sig);
+	}
 }
 
 void pprocess_signal_clear_pending(struct posix_process *proc, int signum)
 {
-	struct posix_thread *thread, *threadn;
-	struct uk_signal *sig;
+	struct uk_list_head discard;
+	unsigned long flags;
 
-	if (IS_PENDING(proc->signal->sigqueue, signum)) {
-		while ((sig = pprocess_signal_dequeue(proc, NULL, signum)))
-			uk_signal_free(proc->_a, sig);
-	}
-
-	uk_pprocess_foreach_pthread(proc, thread, threadn) {
-		if (!IS_PENDING(thread->signal->sigqueue, signum))
-			continue;
-		while ((sig = pprocess_signal_dequeue(proc, thread, signum)))
-			uk_signal_free(thread->_a, sig);
-	}
+	UK_INIT_LIST_HEAD(&discard);
+	flags = pprocess_lock_acquire();
+	pprocess_signal_clear_pending_locked(proc, signum, &discard);
+	pprocess_lock_release(flags);
+	pprocess_signal_free_list(&discard);
 }
 
 void pprocess_signal_sigaction_clear(struct kern_sigaction *ks)
@@ -203,75 +326,250 @@ int pprocess_signal_send(struct posix_process *proc, int signum,
 	return 0;
 }
 
+int signal_unmasked_pending_locked(struct posix_thread *thread)
+{
+	struct posix_process *proc = thread->process;
+	uk_sigset_t pending = (thread->signal->sigqueue.pending |
+			      proc->signal->sigqueue.pending);
+	int signum;
+
+	pending &= ~thread->signal->mask;
+	while (pending) {
+		signum = __builtin_ctzl(pending) + 1;
+		if (!IS_IGNORED(proc, signum))
+			return signum;
+		uk_sigdelset(&pending, signum);
+	}
+	return 0;
+}
+
+void pprocess_signal_wait(struct posix_thread *thread)
+{
+	for (;;) {
+		unsigned long pflags = pprocess_lock_acquire();
+
+		if (pprocess_terminating_signal(thread->process) ||
+		    signal_unmasked_pending_locked(thread)) {
+			thread->state = POSIX_THREAD_RUNNING;
+			pprocess_lock_release(pflags);
+			return;
+		}
+
+		/* Publish the waiter under the same lock used to enqueue. */
+		thread->state = POSIX_THREAD_BLOCKED_SIGNAL;
+		pprocess_lock_release(pflags);
+		uk_semaphore_down(&thread->signal->deliver_semaphore);
+	}
+}
+
+void pprocess_signal_suspend(struct posix_thread *thread, uk_sigset_t mask)
+{
+	struct uk_signal_tdesc *tdesc = thread->signal;
+	unsigned long flags = pprocess_lock_acquire();
+	uk_sigset_t selected = 0;
+	int signum;
+
+	UK_ASSERT(!tdesc->suspend_signal);
+	tdesc->suspend_saved_mask = tdesc->mask;
+	tdesc->mask = mask;
+
+	for (;;) {
+		if (pprocess_terminating_signal(thread->process)) {
+			tdesc->mask = tdesc->suspend_saved_mask;
+			goto out;
+		}
+		signum = signal_unmasked_pending_locked(thread);
+		if (signum)
+			break;
+		thread->state = POSIX_THREAD_BLOCKED_SIGNAL;
+		pprocess_lock_release(flags);
+		uk_semaphore_down(&tdesc->deliver_semaphore);
+		flags = pprocess_lock_acquire();
+	}
+
+	/* Reserve the signal before another thread can consume it. The exit
+	 * hook runs the handler with the temporary mask and restores the old
+	 * mask only after the handler has returned.
+	 */
+	uk_sigaddset(&selected, signum);
+	tdesc->suspend_signal = signal_dequeue_set_locked(thread, selected);
+	UK_ASSERT(tdesc->suspend_signal);
+out:
+	thread->state = POSIX_THREAD_RUNNING;
+	pprocess_lock_release(flags);
+}
+
+int pprocess_signal_wait_set(struct posix_thread *thread, uk_sigset_t set,
+			     __snsec deadline, siginfo_t *info)
+{
+	unsigned long flags;
+	struct uk_signal *sig = NULL;
+	int ret;
+
+	uk_sigdelset(&set, SIGSTOP);
+	uk_sigdelset(&set, SIGKILL);
+
+	for (;;) {
+		flags = pprocess_lock_acquire();
+		if (pprocess_terminating_signal(thread->process)) {
+			ret = -EINTR;
+			break;
+		}
+		sig = signal_dequeue_set_locked(thread, set);
+		if (sig) {
+			ret = sig->siginfo.si_signo;
+			break;
+		}
+		if (signal_unmasked_pending_locked(thread)) {
+			ret = -EINTR;
+			break;
+		}
+		if (deadline && ukplat_monotonic_clock() >= (__nsec)deadline) {
+			ret = -EAGAIN;
+			break;
+		}
+
+		/* Publish and block under the lock used by signal enqueue. */
+		thread->signal->sigwait_set = set;
+		thread->state = POSIX_THREAD_BLOCKED_SIGWAIT;
+		uk_thread_block_until(thread->thread, deadline);
+		pprocess_lock_release(flags);
+		uk_sched_yield();
+	}
+
+	thread->state = POSIX_THREAD_RUNNING;
+	uk_sigemptyset(&thread->signal->sigwait_set);
+	pprocess_lock_release(flags);
+	if (sig) {
+		if (info)
+			*info = sig->siginfo;
+		uk_signal_free(sig->alloc, sig);
+	}
+	return ret;
+}
+
+/* The selected process pin covers allocation, enqueue and FD notification. */
+static int signal_process_pinned(struct posix_process *process, int signum,
+				 siginfo_t *siginfo)
+{
+	struct uk_signal *signal;
+	unsigned long flags;
+	bool queued = false;
+	int result = 0;
+
+	if (signum == SIGSTOP || signum == SIGCONT)
+		return 0;
+	signal = uk_signal_alloc(process->_a);
+	if (!signal)
+		return -EAGAIN;
+	if (siginfo)
+		set_siginfo_sigqueue(signum, &signal->siginfo, siginfo);
+	else
+		set_siginfo_kill(signum, &signal->siginfo);
+	flags = pprocess_lock_acquire();
+	if (process->exiting || process->state != POSIX_PROCESS_RUNNING ||
+	    pprocess_signal_should_drop(process, signum)) {
+		pprocess_lock_release(flags);
+		uk_signal_free(signal->alloc, signal);
+		return 0;
+	}
+	result = pprocess_signal_queue_locked(process, NULL, signal, &queued);
+	pprocess_lock_release(flags);
+	if (!queued)
+		uk_signal_free(signal->alloc, signal);
+#if CONFIG_LIBPOSIX_PROCESS_SIGNALFD
+	if (!result)
+		pprocess_signal_files_notify(process, signum);
+#endif
+	return result;
+}
+
+static int signal_processes(pid_t pid, int signum, siginfo_t *siginfo,
+			    bool file_owner)
+{
+	struct posix_process *self = file_owner ? NULL : uk_pprocess_current();
+	struct posix_process *process, *target = NULL, *single;
+	struct posix_process **targets = &single;
+	struct uk_alloc *alloc = uk_alloc_get_default();
+	unsigned long flags;
+	unsigned int count = 0, index;
+	pid_t pgid = 0;
+	bool many = pid <= 0 && signum;
+	int result = -ESRCH, rc;
+
+	if (signum && !IS_VALID(signum))
+		return -EINVAL;
+	if (pid < -CONFIG_LIBPOSIX_PROCESS_MAX_PID)
+		return -ESRCH;
+	if (many) {
+		targets = uk_calloc(alloc, TIDMAP_SIZE, sizeof(*targets));
+		if (!targets)
+			return -ENOMEM;
+	}
+	flags = pprocess_lock_acquire();
+	if (pid > 0) {
+		target = pid2pprocess(pid);
+		if (!target && !file_owner)
+			target = tid2pprocess(pid);
+	} else if (pid < 0 && (file_owner || pid != -1)) {
+		pgid = -pid;
+	} else if (!pid && !file_owner) {
+		pgid = self->pgid;
+	}
+	/* Snapshot and pin recipients while membership is stable. Signal zero
+	 * only checks existence and permissions; it never queues an entry.
+	 */
+	uk_pprocess_foreach(process) {
+		if (pid > 0 && process != target)
+			continue;
+		if (pgid && process->pgid != pgid)
+			continue;
+		if (!file_owner && pid == -1 &&
+		    (process == self || process->pid == UK_PID_INIT))
+			continue;
+		if (!signal_check_perm(process)) {
+			result = -EPERM;
+			continue;
+		}
+		if (signum) {
+			pprocess_get(process);
+			targets[count] = process;
+		}
+		count++;
+	}
+	pprocess_lock_release(flags);
+	if (!count)
+		goto out;
+	if (!signum) {
+		result = 0;
+		goto out;
+	}
+	if (signum == SIGSTOP || signum == SIGCONT)
+		uk_pr_warn("Process stop / resume not supported. Ignoring\n");
+	for (index = 0; index < count; index++) {
+		rc = signal_process_pinned(targets[index], signum, siginfo);
+		pprocess_put(targets[index]);
+		if (!rc || result)
+			result = rc;
+	}
+out:
+	if (many)
+		uk_free(alloc, targets);
+	return result;
+}
+
 int pprocess_signal_process_do(pid_t pid, int signum, siginfo_t *siginfo)
 {
-	struct posix_process *pproc = NULL;
-	struct posix_thread *thread, *threadn;
-	int rc;
+	return signal_processes(pid, signum, siginfo, false);
+}
 
-	if (unlikely(signum != 0 && !IS_VALID(signum)))
-		return -EINVAL;
+int uk_sigowner_sigio(pid_t owner)
+{
+	siginfo_t info = { .si_code = SI_KERNEL };
 
-	if (unlikely(signum == SIGSTOP || signum == SIGCONT)) {
-		uk_pr_warn("Process stop / resume not supported. Ignoring\n");
+	if (!owner)
 		return 0;
-	}
-
-	/* pid == 0 -> Send the signal to every process in the process group
-	 *             of the calling process.
-	 * pid < -1 -> Send the signal to every process in the process group
-	 *             with ID equal to -pid.
-	 */
-	if (!pid || pid < -1) {
-		uk_pr_warn("pgroups not supported, delivering to every process\n");
-		pid = -1;
-	}
-
-	/* pid == -1 -> Send the signal to every process for which the
-	 *              calling process has permissions to signal.
-	 */
-	if (pid == -1) {
-		uk_pprocess_foreach(pproc) {
-			if (!signal_check_perm(pproc))
-				continue;
-
-			if (pprocess_signal_should_drop(pproc, signum))
-				continue;
-
-			rc = pprocess_signal_send(pproc, signum, siginfo);
-			if (unlikely(rc))
-				return rc;
-		}
-		return 0;
-	}
-
-	/* Default: Send to process with pid */
-	pproc = pid2pprocess(pid);
-	if (unlikely(!pproc))
-		return -ESRCH;
-
-	if (unlikely(signal_check_perm(pproc) == false))
-		return -EPERM;
-
-	/* If signum == 0 do only pid exist & permissions check */
-	if (!signum)
-		return 0;
-
-	/* If this signal is currently ignored, don't even try */
-	if (pprocess_signal_should_drop(pproc, signum))
-		return 0;
-
-	rc = pprocess_signal_send(pproc, signum, siginfo);
-	if (unlikely(rc))
-		return rc;
-
-	/* Wake up any threads that may be paused */
-	uk_pprocess_foreach_pthread(pproc, thread, threadn) {
-		if (thread->state == POSIX_THREAD_BLOCKED_SIGNAL)
-			uk_semaphore_up(&thread->signal->deliver_semaphore);
-	}
-
-	return 0;
+	return signal_processes(owner, SIGIO, &info, true);
 }
 
 int pprocess_signal_thread_do(int tid, int signum, siginfo_t *siginfo)
@@ -306,9 +604,6 @@ int pprocess_signal_thread_do(int tid, int signum, siginfo_t *siginfo)
 		uk_signal_free(pthread->_a, sig);
 		return rc;
 	}
-
-	if (pthread->state == POSIX_THREAD_BLOCKED_SIGNAL)
-		uk_semaphore_up(&pthread->signal->deliver_semaphore);
 
 #if CONFIG_LIBPOSIX_PROCESS_SIGNALFD
 	pthread_signal_files_notify(pproc, pthread, signum);
@@ -391,11 +686,12 @@ int pprocess_signal_tdesc_init(struct posix_thread *thread)
 
 	uk_sigemptyset(&td->mask);
 	uk_sigemptyset(&td->sigqueue.pending);
+	td->suspend_signal = NULL;
 
 	pprocess_signal_foreach(signum)
 		UK_INIT_LIST_HEAD(&td->sigqueue.list_head[signum]);
 
-	uk_semaphore_init(&thread->signal->pending_semaphore, 0);
+	uk_sigemptyset(&td->sigwait_set);
 	uk_semaphore_init(&thread->signal->deliver_semaphore, 0);
 
 	return 0;
@@ -413,7 +709,9 @@ void pprocess_signal_pdesc_free(struct posix_process *process)
 		while ((sig = pprocess_signal_dequeue(process, NULL, signum)))
 			uk_signal_free(process->_a, sig);
 
-	pprocess_signal_sigaction_release(process->signal->sigaction);
+	/* Initialization may have failed while allocating the action table. */
+	if (process->signal->sigaction)
+		pprocess_signal_sigaction_release(process->signal->sigaction);
 
 	uk_free(process->_a, process->signal);
 }
@@ -427,12 +725,15 @@ void pprocess_signal_tdesc_free(struct posix_thread *thread)
 	UK_ASSERT(thread);
 	UK_ASSERT(thread->signal);
 
-	pproc = tid2pprocess(thread->tid);
+	pproc = thread->process;
 	UK_ASSERT(pproc);
 
 	pprocess_signal_foreach(signum)
 		while ((sig = pprocess_signal_dequeue(pproc, thread, signum)))
 			uk_signal_free(thread->_a, sig);
 
+	sig = thread->signal->suspend_signal;
+	if (sig)
+		uk_signal_free(sig->alloc, sig);
 	uk_signal_free(thread->process->_a, thread->signal);
 }

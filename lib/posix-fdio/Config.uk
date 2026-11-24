@@ -10,18 +10,32 @@ menuconfig LIBPOSIX_FDIO
 
 if LIBPOSIX_FDIO
 
-choice LIBPOSIX_FDIO_VMA
-	prompt "File memory mappings"
+config LIBPOSIX_FDIO_ASYNC
+	bool
+	depends on LIBPOSIX_PROCESS_SIGNAL && LIBPOSIX_FD_HEAPOFD
+	depends on LIBUKLOCK_SEMAPHORE
+	select LIBUKFILE_CHAINUPDATE
+	default y
+
+config LIBPOSIX_FDIO_VMA
+	bool "File memory mappings"
 	depends on LIBUKVMEM
-	default LIBPOSIX_FDIO_VMA_COPY
-
-config LIBPOSIX_FDIO_VMA_COPY
-	bool "Private copies"
+	default y
 	help
-	  File mappings are created as private copies on allocation.
-	  This mimics the behavior of legacy vfscore file mappings.
-	  Shared mappings and writeback are not supported.
+	  Private mappings use independent copies. Shared mappings alias file
+	  backing pages through ACQUIRE_PINNED/RETRIEVE/RELEASE and require an
+	  explicit physical pin guarantee from the file driver. They eagerly
+	  acquire the mapped range; unsupported backends fail rather than copy.
 
-endchoice
+
+config LIBPOSIX_FDIO_VMA_COW_TEST
+	bool "Test private and shared file mappings in COW address spaces"
+	depends on LIBPOSIX_FDIO_VMA && LIBPOSIX_FDTAB && LIBPOSIX_MMAP
+	depends on LIBUKVMEM_PROCESS_VAS && LIBPOSIX_FUTEX_VAS
+	depends on LIBUKLOCK_SEMAPHORE && LIBSYSCALL_SHIM
+	select LIBUKTEST
+	select LIBUKPAGING_STATS
+	default n
+
 
 endif

@@ -46,16 +46,85 @@
 #include <uk/pcpuvar.h>
 
 struct uk_sched *uk_sched_head;
+static __spinlock uk_sched_list_lock;
+static struct uk_sched *uk_sched_by_lcpu[CONFIG_UKPLAT_CPU_MAXCOUNT];
+static unsigned int uk_sched_rr_cursor = 1;
 
 __uk_pcpuvar struct uk_thread *__uk_sched_thread_current;
 
+struct uk_sched *uk_sched_current_cpu(void)
+{
+	__u64 idx = uk_pcpuvar_current_get(uk_pcpuvar_cpu_idx);
+
+	if (unlikely(idx >= CONFIG_UKPLAT_CPU_MAXCOUNT))
+		return NULL;
+	return __atomic_load_n(&uk_sched_by_lcpu[idx], __ATOMIC_ACQUIRE);
+}
+
+void uk_sched_kick_cpu(struct uk_sched *s)
+{
+#if CONFIG_HAVE_SMP
+	if (s && __atomic_load_n(&s->is_started, __ATOMIC_ACQUIRE) &&
+	    s->lcpu_idx >= 0) {
+		__u64 target = (__u64)s->lcpu_idx;
+		__u64 curr = uk_pcpuvar_current_get(uk_pcpuvar_cpu_idx);
+
+		if (target != curr) {
+			unsigned int count = 1;
+
+			(void)uk_lcpu_wakeup(&target, &count);
+		}
+	}
+#else
+	(void)s;
+#endif
+}
+
+unsigned int uk_sched_started_count(void)
+{
+	unsigned int count = 0;
+	unsigned int i;
+
+	for (i = 0; i < CONFIG_UKPLAT_CPU_MAXCOUNT; i++) {
+		struct uk_sched *s = __atomic_load_n(&uk_sched_by_lcpu[i],
+						     __ATOMIC_ACQUIRE);
+		if (s && __atomic_load_n(&s->is_started, __ATOMIC_ACQUIRE))
+			count++;
+	}
+	return count ? count : 1;
+}
+
+struct uk_sched *uk_sched_select_round_robin(struct uk_sched *fallback)
+{
+	struct uk_sched *online[CONFIG_UKPLAT_CPU_MAXCOUNT];
+	unsigned int count = 0;
+	unsigned int i, pick;
+
+	for (i = 0; i < CONFIG_UKPLAT_CPU_MAXCOUNT; i++) {
+		struct uk_sched *s = __atomic_load_n(&uk_sched_by_lcpu[i],
+						     __ATOMIC_ACQUIRE);
+		if (s && __atomic_load_n(&s->is_started, __ATOMIC_ACQUIRE))
+			online[count++] = s;
+	}
+	if (count <= 1)
+		return count == 1 ? online[0] : fallback;
+
+	pick = __atomic_fetch_add(&uk_sched_rr_cursor, 1U, __ATOMIC_RELAXED) %
+	       count;
+	return online[pick];
+}
+
 int uk_sched_register(struct uk_sched *s)
 {
-	struct uk_sched *this = uk_sched_head;
+	struct uk_sched *this;
+	unsigned long flags;
 
+	ukplat_spin_lock_irqsave(&uk_sched_list_lock, flags);
+	this = uk_sched_head;
 	if (!uk_sched_head) {
 		uk_sched_head = s;
 		s->next = NULL;
+		ukplat_spin_unlock_irqrestore(&uk_sched_list_lock, flags);
 		return 0;
 	}
 
@@ -63,6 +132,7 @@ int uk_sched_register(struct uk_sched *s)
 		this = this->next;
 	this->next = s;
 	s->next = NULL;
+	ukplat_spin_unlock_irqrestore(&uk_sched_list_lock, flags);
 	return 0;
 }
 
@@ -239,6 +309,17 @@ int uk_sched_start(struct uk_sched *s)
 
 	/* Add main to the scheduler's thread list */
 	UK_TAILQ_INSERT_TAIL(&s->thread_list, main_thread, thread_list);
+	s->lcpu_idx = (int)uk_pcpuvar_current_get(uk_pcpuvar_cpu_idx);
+	UK_ASSERT(s->lcpu_idx >= 0 &&
+		  s->lcpu_idx < CONFIG_UKPLAT_CPU_MAXCOUNT);
+
+#if CONFIG_HAVE_SMP
+	/* Transition startup BUSY0 -> IDLE so remote uk_lcpu_run/wait pairs
+	 * observe IDLE whenever no remote IPI callback is executing.
+	 */
+	if (uk_load_n(&uk_lcpu_get_current()->state) == UK_LCPU_STATE_BUSY0)
+		uk_dec(&uk_lcpu_get_current()->state);
+#endif
 
 	/* Enable scheduler, like time slicing, etc. and notify that `s`
 	 * has an (already) scheduled thread
@@ -246,7 +327,8 @@ int uk_sched_start(struct uk_sched *s)
 	ret = s->sched_start(s, main_thread);
 	if (ret < 0)
 		goto err_unset_thread_current;
-	s->is_started = true;
+	__atomic_store_n(&s->is_started, true, __ATOMIC_RELEASE);
+	__atomic_store_n(&uk_sched_by_lcpu[s->lcpu_idx], s, __ATOMIC_RELEASE);
 
 #if CONFIG_LIBUKSCHED_STATS
 	s->start_time = (__u64)ukplat_monotonic_clock();
@@ -263,22 +345,34 @@ err_out:
 
 unsigned int uk_sched_thread_gc(struct uk_sched *sched)
 {
-	struct uk_thread *thread, *tmp;
+	struct uk_thread *thread;
+	unsigned long flags;
 	unsigned int num = 0;
 
-	/* Cleanup finished threads */
-	UK_TAILQ_FOREACH_SAFE(thread, &sched->exited_threads,
-			      thread_list, tmp) {
+	/* Cleanup finished threads outside sched->lock so destructors and
+	 * termination hooks can acquire higher-level locks without inversion.
+	 */
+	for (;;) {
+		ukplat_spin_lock_irqsave(&sched->lock, flags);
+		thread = UK_TAILQ_FIRST(&sched->exited_threads);
+		if (thread)
+			UK_TAILQ_REMOVE(&sched->exited_threads, thread,
+					thread_list);
+		ukplat_spin_unlock_irqrestore(&sched->lock, flags);
+
+		if (!thread)
+			break;
+
 		UK_ASSERT(thread != uk_thread_current());
+		uk_thread_set_exited(thread);
 		UK_ASSERT(uk_thread_is_exited(thread));
 
 		uk_pr_debug("%p: garbage collect thread %p (%s)\n",
 			    sched, thread,
 			    thread->name ? thread->name : "<unnamed>");
 
-		UK_TAILQ_REMOVE(&sched->exited_threads, thread, thread_list);
 		if (thread->_gc_fn)
-			thread->_gc_fn(thread,  thread->_gc_argp);
+			thread->_gc_fn(thread, thread->_gc_argp);
 		uk_thread_release(thread);
 		++num;
 	}
@@ -289,6 +383,7 @@ unsigned int uk_sched_thread_gc(struct uk_sched *sched)
 void uk_sched_thread_terminate(struct uk_thread *thread)
 {
 	struct uk_sched *sched;
+	unsigned long flags;
 
 	UK_ASSERT(thread);
 	 /* NOTE: The following assertion can also fail on a double-termination.
@@ -308,21 +403,34 @@ void uk_sched_thread_terminate(struct uk_thread *thread)
 		uk_waitq_cancel(thread);
 	/* remove from scheduling queue */
 	uk_sched_thread_remove(thread);
-	/* causes calling termination table */
-	uk_thread_set_exited(thread);
 
 	if (thread == uk_thread_current()) {
+		/* causes calling termination table */
+		uk_thread_set_exited(thread);
 		/* enqueue thread for garbage collecting */
 		uk_pr_debug("%p: thread %p (%s) on gc list\n",
 			    sched, thread, thread->name ?
 					   thread->name : "<unnamed>");
+		ukplat_spin_lock_irqsave(&sched->lock, flags);
 		UK_TAILQ_INSERT_TAIL(&sched->exited_threads, thread,
 				     thread_list);
+		ukplat_spin_unlock_irqrestore(&sched->lock, flags);
 
 		/* leave this thread */
 		sched->yield(sched); /* we won't return */
 		UK_CRASH("Unexpectedly returned to exited thread %p\n", thread);
+	} else if (sched != uk_sched_current()) {
+		/* Defer release to the owning CPU's idle GC so an active
+		 * remote kernel stack/TLS is never freed underneath that CPU.
+		 */
+		ukplat_spin_lock_irqsave(&sched->lock, flags);
+		uk_thread_set_blocked(thread);
+		UK_TAILQ_INSERT_TAIL(&sched->exited_threads, thread,
+				     thread_list);
+		ukplat_spin_unlock_irqrestore(&sched->lock, flags);
+		uk_sched_kick_cpu(sched);
 	} else {
+		uk_thread_set_exited(thread);
 		/* free thread resources immediately */
 		uk_thread_release(thread);
 	}
@@ -357,22 +465,28 @@ void uk_sched_thread_sleep(__nsec nsec)
 int uk_sched_thread_add(struct uk_sched *s, struct uk_thread *t)
 {
 	unsigned long flags;
+	bool runnable = false;
 	int rc;
 
 	UK_ASSERT(s);
 	UK_ASSERT(t);
 	UK_ASSERT(!t->sched);
 
-	flags = uk_lcpu_save_irqf();
+	ukplat_spin_lock_irqsave(&s->lock, flags);
 
+	__atomic_store_n(&t->sched, s, __ATOMIC_RELEASE);
 	rc = s->thread_add(s, t);
-	if (rc < 0)
+	if (rc < 0) {
+		__atomic_store_n(&t->sched, NULL, __ATOMIC_RELEASE);
 		goto out;
+	}
 
-	t->sched = s;
+	runnable = !!uk_thread_is_runnable(t);
 	UK_TAILQ_INSERT_TAIL(&s->thread_list, t, thread_list);
 out:
-	uk_lcpu_restore_irqf(flags);
+	ukplat_spin_unlock_irqrestore(&s->lock, flags);
+	if (rc == 0 && runnable)
+		uk_sched_kick_cpu(s);
 	return rc;
 }
 
@@ -384,12 +498,12 @@ int uk_sched_thread_remove(struct uk_thread *t)
 	UK_ASSERT(t);
 	UK_ASSERT(t->sched);
 
-	flags = uk_lcpu_save_irqf();
 	s = t->sched;
+	ukplat_spin_lock_irqsave(&s->lock, flags);
 	s->thread_remove(s, t);
-	t->sched = NULL;
+	__atomic_store_n(&t->sched, NULL, __ATOMIC_RELEASE);
 	UK_TAILQ_REMOVE(&s->thread_list, t, thread_list);
-	uk_lcpu_restore_irqf(flags);
+	ukplat_spin_unlock_irqrestore(&s->lock, flags);
 	return 0;
 }
 
@@ -402,6 +516,7 @@ UK_SYSCALL_R_DEFINE(int, sched_yield)
 void uk_sched_dumpk_threads(int klvl, struct uk_sched *s)
 {
 	struct uk_thread *t, *tmp;
+	unsigned long flags;
 
 	if (uk_sched_current() == s) {
 		/* Let the scheduler update the thread execution time
@@ -410,6 +525,7 @@ void uk_sched_dumpk_threads(int klvl, struct uk_sched *s)
 		uk_sched_yield();
 	}
 
+	ukplat_spin_lock_irqsave(&s->lock, flags);
 	uk_printk(klvl, "sched %p:\n", s);
 	uk_sched_foreach_thread_safe(s, t, tmp) {
 		uk_printk(klvl,
@@ -426,32 +542,74 @@ void uk_sched_dumpk_threads(int klvl, struct uk_sched *s)
 			  (t->flags & UK_THREADF_AUXSP)    ? 'A' : '-',
 			  (t->flags & UK_THREADF_UKTLS)    ? 'T' : '-');
 	}
+	ukplat_spin_unlock_irqrestore(&s->lock, flags);
 }
 
-UK_SYSCALL_R_DEFINE(int, sched_getaffinity, int, pid, long, cpusetsize,
-						unsigned long*, mask)
+UK_SYSCALL_R_DEFINE(int, sched_getaffinity, int, pid,
+		    long, cpusetsize, unsigned long *, mask)
 {
-	UK_WARN_STUBBED();
-	/* NOTE: Some applications use this to get the count of CPUs,
-	 *       and the result must be positive.
-	 *       So just return CPU0 to make them run.
-	 */
-	UK_ASSERT(cpusetsize > 0);
-	UK_ASSERT(mask);
-	memset(mask, 0, cpusetsize);
+	unsigned char *bytes = (unsigned char *)mask;
+	unsigned int cpu_count, max_bits, i;
 
-	/* Set CPU0 */
-	*mask = 1UL << 0;
+	if (unlikely(cpusetsize <= 0 || !mask))
+		return -EINVAL;
 
-	return cpusetsize;
+	memset(mask, 0, (size_t)cpusetsize);
+	cpu_count = uk_sched_started_count();
+	max_bits = (unsigned int)((size_t)cpusetsize * 8U);
+	if (cpu_count > max_bits)
+		cpu_count = max_bits;
+
+	for (i = 0; i < cpu_count; i++)
+		bytes[i / 8U] |= (unsigned char)(1U << (i % 8U));
+
+	return (int)cpusetsize;
 }
 
-UK_SYSCALL_R_DEFINE(int, sched_setaffinity, int, pid, long, cpusetsize,
-						unsigned long*, mask)
+UK_SYSCALL_R_DEFINE(int, sched_setaffinity, int, pid,
+		    long, cpusetsize, unsigned long *, mask)
 {
-	UK_WARN_STUBBED();
 	return 0;
 }
+
+#if CONFIG_HAVE_SMP
+static __spinlock membarrier_lock;
+
+static void membarrier_ipi_fn(struct uk_lcpu_regs *regs __unused,
+			      void *arg __unused)
+{
+	uk_arch_mb();
+}
+
+static void membarrier_broadcast(void)
+{
+	__u64 targets[CONFIG_UKPLAT_CPU_MAXCOUNT];
+	__u64 self_idx = uk_pcpuvar_current_get(uk_pcpuvar_cpu_idx);
+	const struct uk_lcpu_func fn = { .fn = membarrier_ipi_fn, .user = NULL };
+	unsigned int count = 0, queued, waited;
+	unsigned int i;
+
+	uk_arch_mb();
+	for (i = 0; i < CONFIG_UKPLAT_CPU_MAXCOUNT; i++) {
+		struct uk_sched *s = __atomic_load_n(&uk_sched_by_lcpu[i],
+						     __ATOMIC_ACQUIRE);
+		if (i != self_idx && s &&
+		    __atomic_load_n(&s->is_started, __ATOMIC_ACQUIRE))
+			targets[count++] = i;
+	}
+	if (!count)
+		return;
+
+	ukarch_spin_lock(&membarrier_lock);
+	queued = count;
+	if (uk_lcpu_run(targets, &queued, &fn, 0) == 0 && queued > 0) {
+		waited = queued;
+		(void)uk_lcpu_wait(targets, &waited, 0);
+	}
+	ukarch_spin_unlock(&membarrier_lock);
+	uk_arch_mb();
+}
+#endif /* CONFIG_HAVE_SMP */
 
 #define MEMBARRIER_SUPPORTED_CMDS (\
 	MEMBARRIER_CMD_GLOBAL | \
@@ -488,7 +646,9 @@ UK_LLSYSCALL_R_DEFINE(int, membarrier, int, cmd, unsigned int, flags,
 	case MEMBARRIER_CMD_GLOBAL_EXPEDITED:
 	case MEMBARRIER_CMD_PRIVATE_EXPEDITED:
 	case MEMBARRIER_CMD_PRIVATE_EXPEDITED_SYNC_CORE:
-		/* TODO: implement real cross-core barrier when SMP supported */
+#if CONFIG_HAVE_SMP
+		membarrier_broadcast();
+#endif
 		return 0;
 	case MEMBARRIER_CMD_REGISTER_GLOBAL_EXPEDITED:
 	case MEMBARRIER_CMD_REGISTER_PRIVATE_EXPEDITED:

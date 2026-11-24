@@ -46,6 +46,7 @@ void pprocess_signal_arch_set_ucontext(struct ukarch_execenv *execenv,
 	ucontext->uc_mcontext.regs[27] = uk_lcpu_regs_get(execenv->regs, X27);
 	ucontext->uc_mcontext.regs[28] = uk_lcpu_regs_get(execenv->regs, X28);
 	ucontext->uc_mcontext.regs[29] = uk_lcpu_regs_get(execenv->regs, X29);
+	ucontext->uc_mcontext.pc = uk_lcpu_regs_get(execenv->regs, ELR_EL1);
 
 	/* TODO Populate the rest of the context */
 }
@@ -86,6 +87,7 @@ void pprocess_signal_arch_get_ucontext(ucontext_t *ucontext,
 	uk_lcpu_regs_set(execenv->regs, X27, ucontext->uc_mcontext.regs[27]);
 	uk_lcpu_regs_set(execenv->regs, X28, ucontext->uc_mcontext.regs[28]);
 	uk_lcpu_regs_set(execenv->regs, X29, ucontext->uc_mcontext.regs[29]);
+	uk_lcpu_regs_set(execenv->regs, ELR_EL1, ucontext->uc_mcontext.pc);
 
 	/* TODO Populate the rest of the context */
 }

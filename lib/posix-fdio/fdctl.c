@@ -15,6 +15,7 @@
 
 #include <uk/atomic.h>
 #include <uk/posix-fdio.h>
+#include <uk/syscall.h>
 #include <uk/print.h>
 
 #include "fdio-impl.h"
@@ -38,6 +39,15 @@ int uk_sys_ioctl(struct uk_ofile *of, int cmd, void *arg)
 		return 0;
 	}
 
+#if CONFIG_LIBPOSIX_FDIO_ASYNC
+	if (cmd == FIOASYNC) {
+		if (!arg)
+			return -EFAULT;
+		return fdio_set_status_flags(of, *(int *)arg ? O_ASYNC : 0,
+					     O_ASYNC);
+	}
+#endif /* CONFIG_LIBPOSIX_FDIO_ASYNC */
+
 	iolock = _SHOULD_LOCK(of->mode);
 	f = of->file;
 	if (iolock)
@@ -49,6 +59,9 @@ int uk_sys_ioctl(struct uk_ofile *of, int cmd, void *arg)
 	/* Universally return -ENOTTY for unimplemented TTY ioctls */
 	if (unlikely(r == -ENOSYS && IOCTL_CMD_ISTYPE(cmd, IOCTL_CMD_TYPE_TTY)))
 		return -ENOTTY;
+	if (r == -EINTR && !_IS_SEEKABLE(of->mode) &&
+	    uk_thread_wait_signalled(uk_thread_current()))
+		return -UK_SYSCALL_ERESTARTSYS;
 	return r;
 }
 
@@ -56,13 +69,42 @@ int uk_sys_ioctl(struct uk_ofile *of, int cmd, void *arg)
 #define _FCNTL_MASK (O_APPEND|O_ASYNC|O_DIRECT|O_NOATIME|O_NONBLOCK)
 /* File flags we actually support & care about changing */
 #define _SETFL_MASK (_FCNTL_MASK & UKFD_MODE_MASK)
+#if CONFIG_LIBPOSIX_FDIO_ASYNC
+#define _GETFL_MASK (UKFD_MODE_MASK | O_ASYNC)
+#else
+#define _GETFL_MASK UKFD_MODE_MASK
+#endif /* CONFIG_LIBPOSIX_FDIO_ASYNC */
+
+#if CONFIG_LIBPOSIX_PROCESS_SIGNAL && CONFIG_LIBPOSIX_FD_HEAPOFD
+static int ofile_set_owner(struct uk_ofile *of, pid_t owner)
+{
+	pid_t previous;
+	int ret = uk_sigowner_acquire(owner);
+
+	if (ret)
+		return ret;
+	uk_mutex_lock(&of->lock);
+	previous = of->signal_owner;
+	UK_WRITE_ONCE(of->signal_owner, owner);
+#if CONFIG_LIBPOSIX_FDIO_ASYNC
+	if (previous != owner)
+		UK_WRITE_ONCE(of->async_generation, of->async_generation + 1);
+#endif /* CONFIG_LIBPOSIX_FDIO_ASYNC */
+	uk_mutex_unlock(&of->lock);
+	uk_sigowner_release(previous);
+	return 0;
+}
+#endif /* CONFIG_LIBPOSIX_PROCESS_SIGNAL && CONFIG_LIBPOSIX_FD_HEAPOFD */
 
 int uk_sys_fcntl(struct uk_ofile *of, int cmd, unsigned long arg)
 {
 	switch (cmd) {
 	case F_GETFL:
-		return of->mode & UKFD_MODE_MASK;
+		return of->mode & _GETFL_MASK;
 	case F_SETFL:
+#if CONFIG_LIBPOSIX_FDIO_ASYNC
+		return fdio_set_status_flags(of, arg, _SETFL_MASK | O_ASYNC);
+#else
 	{
 		unsigned int mode = of->mode;
 		unsigned int newmode;
@@ -73,6 +115,42 @@ int uk_sys_fcntl(struct uk_ofile *of, int cmd, unsigned long arg)
 		} while (!uk_compare_exchange_n(&of->mode, &mode, newmode));
 		return 0;
 	}
+#endif /* CONFIG_LIBPOSIX_FDIO_ASYNC */
+#if CONFIG_LIBPOSIX_PROCESS_SIGNAL && CONFIG_LIBPOSIX_FD_HEAPOFD
+	case F_SETOWN:
+		return ofile_set_owner(of, (pid_t)arg);
+	case F_GETOWN:
+		return UK_READ_ONCE(of->signal_owner);
+	case F_SETOWN_EX:
+	{
+		const struct f_owner_ex *owner = (const void *)arg;
+
+		if (!owner)
+			return -EFAULT;
+		if (owner->pid < 0)
+			return -EINVAL;
+		switch (owner->type) {
+		case F_OWNER_PID:
+			return ofile_set_owner(of, owner->pid);
+		case F_OWNER_PGRP:
+			return ofile_set_owner(of, -owner->pid);
+		default:
+			return -EINVAL;
+		}
+	}
+	case F_GETOWN_EX:
+	{
+		struct f_owner_ex *owner = (void *)arg;
+		pid_t id;
+
+		if (!owner)
+			return -EFAULT;
+		id = UK_READ_ONCE(of->signal_owner);
+		owner->type = id < 0 ? F_OWNER_PGRP : F_OWNER_PID;
+		owner->pid = id < 0 ? -id : id;
+		return 0;
+	}
+#endif /* CONFIG_LIBPOSIX_PROCESS_SIGNAL && CONFIG_LIBPOSIX_FD_HEAPOFD */
 	case F_SETLK:
 	case F_SETLKW:
 		/* We currently stub file locking; revisit if needed */

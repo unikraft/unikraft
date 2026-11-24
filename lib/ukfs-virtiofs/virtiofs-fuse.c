@@ -7,10 +7,12 @@
 #include <errno.h>
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 #include <sys/types.h>
 
 #include <uk/assert.h>
 #include <uk/atomic.h>
+#include <uk/paging.h>
 #include <uk/print.h>
 
 #include "virtiofs-fuse.h"
@@ -87,7 +89,15 @@ bool payload_sumv(size_t *s, size_t l0, size_t nelem, size_t elsz)
 static inline
 uint64_t next_unique(struct virtiofs_fuse_dev *fdev)
 {
-	return uk_inc(&fdev->unique);
+	uint64_t unique;
+
+	/* uk_inc is fetch-and-add. Zero is reserved for FUSE notifications,
+	 * so skip it both at initialization and after counter wraparound.
+	 */
+	do {
+		unique = uk_inc(&fdev->unique);
+	} while (!unique);
+	return unique;
 }
 
 /* TODO: use real values from calling context */
@@ -106,6 +116,10 @@ void init_hdr(struct virtiofs_fuse_dev *fdev, struct fuse_in_header *hdr,
 	hdr->len = sizeof(*hdr) + paylen;
 	hdr->opcode = opcode;
 	hdr->unique = next_unique(fdev);
+#if CONFIG_LIBUKFS_VIRTIOFS_DEBUG
+	uk_pr_info("FUSE request opcode=%u unique=%lu\n",
+		   (unsigned int)opcode, (unsigned long)hdr->unique);
+#endif
 	hdr->total_extlen = 0;
 	set_credentials(hdr);
 }
@@ -227,6 +241,16 @@ int virtiofs_fuse_init(struct virtiofs_fuse_dev *fdev)
 		err = -EPROTO;
 		goto err_destroy;
 	}
+
+	if (paylen < FIELDLEN(struct fuse_init_out, max_write) ||
+	    !out.max_write) {
+		err = -EPROTO;
+		goto err_destroy;
+	}
+	fdev->max_write = out.max_write;
+#if CONFIG_LIBUKDEBUG_ENABLE_ASSERT
+	uk_pr_info("FUSE negotiated max_write=%u\n", fdev->max_write);
+#endif
 
 	return 0;
 
@@ -607,6 +631,91 @@ int virtiofs_fuse_link(struct virtiofs_fuse_dev *fdev, uint64_t node,
 	return check_reply_payload(rlen, &ohdr, sizeof(struct fuse_entry_out));
 }
 
+#define VIRTIOFS_MAX_DATA_SEGS 256U
+
+static inline
+size_t virtiofs_buf_pages(const void *base, size_t len)
+{
+	const size_t off = (uintptr_t)base & (UK_PAGING_PAGE_SIZE - 1);
+	size_t pages;
+
+	if (!len)
+		return 0;
+	pages = len / UK_PAGING_PAGE_SIZE;
+	pages += (off + (len % UK_PAGING_PAGE_SIZE) +
+		  UK_PAGING_PAGE_SIZE - 1) / UK_PAGING_PAGE_SIZE;
+	return pages;
+}
+
+static inline
+size_t virtiofs_max_bytes_for_segs(const void *base, size_t max_segs)
+{
+	const size_t off = (uintptr_t)base & (UK_PAGING_PAGE_SIZE - 1);
+	const size_t first = UK_PAGING_PAGE_SIZE - off;
+
+	if (!max_segs)
+		return 0;
+	if (max_segs == 1)
+		return first;
+	return first + (max_segs - 1) * UK_PAGING_PAGE_SIZE;
+}
+
+static
+int virtiofs_limit_iov(const struct iovec *iov, size_t iovcnt,
+		       uint32_t req_size, uint32_t byte_limit,
+		       size_t max_segs, bool strict_len,
+		       size_t *out_count, struct iovec *out_tail,
+		       uint32_t *out_size)
+{
+	const uint32_t target = byte_limit ? MIN(req_size, byte_limit) :
+					     req_size;
+	size_t count = 0;
+	size_t rem = target;
+	size_t segs_left = max_segs;
+
+	out_tail->iov_base = NULL;
+	out_tail->iov_len = 0;
+	*out_count = 0;
+	*out_size = 0;
+	if (!target)
+		return 0;
+
+	while (count < iovcnt && rem > 0 && segs_left > 0) {
+		const size_t iov_len = iov[count].iov_len;
+
+		if (!iov_len) {
+			count++;
+			continue;
+		}
+		const size_t take = MIN(iov_len, rem);
+		const size_t pages = virtiofs_buf_pages(iov[count].iov_base,
+							take);
+
+		if (pages <= segs_left && take == iov_len) {
+			rem -= take;
+			segs_left -= pages;
+			count++;
+			continue;
+		}
+		const size_t seg_cap = virtiofs_max_bytes_for_segs(
+			iov[count].iov_base, segs_left);
+		const size_t part = MIN(take, seg_cap);
+
+		if (part > 0) {
+			out_tail->iov_base = iov[count].iov_base;
+			out_tail->iov_len = part;
+			rem -= part;
+		}
+		break;
+	}
+
+	if (strict_len && rem > 0 && count == iovcnt)
+		return -EINVAL;
+	*out_count = count;
+	*out_size = target - (uint32_t)rem;
+	return *out_size ? 0 : -EINVAL;
+}
+
 int virtiofs_fuse_open(struct virtiofs_fuse_dev *fdev, uint64_t node,
 		       uint32_t flags, struct fuse_open_out *out)
 {
@@ -637,60 +746,99 @@ ssize_t virtiofs_fuse_read(struct virtiofs_fuse_dev *fdev, uint64_t node,
 	struct fuse_in_header hdr = {
 		.nodeid = node
 	};
+	struct fuse_read_in limited = *in;
 	struct fuse_out_header ohdr;
+	struct iovec tail;
+	size_t count = 0;
+	size_t plen;
+	ssize_t rlen;
+	int err;
+
+	if (!in->size)
+		return 0;
+	if (!fdev->max_write)
+		return -EPROTO;
+	err = virtiofs_limit_iov(read_iov, iovcnt, in->size, fdev->max_write,
+				 VIRTIOFS_MAX_DATA_SEGS, false,
+				 &count, &tail, &limited.size);
+	if (unlikely(err)) {
+#if CONFIG_LIBUKDEBUG_ENABLE_ASSERT
+		uk_pr_err("Cannot limit FUSE read: %d (size %u, %zu iovecs)\n",
+			  err, in->size, iovcnt);
+#endif
+		return err;
+	}
 	const struct uk_virtiofs_iovec hdr_iov[] = {
 		{ &hdr, sizeof(hdr) },
-		{ (void *)in, sizeof(*in) },
+		{ &limited, sizeof(limited) },
 		{ &ohdr, sizeof(ohdr) }
 	};
 	const struct uk_virtiofs_iovecs iovecs[] = {
 		{ hdr_iov, 3 },
-		{ (const struct uk_virtiofs_iovec *)read_iov, iovcnt }
+		{ (const struct uk_virtiofs_iovec *)read_iov, count },
+		{ (const struct uk_virtiofs_iovec *)&tail,
+		  tail.iov_len ? 1 : 0 }
 	};
-	ssize_t rlen;
-	int err;
 
-	init_hdr(fdev, &hdr, FUSE_READ, sizeof(*in));
-	rlen = uk_virtiofs_request_vec(fdev->dev, iovecs, 2, 2, iovcnt + 1);
-	if (unlikely((err = check_reply(rlen, &ohdr))))
+	init_hdr(fdev, &hdr, FUSE_READ, sizeof(limited));
+	rlen = uk_virtiofs_request_vec(fdev->dev, iovecs, 3, 2,
+				       1 + count + (tail.iov_len ? 1 : 0));
+	if (unlikely((err = check_reply(rlen, &ohdr)))) {
+#if CONFIG_LIBUKDEBUG_ENABLE_ASSERT
+		uk_pr_err("FUSE read failed: %d (transfer %zd, size %u, %zu iovecs)\n",
+			  err, rlen, limited.size, iovcnt);
+#endif
 		return err;
-	return payload_len(rlen);
+	}
+	plen = payload_len(rlen);
+	return plen <= limited.size ? (ssize_t)plen : -EIO;
 }
 
 ssize_t virtiofs_fuse_write(struct virtiofs_fuse_dev *fdev, uint64_t node,
 			    const struct fuse_write_in *in,
 			    const struct iovec *write_iov, size_t iovcnt)
 {
-	struct fuse_in_header hdr = {
-		.nodeid = node
-	};
+	struct fuse_in_header hdr = { .nodeid = node };
+	struct fuse_write_in limited = *in;
 	struct fuse_write_out out;
 	struct fuse_out_header ohdr;
-	const struct uk_virtiofs_iovec ihdr_iov[] = {
-		{ &hdr, sizeof(hdr) },
-		{ (void *)in, sizeof(*in) },
-	};
-	const struct uk_virtiofs_iovec ohdr_iov[] = {
-		{ &ohdr, sizeof(ohdr) },
-		{ &out, sizeof(out) }
-	};
-	const struct uk_virtiofs_iovecs iovecs[] = {
-		{ ihdr_iov, 2 },
-		{ (const struct uk_virtiofs_iovec *)write_iov, iovcnt },
-		{ ohdr_iov, 2 }
-	};
+	struct iovec tail;
+	size_t count = 0;
 	size_t paylen;
 	ssize_t rlen;
 	int err;
 
-	if (unlikely(!payload_sum(&paylen, sizeof(*in), in->size)))
-		return -EDOM;
-
-	init_hdr(fdev, &hdr, FUSE_WRITE, paylen);
-	rlen = uk_virtiofs_request_vec(fdev->dev, iovecs, 3, 2 + iovcnt, 2);
-	if (unlikely((err = check_reply_payload(rlen, &ohdr, sizeof(out)))))
+	if (!in->size)
+		return 0;
+	if (!fdev->max_write)
+		return -EPROTO;
+	err = virtiofs_limit_iov(write_iov, iovcnt, in->size, fdev->max_write,
+				 VIRTIOFS_MAX_DATA_SEGS, true,
+				 &count, &tail, &limited.size);
+	if (unlikely(err))
 		return err;
-	return out.size;
+	const struct uk_virtiofs_iovec ihdr_iov[] = {
+		{ &hdr, sizeof(hdr) }, { &limited, sizeof(limited) }
+	};
+	const struct uk_virtiofs_iovec ohdr_iov[] = {
+		{ &ohdr, sizeof(ohdr) }, { &out, sizeof(out) }
+	};
+	const struct uk_virtiofs_iovecs iovecs[] = {
+		{ ihdr_iov, 2 },
+		{ (const struct uk_virtiofs_iovec *)write_iov, count },
+		{ (const struct uk_virtiofs_iovec *)&tail,
+		  tail.iov_len ? 1 : 0 },
+		{ ohdr_iov, 2 }
+	};
+
+	if (!payload_sum(&paylen, sizeof(limited), limited.size))
+		return -EDOM;
+	init_hdr(fdev, &hdr, FUSE_WRITE, paylen);
+	rlen = uk_virtiofs_request_vec(fdev->dev, iovecs, 4,
+				       2 + count + (tail.iov_len ? 1 : 0), 2);
+	if ((err = check_reply_payload(rlen, &ohdr, sizeof(out))))
+		return err;
+	return out.size <= limited.size ? (ssize_t)out.size : -EIO;
 }
 
 int virtiofs_fuse_statfs(struct virtiofs_fuse_dev *fdev,
@@ -1055,3 +1203,22 @@ int virtiofs_fuse_statx(struct virtiofs_fuse_dev *fdev, uint64_t node,
 	rlen = uk_virtiofs_request(fdev->dev, iov, 2, 2 + !!out_statx);
 	return check_reply_payload(rlen, &ohdr, sizeof(struct fuse_statx_out));
 }
+
+#if CONFIG_LIBUKFS_VIRTIOFS_TEST
+#include <uk/test.h>
+
+UK_TESTCASE(virtiofs_fuse, nonzero_request_identifiers)
+{
+	struct virtiofs_fuse_dev dev = { 0 };
+
+	UK_TEST_EXPECT_SNUM_EQ(next_unique(&dev), 1);
+	UK_TEST_EXPECT_SNUM_EQ(next_unique(&dev), 2);
+	dev.unique = UINT64_MAX;
+	UK_TEST_EXPECT_ZERO(next_unique(&dev) ^ UINT64_MAX);
+	UK_TEST_EXPECT_SNUM_EQ(next_unique(&dev), 1);
+	UK_TEST_EXPECT_SNUM_EQ(next_unique(&dev), 2);
+}
+
+/* Run before the global statistics initcall at late priority nine. */
+uk_testsuite_late_prio(virtiofs_fuse, NULL, 8);
+#endif /* CONFIG_LIBUKFS_VIRTIOFS_TEST */

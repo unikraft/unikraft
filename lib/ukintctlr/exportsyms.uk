@@ -9,3 +9,4 @@ uk_intctlr_irq_register
 uk_intctlr_irq_unregister
 uk_intctlr_register
 uk_intctlr_plat_probe
+uk_intctlr_irq_unregister_arg

@@ -13,24 +13,31 @@
 
 #include <string.h>
 #include <errno.h>
+#include <stdbool.h>
 
 #include <uk/config.h>
+#include <uk/arch.h>
 #include <uk/arch/limits.h>
+#include <uk/arch/spinlock.h>
 #include <uk/assert.h>
 #include <uk/essentials.h>
 #include <uk/falloc.h>
+#include <uk/lcpu.h>
 #include <uk/paging/arch.h>
 #include <uk/paging.h>
+#include <uk/pcpuvar.h>
 #include <uk/pt.h>
 #include <uk/plat/memory.h>
+#include <uk/plat/spinlock.h>
 #include <uk/print.h>
 
 /* Forward declarations */
 static inline int pg_pt_alloc(struct uk_pagetable *pt, __vaddr_t *pt_vaddr,
 			      __paddr_t *pt_paddr, unsigned int level);
 
+static int pg_batch_reserve_frame(struct uk_pagetable *pt);
 static inline void pg_pt_free(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
-			      unsigned int level);
+			      unsigned int level, bool defer);
 
 static int pg_page_split(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 			 __vaddr_t vaddr, unsigned int level);
@@ -39,7 +46,21 @@ static int pg_page_mapx(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 			unsigned int level, __vaddr_t vaddr, __paddr_t paddr,
 			__sz len, unsigned long attr, unsigned long flags,
 			__pte_t tmpl, unsigned int tmpl_level,
-			struct uk_paging_page_mapx *mapx);
+			struct uk_paging_page_mapx *mapx,
+			uk_paging_page_mapx_result_t result);
+
+/* Distance from vaddr to the end of the level-lvl PTE that covers it. A walk
+ * that starts in the middle of a PTE without a page table below it must
+ * continue at the next boundary of that level. For a full walk
+ * (UK_PAL_VADDR_INV), page_size is 0 and returned unchanged.
+ */
+static inline __sz pg_step_to_boundary(__vaddr_t vaddr, unsigned int lvl,
+				       __sz page_size)
+{
+	if (vaddr == UK_PAL_VADDR_INV || !page_size)
+		return page_size;
+	return UK_PAL_PAGE_Lx_ALIGN_DOWN(vaddr, lvl) + page_size - vaddr;
+}
 
 static int pg_page_unmap(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 			 unsigned int level, __vaddr_t vaddr, __sz len,
@@ -62,18 +83,13 @@ static inline __vaddr_t pg_pte_to_vaddr(__pte_t pte,
  */
 static unsigned int pg_page_largest_level = UK_PAL_PAGE_LEVEL;
 
-/*
- * Pointer to currently active page table.
- * TODO: With SMP support, this should move to a CPU-local variable or we
- * need a way to derive the struct pagetable pointer from the configured
- * HW page table base pointer.
- */
 static struct uk_pagetable kernel_pt;
-static struct uk_pagetable *pg_active_pt;
+static __uk_pcpuvar struct uk_pagetable *pg_active_pt;
+static __uk_pcpuvar struct uk_paging_free_batch *pg_cpu_defer_batch;
 
 struct uk_pagetable *uk_paging_pt_get_active(void)
 {
-	return pg_active_pt;
+	return uk_pcpuvar_current_get(pg_active_pt);
 }
 
 int uk_paging_pt_set_active(struct uk_pagetable *pt)
@@ -81,16 +97,62 @@ int uk_paging_pt_set_active(struct uk_pagetable *pt)
 	int rc;
 
 	rc = uk_pt_activate(&pt->pt);
-	if (rc)
+	if (unlikely(rc))
 		return rc;
 
-	pg_active_pt = pt;
-
+	uk_pcpuvar_current_set(pg_active_pt, pt);
 	return 0;
 }
 
+#if CONFIG_LIBUKPAGING_SHARED
+static bool pg_index_shared(struct uk_pagetable *pt, unsigned int index)
+{
+	return pt->shared_parent && index >= pt->shared_first &&
+	       index - pt->shared_first < pt->shared_count;
+}
+
+struct uk_pagetable *uk_paging_pt_get_owner(struct uk_pagetable *pt,
+					    __vaddr_t vaddr)
+{
+	unsigned int index = UK_PAL_PT_Lx_IDX(vaddr, UK_PAL_PT_LEVELS - 1);
+
+	while (pg_index_shared(pt, index))
+		pt = pt->shared_parent;
+	return pt;
+}
+
+static bool pg_range_shared(struct uk_pagetable *pt, __vaddr_t start, __sz len)
+{
+	unsigned int first, last;
+
+	if (!pt->shared_parent)
+		return false;
+	if (start == UK_PAL_VADDR_INV || len == __SZ_MAX)
+		return true;
+	first = UK_PAL_PT_Lx_IDX(start, UK_PAL_PT_LEVELS - 1);
+	last = UK_PAL_PT_Lx_IDX(start + len - 1, UK_PAL_PT_LEVELS - 1);
+	return first < pt->shared_first + pt->shared_count &&
+	       last >= pt->shared_first;
+}
+
+static bool pg_uses_shared(struct uk_pagetable *pt, struct uk_pagetable *owner)
+{
+	while (pt) {
+		if (pt == owner)
+			return true;
+		pt = pt->shared_parent;
+	}
+	return false;
+}
+
+#endif
 static int pg_pt_clone(struct uk_pagetable *pt_dst, struct uk_pagetable *pt_src,
+#if CONFIG_LIBUKPAGING_SHARED
+		       unsigned long flags, unsigned int first,
+		       unsigned int count)
+#else
 		       unsigned long flags)
+#endif
 {
 	unsigned int lvl = UK_PAL_PT_LEVELS - 1;
 	__vaddr_t pt_vaddr_scache[UK_PAL_PT_LEVELS];
@@ -105,11 +167,20 @@ static int pg_pt_clone(struct uk_pagetable *pt_dst, struct uk_pagetable *pt_src,
 	UK_ASSERT(uk_pt_vbase(&pt_src->pt) != UK_PAL_VADDR_INV);
 	UK_ASSERT(uk_pt_pbase(&pt_src->pt) != UK_PAL_PADDR_INV);
 
-	if (pt_dst != pt_src)
+	if (pt_dst != pt_src) {
 		memset(pt_dst, 0, sizeof(struct uk_pagetable));
+		ukarch_spin_init(&pt_dst->lock);
+	}
 
 	/* Use the same frame allocator for the new page table */
 	pt_dst->fa = pt_src->fa;
+#if CONFIG_LIBUKPAGING_SHARED
+	if (count) {
+		pt_dst->shared_parent = pt_src;
+		pt_dst->shared_first = first;
+		pt_dst->shared_count = count;
+	}
+#endif
 
 	pt_svaddr = uk_pt_vbase(&pt_src->pt);
 	pt_vaddr_scache[lvl] = pt_svaddr;
@@ -136,8 +207,15 @@ static int pg_pt_clone(struct uk_pagetable *pt_dst, struct uk_pagetable *pt_src,
 			goto EXIT_FREE;
 
 		/* This is a page table. Copy it and descent. */
+#if CONFIG_LIBUKPAGING_SHARED
+		if (UK_PAL_PT_Lx_PTE_PRESENT(pte, lvl) &&
+		    !UK_PAL_PAGE_Lx_IS(pte, lvl) &&
+		    !(lvl == UK_PAL_PT_LEVELS - 1 &&
+		      pg_index_shared(pt_dst, pte_idx))) {
+#else
 		if (UK_PAL_PT_Lx_PTE_PRESENT(pte, lvl) &&
 		    !UK_PAL_PAGE_Lx_IS(pte, lvl)) {
+#endif
 			rc = pg_pt_alloc(pt_dst, &pt_dvaddr, &pt_dpaddr,
 					 lvl - 1);
 			if (unlikely(rc))
@@ -155,7 +233,7 @@ static int pg_pt_clone(struct uk_pagetable *pt_dst, struct uk_pagetable *pt_src,
 						pte_idx, UK_PAL_VADDR_INV,
 						pte);
 			if (unlikely(rc)) {
-				pg_pt_free(pt_dst, pt_dvaddr, lvl - 1);
+				pg_pt_free(pt_dst, pt_dvaddr, lvl - 1, false);
 				goto EXIT_FREE;
 			}
 
@@ -172,8 +250,8 @@ static int pg_pt_clone(struct uk_pagetable *pt_dst, struct uk_pagetable *pt_src,
 		}
 
 #ifdef CONFIG_LIBUKPAGING_STATS
-		if (UK_PAL_PT_Lx_PTE_PRESENT(pte, lvl)) {
-			UK_ASSERT(UK_PAL_PAGE_Lx_IS(pte, lvl));
+		if (UK_PAL_PT_Lx_PTE_PRESENT(pte, lvl) &&
+		    UK_PAL_PAGE_Lx_IS(pte, lvl)) {
 			pt_dst->nr_lx_pages[lvl]++;
 		}
 #endif /* CONFIG_LIBUKPAGING_STATS */
@@ -225,7 +303,7 @@ EXIT_FREE:
 		      UK_PAGING_PAGE_FLAG_KEEP_FRAMES);
 
 	pg_pt_free(pt_dst, pt_vaddr_dcache[UK_PAL_PT_LEVELS - 1],
-		   UK_PAL_PT_LEVELS - 1);
+		   UK_PAL_PT_LEVELS - 1, false);
 
 	return rc;
 }
@@ -263,6 +341,7 @@ int uk_paging_pt_init(struct uk_pagetable *pt, __paddr_t start, __sz len)
 	 * of the new page table
 	 */
 	memset(pt, 0, sizeof(struct uk_pagetable));
+	ukarch_spin_init(&pt->lock);
 
 	rc = pgarch_pt_init(pt, start, len);
 	if (unlikely(rc))
@@ -275,7 +354,7 @@ int uk_paging_pt_init(struct uk_pagetable *pt, __paddr_t start, __sz len)
 
 	rc = uk_pt_init(&pt->pt, pt_paddr);
 	if (unlikely(rc)) {
-		pg_pt_free(pt, pt_vaddr, UK_PAL_PT_LEVELS - 1);
+		pg_pt_free(pt, pt_vaddr, UK_PAL_PT_LEVELS - 1, false);
 		return rc;
 	}
 
@@ -303,7 +382,7 @@ int uk_paging_pt_init(struct uk_pagetable *pt, __paddr_t start, __sz len)
 			  UK_PAL_PAGE_ATTR_PROT_READ | UK_PAL_PAGE_ATTR_PROT_WRITE, /* attr */
 			  0, /* flags */
 			  UK_PAL_PT_Lx_PTE_INVALID(UK_PAL_PAGE_LEVEL),
-			  UK_PAL_PAGE_LEVEL, NULL);
+			  UK_PAL_PAGE_LEVEL, NULL, NULL);
 	if (unlikely(rc))
 		return rc;
 #endif /* CONFIG_LIBUKPAGING_DIRECTMAP */
@@ -312,7 +391,7 @@ int uk_paging_pt_init(struct uk_pagetable *pt, __paddr_t start, __sz len)
 	/* If we have stats active, we need to discover all mappings etc. We
 	 * simplify this by just cloning the page table hierarchy.
 	 */
-	rc = pg_pt_clone(pt, pt, 0);
+	rc = pg_pt_clone(pt, pt, 0, 0, 0);
 	if (unlikely(rc))
 		return rc;
 #endif
@@ -322,40 +401,154 @@ int uk_paging_pt_init(struct uk_pagetable *pt, __paddr_t start, __sz len)
 
 int uk_paging_pt_add_mem(struct uk_pagetable *pt, __paddr_t start, __sz len)
 {
+	unsigned long irqf;
+	int rc;
+
 	if (len == 0)
 		return 0;
 
 	UK_ASSERT(start <= __PADDR_MAX - len);
 	UK_ASSERT(uk_pal_paddr_range_isvalid(start, len));
 
-	return pgarch_pt_add_mem(pt, start, len);
+	ukplat_spin_lock_irqsave(&pt->lock, irqf);
+	rc = pgarch_pt_add_mem(pt, start, len);
+	ukplat_spin_unlock_irqrestore(&pt->lock, irqf);
+	return rc;
 }
 
 int uk_paging_pt_clone(struct uk_pagetable *pt, struct uk_pagetable *pt_src,
 		       unsigned long flags)
 {
+	unsigned long irqf;
+	int rc;
+
 	UK_ASSERT(pt != pt_src);
 
-	return pg_pt_clone(pt, pt_src, flags);
+	ukplat_spin_lock_irqsave(&pt_src->lock, irqf);
+#if CONFIG_LIBUKPAGING_SHARED
+	if (pt_src->shared_parent && !(flags & UK_PAGING_PAGE_FLAG_CLONE_NEW))
+		rc = -ENOTSUP;
+	else
+		rc = pg_pt_clone(pt, pt_src, flags, 0, 0);
+#else
+	rc = pg_pt_clone(pt, pt_src, flags);
+#endif
+	ukplat_spin_unlock_irqrestore(&pt_src->lock, irqf);
+	return rc;
 }
 
+#if CONFIG_LIBUKPAGING_SHARED
+int uk_paging_pt_clone_shared(struct uk_pagetable *pt,
+			      struct uk_pagetable *pt_src,
+			      __vaddr_t start, __sz len)
+{
+	const unsigned int level = UK_PAL_PT_LEVELS - 1;
+	const __sz span = UK_PAL_PAGE_Lx_SIZE(level);
+	unsigned int first = UK_PAL_PT_Lx_IDX(start, level);
+	unsigned int count, i;
+	unsigned long irqf;
+	__pte_t pte;
+	int rc = -EINVAL;
+
+	if (pt == pt_src || !len || start > __VADDR_MAX - len ||
+	    !uk_pal_vaddr_range_isvalid(start, len) ||
+	    !UK_PAL_PAGE_Lx_ALIGNED(start, level) || len % span ||
+	    len / span > UK_PAL_PT_Lx_PTES(level) - first)
+		return -EINVAL;
+	count = len / span;
+
+	ukplat_spin_lock_irqsave(&pt_src->lock, irqf);
+	if (pt_src->shared_users == ~0U) {
+		rc = -EOVERFLOW;
+		goto out;
+	}
+	if (pt_src->shared_parent &&
+	    (first != pt_src->shared_first || count != pt_src->shared_count))
+		goto out;
+	for (i = first; i < first + count; i++) {
+		rc = uk_pt_pte_read_at(&pt_src->pt, uk_pt_vbase(&pt_src->pt),
+				       level, i, &pte);
+		if (rc)
+			goto out;
+		if (!UK_PAL_PT_Lx_PTE_PRESENT(pte, level) ||
+		    UK_PAL_PAGE_Lx_IS(pte, level)) {
+			rc = -ENOTSUP;
+			goto out;
+		}
+	}
+	rc = pg_pt_clone(pt, pt_src, 0, first, count);
+	if (!rc)
+		pt_src->shared_users++;
+out:
+	ukplat_spin_unlock_irqrestore(&pt_src->lock, irqf);
+	return rc;
+}
+
+static void pg_shared_parent_release(void *arg)
+{
+	struct uk_pagetable *pt = arg;
+	struct uk_pagetable *parent = pt->shared_parent;
+	unsigned long irqf;
+
+	ukplat_spin_lock_irqsave(&parent->lock, irqf);
+	UK_ASSERT(parent->shared_users);
+	parent->shared_users--;
+	ukplat_spin_unlock_irqrestore(&parent->lock, irqf);
+	pt->shared_parent = __NULL;
+}
+
+#endif
 int uk_paging_pt_free(struct uk_pagetable *pt, unsigned long flags)
 {
+	struct uk_paging_free_batch local_batch;
+	struct uk_paging_free_batch *batch;
+	unsigned long irqf;
 	int rc;
 
 	UK_ASSERT(uk_pt_vbase(&pt->pt) != UK_PAL_VADDR_INV);
 	UK_ASSERT(uk_pt_pbase(&pt->pt) != UK_PAL_PADDR_INV);
 
+	uk_paging_free_batch_init(&local_batch, pt);
+	ukplat_spin_lock_irqsave(&pt->lock, irqf);
+#if CONFIG_LIBUKPAGING_SHARED
+	if (pt->shared_users) {
+		ukplat_spin_unlock_irqrestore(&pt->lock, irqf);
+		return -EBUSY;
+	}
+#endif
+	batch = uk_pcpuvar_current_get(pg_cpu_defer_batch);
+	if (!batch || batch->pt != pt)
+		batch = &local_batch;
+	UK_ASSERT(pt->defer_batch == __NULL);
+	pt->defer_batch = batch;
+
 	rc = pg_page_unmap(pt, uk_pt_vbase(&pt->pt), UK_PAL_PT_LEVELS - 1,
 			   UK_PAL_VADDR_INV, __SZ_MAX,
 			   flags & UK_PAGING_PAGE_FLAG_KEEP_FRAMES);
-	if (unlikely(rc))
+	if (!rc)
+		rc = pg_batch_reserve_frame(pt);
+	if (unlikely(rc)) {
+		pt->defer_batch = __NULL;
+		ukplat_spin_unlock_irqrestore(&pt->lock, irqf);
+		if (batch == &local_batch)
+			uk_paging_free_batch_finish(&local_batch);
 		return rc;
+	}
 
 	/* Also free the top-level page table */
-	pg_pt_free(pt, uk_pt_vbase(&pt->pt), UK_PAL_PT_LEVELS - 1);
+	pg_pt_free(pt, uk_pt_vbase(&pt->pt), UK_PAL_PT_LEVELS - 1, true);
 
 	uk_pt_term(&pt->pt);
+#if CONFIG_LIBUKPAGING_SHARED
+	if (pt->shared_parent)
+		uk_paging_batch_defer(batch, &pt->shared_release,
+				      pg_shared_parent_release, pt);
+#endif
+	pt->defer_batch = __NULL;
+	ukplat_spin_unlock_irqrestore(&pt->lock, irqf);
+
+	if (batch == &local_batch)
+		uk_paging_free_batch_finish(&local_batch);
 
 	return 0;
 }
@@ -364,7 +557,16 @@ int uk_paging_pt_walk(struct uk_pagetable *pt, __vaddr_t vaddr,
 		      unsigned int *level, __vaddr_t *pt_vaddr,
 		      __pte_t *pte)
 {
-	return uk_pt_walk(&pt->pt, vaddr, level, pt_vaddr, pte);
+	unsigned long irqf;
+	int rc;
+
+#if CONFIG_LIBUKPAGING_SHARED
+	pt = uk_paging_pt_get_owner(pt, vaddr);
+#endif
+	ukplat_spin_lock_irqsave(&pt->lock, irqf);
+	rc = uk_pt_walk(&pt->pt, vaddr, level, pt_vaddr, pte);
+	ukplat_spin_unlock_irqrestore(&pt->lock, irqf);
+	return rc;
 }
 
 #define PG_Lx_L0_PAGES(lvl)					\
@@ -404,6 +606,308 @@ static inline void pg_ffree(struct uk_pagetable *pt, __paddr_t paddr,
 	UK_ASSERT(rc == 0 || rc == -EFAULT || rc == -ENOMEM);
 }
 
+#define PG_FREE_CHUNK_CAPACITY						\
+	((UK_PAGING_PAGE_SIZE - sizeof(struct uk_paging_free_chunk *) -	\
+	  sizeof(__paddr_t) - sizeof(unsigned int)) /			\
+	 sizeof(struct uk_paging_free_entry))
+
+struct uk_paging_free_chunk {
+	struct uk_paging_free_chunk *next;
+	__paddr_t chunk_paddr;
+	unsigned int count;
+	struct uk_paging_free_entry entries[PG_FREE_CHUNK_CAPACITY];
+};
+
+void uk_paging_free_batch_init(struct uk_paging_free_batch *batch,
+			       struct uk_pagetable *pt)
+{
+	UK_ASSERT(batch);
+
+	batch->pt = pt;
+	batch->min_vaddr = __VADDR_MAX;
+	batch->max_vaddr = 0;
+	batch->has_tlb_range = 0;
+	batch->full_flush = 0;
+	batch->inline_count = 0;
+	batch->chunks = __NULL;
+#if CONFIG_LIBUKPAGING_DEFERRED_RELEASE
+	batch->calls = __NULL;
+#endif
+}
+
+#if CONFIG_LIBUKPAGING_DEFERRED_RELEASE
+void uk_paging_batch_defer(struct uk_paging_free_batch *batch,
+			   struct uk_paging_deferred_call *call,
+			   void (*release)(void *arg), void *arg)
+{
+	UK_ASSERT(batch && batch->pt);
+	UK_ASSERT(call);
+	UK_ASSERT(release);
+
+	call->release = release;
+	call->arg = arg;
+	call->next = batch->calls;
+	batch->calls = call;
+}
+
+#endif
+static inline void pg_batch_record_tlb(struct uk_paging_free_batch *batch,
+				       __vaddr_t vaddr, __sz page_size)
+{
+	__vaddr_t end;
+
+	if (!batch)
+		return;
+	if (vaddr == UK_PAL_VADDR_INV || page_size == 0) {
+		batch->full_flush = 1;
+		return;
+	}
+	end = (vaddr <= __VADDR_MAX - page_size) ? (vaddr + page_size) :
+						   __VADDR_MAX;
+	if (!batch->has_tlb_range) {
+		batch->min_vaddr = vaddr;
+		batch->max_vaddr = end;
+		batch->has_tlb_range = 1;
+		return;
+	}
+	if (vaddr < batch->min_vaddr)
+		batch->min_vaddr = vaddr;
+	if (end > batch->max_vaddr)
+		batch->max_vaddr = end;
+}
+
+/* Ensure we can defer a frame before invalidating its mapping. */
+static int pg_batch_reserve_frame(struct uk_pagetable *pt)
+{
+	struct uk_paging_free_batch *batch = pt->defer_batch;
+	struct uk_paging_free_chunk *chunk;
+	__paddr_t chunk_paddr = UK_PAL_PADDR_INV;
+	int rc;
+
+	if (!batch || batch->inline_count < UK_PAGING_FREE_BATCH_INLINE)
+		return 0;
+	chunk = batch->chunks;
+	if (chunk && chunk->count < PG_FREE_CHUNK_CAPACITY)
+		return 0;
+
+	rc = pg_falloc(pt, &chunk_paddr, UK_PAL_PAGE_LEVEL);
+	if (unlikely(rc))
+		return rc;
+	chunk = (struct uk_paging_free_chunk *)uk_pt_frame_vaddr(chunk_paddr);
+	chunk->next = batch->chunks;
+	chunk->chunk_paddr = chunk_paddr;
+	chunk->count = 0;
+	batch->chunks = chunk;
+	return 0;
+}
+
+static void pg_batch_defer_frame(struct uk_pagetable *pt, __paddr_t paddr,
+				 unsigned int level)
+{
+	struct uk_paging_free_batch *batch = pt->defer_batch;
+	struct uk_paging_free_entry *entry;
+
+	if (!batch) {
+		pg_ffree(pt, paddr, level);
+		return;
+	}
+
+	if (batch->inline_count < UK_PAGING_FREE_BATCH_INLINE) {
+		entry = &batch->inline_entries[batch->inline_count++];
+	} else {
+		struct uk_paging_free_chunk *chunk = batch->chunks;
+
+		UK_ASSERT(chunk && chunk->count < PG_FREE_CHUNK_CAPACITY);
+		entry = &chunk->entries[chunk->count++];
+	}
+	entry->paddr = paddr;
+	entry->level = level;
+}
+
+void uk_paging_batch_begin(struct uk_paging_free_batch *batch,
+			   struct uk_pagetable *pt)
+{
+	uk_paging_free_batch_init(batch, pt);
+	if (pt) {
+		UK_ASSERT(uk_pcpuvar_current_get(pg_cpu_defer_batch) == __NULL);
+		uk_pcpuvar_current_set(pg_cpu_defer_batch, batch);
+	}
+}
+
+void uk_paging_batch_end(struct uk_paging_free_batch *batch)
+{
+	UK_ASSERT(batch);
+	if (batch->pt) {
+		UK_ASSERT(uk_pcpuvar_current_get(pg_cpu_defer_batch) == batch);
+		uk_pcpuvar_current_set(pg_cpu_defer_batch, __NULL);
+	}
+}
+
+struct uk_paging_free_batch *
+uk_paging_batch_current(struct uk_pagetable *pt)
+{
+	struct uk_paging_free_batch *batch;
+
+	UK_ASSERT(pt);
+	UK_ASSERT(uk_lcpu_irqs_disabled());
+	batch = uk_pcpuvar_current_get(pg_cpu_defer_batch);
+	if (!batch || batch->pt != pt)
+		return __NULL;
+	return batch;
+}
+
+#if CONFIG_HAVE_SMP
+#define PG_TLB_SHOOTDOWN_FULL_THRESHOLD (32UL * UK_PAGING_PAGE_SIZE)
+
+struct pg_tlb_shootdown_req {
+	struct uk_pagetable *pt;
+	__vaddr_t start;
+	__vaddr_t end;
+	__u8 full_flush;
+};
+
+static void pg_tlb_shootdown_ipi(struct uk_lcpu_regs *regs __unused, void *arg)
+{
+	const struct pg_tlb_shootdown_req *req = arg;
+	__vaddr_t va;
+
+#if CONFIG_LIBUKPAGING_SHARED
+	if (!uk_pt_isactive(&req->pt->pt) &&
+	    !pg_uses_shared(uk_paging_pt_get_active(), req->pt))
+#else
+	if (!uk_pt_isactive(&req->pt->pt))
+#endif
+		return;
+
+	if (req->full_flush || req->end <= req->start ||
+	    (req->end - req->start) > PG_TLB_SHOOTDOWN_FULL_THRESHOLD) {
+		uk_pal_tlb_flush();
+		return;
+	}
+
+	for (va = req->start; va < req->end; va += UK_PAGING_PAGE_SIZE) {
+		uk_pal_tlb_flush_entry(va);
+		if (unlikely(va > __VADDR_MAX - UK_PAGING_PAGE_SIZE))
+			break;
+	}
+}
+
+static void pg_batch_shootdown_remote_tlbs(struct uk_paging_free_batch *batch)
+{
+	__u64 targets[CONFIG_UKPLAT_CPU_MAXCOUNT];
+	__u64 self_idx = uk_pcpuvar_current_get(uk_pcpuvar_cpu_idx);
+	unsigned int cpu_count = uk_lcpu_discovered_count();
+	unsigned int count = 0, queued, i;
+	struct pg_tlb_shootdown_req req;
+	struct uk_lcpu_func fn;
+	int rc;
+
+	if (!batch->full_flush && !batch->has_tlb_range)
+		return;
+	if (cpu_count <= 1)
+		return;
+	if (cpu_count > CONFIG_UKPLAT_CPU_MAXCOUNT)
+		cpu_count = CONFIG_UKPLAT_CPU_MAXCOUNT;
+
+	uk_arch_mb();
+	for (i = 0; i < cpu_count; i++) {
+		struct uk_lcpu *lcpu;
+		int state;
+
+		if (i == self_idx)
+			continue;
+		lcpu = &uk_pcpuvar_lval(i, uk_lcpus);
+		state = UK_READ_ONCE(lcpu->state);
+		if (!uk_lcpu_state_is_online(state))
+			continue;
+		targets[count++] = i;
+	}
+	if (!count)
+		return;
+	if (unlikely(uk_lcpu_irqs_disabled()))
+		UK_CRASH("Remote TLB invalidation with local IRQs disabled\n");
+
+	req.pt = batch->pt;
+	req.start = UK_PAGING_PAGE_ALIGN_DOWN(batch->min_vaddr);
+	req.end = batch->max_vaddr;
+	req.full_flush = batch->full_flush;
+	fn.fn = pg_tlb_shootdown_ipi;
+	fn.user = &req;
+
+	/* Run lock-free with local IRQs enabled so concurrent cross-CPU
+	 * shootdown IPIs are serviced immediately without deadlock.
+	 */
+	queued = count;
+	rc = uk_lcpu_run(targets, &queued, &fn, 0);
+	if (unlikely(rc))
+		UK_CRASH("Cannot queue remote TLB invalidation: %d\n", rc);
+	rc = uk_lcpu_wait(targets, &queued, 0);
+	if (unlikely(rc))
+		UK_CRASH("Cannot complete remote TLB invalidation: %d\n", rc);
+	uk_arch_mb();
+}
+#else /* !CONFIG_HAVE_SMP */
+static inline void
+pg_batch_shootdown_remote_tlbs(struct uk_paging_free_batch *batch __unused)
+{
+}
+#endif /* !CONFIG_HAVE_SMP */
+
+void uk_paging_free_batch_finish(struct uk_paging_free_batch *batch)
+{
+	struct uk_paging_free_chunk *chunk, *next;
+#if CONFIG_LIBUKPAGING_DEFERRED_RELEASE
+	struct uk_paging_deferred_call *call, *calls;
+#endif
+	struct uk_pagetable *pt;
+	unsigned int i;
+
+	if (!batch || !batch->pt)
+		return;
+
+	if (batch->full_flush)
+		uk_pt_flush(&batch->pt->pt);
+#if CONFIG_LIBUKPAGING_SHARED
+	if ((batch->full_flush || batch->has_tlb_range) &&
+	    uk_paging_pt_get_active() != batch->pt &&
+	    pg_uses_shared(uk_paging_pt_get_active(), batch->pt))
+		uk_pal_tlb_flush();
+#endif
+	pg_batch_shootdown_remote_tlbs(batch);
+
+	pt = batch->pt;
+	for (i = 0; i < batch->inline_count; i++)
+		pg_ffree(pt, batch->inline_entries[i].paddr,
+			 batch->inline_entries[i].level);
+
+	chunk = batch->chunks;
+	while (chunk) {
+		__paddr_t chunk_paddr = chunk->chunk_paddr;
+
+		next = chunk->next;
+		for (i = 0; i < chunk->count; i++)
+			pg_ffree(pt, chunk->entries[i].paddr,
+				 chunk->entries[i].level);
+		pg_ffree(pt, chunk_paddr, UK_PAL_PAGE_LEVEL);
+		chunk = next;
+	}
+
+	batch->inline_count = 0;
+	batch->chunks = __NULL;
+	batch->has_tlb_range = 0;
+	batch->full_flush = 0;
+
+#if CONFIG_LIBUKPAGING_DEFERRED_RELEASE
+	calls = batch->calls;
+	batch->calls = __NULL;
+	while (calls) {
+		call = calls;
+		calls = call->next;
+		call->release(call->arg);
+	}
+#endif
+}
+
 static inline int pg_pt_alloc(struct uk_pagetable *pt, __vaddr_t *pt_vaddr,
 			      __paddr_t *pt_paddr, unsigned int level)
 {
@@ -438,7 +942,7 @@ EXIT_FREE:
 }
 
 static inline void pg_pt_free(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
-			      unsigned int level)
+			      unsigned int level, bool defer)
 {
 	__paddr_t pt_paddr;
 
@@ -446,7 +950,12 @@ static inline void pg_pt_free(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 
 	pt_paddr = uk_pt_frame_paddr(pt_vaddr);
 
-	pg_ffree(pt, pt_paddr, UK_PAL_PAGE_LEVEL);
+	if (defer && pt->defer_batch)
+		pt->defer_batch->full_flush = 1;
+	if (defer)
+		pg_batch_defer_frame(pt, pt_paddr, UK_PAL_PAGE_LEVEL);
+	else
+		pg_ffree(pt, pt_paddr, UK_PAL_PAGE_LEVEL);
 
 #ifdef CONFIG_LIBUKPAGING_STATS
 	UK_ASSERT(pt->nr_pt_pages[level] > 0);
@@ -476,7 +985,8 @@ static int pg_page_mapx(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 			unsigned int level, __vaddr_t vaddr, __paddr_t paddr,
 			__sz len, unsigned long attr, unsigned long flags,
 			__pte_t tmpl, unsigned int tmpl_level,
-			struct uk_paging_page_mapx *mapx)
+			struct uk_paging_page_mapx *mapx,
+			uk_paging_page_mapx_result_t result)
 {
 	unsigned int to_lvl = UK_PAGING_PAGE_FLAG_SIZE_TO_LEVEL(flags);
 	unsigned int max_lvl = pg_page_largest_level;
@@ -566,7 +1076,7 @@ static int pg_page_mapx(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 							 lvl, vaddr, pt_paddr,
 							 pte, tmpl_level);
 				if (unlikely(rc)) {
-					pg_pt_free(pt, pt_vaddr, lvl - 1);
+					pg_pt_free(pt, pt_vaddr, lvl - 1, false);
 					return rc;
 				}
 			}
@@ -668,6 +1178,9 @@ TOO_BIG:
 			rc = mapx->map(pt, vaddr, pt_vaddr, lvl, &pte,
 				       mapx->ctx);
 			if (unlikely(rc)) {
+				if (result)
+					result(pt, vaddr, pt_vaddr, lvl, rc,
+					       mapx->ctx);
 				if (alloc_pmem &&
 				    !UK_PAL_PT_Lx_PTE_PRESENT(orig_pte, lvl))
 					pg_ffree(pt, paddr, lvl);
@@ -690,6 +1203,8 @@ TOO_BIG:
 		rc = uk_pt_pte_write_at(&pt->pt, pt_vaddr, lvl, pte_idx,
 					UK_PAL_VADDR_INV, pte);
 		if (unlikely(rc)) {
+			if (mapx && result)
+				result(pt, vaddr, pt_vaddr, lvl, rc, mapx->ctx);
 			if (alloc_pmem &&
 			    !UK_PAL_PT_Lx_PTE_PRESENT(orig_pte, lvl))
 				pg_ffree(pt, paddr, lvl);
@@ -698,13 +1213,17 @@ TOO_BIG:
 		}
 
 #ifdef CONFIG_LIBUKPAGING_STATS
-		if (!(flags & UK_PAGING_PAGE_FLAG_INTERN_STATS_KEEP))
+		if (!(flags & UK_PAGING_PAGE_FLAG_INTERN_STATS_KEEP) &&
+		    !UK_PAL_PT_Lx_PTE_PRESENT(orig_pte, lvl))
 			pt->nr_lx_pages[lvl]++;
 #endif /* CONFIG_LIBUKPAGING_STATS */
 
-		/* Only a mapping that we replaced can be cached in the TLB */
-		if (UK_PAL_PT_Lx_PTE_PRESENT(orig_pte, lvl))
+		if (UK_PAL_PT_Lx_PTE_PRESENT(orig_pte, lvl)) {
 			uk_pt_flush_entry(&pt->pt, vaddr);
+			pg_batch_record_tlb(pt->defer_batch, vaddr, page_size);
+		}
+		if (mapx && result)
+			result(pt, vaddr, pt_vaddr, lvl, 0, mapx->ctx);
 
 NEXT_PTE:
 		UK_ASSERT(len >= page_size);
@@ -783,14 +1302,22 @@ NEXT_PTE:
 	return 0;
 }
 
-int uk_paging_page_mapx(struct uk_pagetable *pt, __vaddr_t vaddr,
-			__paddr_t paddr, unsigned long pages,
-			unsigned long attr, unsigned long flags,
-			struct uk_paging_page_mapx *mapx)
+int uk_paging_page_mapx_with_result(struct uk_pagetable *pt,
+				    __vaddr_t vaddr, __paddr_t paddr,
+				    unsigned long pages, unsigned long attr,
+				    unsigned long flags,
+				    struct uk_paging_page_mapx *mapx,
+				    uk_paging_page_mapx_result_t result)
 {
 	unsigned int level = UK_PAGING_PAGE_FLAG_SIZE_TO_LEVEL(flags);
+	struct uk_paging_free_batch local_batch;
+	struct uk_paging_free_batch *batch;
+	unsigned long irqf;
 	__sz len;
+	int rc;
 
+	if (result && !mapx)
+		return -EINVAL;
 	if (unlikely(pages == 0))
 		return 0;
 
@@ -799,20 +1326,48 @@ int uk_paging_page_mapx(struct uk_pagetable *pt, __vaddr_t vaddr,
 	UK_ASSERT(pages <= (__SZ_MAX / UK_PAL_PAGE_Lx_SIZE(level)));
 
 	len = pages * UK_PAL_PAGE_Lx_SIZE(level);
+#if CONFIG_LIBUKPAGING_SHARED
+	if (pg_range_shared(pt, vaddr, len))
+		return -EACCES;
+#endif
 
 #ifdef CONFIG_LIBUKPAGING_STATS
 	UK_ASSERT(!(flags & UK_PAGING_PAGE_FLAG_INTERN_STATS_KEEP));
 #endif /* CONFIG_LIBUKPAGING_STATS */
 
-	UK_ASSERT(uk_pt_vbase(&pt->pt) != UK_PAL_VADDR_INV);
-	UK_ASSERT(uk_pt_pbase(&pt->pt) != UK_PAL_PADDR_INV);
-
 	UK_ASSERT(vaddr <= __VADDR_MAX - len);
 
-	return pg_page_mapx(pt, uk_pt_vbase(&pt->pt), UK_PAL_PT_LEVELS - 1,
-			    vaddr, paddr, len, attr, flags,
-			    UK_PAL_PT_Lx_PTE_INVALID(UK_PAL_PAGE_LEVEL),
-			    UK_PAL_PAGE_LEVEL, mapx);
+	uk_paging_free_batch_init(&local_batch, pt);
+	ukplat_spin_lock_irqsave(&pt->lock, irqf);
+	UK_ASSERT(uk_pt_vbase(&pt->pt) != UK_PAL_VADDR_INV);
+	UK_ASSERT(uk_pt_pbase(&pt->pt) != UK_PAL_PADDR_INV);
+	batch = uk_pcpuvar_current_get(pg_cpu_defer_batch);
+	if (!batch || batch->pt != pt)
+		batch = &local_batch;
+	UK_ASSERT(pt->defer_batch == __NULL);
+	pt->defer_batch = batch;
+
+	rc = pg_page_mapx(pt, uk_pt_vbase(&pt->pt), UK_PAL_PT_LEVELS - 1, vaddr,
+			  paddr, len, attr, flags,
+			  UK_PAL_PT_Lx_PTE_INVALID(UK_PAL_PAGE_LEVEL),
+			  UK_PAL_PAGE_LEVEL, mapx, result);
+
+	pt->defer_batch = __NULL;
+	ukplat_spin_unlock_irqrestore(&pt->lock, irqf);
+
+	if (batch == &local_batch)
+		uk_paging_free_batch_finish(&local_batch);
+
+	return rc;
+}
+
+int uk_paging_page_mapx(struct uk_pagetable *pt, __vaddr_t vaddr,
+			__paddr_t paddr, unsigned long pages,
+			unsigned long attr, unsigned long flags,
+			struct uk_paging_page_mapx *mapx)
+{
+	return uk_paging_page_mapx_with_result(pt, vaddr, paddr, pages, attr,
+					     flags, mapx, NULL);
 }
 
 static int pg_page_split(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
@@ -840,9 +1395,13 @@ static int pg_page_split(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 	rc = uk_pt_table_split_at(&pt->pt, pt_vaddr, level, vaddr,
 				  new_pt_vaddr, new_pt_paddr);
 	if (unlikely(rc)) {
-		pg_pt_free(pt, new_pt_vaddr, level - 1);
+		pg_pt_free(pt, new_pt_vaddr, level - 1, false);
 		return rc;
 	}
+
+	if (pt == uk_paging_pt_get_active())
+		uk_pal_tlb_flush_entry(vaddr);
+	pg_batch_record_tlb(pt->defer_batch, vaddr, UK_PAL_PAGE_Lx_SIZE(level));
 
 #ifdef CONFIG_LIBUKPAGING_STATS
 	UK_ASSERT(pt->nr_lx_pages[level] > 0);
@@ -863,7 +1422,7 @@ static int pg_page_unmap(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 	unsigned int plvl, lvl = level;
 	__vaddr_t pt_vaddr_cache[UK_PAL_PT_LEVELS];
 	__pte_t pte, new_pte;
-	__sz page_size;
+	__sz page_size, step;
 	unsigned int pte_idx_cache[UK_PAL_PT_LEVELS];
 	unsigned int first_pte_idx[UK_PAL_PT_LEVELS];
 	unsigned int pte_idx, i;
@@ -895,6 +1454,11 @@ static int pg_page_unmap(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 		rc = uk_pt_pte_read_at(&pt->pt, pt_vaddr, lvl, pte_idx, &pte);
 		if (unlikely(rc))
 			return rc;
+
+#if CONFIG_LIBUKPAGING_SHARED
+		if (lvl == UK_PAL_PT_LEVELS - 1 && pg_index_shared(pt, pte_idx))
+			goto next_entry;
+#endif
 
 		if (UK_PAL_PT_Lx_PTE_PRESENT(pte, lvl)) {
 
@@ -962,6 +1526,11 @@ static int pg_page_unmap(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 			 * is below the remaining len to unmap and the address
 			 * we want to unmap is aligned to the page size.
 			 */
+			if (!(flags & UK_PAGING_PAGE_FLAG_KEEP_FRAMES)) {
+				rc = pg_batch_reserve_frame(pt);
+				if (unlikely(rc))
+					return rc;
+			}
 			new_pte = (flags & UK_PAGING_PAGE_FLAG_KEEP_PTES) ?
 					UK_PAL_PT_Lx_PTE_CLEAR_PRESENT(pte, lvl) :
 					UK_PAL_PT_Lx_PTE_INVALID(lvl);
@@ -971,6 +1540,8 @@ static int pg_page_unmap(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 			if (unlikely(rc))
 				return rc;
 
+			pg_batch_record_tlb(pt->defer_batch, vaddr, page_size);
+
 #ifdef CONFIG_LIBUKPAGING_STATS
 			if (!(flags & UK_PAGING_PAGE_FLAG_INTERN_STATS_KEEP)) {
 				UK_ASSERT(pt->nr_lx_pages[lvl] > 0);
@@ -979,24 +1550,35 @@ static int pg_page_unmap(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 #endif /* CONFIG_LIBUKPAGING_STATS */
 
 			if (!(flags & UK_PAGING_PAGE_FLAG_KEEP_FRAMES))
-				pg_ffree(pt, UK_PAL_PT_Lx_PTE_PADDR(pte, lvl),
-					 lvl);
+				pg_batch_defer_frame(pt,
+					UK_PAL_PT_Lx_PTE_PADDR(pte, lvl), lvl);
 		}
+
+#if CONFIG_LIBUKPAGING_SHARED
+next_entry:
+#endif
+		/* The current PTE covers the range up to the next boundary of
+		 * this level. The range may start in the middle of a PTE that
+		 * has no page table below it, so step to that boundary and not
+		 * by a whole page size. Otherwise, the start of the next page
+		 * table would be skipped and its pages would stay mapped.
+		 */
+		step = pg_step_to_boundary(vaddr, lvl, page_size);
 
 		/* If this is not the last PTE and there are still pages to
 		 * unmap, we continue to the next PTE in this level
 		 */
-		if ((pte_idx < UK_PAL_PT_Lx_PTES(lvl) - 1) && len > page_size) {
-			UK_ASSERT(vaddr <= __VADDR_MAX - page_size);
-			vaddr += page_size;
-			len -= page_size;
+		if ((pte_idx < UK_PAL_PT_Lx_PTES(lvl) - 1) && len > step) {
+			UK_ASSERT(vaddr <= __VADDR_MAX - step);
+			vaddr += step;
+			len -= step;
 			pte_idx++;
 
 			continue;
 		}
 
 		UK_ASSERT((pte_idx == UK_PAL_PT_Lx_PTES(lvl) - 1) ||
-			  (len <= page_size));
+			  (len <= step));
 
 		/* At this point, we either invalidated the last PTE in this
 		 * page table and we have to walk up again, or we tried to
@@ -1008,7 +1590,7 @@ static int pg_page_unmap(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 		 * the PTEs and all other PTEs are INVALID.
 		 */
 		while ((pte_idx == UK_PAL_PT_Lx_PTES(lvl) - 1) ||
-		       ((len <= page_size) && !skip_pt_free)) {
+		       ((len <= step) && !skip_pt_free)) {
 
 			/* If we reached the top level, stop. */
 			if (lvl == level)
@@ -1026,6 +1608,16 @@ static int pg_page_unmap(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 
 			if (skip_pt_free)
 				continue;
+
+#if CONFIG_LIBUKPAGING_SHARED
+			/* Keep shared top-level links valid while their branch
+			 * temporarily contains no mappings.
+			 */
+			if (lvl == UK_PAL_PT_LEVELS - 1 && pt->shared_users) {
+				skip_pt_free = 1;
+				continue;
+			}
+#endif
 
 			/* Check if the PTEs we did not touch are all invalid.
 			 * In that case we can free the page table. We start
@@ -1076,26 +1668,33 @@ static int pg_page_unmap(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 			/* At this point, we know that the page table does not
 			 * contain any valid entries and we can safely free it
 			 */
+			rc = pg_batch_reserve_frame(pt);
+			if (unlikely(rc))
+				return rc;
 			rc = uk_pt_pte_write_at(&pt->pt, pt_vaddr, lvl, pte_idx,
 						vaddr,
 						UK_PAL_PT_Lx_PTE_INVALID(lvl));
 			if (unlikely(rc))
 				return rc;
 
-			pg_pt_free(pt, pt_vaddr_cache[plvl], plvl);
+			pg_batch_record_tlb(pt->defer_batch, vaddr, page_size);
+			pg_pt_free(pt, pt_vaddr_cache[plvl], plvl, true);
 		}
 
-		if (len <= page_size)
+		if (len <= step)
 			break;
 
 		pt_vaddr = pt_vaddr_cache[lvl];
 
-		UK_ASSERT(vaddr <= __VADDR_MAX - page_size);
-		vaddr += page_size;
-		len -= page_size;
-
-		if (vaddr != UK_PAL_VADDR_INV)
+		/* Continue with the next PTE of the level we walked up to */
+		if (vaddr != UK_PAL_VADDR_INV) {
+			step = pg_step_to_boundary(vaddr, lvl,
+						   UK_PAL_PAGE_Lx_SIZE(lvl));
+			UK_ASSERT(len > step);
+			vaddr += step;
+			len -= step;
 			page_size = UK_PAL_PAGE_Lx_SIZE(lvl);
+		}
 
 		/* Do not move this into the while condition. We use continue */
 		if (++pte_idx == UK_PAL_PT_Lx_PTES(lvl))
@@ -1103,8 +1702,10 @@ static int pg_page_unmap(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 
 	} while (1);
 
-	if (vaddr == UK_PAL_VADDR_INV && uk_pt_isactive(&pt->pt))
-		uk_pal_tlb_flush();
+	if (vaddr == UK_PAL_VADDR_INV) {
+		uk_pt_flush(&pt->pt);
+		pg_batch_record_tlb(pt->defer_batch, UK_PAL_VADDR_INV, 0);
+	}
 
 	return 0;
 }
@@ -1113,7 +1714,11 @@ int uk_paging_page_unmap(struct uk_pagetable *pt, __vaddr_t vaddr,
 			 unsigned long pages, unsigned long flags)
 {
 	unsigned int level = UK_PAGING_PAGE_FLAG_SIZE_TO_LEVEL(flags);
+	struct uk_paging_free_batch local_batch;
+	struct uk_paging_free_batch *batch;
+	unsigned long irqf;
 	__sz len = __SZ_MAX;
+	int rc;
 
 	if (unlikely(pages == 0))
 		return 0;
@@ -1126,16 +1731,35 @@ int uk_paging_page_unmap(struct uk_pagetable *pt, __vaddr_t vaddr,
 
 		len = pages * UK_PAL_PAGE_Lx_SIZE(level);
 	}
+#if CONFIG_LIBUKPAGING_SHARED
+	if (pg_range_shared(pt, vaddr, len))
+		return -EACCES;
+#endif
 
 #ifdef CONFIG_LIBUKPAGING_STATS
 	UK_ASSERT(!(flags & UK_PAGING_PAGE_FLAG_INTERN_STATS_KEEP));
 #endif /* CONFIG_LIBUKPAGING_STATS */
 
+	uk_paging_free_batch_init(&local_batch, pt);
+	ukplat_spin_lock_irqsave(&pt->lock, irqf);
 	UK_ASSERT(uk_pt_vbase(&pt->pt) != UK_PAL_VADDR_INV);
 	UK_ASSERT(uk_pt_pbase(&pt->pt) != UK_PAL_PADDR_INV);
+	batch = uk_pcpuvar_current_get(pg_cpu_defer_batch);
+	if (!batch || batch->pt != pt)
+		batch = &local_batch;
+	UK_ASSERT(pt->defer_batch == __NULL);
+	pt->defer_batch = batch;
 
-	return pg_page_unmap(pt, uk_pt_vbase(&pt->pt), UK_PAL_PT_LEVELS - 1,
-			     vaddr, len, flags);
+	rc = pg_page_unmap(pt, uk_pt_vbase(&pt->pt), UK_PAL_PT_LEVELS - 1, vaddr, len,
+			   flags);
+
+	pt->defer_batch = __NULL;
+	ukplat_spin_unlock_irqrestore(&pt->lock, irqf);
+
+	if (batch == &local_batch)
+		uk_paging_free_batch_finish(&local_batch);
+
+	return rc;
 }
 
 static int pg_page_set_attr(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
@@ -1146,7 +1770,7 @@ static int pg_page_set_attr(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 	unsigned int lvl = level;
 	__vaddr_t pt_vaddr_cache[UK_PAL_PT_LEVELS];
 	__pte_t pte;
-	__sz page_size;
+	__sz page_size, step;
 	unsigned int pte_idx_cache[UK_PAL_PT_LEVELS];
 	unsigned int pte_idx;
 	int rc;
@@ -1240,16 +1864,24 @@ static int pg_page_set_attr(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 					       new_attr);
 			if (unlikely(rc))
 				return rc;
+
+			pg_batch_record_tlb(pt->defer_batch, vaddr, page_size);
 		}
 
+		/* The current PTE covers the range up to the next boundary of
+		 * this level, which is closer than a whole page size if the
+		 * range starts in the middle of a PTE without a page table.
+		 */
+		step = pg_step_to_boundary(vaddr, lvl, page_size);
+
 		/* Bail out if there is nothing more to do */
-		if (page_size >= len)
+		if (step >= len)
 			break;
 
-		len -= page_size;
+		len -= step;
 
-		UK_ASSERT(vaddr <= __VADDR_MAX - page_size);
-		vaddr += page_size;
+		UK_ASSERT(vaddr <= __VADDR_MAX - step);
+		vaddr += step;
 
 		/* We need to change more pages. If we have reached the last PTE
 		 * in this page table, we have to walk up again until we reach
@@ -1278,8 +1910,10 @@ static int pg_page_set_attr(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 
 	} while (1);
 
-	if (vaddr == UK_PAL_VADDR_INV && uk_pt_isactive(&pt->pt))
-		uk_pal_tlb_flush();
+	if (vaddr == UK_PAL_VADDR_INV) {
+		uk_pt_flush(&pt->pt);
+		pg_batch_record_tlb(pt->defer_batch, UK_PAL_VADDR_INV, 0);
+	}
 
 	return 0;
 }
@@ -1289,7 +1923,11 @@ int uk_paging_page_set_attr(struct uk_pagetable *pt, __vaddr_t vaddr,
 			    unsigned long flags)
 {
 	unsigned int level = UK_PAGING_PAGE_FLAG_SIZE_TO_LEVEL(flags);
+	struct uk_paging_free_batch local_batch;
+	struct uk_paging_free_batch *batch;
+	unsigned long irqf;
 	__sz len = __SZ_MAX;
+	int rc;
 
 	if (unlikely(pages == 0))
 		return 0;
@@ -1302,16 +1940,35 @@ int uk_paging_page_set_attr(struct uk_pagetable *pt, __vaddr_t vaddr,
 
 		len = pages * UK_PAL_PAGE_Lx_SIZE(level);
 	}
+#if CONFIG_LIBUKPAGING_SHARED
+	if (pg_range_shared(pt, vaddr, len))
+		return -EACCES;
+#endif
 
 #ifdef CONFIG_LIBUKPAGING_STATS
 	UK_ASSERT(!(flags & UK_PAGING_PAGE_FLAG_INTERN_STATS_KEEP));
 #endif /* CONFIG_LIBUKPAGING_STATS */
 
+	uk_paging_free_batch_init(&local_batch, pt);
+	ukplat_spin_lock_irqsave(&pt->lock, irqf);
 	UK_ASSERT(uk_pt_vbase(&pt->pt) != UK_PAL_VADDR_INV);
 	UK_ASSERT(uk_pt_pbase(&pt->pt) != UK_PAL_PADDR_INV);
+	batch = uk_pcpuvar_current_get(pg_cpu_defer_batch);
+	if (!batch || batch->pt != pt)
+		batch = &local_batch;
+	UK_ASSERT(pt->defer_batch == __NULL);
+	pt->defer_batch = batch;
 
-	return pg_page_set_attr(pt, uk_pt_vbase(&pt->pt), UK_PAL_PT_LEVELS - 1,
-				vaddr, len, new_attr, flags);
+	rc = pg_page_set_attr(pt, uk_pt_vbase(&pt->pt), UK_PAL_PT_LEVELS - 1, vaddr,
+			      len, new_attr, flags);
+
+	pt->defer_batch = __NULL;
+	ukplat_spin_unlock_irqrestore(&pt->lock, irqf);
+
+	if (batch == &local_batch)
+		uk_paging_free_batch_finish(&local_batch);
+
+	return rc;
 }
 
 __paddr_t uk_paging_virt_to_phys(__vaddr_t address)

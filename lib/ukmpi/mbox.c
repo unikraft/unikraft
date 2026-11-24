@@ -14,6 +14,7 @@ struct uk_mbox *uk_mbox_create(struct uk_alloc *a, size_t size)
 		return NULL;
 
 	m->len = size + 1;
+	uk_spin_init(&m->lock);
 
 	uk_semaphore_init(&m->readsem, 0);
 	m->readpos = 0;
@@ -38,6 +39,17 @@ void uk_mbox_free(struct uk_alloc *a, struct uk_mbox *m)
 	UK_ASSERT(m->readpos == m->writepos);
 
 	uk_free(a, m);
+}
+
+bool uk_mbox_is_empty(struct uk_mbox *m)
+{
+	unsigned long irqf;
+	bool empty;
+
+	uk_spin_lock_irqsave(&m->lock, irqf);
+	empty = m->readpos == m->writepos;
+	uk_spin_unlock_irqrestore(&m->lock, irqf);
+	return empty;
 }
 
 void uk_mbox_post(struct uk_mbox *m, void *msg)

@@ -18,89 +18,57 @@
 
 #include "signal.h"
 
-static
-int uk_posix_clone_sighand(void *arg)
+int pprocess_signal_clone(struct posix_thread *ct, struct posix_thread *pt,
+			  __u64 flags)
 {
-	struct posix_process_clone_event_data *event_data;
-	const struct clone_args *cl_args;
 	struct posix_process *pp; /* parent process */
 	struct posix_process *cp; /* child process */
-	struct posix_thread *ct; /* child thread */
-	pid_t ppid; /* parent pid */
+	struct uk_sigaction *shared;
+	unsigned long irqf;
 	pid_t cpid; /* child pid */
 	int signum;
-	int rc;
 
-	event_data = (struct posix_process_clone_event_data *)arg;
-	UK_ASSERT(event_data);
-	UK_ASSERT(event_data->cl_args);
-	UK_ASSERT(event_data->child);
-
-	cl_args = event_data->cl_args;
-
-	cpid = ukthread2pid(event_data->child);
-	cp = pid2pprocess(cpid);
-
-	if (event_data->parent) {
-		ppid = ukthread2pid(event_data->parent);
-		pp = pid2pprocess(ppid);
-	} else {
-		pp = __NULL;
-	}
-
-	ct = tid2pthread(ukthread2tid(event_data->child));
+	UK_ASSERT(ct && ct->signal && ct->process && ct->process->signal);
+	cp = ct->process;
+	pp = pt ? pt->process : __NULL;
+	cpid = cp->pid;
 
 	/* CLONE_SIGHAND and CLONE_CLEAR_SIGHAND should not be together */
-	if (unlikely((cl_args->flags & (CLONE_SIGHAND | CLONE_CLEAR_SIGHAND))
+	if (unlikely((flags & (CLONE_SIGHAND | CLONE_CLEAR_SIGHAND))
 		     == (CLONE_SIGHAND | CLONE_CLEAR_SIGHAND)))
 		return -EINVAL;
 
 	/* CLONE_SIGHAND requires CLONE_VM */
-	if (unlikely((cl_args->flags & CLONE_SIGHAND) &&
-		     !(cl_args->flags & CLONE_VM)))
+	if (unlikely((flags & CLONE_SIGHAND) && !(flags & CLONE_VM)))
 		return -EINVAL;
 
 	/* CLONE_THREAD requires CLONE_SIGHAND */
-	if (unlikely((cl_args->flags & CLONE_THREAD) &&
-		     !(cl_args->flags & CLONE_SIGHAND)))
+	if (unlikely((flags & CLONE_THREAD) && !(flags & CLONE_SIGHAND)))
 		return -EINVAL;
 
-	/* Initialize the new thread's signal descriptor */
-	rc = pprocess_signal_tdesc_alloc(ct);
-	if (unlikely(rc)) {
-		uk_pr_err("Could not allocate signal descriptor\n");
-		return rc;
-	}
-	rc = pprocess_signal_tdesc_init(ct);
-	if (unlikely(rc)) {
-		uk_pr_err("Could not initialize signal descriptor\n");
-		return rc;
+	/* Masks belong to individual threads, even with shared dispositions.
+	 * Keep the initialized child pending queues and synchronization state.
+	 */
+	if (pt) {
+		UK_ASSERT(pt->signal);
+		memcpy(&ct->signal->mask, &pt->signal->mask,
+		       sizeof(ct->signal->mask));
 	}
 
 	/* If CLONE_THREAD was passed, the child is assigned to the
 	 * calling process, so no further action is required.
 	 */
-	if (cl_args->flags & CLONE_THREAD)
+	if (flags & CLONE_THREAD)
 		return 0;
 
-	/* Initialize the new process' signal descriptor */
-	cp->signal = uk_malloc(cp->_a, sizeof(struct uk_signal_pdesc));
-	if (unlikely(!cp->signal)) {
-		uk_pr_err("Could not allocate memory\n");
-		rc = -ENOMEM;
-		goto fail_tdesc_alloc;
-	}
+	/* Process/thread creation already initialized these descriptors and
+	 * the child's private default action table. Keep their ownership.
+	 */
 
 	/* CLONE_CLEAR_SIGHAND: Reset child's signal dispositions to default. */
-	if (!pp || (cl_args->flags & CLONE_CLEAR_SIGHAND)) {
+	if (!pp || (flags & CLONE_CLEAR_SIGHAND)) {
 		uk_pr_debug("CLONE_SIGHAND: pid %d gets default signal dispositions\n",
 			    cpid);
-
-		if (!(cl_args->flags & CLONE_THREAD)) {
-			rc = pprocess_signal_sigaction_new(cp->_a, cp->signal);
-			if (unlikely(rc))
-				goto fail_malloc;
-		}
 
 		pprocess_signal_foreach(signum)
 			pprocess_signal_sigaction_clear(KERN_SIGACTION(cp, signum));
@@ -108,31 +76,26 @@ int uk_posix_clone_sighand(void *arg)
 	/* CLONE_SIGHAND: Inherit a reference of the parent's signal handler
 	 *                table.
 	 */
-	} else if (cl_args->flags & CLONE_SIGHAND) {
+	} else if (flags & CLONE_SIGHAND) {
 		uk_pr_debug("CLONE_SIGHAND: pid %d gets a reference of the parent's handlers\n",
 			    cpid);
-		pprocess_signal_sigaction_acquire(pp->signal->sigaction);
-		cp->signal->sigaction = pp->signal->sigaction;
+		irqf = pprocess_lock_acquire();
+		shared = pp->signal->sigaction;
+		pprocess_signal_sigaction_acquire(shared);
+		pprocess_lock_release(irqf);
+		pprocess_signal_sigaction_release(cp->signal->sigaction);
+		cp->signal->sigaction = shared;
 	/* Default: Iherit a copy of the parent's signal dispositions. */
 	} else {
 		uk_pr_debug("pid %d gets a copy of the parent's handlers\n",
 			    cpid);
 
-		rc = pprocess_signal_sigaction_new(cp->_a, cp->signal);
-		if (unlikely(rc))
-			goto fail_malloc;
-
-		memcpy(cp->signal->sigaction, pp->signal->sigaction,
-		       sizeof(*cp->signal->sigaction));
+		/* Snapshot dispositions against concurrent action writers. */
+		irqf = pprocess_lock_acquire();
+		memcpy(cp->signal->sigaction->ks, pp->signal->sigaction->ks,
+		       sizeof(cp->signal->sigaction->ks));
+		pprocess_lock_release(irqf);
 	}
-
-	/* The child process has no pending signals */
-	cp->signal->queued_count = 0;
-	cp->signal->queued_max = _POSIX_SIGQUEUE_MAX;
-
-	uk_sigemptyset(&cp->signal->sigqueue.pending);
-	pprocess_signal_foreach(signum)
-		UK_INIT_LIST_HEAD(&cp->signal->sigqueue.list_head[signum]);
 
 	if (pp) {
 		/* sigaltstack(2): Children created with clone() inherit the
@@ -141,29 +104,23 @@ int uk_posix_clone_sighand(void *arg)
 		 * inherited by the parent is disabled.
 		 */
 		memcpy(&cp->signal->altstack, &pp->signal->altstack, sizeof(stack_t));
-		if ((cl_args->flags & CLONE_VM) && !(cl_args->flags & CLONE_VFORK))
+		if ((flags & CLONE_VM) && !(flags & CLONE_VFORK))
 			cp->signal->altstack.ss_flags = SS_DISABLE;
 	}
 
-#if CONFIG_LIBPOSIX_PROCESS_SIGNALFD
-	/*
-	 * TODO: At this time we do not support proper open file inheritance
-	 * across vfork/execve for those that do not have the O_CLOEXEC flag.
-	 * Therefore, for now, simply just initialize child process' signal
-	 * descriptor signal file context as empty.
-	 */
-	uk_signal_files_ctx_init(&cp->signal->sigfiles_ctx);
-#endif /* CONFIG_LIBPOSIX_PROCESS_SIGNALFD */
-
 	return 0;
+}
 
-fail_malloc:
-	uk_free(cp->_a, cp->signal);
+static int uk_posix_clone_sighand(void *arg)
+{
+	struct posix_process_clone_event_data *event_data = arg;
+	struct posix_thread *ct, *pt;
 
-fail_tdesc_alloc:
-	pprocess_signal_tdesc_free(ct);
-
-	return rc;
+	UK_ASSERT(event_data && event_data->cl_args && event_data->child);
+	ct = uk_thread_uktls_var(event_data->child, pthread_self);
+	pt = event_data->parent ?
+		uk_thread_uktls_var(event_data->parent, pthread_self) : __NULL;
+	return pprocess_signal_clone(ct, pt, event_data->cl_args->flags);
 }
 #else /* !CONFIG_LIBPOSIX_PROCESS_SIGNAL */
 static int uk_posix_clone_sighand(void *arg)

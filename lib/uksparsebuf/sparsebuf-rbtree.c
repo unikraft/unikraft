@@ -22,7 +22,7 @@ __u64 sparsebuf_map_key(struct uk_sparsebuf_blk *blk)
 static
 int sparsebuf_map_cmp(__u64 a, __u64 b)
 {
-	return a - b;
+	return (a > b) - (a < b);
 }
 
 UK_RB_KEY_GENERATE_STATIC(sparsebuf_map, uk_sparsebuf_blk, rb_entry,

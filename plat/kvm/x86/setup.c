@@ -4,7 +4,9 @@
  * You may not use this file except in compliance with the License.
  */
 
+#include <errno.h>
 #include <string.h>
+#include <kvm-x86/syscall.h>
 #include <x86/traps.h>
 #if CONFIG_LIBUKACPI
 #include <uk/acpi.h>
@@ -57,7 +59,7 @@ void _ukplat_syscall(void);
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-static inline void _init_syscall(void)
+int ukplat_x86_64_syscall_init_cpu(void)
 {
 	__u32 eax, ebx, ecx, edx;
 	int have_syscall = 0;
@@ -70,7 +72,7 @@ static inline void _init_syscall(void)
 	}
 
 	if (!have_syscall)
-		UK_CRASH("CPU does not support SYSCALL/SYSRET!\n");
+		return -ENOTSUP;
 
 	/* Enable and program syscall/sysret */
 	uk_arch_x86_64_wrmsrl(UK_ARCH_X86_64_MSR_EFER,
@@ -90,6 +92,14 @@ static inline void _init_syscall(void)
 			      UK_ARCH_X86_64_RFLAGS_IF |
 			      UK_ARCH_X86_64_RFLAGS_AC |
 			      UK_ARCH_X86_64_RFLAGS_NT);
+
+	return 0;
+}
+
+static inline void _init_syscall(void)
+{
+	if (unlikely(ukplat_x86_64_syscall_init_cpu()))
+		UK_CRASH("CPU does not support SYSCALL/SYSRET!\n");
 
 	uk_pr_info("SYSCALL entrance @ %p\n", _ukplat_syscall);
 }

@@ -131,6 +131,15 @@ UK_CTASSERT(UK_LCPU_MEMBERS_SIZE <= UK_LCPU_SIZE);
  */
 struct uk_lcpu *uk_lcpu_get_current(void);
 
+/**
+ * Number of firmware-recorded CPUs admitted by the kernel capacity, including
+ * BSP. This is not a count of CPUs currently online.
+ * Platform enumerators fill a contiguous linear index map. Unused secondary
+ * slots retain index zero from the per-CPU template. Read that authoritative
+ * map rather than keeping a second topology count.
+ */
+unsigned int uk_lcpu_discovered_count(void);
+
 extern __uk_pcpuvar struct uk_lcpu uk_lcpus;
 
 /**
@@ -202,6 +211,16 @@ int uk_lcpu_init(struct uk_lcpu *this_lcpu);
  * @return 0 on success, -errno otherwise
  */
 int uk_lcpu_mp_init(unsigned long run_irq, unsigned long wakeup_irq);
+
+/**
+ * Transfer the initialized current CPU from startup-busy to interrupt-driven
+ * idle. Interrupts must still be disabled. This function does not return and
+ * keeps the current stack and execution context live.
+ *
+ * Custom CPU entries can prepare their own TLS/auxiliary context before this
+ * transfer. The same transition is used by the default startup entry.
+ */
+void __noreturn uk_lcpu_idle(void);
 
 /**
  * Default entry function for secondary logical CPUs. Calls uk_lcpu_init() and

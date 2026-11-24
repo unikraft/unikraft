@@ -12,6 +12,7 @@
 
 #include <uk/essentials.h>
 #include <uk/arch.h>
+#include <uk/arch/ctx.h>
 #include <uk/assert.h>
 #include <uk/atomic.h>
 #if CONFIG_HAVE_SMP
@@ -36,6 +37,28 @@
 __uk_pcpuvar struct uk_lcpu uk_lcpus;
 
 static const struct uk_lcpu_pm_ops *pm_ops;
+
+unsigned int uk_lcpu_discovered_count(void)
+{
+	unsigned int count = 1;
+
+	while (count < CONFIG_UKPLAT_CPU_MAXCOUNT &&
+	       uk_pcpuvar_lval(count, uk_pcpuvar_cpu_idx) == count)
+		count++;
+	return count;
+}
+
+
+void uk_lcpu_init_auxsp(__uptr auxsp, __uptr uktlsp)
+{
+	struct ukarch_auxspcb *auxspcb;
+
+	ukarch_auxsp_init(auxsp);
+	auxspcb = ukarch_auxsp_get_cb(auxsp);
+	UK_ASSERT(auxspcb);
+	ukarch_auxspcb_set_uktlsp(auxspcb, uktlsp);
+	uk_lcpu_set_auxsp(auxsp);
+}
 
 int uk_lcpu_pm_ops_register(const struct uk_lcpu_pm_ops *ops)
 {
@@ -158,7 +181,7 @@ int uk_lcpu_fn_enqueue(struct uk_lcpu *lcpu, const struct uk_lcpu_func *fn)
 	 * only take one function and return afterwards. And we only raise the
 	 * IRQ after finishing setup.
 	 */
-	lcpu->fn.user = fn->user;
+	UK_WRITE_ONCE(lcpu->fn.user, fn->user);
 
 	/* Ensure everything is written back when we return and the arch
 	 * support code will raise the IRQ
@@ -170,15 +193,15 @@ int uk_lcpu_fn_enqueue(struct uk_lcpu *lcpu, const struct uk_lcpu_func *fn)
 
 static void lcpu_fn_dequeue(struct uk_lcpu *this_lcpu, struct uk_lcpu_func *fn)
 {
-	*fn = this_lcpu->fn;
-
-	/* Ensure that we have captured the whole function object */
-	uk_arch_rmb();
+	fn->fn = __atomic_load_n(&this_lcpu->fn.fn, __ATOMIC_ACQUIRE);
+	fn->user = UK_READ_ONCE(this_lcpu->fn.user);
 
 	UK_ASSERT(fn->fn);
 
-	/* Free the slot. Another function object can be queued afterwards */
-	this_lcpu->fn.fn = __NULL;
+	/* Free the slot after capturing fn->user so a concurrent producer
+	 * cannot overwrite fn.user before we read it.
+	 */
+	__atomic_store_n(&this_lcpu->fn.fn, __NULL, __ATOMIC_RELEASE);
 }
 
 static int lcpu_ipi_run_handler(void *args __unused)
@@ -250,6 +273,31 @@ int uk_lcpu_mp_init(unsigned long run_irq, unsigned long wakeup_irq)
 	return 0;
 }
 
+void __noreturn uk_lcpu_idle(void)
+{
+	struct uk_lcpu *this_lcpu = uk_lcpu_get_current();
+
+	/* We are coming from BUSY0 state and want to transition to
+	 * IDLE state. However, there can be functions queued already
+	 * so we have to use a decrement here.
+	 */
+	uk_dec(&this_lcpu->state);
+
+	/* Enable IRQs. If there are functions queued we will
+	 * immediately jump to the IRQ handler.
+	 */
+	uk_lcpu_enable_irq();
+	while (1) {
+		/* Besides interrupts in general, the halt can be
+		 * interrupted by calls to uk_lcpu_run().
+		 */
+		if (!pm_ops || !pm_ops->halt)
+			uk_arch_spinwait();
+		else
+			pm_ops->halt();
+	}
+}
+
 void __weak __noreturn uk_lcpu_entry_default(struct uk_lcpu *this_lcpu)
 {
 	__uptr sentry, sstackp, sarg;
@@ -271,27 +319,8 @@ void __weak __noreturn uk_lcpu_entry_default(struct uk_lcpu *this_lcpu)
 	if (sentry && sentry != (__uptr)uk_lcpu_entry_default) {
 		/* Does not return */
 		uk_arch_jump_to_with_arg(sstackp, sentry, sarg);
-	} else {
-		/* We are coming from BUSY0 state and want to transition to
-		 * IDLE state. However, there can be functions queued already
-		 * so we have to use a decrement here.
-		 */
-		uk_dec(&this_lcpu->state);
-
-		/* Enable IRQs. If there are functions queued we will
-		 * immediately jump to the IRQ handler.
-		 */
-		uk_lcpu_enable_irq();
-		while (1) {
-			/* Besides interrupts in general, the halt can be
-			 * interrupted by calls to uk_lcpu_run().
-			 */
-			if (!pm_ops || !pm_ops->halt)
-				uk_arch_spinwait();
-			else
-				pm_ops->halt();
-		}
 	}
+	uk_lcpu_idle();
 }
 
 int uk_lcpu_start(const __u64 lcpuidx[], unsigned int *num,
@@ -449,19 +478,15 @@ int uk_lcpu_run(const __u64 lcpuidx[], unsigned int *num,
 		 */
 		while (1) {
 			rc = uk_lcpu_fn_enqueue(lcpu, fn);
-			if (unlikely(rc))
-				goto lcpu_run_err;
-
-			rc = uk_pal_except_send_ipi(uk_pcpuvar_lval(lcpuidx[i],
-							uk_pcpuvar_cpu_id),
-						    *uk_lcpu_run_irqv);
 			if (unlikely(rc)) {
 				/* Retry if we could not enqueue the function
 				 * and it is ok to block
 				 */
 				if ((rc == -EAGAIN) &&
-				    (!(flags & UK_LCPU_RFLG_DONOTBLOCK)))
+				    (!(flags & UK_LCPU_RFLG_DONOTBLOCK))) {
+					uk_arch_spinwait();
 					continue;
+				}
 
 				/* Try to transition back one busy level. We
 				 * don't care if the CPU is no longer online
@@ -469,6 +494,12 @@ int uk_lcpu_run(const __u64 lcpuidx[], unsigned int *num,
 				lcpu_transition_safe(lcpu, -1);
 				goto lcpu_run_err;
 			}
+
+			rc = uk_pal_except_send_ipi(uk_pcpuvar_lval(lcpuidx[i],
+							uk_pcpuvar_cpu_id),
+						    *uk_lcpu_run_irqv);
+			if (unlikely(rc))
+				goto lcpu_run_err;
 
 			break;
 		}
@@ -520,6 +551,8 @@ int uk_lcpu_wait(const __u64 lcpuidx[], unsigned int *num,
 				rc = -ETIMEDOUT; /* Timed out */
 				goto lcpu_wait_err;
 			}
+
+			uk_arch_spinwait();
 		}
 	}
 

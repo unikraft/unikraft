@@ -41,6 +41,8 @@
 #include <uk/alloc_impl.h>
 #include <uk/allocpool.h>
 #include <uk/list.h>
+#include <uk/plat/spinlock.h>
+#include <stdbool.h>
 #include <string.h>
 #include <errno.h>
 
@@ -68,6 +70,7 @@
 
 struct uk_allocpool {
 	struct uk_alloc self;
+	struct __spinlock lock;
 
 	struct uk_list_head free_obj;
 	unsigned int free_obj_count;
@@ -154,9 +157,12 @@ static inline void *_try_take_free_obj(struct uk_allocpool *p)
 static void pool_free(struct uk_alloc *a, void *ptr)
 {
 	struct uk_allocpool *p = ukalloc2pool(a);
+	unsigned long irqf;
 
 	if (likely(ptr)) {
+		ukplat_spin_lock_irqsave(&p->lock, irqf);
 		_prepend_free_obj(p, ptr);
+		ukplat_spin_unlock_irqrestore(&p->lock, irqf);
 		uk_alloc_stats_count_free(a, ptr, p->obj_len);
 	}
 }
@@ -164,11 +170,14 @@ static void pool_free(struct uk_alloc *a, void *ptr)
 static void *pool_malloc(struct uk_alloc *a, __sz size __maybe_unused)
 {
 	struct uk_allocpool *p = ukalloc2pool(a);
+	unsigned long irqf;
 	void *obj;
 
 	UK_ASSERT(size <= p->obj_len);
 
+	ukplat_spin_lock_irqsave(&p->lock, irqf);
 	obj = _try_take_free_obj(p);
+	ukplat_spin_unlock_irqrestore(&p->lock, irqf);
 	uk_alloc_stats_count_alloc(a, obj, p->obj_len);
 	return obj;
 }
@@ -178,22 +187,30 @@ static int pool_posix_memalign(struct uk_alloc *a, void **memptr,
 			       __sz size __maybe_unused)
 {
 	struct uk_allocpool *p = ukalloc2pool(a);
+	unsigned long irqf;
+	void *obj;
 
 	UK_ASSERT(size <= p->obj_len);
 	UK_ASSERT(p->obj_align % align == 0);
 
-	*memptr = _try_take_free_obj(p);
-	uk_alloc_stats_count_alloc(a, *memptr, p->obj_len);
-	return (likely(*memptr)) ? 0 : ENOMEM;
+	ukplat_spin_lock_irqsave(&p->lock, irqf);
+	obj = _try_take_free_obj(p);
+	ukplat_spin_unlock_irqrestore(&p->lock, irqf);
+	*memptr = obj;
+	uk_alloc_stats_count_alloc(a, obj, p->obj_len);
+	return (likely(obj)) ? 0 : ENOMEM;
 }
 
 void *uk_allocpool_take(struct uk_allocpool *p)
 {
+	unsigned long irqf;
 	void *obj;
 
 	UK_ASSERT(p);
 
+	ukplat_spin_lock_irqsave(&p->lock, irqf);
 	obj = _try_take_free_obj(p);
+	ukplat_spin_unlock_irqrestore(&p->lock, irqf);
 	uk_alloc_stats_count_alloc(allocpool2ukalloc(p),
 				   obj, p->obj_len);
 	return obj;
@@ -202,27 +219,42 @@ void *uk_allocpool_take(struct uk_allocpool *p)
 unsigned int uk_allocpool_take_batch(struct uk_allocpool *p,
 				     void *obj[], unsigned int count)
 {
+	unsigned long irqf;
 	unsigned int i;
+	bool oom = false;
 
 	UK_ASSERT(p);
 	UK_ASSERT(obj);
 
+	ukplat_spin_lock_irqsave(&p->lock, irqf);
 	for (i = 0; i < count; ++i) {
 		obj[i] = _try_take_free_obj(p);
-		uk_alloc_stats_count_alloc(allocpool2ukalloc(p),
-					   obj[i], p->obj_len);
-		if (unlikely(!obj[i]))
+		if (unlikely(!obj[i])) {
+			oom = true;
 			break;
+		}
 	}
+	ukplat_spin_unlock_irqrestore(&p->lock, irqf);
+
+	for (unsigned int j = 0; j < i; ++j)
+		uk_alloc_stats_count_alloc(allocpool2ukalloc(p),
+					   obj[j], p->obj_len);
+	if (unlikely(oom))
+		uk_alloc_stats_count_alloc(allocpool2ukalloc(p),
+					   NULL, p->obj_len);
 
 	return i;
 }
 
 void uk_allocpool_return(struct uk_allocpool *p, void *obj)
 {
+	unsigned long irqf;
+
 	UK_ASSERT(p);
 
+	ukplat_spin_lock_irqsave(&p->lock, irqf);
 	_prepend_free_obj(p, obj);
+	ukplat_spin_unlock_irqrestore(&p->lock, irqf);
 	uk_alloc_stats_count_free(allocpool2ukalloc(p),
 				  obj, p->obj_len);
 }
@@ -230,23 +262,27 @@ void uk_allocpool_return(struct uk_allocpool *p, void *obj)
 void uk_allocpool_return_batch(struct uk_allocpool *p,
 			       void *obj[], unsigned int count)
 {
+	unsigned long irqf;
 	unsigned int i;
 
 	UK_ASSERT(p);
 	UK_ASSERT(obj);
 
-	for (i = 0; i < count; ++i) {
+	ukplat_spin_lock_irqsave(&p->lock, irqf);
+	for (i = 0; i < count; ++i)
 		_prepend_free_obj(p, obj[i]);
+	ukplat_spin_unlock_irqrestore(&p->lock, irqf);
+
+	for (i = 0; i < count; ++i)
 		uk_alloc_stats_count_free(allocpool2ukalloc(p),
 					  obj[i], p->obj_len);
-	}
 }
 
 static __ssz pool_availmem(struct uk_alloc *a)
 {
 	struct uk_allocpool *p = ukalloc2pool(a);
 
-	return (__ssz)(p->free_obj_count * p->obj_len);
+	return (__ssz)((__sz)UK_READ_ONCE(p->free_obj_count) * p->obj_len);
 }
 
 static __ssz pool_maxalloc(struct uk_alloc *a)
@@ -273,7 +309,7 @@ __sz uk_allocpool_reqmem(unsigned int obj_count, __sz obj_len,
 
 unsigned int uk_allocpool_availcount(struct uk_allocpool *p)
 {
-	return p->free_obj_count;
+	return UK_READ_ONCE(p->free_obj_count);
 }
 
 unsigned int uk_allocpool_maxcount(struct uk_allocpool *p)
@@ -308,6 +344,7 @@ struct uk_allocpool *uk_allocpool_init(void *base, __sz len,
 
 	p = (struct uk_allocpool *)base;
 	memset(p, 0, sizeof(*p));
+	ukarch_spin_init(&p->lock);
 	a = allocpool2ukalloc(p);
 
 	obj_alen = ALIGN_UP(obj_len, obj_align);

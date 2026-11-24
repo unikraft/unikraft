@@ -50,8 +50,7 @@ static void uk_sigact_term(int __unused sig)
 
 	uk_pr_info("pid: %d terminated by signal\n", pprocess->pid);
 
-	pprocess_exit(pprocess, POSIX_PROCESS_KILLED, sig);
-	uk_sched_thread_exit(); /* noreturn */
+	pprocess_exit_signalled(sig);
 }
 
 static void uk_sigact_ign(int __unused sig)
@@ -166,10 +165,13 @@ static void handle_self(struct uk_signal *sig, const struct kern_sigaction *ks,
  * default disposition.
  */
 static void do_deliver(struct posix_thread *pthread, struct uk_signal *sig,
-		       struct ukarch_execenv *execenv)
+		       struct ukarch_execenv *execenv,
+		       struct uk_syscall_exit_ctx *exit_ctx)
 {
 	struct posix_process *pproc;
+	struct kern_sigaction action;
 	uk_sigset_t saved_mask;
+	unsigned long flags;
 	int signum;
 
 	UK_ASSERT(sig && sig->siginfo.si_signo);
@@ -179,9 +181,17 @@ static void do_deliver(struct posix_thread *pthread, struct uk_signal *sig,
 	UK_ASSERT(pproc);
 
 	signum = sig->siginfo.si_signo;
+	flags = pprocess_lock_acquire();
+	action = *KERN_SIGACTION(pproc, signum);
+	if (action.ks_handler != SIG_DFL && action.ks_handler != SIG_IGN &&
+	    (action.ks_flags & SA_RESETHAND))
+		pprocess_signal_sigaction_clear(KERN_SIGACTION(pproc, signum));
+	pprocess_lock_release(flags);
+	if (action.ks_handler == SIG_IGN)
+		return;
 
 	/* Execute the default action if a signal handler is not defined */
-	if (KERN_SIGACTION(pproc, signum)->ks_handler == SIG_DFL) {
+	if (action.ks_handler == SIG_DFL) {
 		/* Standard signals: Invoke signal-specific default action */
 		if (signum < SIGRTMIN) {
 			if (UK_BIT(signum) & SIGACT_CORE_MASK)
@@ -205,22 +215,18 @@ static void do_deliver(struct posix_thread *pthread, struct uk_signal *sig,
 
 	/* Save original mask and apply mask from sigaction */
 	saved_mask = pthread->signal->mask;
-	uk_sigorset(&pthread->signal->mask,
-		    &KERN_SIGACTION(pproc, signum)->ks_mask);
+	uk_sigorset(&pthread->signal->mask, &action.ks_mask);
 
 	/* Also add this signal to masked signals */
-	if (!(KERN_SIGACTION(pproc, signum)->ks_flags & SA_NODEFER))
+	if (!(action.ks_flags & SA_NODEFER))
 		SET_MASKED(pthread, signum);
 
 	/* Execute handler */
-	handle_self(sig, KERN_SIGACTION(pproc, signum), execenv);
+	uk_syscall_exit_resolve_restart(exit_ctx, action.ks_flags & SA_RESTART);
+	handle_self(sig, &action, execenv);
 
 	/* Restore original mask */
 	pthread->signal->mask = saved_mask;
-
-	/* If SA_RESETHAND flag is set, restore the default handler */
-	if (KERN_SIGACTION(pproc, signum)->ks_flags & SA_RESETHAND)
-		pprocess_signal_sigaction_clear(KERN_SIGACTION(pproc, signum));
 }
 
 /* Deliver pending signals of a given process. We deliver each
@@ -228,65 +234,36 @@ static void do_deliver(struct posix_thread *pthread, struct uk_signal *sig,
  * signal.
  */
 static int deliver_pending_proc(struct posix_process *proc,
-				struct ukarch_execenv *execenv)
+				struct uk_syscall_exit_ctx *exit_ctx)
 {
-	struct posix_thread *thread, *threadn;
 	struct posix_thread *this_thread;
 	struct uk_signal *sig;
 	int handled_cnt = 0;
-	bool handled;
 	int signum;
 
 	UK_ASSERT(proc);
-	UK_ASSERT(execenv);
+	UK_ASSERT(exit_ctx->execenv);
+
+	if (!proc->signal ||
+	    __atomic_load_n(&proc->signal->sigqueue.pending,
+			    __ATOMIC_ACQUIRE) == 0)
+		return 0;
 
 	this_thread = uk_pthread_current();
 	UK_ASSERT(this_thread);
 
 	pprocess_signal_foreach(signum) {
-		handled = false;
-
-		/* Skip if the process ignores this signal altogether */
-		if (IS_IGNORED(proc, signum))
+		if (!IS_PENDING(proc->signal->sigqueue, signum) ||
+		    IS_IGNORED(proc, signum) ||
+		    IS_MASKED(this_thread, signum))
 			continue;
 
-		/* POSIX specifies that if a signal targets the
-		 * current process / thread, then at least one
-		 * signal for this process /thread must be
-		 * delivered before the syscall returns, as long as:
-		 *
-		 * 1. No other thread has that signal unblocked
-		 * 2. No other thread is in sigwait() for that signal (TODO)
-		 */
-		uk_pprocess_foreach_pthread(proc, thread, threadn) {
-			if (thread->tid == this_thread->tid)
-				continue;
-
-			if (IS_MASKED(thread, signum))
-				continue;
-
-			while ((sig = pprocess_signal_dequeue(proc, __NULL,
-							      signum))) {
-				do_deliver(thread, sig, execenv);
-				uk_signal_free(proc->_a, sig);
-				handled = true;
-				handled_cnt++;
-			}
-			break;
-		}
-
-		/* Try to deliver to this thread */
-		if (!handled) {
-			if (IS_MASKED(this_thread, signum))
-				continue;
-
-			while ((sig = pprocess_signal_dequeue(proc, __NULL,
-							      signum))) {
-				do_deliver(this_thread, sig, execenv);
-				uk_signal_free(proc->_a, sig);
-				handled = true;
-				handled_cnt++;
-			}
+		/* Deliver on the current CPU's thread whose execenv is saved */
+		while ((sig = pprocess_signal_dequeue(proc, __NULL, signum))) {
+			do_deliver(this_thread, sig, exit_ctx->execenv,
+				   exit_ctx);
+			uk_signal_free(proc->_a, sig);
+			handled_cnt++;
 		}
 	}
 
@@ -294,14 +271,19 @@ static int deliver_pending_proc(struct posix_process *proc,
 }
 
 static int deliver_pending_thread(struct posix_thread *thread,
-				  struct ukarch_execenv *execenv)
+				  struct uk_syscall_exit_ctx *exit_ctx)
 {
 	struct posix_process *proc;
 	struct uk_signal *sig;
 	int handled = 0;
 	int signum;
 
-	proc = tid2pprocess(thread->tid);
+	if (!thread->signal ||
+	    __atomic_load_n(&thread->signal->sigqueue.pending,
+			    __ATOMIC_ACQUIRE) == 0)
+		return 0;
+
+	proc = thread->process;
 	UK_ASSERT(proc);
 
 	/* Deliver this thread's signals. SUS requires that RT signals
@@ -314,7 +296,7 @@ static int deliver_pending_thread(struct posix_thread *thread,
 			continue;
 
 		while ((sig = pprocess_signal_dequeue(proc, thread, signum))) {
-			do_deliver(thread, sig, execenv);
+			do_deliver(thread, sig, exit_ctx->execenv, exit_ctx);
 			uk_signal_free(thread->_a, sig);
 			handled++;
 		}
@@ -323,28 +305,67 @@ static int deliver_pending_thread(struct posix_thread *thread,
 	return handled;
 }
 
+static void deliver_suspend_signal(struct posix_thread *thread,
+				   struct uk_syscall_exit_ctx *exit_ctx)
+{
+	struct uk_signal_tdesc *tdesc = thread->signal;
+	struct uk_signal *pending = tdesc->suspend_signal;
+	struct uk_signal sig;
+	uk_sigset_t saved_mask;
+	unsigned long flags;
+
+	/* A handler can enter another wait, so detach the signal first. */
+	tdesc->suspend_signal = NULL;
+	saved_mask = tdesc->suspend_saved_mask;
+	sig.siginfo = pending->siginfo;
+	uk_signal_free(pending->alloc, pending);
+	do_deliver(thread, &sig, exit_ctx->execenv, exit_ctx);
+
+	flags = pprocess_lock_acquire();
+	tdesc->mask = saved_mask;
+	pprocess_lock_release(flags);
+}
+
 static void uk_signal_deliver(struct uk_syscall_exit_ctx *exit_ctx)
 {
 	struct ukarch_execenv *execenv;
 	struct posix_thread *pthread;
 	struct posix_process *pproc;
+	struct uk_thread *thread;
+	int sig;
 
 	UK_ASSERT(exit_ctx);
 
 	execenv = exit_ctx->execenv;
 
-	/* FIXME: This can go away once we eliminate the last syscall made
-	 *        by kernel context and pass execenv to syscalls in native
-	 *        mode.
-	 */
+	thread = uk_thread_current();
+	if (!thread || !(thread->flags & UK_THREADF_UKTLS))
+		return;
+	pthread = uk_pthread_current();
+	if (unlikely(!pthread)) {
+		if (execenv && !thread->sched)
+			uk_sched_yield();
+		return;
+	}
+
+	/* Native syscalls can terminate at the outermost return boundary. */
+	if (!execenv && (exit_ctx->nested_depth != 1 ||
+			 pthread->state == POSIX_THREAD_EXITED ||
+			 pthread->state == POSIX_THREAD_KILLED))
+		return;
+	pproc = pthread->process;
+	UK_ASSERT(pproc);
+	sig = pprocess_terminating_signal(pproc);
+	if (sig)
+		pprocess_exit_signalled(sig);
+
+	/* User handlers need saved application registers and a stack. */
 	if (!execenv)
 		return;
 
-	pthread = uk_pthread_current();
-	UK_ASSERT(pthread);
-
-	pproc = uk_pprocess_current();
-	UK_ASSERT(pproc);
+	/* Clear an existing mark before delivering pending signals. */
+	if (uk_thread_wait_signalled(thread))
+		uk_thread_wait_signal_clear(thread);
 
 	/* If there's SIGKILL pending, kill the process right away */
 	if (IS_PENDING(pproc->signal->sigqueue, SIGKILL)) {
@@ -360,11 +381,14 @@ static void uk_signal_deliver(struct uk_syscall_exit_ctx *exit_ctx)
 	UK_ASSERT(!IS_PENDING(pproc->signal->sigqueue, SIGSTOP));
 	UK_ASSERT(!IS_PENDING(pproc->signal->sigqueue, SIGCONT));
 
+	if (pthread->signal && pthread->signal->suspend_signal)
+		deliver_suspend_signal(pthread, exit_ctx);
+
 	/* Deliver all pending signals of this process & thread */
-	deliver_pending_proc(pproc, execenv);
+	deliver_pending_proc(pproc, exit_ctx);
 	if (pthread->state == POSIX_THREAD_RUNNING ||
 	    pthread->state == POSIX_THREAD_BLOCKED_SIGNAL)
-		deliver_pending_thread(pthread, execenv);
+		deliver_pending_thread(pthread, exit_ctx);
 }
 
 uk_syscall_exittab_prio(uk_signal_deliver, UK_PRIO_BEFORE(UK_PRIO_LATEST));
@@ -419,7 +443,7 @@ void sys_error_handler(struct ukarch_execenv *ee __unused, long arg)
 	set_siginfo_kill(error->signum, &sig.siginfo);
 
 	/* Execute standard delivery path */
-	do_deliver(pthread, &sig, ee);
+	do_deliver(pthread, &sig, ee, NULL);
 
 	return;
 

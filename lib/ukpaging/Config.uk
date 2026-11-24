@@ -4,7 +4,9 @@ menuconfig LIBUKPAGING
 	depends on HAVE_DYNAMIC_MAPPINGS
 	depends on !HAVE_FIXMAP
 	select LIBUKPAL
+	select LIBUKPCPUVAR
 	select LIBUKPT
+	select LIBUKLCPU if HAVE_SMP
 	select LIBUKFALLOC
 	select LIBUKFALLOCBUDDY
 	help
@@ -15,6 +17,20 @@ menuconfig LIBUKPAGING
 		For raw page table operations use libukpt.
 
 if LIBUKPAGING
+config LIBUKPAGING_DEFERRED_RELEASE
+	bool
+	default n
+	help
+		Release optional mapping backing references after local and
+		remote TLB invalidations have completed.
+
+config LIBUKPAGING_SHARED
+	bool
+	select LIBUKPAGING_DEFERRED_RELEASE
+	default n
+	help
+		Share pinned kernel branches between page-table hierarchies.
+
 config LIBUKPAGING_DIRECTMAP
 	bool
 	default y if ARCH_ARM_64 || ARCH_X86_64

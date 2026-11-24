@@ -39,6 +39,7 @@
 #include <uk/plat/time.h>
 #include <uk/asm/lcpu.h>
 #include <uk/lcpu.h>
+#include <uk/pcpuvar.h>
 #include <uk/atomic.h>
 #include <uk/plat/common/sections.h>
 #include <uk/plat/common/bootinfo.h>
@@ -91,13 +92,14 @@ uint32_t generic_timer_get_frequency(int fdt_timer)
 	return fdt32_to_cpu(fdt_freq[0]);
 }
 
-unsigned long sched_have_pending_events;
+__uk_pcpuvar unsigned long sched_have_pending_events;
 
 void time_block_until(__nsec until)
 {
 	while (ukplat_monotonic_clock() < until) {
 		generic_timer_cpu_block_until(until);
-		if (uk_and_relax(&sched_have_pending_events, 0))
+		if (uk_and_relax(uk_pcpuvar_current_ptr_get(
+					 sched_have_pending_events), 0))
 			break;
 	}
 }

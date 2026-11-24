@@ -13,6 +13,127 @@ menuconfig LIBUKVMEM
 
 if LIBUKVMEM
 
+config LIBUKVMEM_THREAD_VAS
+	bool "Select the address space on thread switches"
+	depends on HAVE_SCHED
+	select LIBUKPAGING_SHARED
+	help
+		Allow threads to use an address space distinct from the kernel
+		address space. All address spaces must map the kernel and its
+		stacks and thread metadata at the same addresses.
+
+config LIBUKVMEM_COW
+	bool
+	select LIBUKPAGING_DEFERRED_RELEASE
+	default n
+
+config LIBUKVMEM_VAS_BOUNDS
+	bool
+	default n
+
+config LIBUKVMEM_PROCESS_VAS
+	bool
+	depends on LIBUKVMEM_THREAD_VAS && LIBUKPAGING_DIRECTMAP
+	depends on LIBUKPLAT_NATIVE_PAGING
+	select LIBUKVMEM_COW_VMA
+	select LIBUKVMEM_VAS_BOUNDS
+	default n
+
+config LIBUKVMEM_PROCESS_VAS_TEST
+	bool "Test process address space creation and cloning"
+	depends on LIBUKVMEM_THREAD_VAS && LIBUKPAGING_DIRECTMAP
+	depends on LIBUKPLAT_NATIVE_PAGING
+	select LIBUKVMEM_PROCESS_VAS
+	select LIBUKVMEM_VAS_ACCESS
+	select LIBUKPAGING_STATS
+	select LIBUKTEST
+	default n
+
+config LIBUKVMEM_COW_VMA
+	bool
+	depends on LIBUKVMEM_THREAD_VAS && LIBUKPAGING_DIRECTMAP
+	select LIBUKVMEM_COW
+	select LIBUKVMEM_VAS_REFCOUNT
+	default n
+
+config LIBUKVMEM_SHARED_REF_TEST
+	bool "Test shared mapping identity and fault-free word loads"
+	depends on LIBUKVMEM_THREAD_VAS && LIBUKPAGING_DIRECTMAP
+	depends on LIBUKPLAT_NATIVE_PAGING
+	select LIBUKVMEM_PROCESS_VAS
+	select LIBUKVMEM_VAS_ACCESS
+	select LIBUKTEST
+	default n
+
+config LIBUKVMEM_COW_VMA_TEST
+	bool "Test private anonymous COW address space cloning"
+	depends on LIBUKVMEM_THREAD_VAS && LIBUKPAGING_DIRECTMAP
+	depends on LIBUKLOCK_SEMAPHORE
+	depends on LIBUKVMEM_PAGEFAULT_HANDLER_PRIO > 0
+	select LIBUKVMEM_COW_VMA
+	select LIBUKVMEM_VAS_ACCESS
+	select LIBUKVMEM_VAS_BOUNDS
+	select LIBUKPAGING_STATS
+	select LIBUKTEST
+	default n
+
+config LIBUKVMEM_VAS_REFCOUNT
+	bool
+	depends on LIBUKVMEM_THREAD_VAS
+	default n
+
+config LIBUKVMEM_VAS_ACCESS
+	bool
+	depends on LIBUKVMEM_THREAD_VAS && LIBUKPAGING_DIRECTMAP
+	default n
+
+config LIBUKVMEM_VAS_REFCOUNT_TEST
+	bool "Test owned address space lifetime"
+	depends on LIBUKVMEM_THREAD_VAS && LIBUKLOCK_SEMAPHORE
+	depends on LIBUKPAGING_DIRECTMAP
+	select LIBUKVMEM_VAS_REFCOUNT
+	select LIBUKVMEM_VAS_ACCESS
+	select LIBUKTEST
+	default n
+
+config LIBUKVMEM_COW_TEST
+	bool "Test copy-on-write frame lifetime"
+	depends on HAVE_SCHED
+	select LIBUKVMEM_COW
+	select LIBUKTEST
+
+config LIBUKVMEM_COW_ALLOC_TEST
+	bool "Test resident COW metadata allocation"
+	depends on HAVE_SCHED && LIBUKLOCK_SEMAPHORE
+	depends on LIBUKPAGING_DIRECTMAP
+	select LIBUKVMEM_COW
+	select LIBUKTEST
+	default n
+
+config LIBUKVMEM_FAULT_RESULT_TEST
+	bool "Test staged fault ownership results"
+	depends on LIBUKVMEM_THREAD_VAS && LIBUKPAGING_DIRECTMAP
+	select LIBUKVMEM_COW
+	select LIBUKVMEM_VAS_ACCESS
+	select LIBUKTEST
+	default n
+
+config LIBUKVMEM_TRANSITION_TEST
+	bool "Test VAS transition exclusion and fault completion IPIs"
+	depends on LIBUKVMEM_THREAD_VAS && LIBUKPAGING_DIRECTMAP
+	depends on LIBUKLOCK_SEMAPHORE
+	depends on LIBUKVMEM_PAGEFAULT_HANDLER_PRIO > 0
+	select LIBUKVMEM_COW
+	select LIBUKVMEM_VAS_ACCESS
+	select LIBUKTEST
+	default n
+
+config LIBUKVMEM_TRACE_PAGEFAULTS
+	bool "Expose per-thread minor fault count for development measurements"
+	depends on ARCH_X86_64 && HAVE_SCHED && LIBPOSIX_PROCESS
+	depends on LIBUKDEBUG_ENABLE_ASSERT
+	default n
+
 config LIBUKVMEM_DEMAND_PAGE_IN_SIZE
 	int "Page size in log2 for demand-paging"
 	default 12
@@ -89,5 +210,22 @@ config LIBUKVMEM_TEST
 	default n
 	select LIBUKTEST
 	select LIBUKNOFAULT
+
+config LIBUKVMEM_THREAD_VAS_TEST
+	bool "Test address-space switches"
+	depends on LIBUKVMEM_THREAD_VAS
+	select LIBUKTEST
+
+config LIBUKVMEM_SYNC_TEST
+	bool "Test backing-store synchronization contracts"
+	default n
+	select LIBUKTEST
+
+config LIBUKVMEM_NESTED_FAULT_TEST
+	bool "Test nested native x86 page faults"
+	depends on ARCH_X86_64 && LIBUKPLAT_NATIVE_EXCEPT && HAVE_SCHED
+	depends on LIBUKVMEM_PAGEFAULT_HANDLER_PRIO > 0
+	depends on LIBUKLOCK_SEMAPHORE
+	select LIBUKTEST
 
 endif

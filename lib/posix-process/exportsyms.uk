@@ -1,4 +1,10 @@
 alarm
+uk_process_setitimer
+uk_process_getitimer
+uk_process_alarm
+uk_sigowner_acquire
+uk_sigowner_release
+uk_sigowner_sigio
 brk
 sbrk
 execl
@@ -45,6 +51,7 @@ brk
 sbrk
 clone
 vfork
+fork
 kill
 pause
 sigaddset
@@ -56,5 +63,9 @@ sigismember
 sigprocmask
 tgkill
 signalfd
+uk_posix_process_abort_prepared
 uk_posix_process_create_pthread
+uk_posix_process_prepare_spawn
+uk_posix_process_publish_prepared
+uk_posix_process_set_stack_size
 uk_posix_process_run

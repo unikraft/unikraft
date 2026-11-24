@@ -8,4 +8,4 @@ LIBVIRTIO_RING_CINCLUDES-y  += -I$(LIBVIRTIO_RING_BASE)/include
 # TODO Remove as soon as plat/ dependencies go away
 LIBVIRTIO_RING_CINCLUDES-y += -I$(UK_PLAT_COMMON_BASE)/include
 
-LIBVIRTIO_RING_SRCS-y += $(LIBVIRTIO_RING_BASE)/virtio_ring.c
+LIBVIRTIO_RING_SRCS-y += $(LIBVIRTIO_RING_BASE)/virtio_ring.c|isr

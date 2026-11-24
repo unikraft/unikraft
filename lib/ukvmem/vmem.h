@@ -7,6 +7,7 @@
 #ifndef __VMEM_H__
 #define __VMEM_H__
 
+#include <stdbool.h>
 #include <uk/vmem.h>
 #include <uk/assert.h>
 #ifdef CONFIG_LIBUKPAGING
@@ -14,6 +15,21 @@
 #endif /* CONFIG_LIBUKPAGING */
 
 #ifdef CONFIG_LIBUKPAGING
+static inline bool vmem_vas_range_allowed(struct uk_vas *vas,
+					  __vaddr_t start, __sz len)
+{
+#if CONFIG_LIBUKVMEM_VAS_BOUNDS
+	if (vas->range_end)
+		return start >= vas->range_start && start < vas->range_end &&
+			len <= vas->range_end - start;
+#else
+	(void)vas;
+	(void)start;
+	(void)len;
+#endif
+	return true;
+}
+
 /**
  * Architecture-independent page fault handler
  *
@@ -29,6 +45,44 @@
  */
 int vmem_pagefault(__vaddr_t vaddr, unsigned int type,
 		   struct uk_lcpu_regs *regs);
+
+/** Complete deferred work after dropping the VAS and paging locks. */
+void vmem_arch_pagefault_finish(struct uk_paging_free_batch *batch,
+				struct uk_lcpu_regs *regs);
+
+#if CONFIG_LIBUKVMEM_COW
+/**
+ * Serialize a mapping transition across its unlocked TLB completion.
+ * The caller keeps the VAS and this initially zeroed object alive, and must
+ * neither block nor yield, nor access private VAS mappings, until end().
+ * Only resident allocations and shared kernel mappings may be used there.
+ */
+struct vmem_vas_transition {
+	struct uk_vas *vas;
+};
+
+/** Begin in IRQ-enabled thread context, outside VAS and paging locks. */
+int vmem_vas_transition_begin(struct uk_vas *vas,
+			      struct vmem_vas_transition *transition);
+
+/** Begin from a VMA fault callback holding the VAS lock, with IRQs off. */
+int vmem_vas_transition_mark_locked(struct uk_vas *vas,
+				    struct vmem_vas_transition *transition);
+
+/**
+ * End with IRQs enabled and all VAS/paging locks released, after every TLB
+ * batch belonging to the transition has completed. A copied frame must stay
+ * read-only until old translations have been acknowledged; promoting it to
+ * writable and completing that batch precedes end().
+ */
+void vmem_vas_transition_end(struct vmem_vas_transition *transition);
+
+/** Wait outside all VAS/paging locks, with IRQs enabled. Never schedules. */
+void vmem_vas_transition_wait(struct uk_vas *vas);
+
+/** Wait from a hardware fault without relaxing the interrupted IRQ mask. */
+int vmem_arch_pagefault_wait(struct uk_vas *vas, struct uk_lcpu_regs *regs);
+#endif
 
 /**
  * Computes the number of pages depending on the VMA's configured page size.

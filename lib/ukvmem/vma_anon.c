@@ -16,6 +16,10 @@
 #include <uk/falloc.h>
 #endif /* CONFIG_LIBUKPAGING */
 #include <uk/isr/string.h>
+#if CONFIG_LIBUKVMEM_TRACE_PAGEFAULTS
+#include <uk/plat/time.h>
+#include <uk/thread.h>
+#endif
 
 #ifdef CONFIG_LIBUKVMEM_ANON_BASE
 static __vaddr_t vma_op_anon_get_base(struct uk_vas *vas __unused,
@@ -33,14 +37,28 @@ static int vma_op_anon_fault(struct uk_vma *vma, struct uk_vm_fault *fault)
 	__paddr_t paddr = UK_PAGING_PADDR_ANY;
 	__vaddr_t vaddr;
 	int rc;
+#if CONFIG_LIBUKVMEM_TRACE_PAGEFAULTS
+	struct uk_thread *thread = !(fault->type & UK_VMA_FAULT_SOFT)
+		? uk_thread_current() : __NULL;
+	__nsec started;
+#endif
 
 	UK_ASSERT(UK_PAGING_PAGE_ALIGNED(fault->len));
 	UK_ASSERT(fault->len == UK_PAGING_PAGE_Lx_SIZE(fault->level));
 	UK_ASSERT(fault->type & UK_VMA_FAULT_NONPRESENT);
 
+#if CONFIG_LIBUKVMEM_TRACE_PAGEFAULTS
+	if (thread)
+		started = ukplat_monotonic_clock();
+#endif
 	rc = pt->fa->falloc(pt->fa, &paddr, pages, FALLOC_FLAG_ALIGNED);
 	if (unlikely(rc))
 		return rc;
+#if CONFIG_LIBUKVMEM_TRACE_PAGEFAULTS
+	if (thread)
+		thread->vmem_fault_anon_alloc_time +=
+			ukplat_monotonic_clock() - started;
+#endif
 
 	if (!(vma->flags & UK_VMA_FLAG_UNINITIALIZED)) {
 		vaddr = uk_paging_page_kmap(pt, paddr, pages, 0);
@@ -49,7 +67,16 @@ static int vma_op_anon_fault(struct uk_vma *vma, struct uk_vm_fault *fault)
 			return -ENOMEM;
 		}
 
+#if CONFIG_LIBUKVMEM_TRACE_PAGEFAULTS
+		if (thread)
+			started = ukplat_monotonic_clock();
+#endif
 		memset_isr((void *)vaddr, 0, fault->len);
+#if CONFIG_LIBUKVMEM_TRACE_PAGEFAULTS
+		if (thread)
+			thread->vmem_fault_anon_zero_time +=
+				ukplat_monotonic_clock() - started;
+#endif
 		uk_paging_page_kunmap(pt, vaddr, pages, 0);
 	}
 

@@ -15,13 +15,17 @@
 
 #if CONFIG_LIBPOSIX_PROCESS_MULTIPROCESS
 #include <uk/process.h>
-#include <uk/semaphore.h>
+#include <uk/sched.h>
 
 #include "process.h"
+#if CONFIG_LIBPOSIX_PROCESS_SIGNAL
+#include "signal/signal.h"
+#endif
 #include "signal/siginfo.h"
 
 #define PPROCESS_STATE_CHANGED(_pp, _state)				  \
-	(((_state) & WEXITED) && ((_pp)->state == POSIX_PROCESS_EXITED || \
+	(!(_pp)->reap_claimed && ((_state) & WEXITED) &&		 \
+	 ((_pp)->state == POSIX_PROCESS_EXITED ||			 \
 				(_pp)->state == POSIX_PROCESS_KILLED))
 
 static inline
@@ -32,47 +36,30 @@ struct posix_process *pprocess_state_changed(struct posix_process *pproc,
 	return (PPROCESS_STATE_CHANGED(pproc, state)) ? pproc : NULL;
 }
 
-static inline
-struct posix_process *pprocess_child_state_changed(int state)
+static void pprocess_reap(struct posix_process *pprocess)
 {
-	struct posix_process *pchild, *pchildn;
-	struct posix_process *pproc;
-
-	uk_pprocess_foreach_child(uk_pprocess_current(), pchild, pchildn)
-		if ((pproc = pprocess_state_changed(pchild, state)))
-			return pproc;
-	return NULL;
-}
-
-static int pprocess_reap(struct posix_process *pprocess, siginfo_t *si)
-{
-	pid_t pid;
-
 	UK_ASSERT(pprocess);
 	UK_ASSERT(uk_list_empty(&pprocess->threads));
 
-	if (si)
-		set_siginfo_wait(pprocess, si);
-
-	pid = pprocess->pid;
 	pprocess_release(pprocess);
-
-	return pid;
 }
 
 /* Wait helper
  *
  * @param pid: child pid to wait for or -1 for any
+ * @param pgid: restrict any-child selection to this group, or zero
  * @param opt: same as waitid()
  * @return child pid, zero if no waitable, negative value on error
  */
-static int pprocess_wait(pid_t pid, siginfo_t *si, int opt)
+static int pprocess_wait(pid_t pid, pid_t pgid, siginfo_t *si, int opt)
 {
 	struct posix_process *this_process;
 	struct posix_thread *this_thread;
 	struct posix_process *waitable = NULL;
-	struct posix_process *child = NULL;
-	int ret;
+	struct posix_process *child, *next, *reap = NULL;
+	bool matched, blocked;
+	unsigned long flags;
+	int ret, sig;
 
 	UK_ASSERT(pid > 0 || pid == -1);
 	UK_ASSERT(si);
@@ -83,63 +70,98 @@ static int pprocess_wait(pid_t pid, siginfo_t *si, int opt)
 	this_process = this_thread->process;
 	UK_ASSERT(this_process);
 
-	if (uk_list_empty(&this_process->children))
-		return -ECHILD;
-
-	this_thread->state = POSIX_THREAD_BLOCKED_WAIT;
-
-	if (pid > 0) {
-		child = pid2pprocess(pid);
-		/* Child does not exist or not our child. This also
-		 * covers the case where the process chose to ignore
-		 * SIGCHLD or set SA_NOCLDWAIT and therefore _exit()
-		 * terminated it without further ado.
-		 */
-		if (unlikely(!child || child->parent != this_process)) {
+	for (;;) {
+		flags = pprocess_lock_acquire();
+		sig = pprocess_terminating_signal(this_process);
+		if (sig) {
+			this_thread->state = POSIX_THREAD_RUNNING;
+			pprocess_lock_release(flags);
+			pprocess_exit_signalled(sig);
+		}
+		this_thread->wait_pid = pid;
+		this_thread->wait_pgid = pgid;
+		this_thread->state = POSIX_THREAD_BLOCKED_WAIT;
+		if (uk_list_empty(&this_process->children)) {
 			ret = -ECHILD;
 			goto out;
 		}
-
-		/* If the process exited already, reap and return the pid */
-		if (child->state != POSIX_PROCESS_RUNNING) {
-			ret = pprocess_reap(child, si);
-			goto out;
-		}
-
-		this_thread->wait_pid = pid;
-	} else { /* any */
-		this_thread->wait_pid = -1;
-	}
-
-	for (;;) {
-		/* Find process with changed state. No change means that
-		 * the state change happened to a different child, so we
-		 * loop back to the semaphore.
-		 */
-		if (pid > 0)
+		if (pid > 0) {
+			child = pid2pprocess(pid);
+			if (!child || child->parent != this_process ||
+			    child->reap_claimed) {
+				ret = -ECHILD;
+				goto out;
+			}
 			waitable = pprocess_state_changed(child, opt);
-		else /* any */
-			waitable = pprocess_child_state_changed(opt);
+		} else {
+			matched = false;
+			waitable = NULL;
+			uk_pprocess_foreach_child(this_process, child, next) {
+				if (child->reap_claimed ||
+				    (pgid && child->pgid != pgid))
+					continue;
+				matched = true;
+				waitable = pprocess_state_changed(child, opt);
+				if (waitable)
+					break;
+			}
+			if (!matched) {
+				ret = -ECHILD;
+				goto out;
+			}
+		}
 
 		if (waitable) {
 			ret = waitable->pid;
-			if (!(opt & WNOWAIT))
-				pprocess_reap(waitable, si);
-			break;
+			set_siginfo_wait(waitable, si);
+			if (!(opt & WNOWAIT)) {
+				/* Claim the child before unlocking. */
+				waitable->reap_claimed = true;
+				uk_list_del_init(&waitable->child_list_entry);
+				waitable->parent = NULL;
+				reap = waitable;
+			}
+			goto out;
 		}
 
 		if (opt & WNOHANG) {
 			ret = 0;
-			break;
+			goto out;
 		}
 
-		/* Wait for a state change on one of our children */
-		uk_semaphore_down(&this_thread->process->wait_semaphore);
+#if CONFIG_LIBPOSIX_PROCESS_SIGNAL
+		if (uk_thread_wait_signalled(this_thread->thread)) {
+			uk_thread_wait_signal_clear(this_thread->thread);
+			if (signal_unmasked_pending_locked(this_thread)) {
+				ret = -UK_SYSCALL_ERESTARTSYS;
+				goto out;
+			}
+		}
+#endif /* CONFIG_LIBPOSIX_PROCESS_SIGNAL */
+
+		/* Child-state and signal notifications use the same lock. */
+		blocked = uk_thread_block_sigintr(this_thread->thread, 0);
+		pprocess_lock_release(flags);
+		if (blocked)
+			uk_sched_yield();
 	}
 
 out:
 	this_thread->state = POSIX_THREAD_RUNNING;
+	pprocess_lock_release(flags);
+	if (reap)
+		pprocess_reap(reap);
 	return ret;
+}
+
+/* Capture PID-zero group selection once, before the first blocking wait. */
+static pid_t current_group(void)
+{
+	unsigned long flags = pprocess_lock_acquire();
+	pid_t pgid = uk_pthread_current()->process->pgid;
+
+	pprocess_lock_release(flags);
+	return pgid;
 }
 
 UK_SYSCALL_R_DEFINE(pid_t, wait4, pid_t, pid,
@@ -147,22 +169,24 @@ UK_SYSCALL_R_DEFINE(pid_t, wait4, pid_t, pid,
 		    struct rusage *, rusage)
 {
 	siginfo_t si;
+	pid_t pgid = 0;
 	int ret;
 
-	if (options)
-		if (unlikely(!(options & (WNOHANG | WUNTRACED | WCONTINUED))))
-			return -EINVAL;
-
-	if (pid < -1 || pid == 0) /* process groups */
-		return -ENOTSUP;
-
-	ret = pprocess_wait(pid, &si, options | WEXITED);
+	if (options & ~(WNOHANG | WUNTRACED | WCONTINUED))
+		return -EINVAL;
+	if (pid < -CONFIG_LIBPOSIX_PROCESS_MAX_PID)
+		return -ECHILD;
+	if (pid <= 0 && pid != -1) {
+		pgid = pid ? -pid : current_group();
+		pid = -1;
+	}
+	ret = pprocess_wait(pid, pgid, &si, options | WEXITED);
 
 	if (ret > 0 && wstatus) {
-		if (si.si_status == CLD_KILLED)
-			*wstatus = si.si_code;
+		if (si.si_code == CLD_KILLED)
+			*wstatus = si.si_status;
 		else /* CLD_EXITED */
-			*wstatus = si.si_code << 8;
+			*wstatus = si.si_status << 8;
 	}
 
 	return ret;
@@ -172,34 +196,42 @@ UK_LLSYSCALL_R_DEFINE(int, waitid, idtype_t, idtype, id_t, id,
 		      siginfo_t *, infop, int, options,
 		      struct rusage * __unused, rusage)
 {
+	siginfo_t si = { 0 };
 	int ret;
 
-	if (options)
-		if (unlikely(!(options & (WEXITED | WSTOPPED | WCONTINUED |
-					  WNOHANG | WNOWAIT))))
-			return -EINVAL;
+	if (unlikely(options & ~(WEXITED | WSTOPPED | WCONTINUED |
+				 WNOHANG | WNOWAIT)))
+		return -EINVAL;
+	if (unlikely(!(options & (WEXITED | WSTOPPED | WCONTINUED))))
+		return -EINVAL;
 
 	switch (idtype) {
 	case P_PID:
-		ret = pprocess_wait(id, infop, options);
+		if ((pid_t)id <= 0)
+			return -EINVAL;
+		ret = pprocess_wait(id, 0, &si, options);
+		break;
+	case P_PGID:
+		if ((pid_t)id < 0)
+			return -EINVAL;
+		ret = pprocess_wait(-1, id ? (pid_t)id : current_group(),
+				    &si, options);
 		break;
 	case P_PIDFD:
-	case P_PGID:
 		return -ENOTSUP;
 	case P_ALL:
-		ret = pprocess_wait(-1, infop, options);
+		ret = pprocess_wait(-1, 0, &si, options);
 		break;
 	default:
 		return -EINVAL;
 	}
 
-	/* POSIX.1-2008 requires that infop must not be NULL, yet Linux
-	 * violates the standard and returns the pid of the waited child
-	 * when that happens. wait(2) discourages applications to rely on
-	 * that behavior, still for backwards compatibility we implement
-	 * Linux's behavior nevertheless.
-	 */
-	return (infop && ret >= 0) ? 0 : ret;
+	if (ret < 0)
+		return ret;
+	/* Linux also permits a NULL result pointer and returns zero. */
+	if (infop)
+		*infop = si;
+	return 0;
 }
 #else /* !CONFIG_LIBPOSIX_PROCESS_MULTIPROCESS */
 UK_SYSCALL_R_DEFINE(pid_t, wait4, pid_t, pid,

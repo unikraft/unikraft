@@ -313,13 +313,54 @@ extern "C" {
 
 #if CONFIG_LIBUKPAGING
 
+#include <uk/arch/spinlock.h>
+
 struct uk_falloc;
+struct uk_paging_free_batch;
+
+#define UK_PAGING_FREE_BATCH_INLINE 64
+
+struct uk_paging_free_entry {
+	__paddr_t paddr;
+	unsigned int level;
+};
+
+struct uk_paging_free_chunk;
+
+struct uk_paging_deferred_call {
+	struct uk_paging_deferred_call *next;
+	void (*release)(void *arg);
+	void *arg;
+};
+
+struct uk_paging_free_batch {
+	struct uk_pagetable *pt;
+	__vaddr_t min_vaddr;
+	__vaddr_t max_vaddr;
+	__u8 has_tlb_range;
+	__u8 full_flush;
+	unsigned int inline_count;
+	struct uk_paging_free_entry inline_entries[UK_PAGING_FREE_BATCH_INLINE];
+	struct uk_paging_free_chunk *chunks;
+#if CONFIG_LIBUKPAGING_DEFERRED_RELEASE
+	struct uk_paging_deferred_call *calls;
+#endif
+};
 
 struct uk_pagetable {
 	/** The page table hierarchy (see libukpt) */
 	struct uk_pt pt;
 
 	struct uk_falloc *fa;
+	struct uk_paging_free_batch *defer_batch;
+	struct __spinlock lock;
+#if CONFIG_LIBUKPAGING_SHARED
+	struct uk_pagetable *shared_parent;
+	unsigned int shared_first;
+	unsigned int shared_count;
+	unsigned int shared_users;
+	struct uk_paging_deferred_call shared_release;
+#endif
 
 #ifdef CONFIG_LIBUKPAGING_STATS
 	unsigned long nr_lx_pages[UK_PAL_PT_LEVELS];
@@ -457,6 +498,48 @@ void uk_paging_tlb_flush(void)
 	uk_pal_tlb_flush();
 }
 
+static inline
+unsigned long uk_paging_attr_from_pte(__pte_t pte, unsigned int lvl)
+{
+	return uk_pal_attr_from_pte(pte, lvl);
+}
+
+void uk_paging_free_batch_init(struct uk_paging_free_batch *batch,
+			       struct uk_pagetable *pt);
+void uk_paging_free_batch_finish(struct uk_paging_free_batch *batch);
+void uk_paging_batch_begin(struct uk_paging_free_batch *batch,
+			   struct uk_pagetable *pt);
+void uk_paging_batch_end(struct uk_paging_free_batch *batch);
+
+/**
+ * Return this CPU's outer batch for pt, or NULL if no matching batch exists.
+ *
+ * The caller keeps local interrupts disabled from lookup through use of the
+ * returned batch and must not yield. Unlike pt->defer_batch, this pointer
+ * remains available between public paging operations, until batch_end().
+ * The caller owns the enclosing batch and must finish it after dropping
+ * its VAS and paging locks. A missing batch does not authorize early release
+ * of backing references for mappings that still require TLB invalidation.
+ */
+struct uk_paging_free_batch *
+uk_paging_batch_current(struct uk_pagetable *pt);
+
+#if CONFIG_LIBUKPAGING_DEFERRED_RELEASE
+/**
+ * Queue a release after the batch's local and remote TLB invalidations.
+ *
+ * The caller serializes access to the batch and keeps call and arg alive
+ * until uk_paging_free_batch_finish(). The call may only be queued once
+ * at a time. Its release function may free call and runs after all paging
+ * locks have been dropped. No allocation is required to queue a call.
+ * Callers must finish the batch even if a later page-table operation fails.
+ * Releases queued by page-fault handlers must not block or yield.
+ */
+void uk_paging_batch_defer(struct uk_paging_free_batch *batch,
+			   struct uk_paging_deferred_call *call,
+			   void (*release)(void *arg), void *arg);
+#endif
+
 /**
  * Returns the active page table (the one that defines the virtual address
  * space at the moment of the execution of this function).
@@ -537,10 +620,30 @@ int uk_paging_pt_add_mem(struct uk_pagetable *pt, __paddr_t start, __sz len);
 int uk_paging_pt_clone(struct uk_pagetable *pt, struct uk_pagetable *pt_src,
 		       unsigned long flags);
 
+#if CONFIG_LIBUKPAGING_SHARED
+/**
+ * Clone a page table while sharing the branches covering [start, start+len).
+ * The range must cover complete, present top-level page-table branches.
+ * Other branches are copied as in uk_paging_pt_clone(). Mutations of shared
+ * mappings must use their owner, returned by uk_paging_pt_get_owner().
+ * The source object must remain alive until the clone's free batch finishes;
+ * freeing its page tables is rejected while clones still reference them.
+ */
+int uk_paging_pt_clone_shared(struct uk_pagetable *pt,
+			      struct uk_pagetable *pt_src,
+			      __vaddr_t start, __sz len);
+
+/** Return the page table owning the branch containing vaddr. */
+struct uk_pagetable *uk_paging_pt_get_owner(struct uk_pagetable *pt,
+					    __vaddr_t vaddr);
+#endif
+
 /**
  * Frees the given page table by recursively releasing the page table hierarchy
  * and all mapped physical memory. Mapped physical memory not belonging to the
  * page table is not freed.
+ * The caller must ensure that the page table is inactive on every CPU and
+ * cannot be activated until this operation has completed.
  *
  * @param pt
  *   The page table hierarchy to release
@@ -629,6 +732,17 @@ struct uk_paging_page_mapx {
 };
 
 /**
+ * Result of one mapper invocation, under the same page-table lock. A zero
+ * result means the proposed PTE was written; an error or mapper control code
+ * means it was not. This does not signal completed TLB invalidation. The
+ * callback must not block, yield or recursively modify this page table. It
+ * may append retirement work to the current paging batch.
+ */
+typedef void (*uk_paging_page_mapx_result_t)(struct uk_pagetable *pt,
+		__vaddr_t vaddr, __vaddr_t pt_vaddr, unsigned int level,
+		int result, void *ctx);
+
+/**
  * Creates a mapping from a range of contiguous virtual addresses to a range of
  * physical addresses using the specified attributes.
  *
@@ -696,6 +810,18 @@ int uk_paging_page_mapx(struct uk_pagetable *pt, __vaddr_t vaddr,
 			__paddr_t paddr, unsigned long pages,
 			unsigned long attr, unsigned long flags,
 			struct uk_paging_page_mapx *mapx);
+
+/**
+ * Map as with uk_paging_page_mapx(), reporting each mapper outcome exactly
+ * once. Invocations rejected before the mapper runs have no result callback.
+ * The existing mapper structure and entry point keep their original layout.
+ */
+int uk_paging_page_mapx_with_result(struct uk_pagetable *pt,
+				    __vaddr_t vaddr, __paddr_t paddr,
+				    unsigned long pages, unsigned long attr,
+				    unsigned long flags,
+				    struct uk_paging_page_mapx *mapx,
+				    uk_paging_page_mapx_result_t result);
 
 #define uk_paging_page_map(pt, va, pa, pages, attr, flags)		\
 	uk_paging_page_mapx(pt, va, pa, pages, attr, flags, __NULL)
