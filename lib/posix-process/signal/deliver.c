@@ -338,29 +338,34 @@ static void uk_signal_deliver(struct uk_syscall_exit_ctx *exit_ctx)
 
 	execenv = exit_ctx->execenv;
 
-	/* FIXME: This can go away once we eliminate the last syscall made
-	 *        by kernel context and pass execenv to syscalls in native
-	 *        mode.
-	 */
-	if (!execenv)
-		return;
-
 	thread = uk_thread_current();
+	if (!thread || !(thread->flags & UK_THREADF_UKTLS))
+		return;
 	pthread = uk_pthread_current();
 	if (unlikely(!pthread)) {
-		if (!thread->sched)
+		if (execenv && !thread->sched)
 			uk_sched_yield();
 		return;
 	}
 
+	/* Native syscalls can terminate at the outermost return boundary. */
+	if (!execenv && (exit_ctx->nested_depth != 1 ||
+			 pthread->state == POSIX_THREAD_EXITED ||
+			 pthread->state == POSIX_THREAD_KILLED))
+		return;
 	pproc = pthread->process;
 	UK_ASSERT(pproc);
-	/* Clear an existing mark before delivering pending signals. */
-	if (uk_thread_wait_signalled(thread))
-		uk_thread_wait_signal_clear(thread);
 	sig = pprocess_terminating_signal(pproc);
 	if (sig)
 		pprocess_exit_signalled(sig);
+
+	/* User handlers need saved application registers and a stack. */
+	if (!execenv)
+		return;
+
+	/* Clear an existing mark before delivering pending signals. */
+	if (uk_thread_wait_signalled(thread))
+		uk_thread_wait_signal_clear(thread);
 
 	/* If there's SIGKILL pending, kill the process right away */
 	if (IS_PENDING(pproc->signal->sigqueue, SIGKILL)) {

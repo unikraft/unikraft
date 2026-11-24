@@ -326,7 +326,7 @@ int pprocess_signal_send(struct posix_process *proc, int signum,
 	return 0;
 }
 
-static int signal_unmasked_pending_locked(struct posix_thread *thread)
+int signal_unmasked_pending_locked(struct posix_thread *thread)
 {
 	struct posix_process *proc = thread->process;
 	uk_sigset_t pending = (thread->signal->sigqueue.pending |

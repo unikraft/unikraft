@@ -18,6 +18,9 @@
 #include <uk/sched.h>
 
 #include "process.h"
+#if CONFIG_LIBPOSIX_PROCESS_SIGNAL
+#include "signal/signal.h"
+#endif
 #include "signal/siginfo.h"
 
 #define PPROCESS_STATE_CHANGED(_pp, _state)				  \
@@ -56,7 +59,7 @@ static int pprocess_wait(pid_t pid, pid_t pgid, siginfo_t *si, int opt)
 	struct posix_process *child, *next, *reap = NULL;
 	bool matched, blocked;
 	unsigned long flags;
-	int ret;
+	int ret, sig;
 
 	UK_ASSERT(pid > 0 || pid == -1);
 	UK_ASSERT(si);
@@ -69,9 +72,11 @@ static int pprocess_wait(pid_t pid, pid_t pgid, siginfo_t *si, int opt)
 
 	for (;;) {
 		flags = pprocess_lock_acquire();
-		if (pprocess_terminating_signal(this_process)) {
-			ret = -EINTR;
-			goto out;
+		sig = pprocess_terminating_signal(this_process);
+		if (sig) {
+			this_thread->state = POSIX_THREAD_RUNNING;
+			pprocess_lock_release(flags);
+			pprocess_exit_signalled(sig);
 		}
 		this_thread->wait_pid = pid;
 		this_thread->wait_pgid = pgid;
@@ -124,10 +129,15 @@ static int pprocess_wait(pid_t pid, pid_t pgid, siginfo_t *si, int opt)
 			goto out;
 		}
 
+#if CONFIG_LIBPOSIX_PROCESS_SIGNAL
 		if (uk_thread_wait_signalled(this_thread->thread)) {
-			ret = -UK_SYSCALL_ERESTARTSYS;
-			goto out;
+			uk_thread_wait_signal_clear(this_thread->thread);
+			if (signal_unmasked_pending_locked(this_thread)) {
+				ret = -UK_SYSCALL_ERESTARTSYS;
+				goto out;
+			}
 		}
+#endif /* CONFIG_LIBPOSIX_PROCESS_SIGNAL */
 
 		/* Child-state and signal notifications use the same lock. */
 		blocked = uk_thread_block_sigintr(this_thread->thread, 0);

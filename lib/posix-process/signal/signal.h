@@ -319,6 +319,9 @@ int pprocess_signal_send(struct posix_process *proc, int signum,
 void pprocess_signal_wait(struct posix_thread *thread);
 void pprocess_signal_suspend(struct posix_thread *thread, uk_sigset_t mask);
 
+/* Caller holds pprocess_lock. */
+int signal_unmasked_pending_locked(struct posix_thread *thread);
+
 /* Jump to signal handler
  *
  * Trampoline to jump from unikraft to userspace context.
