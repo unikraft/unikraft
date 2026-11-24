@@ -6,17 +6,17 @@
 
 #include <errno.h>
 #include <signal.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/epoll.h>
 #include <sys/signalfd.h>
 #include <sys/types.h>
 #include <sys/wait.h>
-#include <time.h>
 #include <unistd.h>
 
 #include <uk/essentials.h>
+#include <uk/plat/time.h>
 #include <uk/process.h>
 #include <uk/sched.h>
 
@@ -42,12 +42,12 @@ static pid_t application_pid;
 static int application_returned;
 static int application_status;
 
-static inline pid_t wait_nonblocking(void)
+static inline pid_t wait_for_child(int options)
 {
 	int wstatus;
 	pid_t pid;
 
-	pid = waitpid(-1, &wstatus, WNOHANG);
+	pid = waitpid(-1, &wstatus, options);
 
 	/* Save the application's return code. This will be
 	 * the value Unikraft returns upon exit. If the
@@ -67,109 +67,50 @@ static inline pid_t wait_nonblocking(void)
 }
 
 #if CONFIG_LIBUKBOOT_GRACEFUL_SHUTDOWN
-/* Monotonic time in msec */
-static inline long now(void)
+#define SHUTDOWN_POLL_MS 50L
+#define GRACEFUL_SHUTDOWN_REAP_MS 100L
+
+static inline long now_ms(void)
 {
-	struct timespec ts;
-
-	clock_gettime(CLOCK_MONOTONIC, &ts);
-
-	return ts.tv_sec * 1000UL + ts.tv_nsec / 1000000UL;
+	return ukplat_monotonic_clock() / 1000000UL;
 }
 
-/* Wait for processes to terminate gracefully. Although we return main()'s exit
- * status back to libukboot, when it comes to reaping we don't differentiate
- * between the application processes and reparented children, as these are
- * likely the result of daemonization so we also need to treat as equal.
- *
- * Notice: We don't return on error as we don't have a way to handle these
- *         other than printing an error message (do_init() is expected to
- *         return the application's code, that we don't want to shadow if
- *         the application has already returned by this point).
- */
-static void graceful_shutdown(int sigfd)
+static void graceful_shutdown(void)
 {
-	struct epoll_event ev;
-	struct signalfd_siginfo info;
-	long deadline; /* msec */
-	long timeout;  /* msec */
-	ssize_t bytes;
-	int epollfd;
-	int nfds;
-	int ret;
+	const long timeout = GRACEFUL_SHUTDOWN_TIMEOUT;
+	const int options = timeout < 0 ? 0 : WNOHANG;
+	long deadline = now_ms() + MAX(timeout, 0L);
+	bool forced = false;
 
-	uk_pr_debug("Signalling children\n");
+	/* Broadcast to the application processes while leaving init alone. */
+	kill(-1, GRACEFUL_SHUTDOWN_SIGNAL);
 
-	kill(0, GRACEFUL_SHUTDOWN_SIGNAL);
+	for (;;) {
+		pid_t pid = wait_for_child(options);
+		long remaining;
 
-	/* Make signalfd non-blocking */
-	ret = fcntl(sigfd, F_SETFL, fcntl(sigfd, F_GETFL) | O_NONBLOCK);
-	if (unlikely(ret < 0)) {
-		uk_pr_err("Could not set signalfd to non-blocking mode (%d)\n",
-			  errno);
-		return;
-	}
-
-	/* Create epoll instance */
-	epollfd = epoll_create1(0);
-	if (unlikely(epollfd == -1)) {
-		uk_pr_err("epoll_create() failed (%d)\n", errno);
-		return;
-	}
-
-	/* Add existing signalfd to epoll */
-	ev.events = EPOLLIN;
-	ev.data.fd = sigfd;
-	ret = epoll_ctl(epollfd, EPOLL_CTL_ADD, sigfd, &ev);
-	if (unlikely(ret == -1)) {
-		uk_pr_err("epoll_ctl failed (%d)\n", errno);
-		goto err_close_epollfd;
-	}
-
-	/* Reap terminated children */
-	if (GRACEFUL_SHUTDOWN_TIMEOUT > 0)
-		deadline = now() + GRACEFUL_SHUTDOWN_TIMEOUT;
-	timeout = GRACEFUL_SHUTDOWN_TIMEOUT;
-	while (1) {
-		/* Wait for events or timeout */
-		nfds = epoll_wait(epollfd, &ev, 1, timeout);
-		if (unlikely(nfds == -1)) {
-			uk_pr_err("epoll_wait failed (%d)\n", errno);
-			break;
+		if (pid < 0 && errno == ECHILD)
+			return;
+		if (unlikely(pid < 0 && errno != EINTR)) {
+			uk_pr_err("Could not reap children (%d)\n", errno);
+			return;
 		}
+		if (timeout < 0)
+			continue;
+		remaining = deadline - now_ms();
+		if (remaining <= 0) {
+			if (forced)
+				return;
+			/* Broadcast SIGKILL without signalling init. */
+			kill(-1, SIGKILL);
+			forced = true;
+			deadline = now_ms() + GRACEFUL_SHUTDOWN_REAP_MS;
+		} else if (pid <= 0) {
+			long interval = MIN(remaining, SHUTDOWN_POLL_MS);
 
-		if (!nfds) {
-			uk_pr_debug("Reached timeout, terminating forcefully\n");
-			break;
-		}
-
-		/* Process SIGCHLD */
-		bytes = read(sigfd, &info, sizeof(info));
-		if (bytes == sizeof(info) && info.ssi_signo == SIGCHLD) {
-			/* Reap terminated children */
-			do {
-				ret = wait_nonblocking();
-			} while (ret > 0);
-
-			UK_ASSERT(ret == 0 || (ret == -1 && errno == ECHILD));
-
-			if (ret == -1 && errno == ECHILD) {
-				uk_pr_debug("All children exited gracefully\n");
-				break;
-			}
-		}
-
-		if (timeout >= 0) {
-			if (!timeout) /* User set to zero */
-				break;
-			timeout = deadline - now();
-			if (timeout <= 0)
-				break;
+			uk_sched_thread_sleep(interval * 1000000UL);
 		}
 	}
-
-err_close_epollfd:
-	close(epollfd);
 }
 #endif /* CONFIG_LIBUKBOOT_GRACEFUL_SHUTDOWN */
 
@@ -195,6 +136,7 @@ static __noreturn void init_mainlike(void *argc_arg, void *argv_arg)
 
 int do_init(int argc, char *argv[])
 {
+	bool graceful __maybe_unused = false;
 	struct signalfd_siginfo info;
 	ssize_t bytes;
 	sigset_t mask;
@@ -226,7 +168,7 @@ int do_init(int argc, char *argv[])
 		bytes = read(sigfd, &info, sizeof(info));
 		if (bytes != sizeof(info)) {
 			uk_pr_err("Read from signalfd failed\n");
-			goto out;
+			break;
 		}
 
 		if (info.ssi_signo == SIGCHLD) {
@@ -234,26 +176,29 @@ int do_init(int argc, char *argv[])
 			 * initiate shutdown.
 			 */
 			do {
-				ret = wait_nonblocking();
+				ret = wait_for_child(WNOHANG);
 			} while (ret > 0);
 
 			UK_ASSERT(ret == 0 || (ret == -1 && errno == ECHILD));
 
 			if (ret == -1 && errno == ECHILD) {
 				uk_pr_info("All children terminated. Initiating shutdown...\n");
-				goto out;
+				break;
 			}
 		} else if (info.ssi_signo == SIGTERM) {
 			uk_pr_info("Received SIGTERM. Initiating shutdown...\n");
+			graceful = true;
 			break;
 		}
 	}
 
+	/* Consume one shutdown request before notifying the applications. */
+	close(sigfd);
 #if CONFIG_LIBUKBOOT_GRACEFUL_SHUTDOWN
-	graceful_shutdown(sigfd);
+	if (graceful)
+		graceful_shutdown();
 #endif /* CONFIG_LIBUKBOOT_GRACEFUL_SHUTDOWN */
 
-out:
 	/* If the application is still running, set the error code to SIGKILL
 	 * to signify it was (actually, will be) force-killed. Return back to
 	 * Unikraft to terminate all remaining processes and shut down the
@@ -263,8 +208,6 @@ out:
 		uk_pr_debug("The application did not exit gracefully\n");
 		application_status = TERM_BY_SIGNAL_BIT | SIGKILL;
 	}
-
-	close(sigfd);
 
 	return application_status;
 }
