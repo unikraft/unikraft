@@ -59,6 +59,8 @@ enum posix_process_state {
 
 struct posix_process {
 	pid_t pid;
+	pid_t pgid; /* process group */
+	pid_t sid;  /* session */
 	struct posix_process *parent;
 	struct uk_list_head children; /* child processes */
 	struct uk_list_head child_list_entry;
@@ -69,9 +71,15 @@ struct posix_process {
 #endif /* CONFIG_LIBPOSIX_PROCESS_SIGNAL */
 	struct uk_semaphore wait_semaphore;
 	struct uk_semaphore exit_semaphore;
+	/* Woken when a vfork child gives a thread its stack back */
+	struct uk_waitq vfork_waitq;
 	enum posix_process_state state;
 	__u64 exit_signal;
 	int exit_status;
+	int term_signal; /* the signal ending it, while it ends; 0 before */
+#if CONFIG_LIBPOSIX_PROCESS_MULTIPROCESS && CONFIG_LIBPOSIX_MMAP
+	struct process_mmap_owner *mmap_owner;
+#endif
 #if CONFIG_LIBPOSIX_PROCESS_BRK
 	struct {
 		struct uk_mutex mtx;
@@ -87,6 +95,8 @@ struct posix_thread {
 	pid_t tid;
 	struct posix_process *process;
 	struct posix_thread *parent;
+	/* The child this thread lends its stack to while BLOCKED_VFORK */
+	struct posix_thread *vfork_child;
 	struct uk_list_head thread_list_entry;
 	struct uk_thread *thread;
 	struct uk_alloc *_a;
@@ -95,6 +105,12 @@ struct posix_thread {
 	struct uk_signal_tdesc *signal;
 #endif /* CONFIG_LIBPOSIX_PROCESS_SIGNAL */
 	pid_t wait_pid;
+	/* With wait_pid == -1: the process group waited on, 0 for any */
+	pid_t wait_pgid;
+#if CONFIG_LIBPOSIX_PROCESS_MULTIPROCESS && CONFIG_LIBPOSIX_MMAP
+	/* The owner of the image this thread's execve() is loading */
+	struct process_mmap_owner *mmap_exec_owner;
+#endif
 
 	/* TODO: Mutex */
 };
@@ -166,6 +182,24 @@ void pprocess_exit_pthread(struct posix_thread *pthread,
  *                     POSIX_PROCESS_STATE_KILLED if terminated by signal.
  * @param exit_status  The exit status of the terminating process.
  */
+/* Wait until no thread of the caller's process lends its stack to a
+ * vfork child
+ */
+void pprocess_wait_vfork(struct posix_process *pprocess);
+
+#if CONFIG_LIBPOSIX_PROCESS_MULTIPROCESS && CONFIG_LIBPOSIX_MMAP
+/* execve() loads the new image under an owner of the calling thread's
+ * (begin), which a failed exec unmaps (abort); a successful one makes it
+ * the process's and drops the old image's owner (commit).
+ */
+int uk_process_mmap_exec_begin(void);
+void uk_process_mmap_exec_commit(void);
+void uk_process_mmap_exec_abort(void);
+#endif
+
+/* Wake every thread of @pprocess waiting in wait(), to look again */
+void pprocess_wake_waiters(struct posix_process *pprocess);
+
 void pprocess_exit(struct posix_process *process,
 		   enum posix_process_state state,
 		   int exit_status);
@@ -188,6 +222,14 @@ void pprocess_release_pthread(struct posix_thread *pthread);
  * @param pprocess  The process to release.
  */
 void pprocess_release(struct posix_process *pprocess);
+
+#if CONFIG_LIBPOSIX_PROCESS_MULTIPROCESS
+/* Release @pprocess, just made with its only thread @thread, which never
+ * ran: the call making it failed
+ */
+void pprocess_release_unrun(struct posix_process *pprocess,
+			    struct uk_thread *thread);
+#endif /* CONFIG_LIBPOSIX_PROCESS_MULTIPROCESS */
 
 /**
  * INTERNAL. Create pthread

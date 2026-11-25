@@ -82,6 +82,7 @@ struct uk_bbpalloc {
 	unsigned long nr_free_pages;
 	struct uk_hlist_head free_head[FREELIST_SIZE];
 	struct uk_bbpalloc_memr *memr_head;
+	uk_allocbbuddy_release_func_t release;
 };
 
 #if CONFIG_LIBUKALLOCBBUDDY_FREELIST_SANITY
@@ -498,11 +499,41 @@ static void bbuddy_pfree(struct uk_alloc *a, void *obj, unsigned long num_pages)
 		/* Link into freelist */
 		uk_hlist_add_head(&ch->link, &b->free_head[ord]);
 
+		/* The block this made or grew, all but its head */
+		if (b->release && ord > 0)
+			b->release(a, (char *)ch + __PAGE_SIZE,
+				   BBUDDY_PAGES(ord) - 1);
+
 		num_pages -= freed_pages;
 		base += freed_pages * __PAGE_SIZE;
 	} while (num_pages);
 
 	freelist_sanitycheck(b->free_head);
+}
+
+/* See uk/allocbbuddy.h: as bbuddy_pfree() takes the range apart */
+void uk_allocbbuddy_foreach_chunk(void *base, unsigned long num_pages,
+				  uk_allocbbuddy_chunk_func_t fn, void *arg)
+{
+	char *chunk = base;
+	size_t ord;
+
+	UK_ASSERT(IS_ALIGNED((uintptr_t)base, __PAGE_SIZE));
+	while (num_pages) {
+		ord = ptr_order(chunk, npages_order(num_pages));
+		fn(chunk, BBUDDY_PAGES(ord), arg);
+		chunk += BBUDDY_LEN(ord);
+		num_pages -= BBUDDY_PAGES(ord);
+	}
+}
+
+void uk_allocbbuddy_set_release(struct uk_alloc *a,
+				uk_allocbbuddy_release_func_t release)
+{
+	struct uk_bbpalloc *const b = (struct uk_bbpalloc *)&a->priv;
+
+	UK_ASSERT(a);
+	b->release = release;
 }
 
 static long bbuddy_pmaxalloc(struct uk_alloc *a)

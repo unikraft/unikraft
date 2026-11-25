@@ -2,4 +2,6 @@ config LIBRAMFS
 	bool "ramfs: simple RAM file system"
 	default n
 	depends on LIBVFSCORE
+	depends on LIBUKBOOT
+	depends on LIBUKALLOC
 	select LIBPOSIX_TIME

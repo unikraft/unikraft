@@ -74,10 +74,19 @@ path_conv(const char *wd, const char *cpath, char *full)
 		*tgt++ = *src++;
 		len = 1;
 	} else {
+		/* The loop below resolves a leading "." or ".." against wd
+		 * as it is, so no separator goes in front of one; any other
+		 * first component, a dotfile (".profile") included, is a
+		 * name in wd and needs one, unless wd already ends in '/'.
+		 */
+		size_t first = strcspn(path, "/");
+		int dot = path[0] == '.' &&
+			  (first == 1 || (first == 2 && path[1] == '.'));
+
 		strlcpy(full, wd, PATH_MAX);
 		len = strlen(wd);
 		tgt += len;
-		if (len > 1 && path[0] != '.') {
+		if (len > 1 && !dot && full[len - 1] != '/') {
 			*tgt = '/';
 			tgt++;
 			len++;
@@ -179,9 +188,22 @@ taskat_conv(struct task *t, int dirfd, const char *path, char *full)
 		dirvp = dirfp->f_dentry->d_vnode;
 		vn_lock(dirvp);
 
-		/* get working directory */
-		strlcpy(wdpath, dirfp->f_dentry->d_mount->m_path, PATH_MAX);
-		len = strlcat(wdpath, dirfp->f_dentry->d_path, PATH_MAX);
+		/* get working directory: the mount's path, then the
+		 * directory's path within it.  Both carry a '/', so the
+		 * root mount's "/" and "/" would join as "//", which
+		 * path_conv keeps and vfs_findroot matches to no mount but
+		 * the root: a lookup relative to a directory fd would then
+		 * never cross into a mount below it, as openat() from a
+		 * preopened "/" (a WASI runtime's) must.
+		 */
+		const char *dpath = dirfp->f_dentry->d_path;
+
+		len = strlcpy(wdpath, dirfp->f_dentry->d_mount->m_path,
+			      PATH_MAX);
+		if (len > 0 && len < PATH_MAX && wdpath[len - 1] == '/')
+			while (*dpath == '/')
+				dpath++;
+		len = strlcat(wdpath, dpath, PATH_MAX);
 		/* check for truncation */
 		if (len < PATH_MAX)
 			error = path_conv(wdpath, path, full);

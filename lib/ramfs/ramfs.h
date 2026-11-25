@@ -64,6 +64,11 @@ struct ramfs_node {
 	char *rn_buf;
 	/* Size of the allocated buffer */
 	size_t rn_bufsize;
+	/* Pages of the buffer, from its first, with memory behind them: the
+	 * room past the file's end has none until the file grows into it
+	 * (see ramfs_grow(), ramfs_back())
+	 */
+	unsigned long rn_backed;
 	/* Last change time */
 	struct timespec rn_ctime;
 	/* Last access time */

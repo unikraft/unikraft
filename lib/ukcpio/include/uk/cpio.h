@@ -165,6 +165,15 @@ enum ukcpio_error {
 enum ukcpio_error
 ukcpio_extract(const char *dest, const void *buf, size_t buflen);
 
+/**
+ * Like ukcpio_extract(), but a file system that supports it (ramfs) makes
+ * each regular file reference its contents in @buf instead of copying
+ * them.  @buf may be read-only and must stay mapped for as long as the
+ * files exist.
+ */
+enum ukcpio_error
+ukcpio_extract_borrowed(const char *dest, const void *buf, size_t buflen);
+
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */

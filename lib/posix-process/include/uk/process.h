@@ -69,6 +69,25 @@ pid_t uk_sys_gettid(void);
 pid_t uk_sys_getppid(void);
 pid_t uk_sys_getpid(void);
 
+#if CONFIG_LIBPOSIX_PROCESS_MULTIPROCESS && CONFIG_LIBPOSIX_MMAP
+/* The owner to tag a new mmap() mapping of the calling process with, for
+ * uk_vma_map_owned(): NULL outside a process, for the kernel's mappings.
+ */
+const void *uk_process_mmap_owner(void);
+#endif
+
+/* pause() and rt_sigsuspend(), for another library's system call to wait
+ * for a signal with.  With CONFIG_LIBPOSIX_PROCESS_SIGNAL they wait, then
+ * return -EINTR, and the signal is taken at the exit of that call; without
+ * it they are the stubs of those calls and return at once.  A thread that
+ * is not a POSIX thread (one uk_thread_create() made) has no signals to
+ * wait for: they return -ENOTSUP.  @sigmask is a kernel signal set of
+ * @sigsetsize bytes, which must be the kernel's (an unsigned long), not
+ * libc's sigset_t: -EINVAL otherwise.
+ */
+int uk_sys_pause(void);
+int uk_sys_rt_sigsuspend(const void *sigmask, size_t sigsetsize);
+
 #if CONFIG_LIBPOSIX_PROCESS_MULTITHREADING
 
 /* Creates a pthread and attaches it to the current process
