@@ -295,6 +295,7 @@ static int virtio_9p_vq_alloc(struct virtio_9p_device *d)
 	int vq_avail = 0;
 	int rc = 0;
 	__u16 qdesc_size;
+	__u16 nr_desc = NUM_SEGMENTS;
 
 	vq_avail = virtio_find_vqs(d->vdev, 1, &qdesc_size);
 	if (unlikely(vq_avail != 1)) {
@@ -305,16 +306,33 @@ static int virtio_9p_vq_alloc(struct virtio_9p_device *d)
 	}
 
 	d->hwvq_id = 0;
-	if (unlikely(qdesc_size != NUM_SEGMENTS)) {
-		uk_pr_info(DRIVER_NAME": Expected %d descriptors, found %d (virtqueue %"
-			  PRIu16")\n", NUM_SEGMENTS, qdesc_size, d->hwvq_id);
+	/* A request can take up to NUM_SEGMENTS descriptors */
+	if (unlikely(qdesc_size < NUM_SEGMENTS)) {
+		uk_pr_err(DRIVER_NAME ": The device supports %" PRIu16
+			  " descriptors, fewer than %d (virtqueue %" PRIu16
+			  ")\n",
+			  qdesc_size, NUM_SEGMENTS, d->hwvq_id);
+		rc = -ENOTSUP;
+		goto exit;
 	}
+
+	/* Legacy devices (no VIRTIO_F_VERSION_1) do not let the driver
+	 * choose the queue size: the device lays out the vring for the size
+	 * it reports, so a smaller ring in the driver does not match it.
+	 * This is what happens with the legacy virtio-pci transport, where
+	 * QEMU reports 1024 descriptors. virtio-net does the same.
+	 */
+	if (!VIRTIO_FEATURE_HAS(d->vdev->features, VIRTIO_F_VERSION_1))
+		nr_desc = qdesc_size;
+
+	uk_pr_debug(DRIVER_NAME ": Configuring %" PRIu16 " descriptors\n",
+		    nr_desc);
 
 	uk_sglist_init(&d->sg, ARRAY_SIZE(d->sgsegs), &d->sgsegs[0]);
 
 	d->vq = virtio_vqueue_setup(d->vdev,
 				    d->hwvq_id,
-				    NUM_SEGMENTS,
+				    nr_desc,
 				    virtio_9p_recv,
 				    a);
 	if (unlikely(PTRISERR(d->vq))) {
