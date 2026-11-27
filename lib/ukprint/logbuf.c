@@ -162,6 +162,23 @@ int uk_logbuf_write_isr(struct uk_logbuf *lb, struct uk_print_msg *msg)
 	return 0;
 }
 
+#if CONFIG_LIBUKCONSOLE
+/* As kernel messages are printed (see console.c) */
+#if CONFIG_LIBUKPRINT_NOCARRIAGERETURN
+#if !__INTERRUPTSAFE__
+#define dmesg_out uk_console_err
+#else /* __INTERRUPTSAFE__ */
+#define dmesg_out uk_console_emerg_out
+#endif /* __INTERRUPTSAFE__ */
+#else /* !CONFIG_LIBUKPRINT_NOCARRIAGERETURN */
+#if !__INTERRUPTSAFE__
+#define dmesg_out uk_console_err_onlcr
+#else /* __INTERRUPTSAFE__ */
+#define dmesg_out uk_console_emerg_out_onlcr
+#endif /* __INTERRUPTSAFE__ */
+#endif /* !CONFIG_LIBUKPRINT_NOCARRIAGERETURN */
+#endif /* CONFIG_LIBUKCONSOLE */
+
 #if !__INTERRUPTSAFE__
 void uk_print_dmesg(void)
 #else /* __INTERRUPTSAFE__ */
@@ -182,12 +199,9 @@ void uk_print_dmesg_isr(void)
 		return;
 	}
 
+	/* msg.len counts the NUL each message is stored with: not sent */
 	uk_logbuf_foreach(lb, lm)
-#if !__INTERRUPTSAFE__
-		uk_console_out(lm->msg.msg, lm->msg.len);
-#else /* __INTERRUPTSAFE__ */
-		uk_console_emerg_out(lm->msg.msg, lm->msg.len);
-#endif /* __INTERRUPTSAFE__ */
+		dmesg_out(lm->msg.msg, lm->msg.len - 1);
 
 	uk_spin_unlock_irqrestore(&lb->lock, irqf);
 #endif /* CONFIG_LIBUKCONSOLE */

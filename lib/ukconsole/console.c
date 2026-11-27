@@ -80,6 +80,129 @@ __ssz uk_console_out(const char *buf, __sz len)
 	return len;
 }
 
+/* Standard error to the STDOUT devices (there is no STDERR flag): all of
+ * them, or with @unlogged only those that did not take the last kernel
+ * message from uk_console_log()
+ */
+static __ssz console_err(const char *buf, __sz len, __bool unlogged)
+{
+	struct uk_console *dev = __NULL;
+
+	if (unlikely(!len))
+		return 0;
+
+	if (unlikely(!buf))
+		return -EINVAL;
+
+	uk_spin_lock(&cons_dev_list_lock);
+	uk_list_for_each_entry(dev, &cons_dev_list, _list) {
+		if (!(dev->flags & UK_CONSOLE_FLAG_STDOUT))
+			continue;
+		if (!dev->ops->err && !dev->ops->out)
+			continue;
+		if (unlogged && dev->ops->log && !dev->_log_declined)
+			continue;
+		uk_console_err_direct(dev, buf, len);
+	}
+	uk_spin_unlock(&cons_dev_list_lock);
+
+	return len;
+}
+
+__ssz uk_console_err(const char *buf, __sz len)
+{
+	return console_err(buf, len, __false);
+}
+
+__ssz uk_console_err_unlogged(const char *buf, __sz len)
+{
+	return console_err(buf, len, __true);
+}
+
+void uk_console_log(const struct uk_console_log_msg *msg)
+{
+	struct uk_console *dev = __NULL;
+
+	UK_ASSERT(msg);
+
+	uk_spin_lock(&cons_dev_list_lock);
+	uk_list_for_each_entry(dev, &cons_dev_list, _list) {
+		if ((dev->flags & UK_CONSOLE_FLAG_STDOUT) && dev->ops->log)
+			dev->_log_declined = dev->ops->log(dev, msg) != 0;
+	}
+	uk_spin_unlock(&cons_dev_list_lock);
+}
+
+#if CONFIG_LIBUKCONSOLE_ONLCR
+/* The first newline in @buf[0..@len), or NULL. This file is built
+ * interrupt-safe, so it cannot use memchr().
+ */
+__isr static inline const char *console_find_nl(const char *buf, __sz len)
+{
+	for (__sz i = 0; i < len; i++)
+		if (buf[i] == '\n')
+			return buf + i;
+	return __NULL;
+}
+#endif /* CONFIG_LIBUKCONSOLE_ONLCR */
+
+/* One place for the CR-LF serial consoles need and byte-keeping hosts do
+ * not: write @buf with @write, best-effort, each newline as CR-LF if
+ * CONFIG_LIBUKCONSOLE_ONLCR is set.
+ */
+__isr static __ssz console_onlcr(__typeof__(uk_console_out) *write,
+				 const char *buf, __sz len)
+{
+#if CONFIG_LIBUKCONSOLE_ONLCR
+	const char *next_nl;
+	__sz off;
+#endif /* CONFIG_LIBUKCONSOLE_ONLCR */
+	__sz l = len;
+	__ssz rc;
+
+	if (unlikely(!len))
+		return 0;
+
+	if (unlikely(!buf))
+		return -EINVAL;
+
+#if CONFIG_LIBUKCONSOLE_ONLCR
+	while ((next_nl = console_find_nl(buf, l))) {
+		off = next_nl - buf;
+		if (off && (rc = write(buf, off)) < 0)
+			return rc;
+		if ((rc = write("\r\n", 2)) < 0)
+			return rc;
+		buf = next_nl + 1;
+		l -= off + 1;
+	}
+#endif /* CONFIG_LIBUKCONSOLE_ONLCR */
+	if (l && (rc = write(buf, l)) < 0)
+		return rc;
+
+	return len;
+}
+
+__ssz uk_console_out_onlcr(const char *buf, __sz len)
+{
+	return console_onlcr(uk_console_out, buf, len);
+}
+
+__ssz uk_console_err_onlcr(const char *buf, __sz len)
+{
+	return console_onlcr(uk_console_err, buf, len);
+}
+
+__ssz uk_console_err_unlogged_onlcr(const char *buf, __sz len)
+{
+	return console_onlcr(uk_console_err_unlogged, buf, len);
+}
+
+__isr __ssz uk_console_emerg_out_onlcr(const char *buf, __sz len)
+{
+	return console_onlcr(uk_console_emerg_out, buf, len);
+}
+
 __ssz uk_console_in(char *buf, __sz len)
 {
 	struct uk_console *dev = __NULL;
@@ -156,6 +279,93 @@ __ssz uk_console_out_direct(struct uk_console *dev, const char *buf, __sz len)
 		return -EIO;
 
 	return dev->ops->out(dev, buf, len);
+}
+
+__ssz uk_console_err_direct(struct uk_console *dev, const char *buf, __sz len)
+{
+	UK_ASSERT(dev && dev->ops);
+
+	if (!dev->ops->err)
+		return uk_console_out_direct(dev, buf, len);
+
+	if (unlikely(!len))
+		return 0;
+
+	if (unlikely(!buf))
+		return -EINVAL;
+
+	return dev->ops->err(dev, buf, len);
+}
+
+/* uk_console_[out|err]_direct(), each newline as CR-LF if
+ * CONFIG_LIBUKCONSOLE_ONLCR is set: stops at the first partial write and
+ * returns how much of @buf went out, not counting the CRs added.
+ */
+static __ssz console_direct_onlcr(uk_console_out_func write,
+				  struct uk_console *dev,
+				  const char *buf, __sz len)
+{
+#if CONFIG_LIBUKCONSOLE_ONLCR
+	const char *next_nl;
+	__sz done = 0, seg;
+	__ssz rc;
+
+	UK_ASSERT(dev && dev->ops);
+
+	if (unlikely(!len))
+		return 0;
+
+	if (unlikely(!buf))
+		return -EINVAL;
+
+	while (done < len) {
+		next_nl = console_find_nl(buf + done, len - done);
+		seg = next_nl ? (__sz)(next_nl - (buf + done)) : len - done;
+
+		if (seg) {
+			rc = write(dev, buf + done, seg);
+			if (unlikely(rc < 0))
+				return rc;
+			done += (__sz)rc;
+			if ((__sz)rc < seg)
+				return done;
+		}
+		if (!next_nl)
+			break;
+
+		/* The newline counts as written once its LF is: if only the
+		 * CR went, the next call starts from it again, which at worst
+		 * repeats a harmless CR.
+		 */
+		rc = write(dev, "\r\n", 2);
+		if (rc == 1) {
+			rc = write(dev, "\n", 1);
+			if (rc >= 0)
+				rc++;
+		}
+		if (unlikely(rc < 0))
+			return rc;
+		if (rc < 2)
+			return done;
+		done++;
+	}
+
+	return done;
+#else /* !CONFIG_LIBUKCONSOLE_ONLCR */
+	return write(dev, buf, len);
+#endif /* !CONFIG_LIBUKCONSOLE_ONLCR */
+}
+
+__ssz uk_console_out_direct_onlcr(struct uk_console *dev,
+				  const char *buf, __sz len)
+{
+	return console_direct_onlcr(uk_console_out_direct, dev, buf, len);
+}
+
+__ssz uk_console_err_direct_onlcr(struct uk_console *dev,
+				  const char *buf, __sz len)
+{
+	return console_direct_onlcr(uk_console_err_direct, dev, buf, len);
 }
 
 __ssz uk_console_in_direct(struct uk_console *dev, char *buf, __sz len)
@@ -276,6 +486,13 @@ __isr int uk_console_emerg_out_direct_all(struct uk_console *dev,
 	}
 
 	return 0;
+}
+
+__bool uk_console_is_terminal(struct uk_console *dev, int stream)
+{
+	UK_ASSERT(dev && dev->ops);
+
+	return !dev->ops->terminal || dev->ops->terminal(dev, stream);
 }
 
 void uk_console_register(struct uk_console *dev)

@@ -37,6 +37,18 @@ UK_LIBPARAM_PARAM_ALIAS(console, &tty_cons_arg, charp,
 
 const struct uk_file *tty_f;
 
+#if CONFIG_LIBPOSIX_TTY_SERIAL_STDERR
+const struct uk_file *tty_err_f;
+
+/* Standard error: a file of its own on the console behind tty_f */
+static void init_tty_err(void)
+{
+	tty_err_f = uk_file_console_create_err(tty_f);
+	if (unlikely(!tty_err_f))
+		uk_pr_warn("No console file for stderr; it duplicates stdout\n");
+}
+#endif /* CONFIG_LIBPOSIX_TTY_SERIAL_STDERR */
+
 #if CONFIG_LIBUKFS_DEVFS
 static int init_tty_cons(struct uk_init_ctx *ictx __unused)
 {
@@ -87,6 +99,9 @@ static int init_tty_cons(struct uk_init_ctx *ictx __unused)
 	}
 
 	tty_f = lout.target;
+#if CONFIG_LIBPOSIX_TTY_SERIAL_STDERR
+	init_tty_err();
+#endif /* CONFIG_LIBPOSIX_TTY_SERIAL_STDERR */
 	return 0;
 }
 
@@ -164,6 +179,9 @@ setup_tty_globals:
 		uk_pr_err("Failed to create main console-backed file\n");
 		return -ENOMEM;
 	}
+#if CONFIG_LIBPOSIX_TTY_SERIAL_STDERR
+	init_tty_err();
+#endif /* CONFIG_LIBPOSIX_TTY_SERIAL_STDERR */
 
 	return 0;
 }

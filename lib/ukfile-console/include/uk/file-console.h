@@ -21,4 +21,17 @@
  */
 const struct uk_file *uk_file_console_create(struct uk_console *cons);
 
+/**
+ * Create a file for the standard error stream of the console behind
+ * console file @f: writes to it go through the console's err operation
+ * (see uk_console_err_direct()), and it shares @f's line settings, as
+ * it is the same terminal.  It holds a reference to @f.
+ *
+ * @param f
+ *   A console file, from uk_file_console_create() or a devfs console node
+ * @return
+ *   The new file, or NULL if @f is not a console file or on error.
+ */
+const struct uk_file *uk_file_console_create_err(const struct uk_file *f);
+
 #endif /* __UK_FILE_CONSOLE_H__ */
