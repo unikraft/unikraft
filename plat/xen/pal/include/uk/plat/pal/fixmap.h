@@ -37,6 +37,7 @@ unsigned int uk_pal_fixmap_window_slots(unsigned int slot)
 #define UK_PAL_FIXMAP_XS		UK_PLAT_XEN_FIXMAP_IDX_XS
 #define UK_PAL_FIXMAP_GIC		UK_PLAT_XEN_FIXMAP_IDX_GIC
 #define UK_PAL_FIXMAP_GNT		UK_PLAT_XEN_FIXMAP_IDX_GNT
+#define UK_PAL_FIXMAP_PL011		UK_PLAT_XEN_FIXMAP_IDX_PL011
 
 #endif /* !__ASSEMBLY__ */
 
