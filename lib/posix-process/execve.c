@@ -11,6 +11,7 @@
 #include <uk/plat/config.h>
 #include <uk/process.h>
 #include <uk/syscall.h>
+#include <uk/sched.h>
 #include <uk/thread.h>
 
 #include "process.h"
@@ -39,23 +40,27 @@ static void __noreturn execve_ctx_switch(long arg0, long arg1)
 
 	pthread_parent = pthread->parent;
 
-	/* If there is no parent, then must be calling execve()
-	 * from init without having called vfork().
+	/* No parent: init's first execve() (whose stack is the boot's, not
+	 * to free), or a thread whose creator is gone and so lends it none
 	 */
 	if (!pthread_parent) {
 		UK_ASSERT(pthread->process);
-		UK_ASSERT(pthread->process->pid == UK_PID_INIT);
+		if (pthread->process->pid != UK_PID_INIT && stack_old)
+			uk_free(this_thread->_mem.stack_a, stack_old);
 		goto switch_ctx;
 	}
 
 	/* If we're coming from VFORK it's time to wake up the parent.
 	 * Otherwise, free the old stack.
 	 */
-	if (pthread_parent->state == POSIX_THREAD_BLOCKED_VFORK) {
+	if (pthread_parent->state == POSIX_THREAD_BLOCKED_VFORK &&
+	    pthread_parent->vfork_child == pthread) {
+		pthread_parent->vfork_child = NULL;
 		uk_pr_debug("Waking up parent (tid %d)\n", pthread_parent->tid);
 		uk_thread_wake(tid2ukthread(pthread_parent->tid));
 		pthread_parent->state = POSIX_THREAD_RUNNING;
-	} else {
+		uk_waitq_wake_up(&pthread_parent->process->vfork_waitq);
+	} else if (stack_old) {
 		uk_free(this_thread->_mem.stack_a, stack_old);
 	}
 
@@ -88,6 +93,7 @@ UK_SYSCALL_R_E_DEFINE(int, execve, const char *, pathname,
 	struct posix_process_execve_event_data event_data;
 	struct uk_binfmt_loader_args loader_args;
 	struct ukarch_execenv *execenv_new;
+	struct uk_alloc *stack_a;
 	struct uk_thread *this_thread;
 	struct ukarch_ctx ctx_old;
 	void *stack_old;
@@ -103,6 +109,13 @@ UK_SYSCALL_R_E_DEFINE(int, execve, const char *, pathname,
 
 	this_thread = uk_thread_current();
 	UK_ASSERT(this_thread);
+
+	/* The other threads end with the old image (pprocess_cleanup()), and
+	 * not one may be lending its stack to a running vfork child.  Wait
+	 * for that here, before anything of the image is replaced: the wait
+	 * lets them run.
+	 */
+	pprocess_wait_vfork(uk_pprocess_current());
 
 	loader_args.argv = (const char **)argv;
 	loader_args.envp = (const char **)envp;
@@ -120,16 +133,27 @@ UK_SYSCALL_R_E_DEFINE(int, execve, const char *, pathname,
 
 	/* Allocate a new stack. Even if we don't come from vfork we
 	 * can't operate on the current thread's stack without either
-	 * corrupting it or wasting space. Use the threads's
-	 * stack allocator for the new stack.
+	 * corrupting it or wasting space.
 	 */
-	stack_new = uk_malloc(this_thread->_mem.stack_a, STACK_SIZE);
+#if CONFIG_LIBPOSIX_PROCESS_EXECVE_STACK_SIZE_PAGES
+	const __sz exec_stack_size = __PAGE_SIZE *
+		(__sz)CONFIG_LIBPOSIX_PROCESS_EXECVE_STACK_SIZE_PAGES;
+#else
+	const __sz exec_stack_size = STACK_SIZE;
+#endif
+	/* A thread made by clone() got its stack from its caller and has
+	 * no stack allocator: the new stack comes from the scheduler's.
+	 */
+	stack_a = this_thread->_mem.stack_a;
+	if (!stack_a)
+		stack_a = uk_sched_current()->a_stack;
+	stack_new = uk_malloc(stack_a, exec_stack_size);
 	if (unlikely(!stack_new)) {
 		uk_pr_err("Could not allocate stack\n");
 		return -ENOMEM;
 	}
 
-	loader_args.stack_size = STACK_SIZE;
+	loader_args.stack_size = exec_stack_size;
 	loader_args.ctx.sp = ukarch_gen_sp((__uptr)stack_new,
 					   loader_args.stack_size);
 
@@ -188,10 +212,17 @@ UK_SYSCALL_R_E_DEFINE(int, execve, const char *, pathname,
 	 * a context-switch trampoline that we execute on the new stack.
 	 */
 	stack_old = this_thread->_mem.stack;
-	uk_pr_debug("%s: Old stack at %p - %p\n", loader_args.progname,
-		    stack_old, (void *)((uintptr_t)stack_old + STACK_SIZE));
+	/* The trampoline frees the old stack (except from init) with the
+	 * thread's allocator: a thread without one did not allocate it
+	 */
+	if (!this_thread->_mem.stack_a)
+		stack_old = NULL;
+	if (stack_old)
+		uk_pr_debug("%s: Old stack at %p\n",
+			    loader_args.progname, stack_old);
 
 	this_thread->_mem.stack = stack_new;
+	this_thread->_mem.stack_a = stack_a;
 	this_thread->ctx = loader_args.ctx;
 
 	ukarch_ctx_init_entry2(&loader_args.ctx,
@@ -203,7 +234,7 @@ UK_SYSCALL_R_E_DEFINE(int, execve, const char *, pathname,
 	UK_BUG(); /* noreturn */
 
 err_free_stack_new:
-	uk_free(this_thread->_mem.stack_a, stack_new);
+	uk_free(stack_a, stack_new);
 
 	return rc;
 }

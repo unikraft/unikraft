@@ -119,13 +119,16 @@ static void _clone_child_gc(struct uk_thread *t)
  *       the TLS effectively as TCB.
  *       In case no TLS is handed over (CLONE_SETTLS is not set), uk_clone will
  *       still allocate an Unikraft TLS but sets the TLS architecture pointer
- *       to zero.
+ *       to zero -- except for a vfork child, which returns to userland on
+ *       the TLS CLONE_SETTLS passed, or else on its parent's TLS, or on its
+ *       own Unikraft TLS when the parent was running on its own (a native
+ *       caller).
  */
 int uk_clone(struct clone_args *cl_args, size_t cl_args_len,
 	     struct ukarch_execenv *execenv)
 {
 	struct posix_process_clone_event_data clone_event;
-	struct posix_process *child_process __maybe_unused;
+	struct posix_process *child_process __maybe_unused = NULL;
 	struct posix_process *pprocess;
 	struct posix_thread *pthread;
 	struct uk_thread *child = NULL;
@@ -137,6 +140,8 @@ int uk_clone(struct clone_args *cl_args, size_t cl_args_len,
 	__u64 stack;
 	__u64 flags;
 	__u64 tls;
+	__uptr utlsp;
+	char *name;
 	int ret;
 
 	t = uk_thread_current();
@@ -229,9 +234,9 @@ int uk_clone(struct clone_args *cl_args, size_t cl_args_len,
 	/* CLONE_VM requires that the child operates on the same memory
 	 * space as the parent.
 	 *
-	 * Assign the parent's stack. We assign the user TLS to the
-	 * parent's in clone_setup_child_ctx(). We copy the registers
-	 * later below.
+	 * Assign the parent's stack. Which userland TLS the child gets is
+	 * decided below, before clone_setup_child_ctx(). We copy the
+	 * registers later below.
 	 */
 	if (flags & CLONE_VM) {
 		if (!stack && !stack_size) {
@@ -247,6 +252,8 @@ int uk_clone(struct clone_args *cl_args, size_t cl_args_len,
 		}
 	}
 
+	/* The child's: freed with it (_clone_child_gc()), or below */
+	name = t->name ? strdup(t->name) : NULL;
 	if ((flags & CLONE_SETTLS)
 #if CONFIG_LIBSYSCALL_SHIM_HANDLER_ULTLS
 	    && (uk_lcpu_sysctx_get(execenv->sysctx, TLSP) == 0x0)
@@ -265,8 +272,7 @@ int uk_clone(struct clone_args *cl_args, size_t cl_args_len,
 						    (__uptr)tls,
 						    true, /* TLS is an UKTLS */
 						    false, /* We want ECTX */
-						    (t->name) ? strdup(t->name)
-							      : NULL,
+						    name,
 						    NULL,
 						    _clone_child_gc);
 	} else {
@@ -288,13 +294,14 @@ int uk_clone(struct clone_args *cl_args, size_t cl_args_len,
 						   s->a_auxstack, AUXSTACK_SIZE,
 						   s->a_uktls,
 						   false, /* We want ECTX */
-						   (t->name) ? strdup(t->name)
-							     : NULL,
+						   name,
 						   NULL,
 						   _clone_child_gc);
 	}
-	if (PTRISERR(child)) {
-		ret = (PTR2ERR(child) != 0) ? PTR2ERR(child) : -ENOMEM;
+	/* uk_thread_create_container*() return NULL on error: out of memory */
+	if (!child) {
+		free(name);
+		ret = -ENOMEM;
 		goto err_out;
 	}
 #ifdef CONFIG_LIBUKDEBUG_ENABLE_ASSERT
@@ -313,11 +320,12 @@ int uk_clone(struct clone_args *cl_args, size_t cl_args_len,
 		 */
 		child->tlsp = child->uktlsp;
 
-		/* Since we didn't specify a stack to
-		 * uk_thread_create_container2() above,
-		 * we need to assign the stack manually.
+		/* The child runs on the parent's stack, which is not its to
+		 * free: it owns no stack until execve allocates one.  A child
+		 * that exits without a successful execve would otherwise free
+		 * the parent's stack.
 		 */
-		child->_mem.stack = (void *)stack;
+		child->_mem.stack = NULL;
 
 		/* Also inherit the parent's stack allocator */
 		child->_mem.stack_a = t->_mem.stack_a;
@@ -338,9 +346,30 @@ int uk_clone(struct clone_args *cl_args, size_t cl_args_len,
 			child->tlsp = 0;
 	}
 
-	uk_pr_debug("Child is going to wake up with TLS pointer set to: %p (%s TLS)\n",
-		    (void *) child->tlsp,
-		    (child->tlsp != child->uktlsp) ? "custom" : "Unikraft");
+	/* The child's userland TLS is child->tlsp, or the parent's when that
+	 * is 0 -- except for a vfork child, whose tlsp is its Unikraft TLS,
+	 * for the scheduler: in userland it runs on the TLS that CLONE_SETTLS
+	 * passed, or else on the parent's, as it runs on the parent's stack.
+	 * A parent whose saved TLS is its own Unikraft TLS (a native caller:
+	 * native system calls keep it) must not lend it, or the child finds
+	 * the parent as current: that child keeps its own.  Without
+	 * CONFIG_LIBSYSCALL_SHIM_HANDLER_ULTLS, a thread made with
+	 * CLONE_SETTLS has the passed TLS as its Unikraft TLS (above), so
+	 * the test holds for it too.
+	 */
+	if (!(flags & CLONE_VFORK))
+		utlsp = child->tlsp;
+	else if (flags & CLONE_SETTLS)
+		utlsp = (__uptr)tls;
+	else if (uk_lcpu_sysctx_get(execenv->sysctx, TLSP) == t->uktlsp)
+		utlsp = child->uktlsp;
+	else
+		utlsp = 0;
+
+	uk_pr_debug("Child is going to return to userland with TLS pointer: %p (%s TLS)\n",
+		    (void *)utlsp,
+		    !utlsp ? "parent's"
+			   : (utlsp != child->uktlsp) ? "custom" : "Unikraft");
 
 	pprocess = uk_pprocess_current();
 	UK_ASSERT(pprocess);
@@ -358,6 +387,7 @@ int uk_clone(struct clone_args *cl_args, size_t cl_args_len,
 						child, t);
 		if (unlikely(PTRISERR(child_process))) {
 			ret = PTR2ERR(child_process);
+			child_process = NULL;
 			uk_pr_err("Could not create process (%d)\n", ret);
 			goto err_free_child;
 		}
@@ -392,7 +422,7 @@ int uk_clone(struct clone_args *cl_args, size_t cl_args_len,
 		    t, t->name ? child->name : "<unnamed>",
 		    child, child->name ? child->name : "<unnamed>", ret);
 
-	clone_setup_child_ctx(execenv, child, (__uptr)stack);
+	clone_setup_child_ctx(execenv, child, (__uptr)stack, utlsp);
 
 	uk_thread_set_runnable(child);
 
@@ -424,6 +454,10 @@ int uk_clone(struct clone_args *cl_args, size_t cl_args_len,
 	 */
 	if (flags & CLONE_VFORK) {
 		pthread = tid2pthread(ukthread2tid(t));
+		/* Only this child's execve() or exit gives the stack back:
+		 * not those of another thread or child this thread made
+		 */
+		pthread->vfork_child = tid2pthread(child_tid);
 		uk_thread_block(t);
 		pthread->state = POSIX_THREAD_BLOCKED_VFORK;
 		uk_sched_yield();
@@ -437,6 +471,12 @@ out:
 	return ret;
 
 err_free_child:
+#if CONFIG_LIBPOSIX_PROCESS_MULTIPROCESS
+	if (child_process) {
+		pprocess_release_unrun(child_process, child);
+		return ret;
+	}
+#endif /* CONFIG_LIBPOSIX_PROCESS_MULTIPROCESS */
 	/* also issues exit events */
 	uk_thread_release(child);
 err_out:

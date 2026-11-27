@@ -5,6 +5,7 @@
  */
 
 #include <errno.h>
+#include <signal.h>
 #include <sys/types.h>
 #include <stddef.h>
 
@@ -20,9 +21,11 @@
 
 #include "process.h"
 
-#define PTHREAD_WAITING_FOR_PID(_pt, _pid)				\
+#define PTHREAD_WAITING_FOR(_pt, _pproc)				\
 	((_pt)->state == POSIX_THREAD_BLOCKED_WAIT &&			\
-	 ((_pt)->wait_pid == (_pid) || (_pt)->wait_pid == -1))
+	 ((_pt)->wait_pid == (_pproc)->pid ||				\
+	  ((_pt)->wait_pid == -1 &&					\
+	   (!(_pt)->wait_pgid || (_pt)->wait_pgid == (_pproc)->pgid))))
 
 #if CONFIG_LIBPOSIX_PROCESS_SIGNAL
 #define PTHREAD_BLOCKING_ON_SIGNAL(_pt)					\
@@ -52,6 +55,11 @@ static void pprocess_reparent_children(struct posix_process *pprocess)
 		uk_list_del(&pchild->child_list_entry);
 		if (pprocess_init && pprocess != pprocess_init) {
 			pchild->parent = pprocess_init;
+			/* Its exit is for init to hear of as SIGCHLD, whatever
+			 * signal it was to send its parent, as on Linux: init
+			 * has no handler for most signals and would die of one
+			 */
+			pchild->exit_signal = SIGCHLD;
 			uk_list_add(&pchild->child_list_entry,
 				    &pprocess_init->children);
 			uk_pr_debug("Process PID %d re-assigned to PID %d\n",
@@ -66,26 +74,117 @@ static void pprocess_reparent_children(struct posix_process *pprocess)
 }
 
 #if CONFIG_LIBPOSIX_PROCESS_SIGNAL
-static inline int signal_exit(struct posix_process *pprocess)
+/* Signal @parent that @child exits, with the child's exit signal (the one
+ * its clone() named), not the parent's own.  Returns 1 when the parent
+ * discards its children's status (SIGCHLD ignored, or SA_NOCLDWAIT).
+ */
+static inline int signal_exit(struct posix_process *parent,
+			      struct posix_process *child)
 {
 	struct kern_sigaction *ks;
 	__u64 exit_signal;
+	int discard = 0;
+	int rc;
 
-	UK_ASSERT(pprocess);
-	UK_ASSERT(pprocess->signal);
+	UK_ASSERT(parent);
+	UK_ASSERT(parent->signal);
+	UK_ASSERT(child);
 
-	if (pprocess->exit_signal)
-		exit_signal = pprocess->exit_signal;
-	else
-		exit_signal = SIGCHLD;
+	exit_signal = child->exit_signal ? child->exit_signal : SIGCHLD;
 
-	ks = KERN_SIGACTION(pprocess, exit_signal);
-	if (ks->ks_handler == SIG_IGN || ks->ks_flags & SA_NOCLDWAIT)
-		return 1;
+	if (exit_signal == SIGCHLD) {
+		ks = KERN_SIGACTION(parent, SIGCHLD);
+		if (ks->ks_handler == SIG_IGN)
+			return 1;
+		/* Reaped at once, but a handler still hears of it */
+		if (ks->ks_flags & SA_NOCLDWAIT)
+			discard = 1;
+	}
 
-	return pprocess_signal_send(pprocess, exit_signal, NULL);
+	/* clone() takes any number for the exit signal: one that is not a
+	 * signal sends nothing, as on Linux; nor do SIGSTOP and SIGCONT,
+	 * which kill() ignores too (stop and resume are not supported)
+	 */
+	if (!IS_VALID(exit_signal) ||
+	    exit_signal == SIGSTOP || exit_signal == SIGCONT)
+		return discard;
+
+	/* As kill() sends it: dropped if ignored, init spared, the parent
+	 * ended by a signal that ends it.  One the parent cannot take (a
+	 * full queue of realtime signals, no memory) is lost, as on Linux:
+	 * the child stays to be waited for, which is what the parent needs.
+	 */
+	rc = pprocess_signal_notify_parent(parent, (int)exit_signal);
+	if (unlikely(rc < 0))
+		uk_pr_warn("pid %d: could not signal parent %d of its exit (%d)\n",
+			   child->pid, parent->pid, rc);
+	return discard;
 }
 #endif /* CONFIG_LIBPOSIX_PROCESS_SIGNAL */
+
+/* The threads of @pprocess in wait() share one semaphore: up it once for
+ * each, so each looks again.  One up could go to a thread waiting for
+ * another child, which sleeps again, while the one it was for sleeps on.
+ */
+void pprocess_wake_waiters(struct posix_process *pprocess)
+{
+	struct posix_thread *pt, *ptn;
+	int waiters = 0;
+
+	uk_pprocess_foreach_pthread(pprocess, pt, ptn) {
+		if (pt->state == POSIX_THREAD_BLOCKED_WAIT)
+			waiters++;
+	}
+	/* A thread paused for a signal looks too (see pprocess_exit()) */
+	if (!waiters)
+		waiters = 1;
+	while (waiters--)
+		uk_semaphore_up(&pprocess->wait_semaphore);
+}
+
+/* Wait until no thread of @pprocess, the caller's, lends its stack to a
+ * vfork child: the child runs on it until it execs or exits, which gives
+ * it back.  Ending such a thread first would free the stack, and the
+ * thread the child wakes, from under the child.
+ */
+/* Whether @self is @lender's vfork child, or one down a chain of them:
+ * a vfork child that shares its process (CLONE_THREAD) gives the stack
+ * back with its own execve or exit, so it cannot wait for its lenders.
+ */
+static __bool pthread_lends_to(struct posix_thread *lender,
+			       struct posix_thread *self)
+{
+	struct posix_thread *q;
+
+	for (q = lender; q && q->state == POSIX_THREAD_BLOCKED_VFORK;
+	     q = q->vfork_child) {
+		if (q->vfork_child == self)
+			return true;
+	}
+	return false;
+}
+
+static __bool pprocess_lends_to_vfork(struct posix_process *pprocess)
+{
+	struct posix_thread *self = uk_pthread_current();
+	struct posix_thread *pt, *ptn;
+
+	uk_pprocess_foreach_pthread(pprocess, pt, ptn) {
+		if (pt->state == POSIX_THREAD_BLOCKED_VFORK &&
+		    !pthread_lends_to(pt, self))
+			return true;
+	}
+	return false;
+}
+
+void pprocess_wait_vfork(struct posix_process *pprocess)
+{
+	/* Blocked, not yielding: the guest goes idle, so what the child
+	 * waits for (the host, another thread) can come.
+	 */
+	uk_waitq_wait_event(&pprocess->vfork_waitq,
+			    !pprocess_lends_to_vfork(pprocess));
+}
 
 /* Exit AND release pthread.
  * Notice: Unlike pprocesses, pthreads are released upon exit.
@@ -123,11 +222,14 @@ void pprocess_exit_pthread(struct posix_thread *pthread,
 	event_data.tid = pthread->tid;
 	pprocess_raise_ptexit_event(&event_data);
 
-	/* Wake up parent if it was blocking on vfork */
+	/* Wake up parent if it was blocking on vfork for this child */
 	if (parent_pthread &&
-	    parent_pthread->state == POSIX_THREAD_BLOCKED_VFORK) {
+	    parent_pthread->state == POSIX_THREAD_BLOCKED_VFORK &&
+	    parent_pthread->vfork_child == pthread) {
+		parent_pthread->vfork_child = NULL;
 		uk_thread_wake(parent_pthread->thread);
 		parent_pthread->state = POSIX_THREAD_RUNNING;
+		uk_waitq_wake_up(&parent_pthread->process->vfork_waitq);
 	}
 
 	/* Release pthread and terminate the underlying uk_thread
@@ -159,6 +261,15 @@ void pprocess_exit(struct posix_process *pprocess,
 	UK_ASSERT(pprocess);
 	UK_ASSERT(pprocess->state == POSIX_PROCESS_RUNNING);
 
+	/* The shutdown path ends processes from a thread that is none's */
+	if (uk_pthread_current() &&
+	    uk_pthread_current()->process == pprocess) {
+		pprocess_wait_vfork(pprocess);
+		/* Another of its threads may have ended it meanwhile */
+		if (pprocess->state != POSIX_PROCESS_RUNNING)
+			uk_sched_thread_exit();
+	}
+
 	uk_pr_debug("pid %d: exit process\n", pprocess->pid);
 
 	/* May be NULL if init terminated early */
@@ -171,7 +282,7 @@ void pprocess_exit(struct posix_process *pprocess,
 	 * current).
 	 */
 	if (parent_process) {
-		ret = signal_exit(parent_process);
+		ret = signal_exit(parent_process, pprocess);
 		if (ret > 0) {
 			/* From exit(2): "If the parent has set SA_NOCLDWAIT, or
 			 * has set the SIGCHLD handler to SIG_IGN, the status is
@@ -179,8 +290,6 @@ void pprocess_exit(struct posix_process *pprocess,
 			 */
 			uk_pr_info("Parent ignores SIGHLD, terminating\n");
 			nowait = true;
-		} else if (unlikely(ret < 0)) { /* no choice here but crash */
-			UK_CRASH("Could not signal parent (%d)\n", ret);
 		}
 	}
 #endif /* CONFIG_LIBPOSIX_PROCESS_SIGNAL */
@@ -214,17 +323,27 @@ void pprocess_exit(struct posix_process *pprocess,
 
 	uk_semaphore_up(&pprocess->exit_semaphore);
 
-	/* Unblock wait */
+	/* Unblock wait. Match on the exiting process, not the caller: the
+	 * caller's pthread is gone by now (getpid() fails), and with kill(2)
+	 * the caller is not the exiting process at all.
+	 */
 	if (parent_process && !nowait) {
+		__bool wake = false;
+
 		uk_pprocess_foreach_pthread(parent_process, pt, ptn) {
-			if (PTHREAD_WAITING_FOR_PID(pt, uk_sys_getpid()) ||
-			    PTHREAD_BLOCKING_ON_SIGNAL(pt)) {
-				uk_semaphore_up(&parent_process->wait_semaphore);
-				break;
-			}
+			if (PTHREAD_WAITING_FOR(pt, pprocess) ||
+			    PTHREAD_BLOCKING_ON_SIGNAL(pt))
+				wake = true;
 		}
+		if (wake)
+			pprocess_wake_waiters(parent_process);
 	} else if (nowait) { /* release now */
 		pprocess_release(pprocess);
+		/* Gone from its parent's children: a wait() of the parent's
+		 * may now have none left (ECHILD)
+		 */
+		if (parent_process)
+			pprocess_wake_waiters(parent_process);
 	}
 }
 
