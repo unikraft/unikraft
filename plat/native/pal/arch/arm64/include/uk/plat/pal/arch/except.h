@@ -41,7 +41,8 @@ __isr static inline void
 uk_pal_arm64_except_err_ctx_set_eid(struct uk_pal_except_err_ctx *ctx, int eid)
 {
 	uk_plat_native_arm64_except_err_ctx_set_eid(
-		(struct uk_plat_native_except_err_ctx *)ctx, eid);
+		(struct uk_plat_native_except_err_ctx *)ctx,
+		(enum uk_plat_native_arm64_except_id)eid);
 }
 
 __isr static inline __u64
