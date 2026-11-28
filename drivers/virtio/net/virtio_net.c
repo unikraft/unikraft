@@ -1155,7 +1155,7 @@ static int virtio_netdev_feature_negotiate(struct uk_netdev *n,
 
 	if (VIRTIO_FEATURE_HAS(vndev->vdev->features, VIRTIO_NET_F_MTU)) {
 		virtio_config_get(vndev->vdev,
-				  __offsetof(struct virtio_net_config, mac),
+				  __offsetof(struct virtio_net_config, mtu),
 				  &vndev->mtu, sizeof(vndev->mtu), 1);
 		vndev->max_mtu = vndev->mtu;
 	} else {
