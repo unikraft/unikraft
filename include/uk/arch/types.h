@@ -248,7 +248,11 @@ typedef __u64 __paddr_t;
 #endif
 
 #ifndef __NULL
+#ifdef __cplusplus
+#define __NULL nullptr
+#else
 #define __NULL ((void *) 0)
+#endif 
 #endif
 
 typedef char *caddr_t; /* core address */
