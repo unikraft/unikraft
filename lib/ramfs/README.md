@@ -101,11 +101,11 @@ To configure the application to run under `RamFS` we follow the steps below:
    $ make menuconfig
    ```
 
-1. Select `vfscore:` `VFS Core Interface`.
-1. Select `vfscore: Configuration  --->`.
-1. Select `Automatically mount a root filesystem (/)`.
-1. Select `Default root filesystem`.
-1. Select `RamFS`.
+1. Go to `Library Configuration --->` and enable `vfscore - VFS Core Interface`.
+2. Then, select `vfscore: Configuration --->`.
+3. Select `Automatically mount a root filesystem (/)`.
+4. Select `Default root filesystem`.
+5. Select `RamFS`.
 
 Building and running the program above yields the output below:
 
