@@ -206,7 +206,10 @@ int uk_clone(struct clone_args *cl_args, size_t cl_args_len,
 #endif /* UK_DEBUG */
 
 #if !CONFIG_LIBPOSIX_PROCESS_MULTIPROCESS
-	if (unlikely(flags & !CLONE_THREAD)) {
+	/* Without multiprocess support we can only create threads, that is,
+	 * clones that share our process context.
+	 */
+	if (unlikely(!(flags & CLONE_THREAD))) {
 		uk_pr_err("Multiprocess support not enabled\n");
 		return -ENOTSUP;
 	}
