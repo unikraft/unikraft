@@ -1,0 +1,17 @@
+# SPDX-License-Identifier: BSD-3-Clause
+
+name: catalog-core
+
+on:
+  pull_request_target:  # zizmor: ignore[dangerous-triggers]
+    types: [opened, synchronize, reopened, edited, ready_for_review]
+  issue_comment:
+    types: [created]
+
+permissions: {}
+
+jobs:
+  dispatch:
+    uses: raresgoidescu/catalog-core/.github/workflows/dispatch.yml@ci/rework
+    secrets:
+      PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
