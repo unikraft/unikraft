@@ -113,11 +113,9 @@ static int futex_wait(uint32_t *uaddr, uint32_t val, const __nsec *timeout)
 			val, uaddr);
 
 	/* Enqueue thread to wait list */
-	irqf = uk_lcpu_save_irqf();
-	uk_spin_lock(&futex_list_lock);
+	uk_spin_lock_irqsave(&futex_list_lock, irqf);
 	uk_list_add_tail(&f.list_node, &futex_list);
-	uk_spin_unlock(&futex_list_lock);
-	uk_lcpu_restore_irqf(irqf);
+	uk_spin_unlock_irqrestore(&futex_list_lock, irqf);
 
 	if (timeout) {
 		/* Block at most until `timeout` nanosecs */
@@ -132,8 +130,7 @@ static int futex_wait(uint32_t *uaddr, uint32_t val, const __nsec *timeout)
 	uk_sched_yield();
 
 	uk_pr_debug("FUTEX_WAIT: Woke up (uaddr: %p)\n", uaddr);
-	irqf = uk_lcpu_save_irqf();
-	uk_spin_lock(&futex_list_lock);
+	uk_spin_lock_irqsave(&futex_list_lock, irqf);
 
 	/* If the futex is still in the wait list, then it timed out */
 	uk_list_for_each_safe(itr, tmp, &futex_list) {
@@ -142,15 +139,13 @@ static int futex_wait(uint32_t *uaddr, uint32_t val, const __nsec *timeout)
 		if (f_tmp->uaddr == uaddr && f_tmp->thread == current) {
 			/* Remove the thread from the futex list */
 			uk_list_del(&f_tmp->list_node);
-			uk_spin_unlock(&futex_list_lock);
-			uk_lcpu_restore_irqf(irqf);
+			uk_spin_unlock_irqrestore(&futex_list_lock, irqf);
 
 			uk_pr_debug("FUTEX_WAIT: Woke up because of timeout\n");
 			return -ETIMEDOUT;
 		}
 	}
-	uk_spin_unlock(&futex_list_lock);
-	uk_lcpu_restore_irqf(irqf);
+	uk_spin_unlock_irqrestore(&futex_list_lock, irqf);
 
 	return 0;
 }
@@ -175,8 +170,7 @@ static int futex_wake(uint32_t *uaddr, uint32_t val)
 	struct uk_futex *f;
 	uint32_t count = 0;
 
-	irqf = uk_lcpu_save_irqf();
-	uk_spin_lock(&futex_list_lock);
+	uk_spin_lock_irqsave(&futex_list_lock, irqf);
 
 	uk_list_for_each_safe(itr, tmp, &futex_list) {
 		f = uk_list_entry(itr, struct uk_futex, list_node);
@@ -196,8 +190,7 @@ static int futex_wake(uint32_t *uaddr, uint32_t val)
 		}
 	}
 
-	uk_spin_unlock(&futex_list_lock);
-	uk_lcpu_restore_irqf(irqf);
+	uk_spin_unlock_irqrestore(&futex_list_lock, irqf);
 
 	return (int) count;
 }
@@ -240,8 +233,7 @@ static int futex_cmp_requeue(uint32_t *uaddr, uint32_t val, uint32_t val2,
 	if (!val2)
 		return woken_uaddr1;
 
-	irqf = uk_lcpu_save_irqf();
-	uk_spin_lock(&futex_list_lock);
+	uk_spin_lock_irqsave(&futex_list_lock, irqf);
 
 	/* Requeue val2 waiters on uaddr2 */
 	uk_list_for_each_safe(itr, tmp, &futex_list) {
@@ -259,10 +251,75 @@ static int futex_cmp_requeue(uint32_t *uaddr, uint32_t val, uint32_t val2,
 		}
 	}
 
-	uk_spin_unlock(&futex_list_lock);
-	uk_lcpu_restore_irqf(irqf);
+	uk_spin_unlock_irqrestore(&futex_list_lock, irqf);
 
 	return woken_uaddr1 + waiters_uaddr2;
+}
+
+/**
+ * Requeue waiters from uaddr to uaddr2.
+ *
+ * Requeue waiters on uaddr to uaddr2. Wakes up a maximum of val waiters that
+ * are waiting on the futex at uaddr.  If there are more than val waiters, then
+ * the remaining waiters are removed from the wait queue of the source futex at
+ * uaddr and added to the wait queue of the target futex at uaddr2. The val2
+ * argument specifies an upper limit on the number of waiters that are requeued
+ * to the futex at uaddr2.
+ *
+ * @param uaddr		Source futex user address
+ * @param val		Number of waiters to wake
+ * @param val2		Number of waiters to requeue (0-INT_MAX)
+ * @param uaddr2	Target futex user address
+ *
+ * @return
+ *	>=0: on success, the number of tasks woken;
+ *	<0: on error
+ */
+static int futex_requeue(uint32_t *uaddr, uint32_t val, uint32_t val2,
+			     uint32_t *uaddr2)
+{
+	unsigned long irqf;
+	struct uk_list_head *itr, *tmp;
+	struct uk_futex *f;
+	int woken_uaddr1 = 0;
+	uint32_t waiters_uaddr2 = 0;
+
+	/* Wake up val waiters on uaddr */
+	if (val)
+		woken_uaddr1 = futex_wake(uaddr, val);
+
+	if (!val2)
+		return woken_uaddr1;
+
+	if (uaddr == uaddr2)
+		return woken_uaddr1;
+
+	uk_spin_lock_irqsave(&futex_list_lock, irqf);
+
+	/* Requeue val2 waiters on uaddr2 */
+	uk_list_for_each_safe(itr, tmp, &futex_list) {
+		f = uk_list_entry(itr, struct uk_futex, list_node);
+
+		if (f->uaddr == uaddr) {
+			/* Requeue thread to uaddr2.
+			 * Re-added node may be revisited during
+			 * iteration, but f->uaddr is now uaddr2
+			 * so it won't match again.
+			 * uaddr == uaddr2 case is guarded above.
+			 */
+			uk_list_del(&f->list_node);
+			f->uaddr = uaddr2;
+			uk_list_add_tail(&f->list_node, &futex_list);
+
+			/* Requeue at most val2 threads */
+			if (++waiters_uaddr2 >= val2)
+				break;
+		}
+	}
+
+	uk_spin_unlock_irqrestore(&futex_list_lock, irqf);
+
+	return woken_uaddr1;
 }
 
 /**
@@ -332,8 +389,11 @@ UK_LLSYSCALL_R_DEFINE(int, futex, uint32_t *, uaddr, int, futex_op,
 		return futex_wake(uaddr, val);
 
 	case FUTEX_FD:
-	case FUTEX_REQUEUE:
 		return -ENOSYS;
+
+	case FUTEX_REQUEUE:
+		return futex_requeue(uaddr, val,
+				     (unsigned long)timeout, uaddr2);
 
 	case FUTEX_CMP_REQUEUE:
 		return futex_cmp_requeue(uaddr, val, (unsigned long)timeout,
