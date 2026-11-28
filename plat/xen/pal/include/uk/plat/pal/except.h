@@ -121,7 +121,7 @@ void uk_pal_except_irq_ctx_set_regs(struct uk_pal_except_irq_ctx *ctx,
 }
 
 static inline
-__u64 uk_pal_except_irq_ctx_get_irq(const struct uk_pal_except_irq_ctx *ctx)
+__u32 uk_pal_except_irq_ctx_get_irq(const struct uk_pal_except_irq_ctx *ctx)
 {
 	return uk_plat_xen_except_irq_ctx_get_irq(
 		(const struct uk_plat_xen_except_irq_ctx *)ctx);
