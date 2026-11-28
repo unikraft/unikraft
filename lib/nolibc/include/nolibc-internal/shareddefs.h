@@ -119,7 +119,13 @@ typedef __u64 ino_t;
 #endif
 
 #if defined(__NEED_nlink_t) && !defined(__DEFINED_nlink_t)
+#if defined(CONFIG_ARCH_X86_64)
 typedef __u64 nlink_t;
+#elif defined(CONFIG_ARCH_ARM_64)
+typedef __u32 nlink_t;
+#else
+#error "nlink_t defined only on x86_64 and arm64"
+#endif
 #define __DEFINED_nlink_t
 #endif
 
@@ -129,7 +135,13 @@ typedef __s64 blkcnt_t;
 #endif
 
 #if defined(__NEED_blksize_t) && !defined(__DEFINED_blksize_t)
+#if defined(CONFIG_ARCH_X86_64)
 typedef long blksize_t;
+#elif defined(CONFIG_ARCH_ARM_64)
+typedef int blksize_t;
+#else
+#error "blksize_t defined only on x86_64 and arm64"
+#endif
 #define __DEFINED_blksize_t
 #endif
 
