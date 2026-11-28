@@ -33,9 +33,9 @@
 	·
 	<a href="https://github.com/unikraft/unikraft/issues/new?assignees=&labels=kind%2Fenhancement&projects=&template=project_backlog.yml">Feature Request</a>
 	·
-	<a href="https://unikraft.org/discord">Join Our Discord</a>
-	·
 	<a href="https://x.com/UnikraftSDK">X.com</a>
+   ·
+	<a href="https://unikraft.org/discord">Join Our Discord</a>
 </p>
 
 <br />
