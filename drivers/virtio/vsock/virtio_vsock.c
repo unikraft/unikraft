@@ -2005,7 +2005,8 @@ static int virtio_vsockdev_feature_negotiate(struct virtio_vsockdev *vvd)
 	rc = virtio_config_get(vvd->vdev,
 			       __offsetof(struct virtio_vsock_config,
 					  guest_cid),
-			       &guest_cid, sizeof(guest_cid), 1);
+			       &guest_cid, sizeof(guest_cid),
+			       sizeof(guest_cid));
 	if (unlikely(rc)) {
 		uk_pr_err("Unable to read guest CID from virtio-vsock device: read %d bytes but expected %zu bytes\n",
 			  rc, sizeof(guest_cid));

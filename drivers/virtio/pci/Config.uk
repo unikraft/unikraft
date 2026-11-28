@@ -5,3 +5,10 @@ config LIBVIRTIO_PCI
 	select LIBUKBUS_PCI
 	help
 		Support virtio devices on PCI bus
+
+config LIBVIRTIO_PCI_TEST
+	bool "Virtio PCI transport tests"
+	depends on LIBVIRTIO_PCI
+	select LIBUKTEST
+	help
+		Build unit tests for virtio PCI transport parsing helpers
