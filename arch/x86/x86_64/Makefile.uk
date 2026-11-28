@@ -1,3 +1,9 @@
+ifeq ($(call have_gcc),y)
+$(call error_if_gcc_version_lt,11,0)
+else ifeq ($(call have_clang),y)
+$(call error_if_clang_version_lt,13,0)
+endif
+
 ARCHFLAGS     += -D__X86_64__
 ARCHFLAGS     += -m64 -mno-red-zone -fno-asynchronous-unwind-tables
 ARCHFLAGS-$(call have_gcc)	+= -fno-reorder-blocks
