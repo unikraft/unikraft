@@ -43,8 +43,19 @@ _all:
 else # umask
 
 # This is our default rule, so must come first
-.PHONY: all
-all:
+.PHONY: check-deps all
+
+check-deps: build/scripts/check-dependencies.sh
+	@./build/scripts/check-dependencies.sh
+
+build/scripts/check-dependencies.sh: scripts/check-dependencies.sh
+	@mkdir -p build/scripts
+	@cp scripts/check-dependencies.sh build/scripts/
+	@chmod +x build/scripts/check-dependencies.sh
+
+all: check-deps
+
+
 
 # Disable built-in rules
 .SUFFIXES:
