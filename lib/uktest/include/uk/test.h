@@ -611,6 +611,29 @@ _uk_test_find_assert(struct uk_testcase *esac, unsigned short line)
 
 
 /**
+ * Check if the test case has encountered any failed assertions.
+ *
+ * @param esac
+ *   The test case to check.
+ * @return
+ *   1 if at least one assertion has failed, 0 otherwise.
+ */
+static inline int
+uk_testcase_failed(struct uk_testcase *esac)
+{
+	struct uk_assert *assert;
+
+	UK_ASSERT(esac);
+
+	uk_test_assert_foreach(esac, assert) {
+		if (assert->status == UK_TEST_ASSERT_FAIL)
+			return 1;
+	}
+
+	return 0;
+}
+
+/**
  * Perform an assertion; saving and logging its result.
  *
  * @param esac
@@ -622,7 +645,7 @@ _uk_test_find_assert(struct uk_testcase *esac, unsigned short line)
  * @param fmt...
  *   The formatted string to print about the assertion.
  */
-static void __maybe_unused
+static int __maybe_unused
 _uk_test_do_assert(struct uk_testcase *esac, unsigned short line, int cond,
 		   const char *fmt, ...)
 {
@@ -662,15 +685,32 @@ _uk_test_do_assert(struct uk_testcase *esac, unsigned short line, int cond,
 #if CONFIG_LIBUKTEST_FAILFAST
 		UK_CRASH("Crashing on first failure!");
 #endif
+		return 0;
 	} else if (assert->status != UK_TEST_ASSERT_FAIL) {
 		/* If the test failed once, we do not reset it to success */
 		assert->status = UK_TEST_ASSERT_SUCCESS;
 	}
+
+	return 1;
 }
 
+/**
+ * Check a boolean condition with formatted string (non-fatal).
+ *
+ * @param cond
+ *   The boolean condition to be evaluated for this check.
+ * @param fmt
+ *   Formatted string to print as help text to explain the check.
+ */
+#define UK_TEST_EXPECTF(cond, fmt, ...)					\
+	do {								\
+		_UK_TEST_ASSERTTAB_ENTRY(UK_TEST_ASSERT_NOT_RUN);	\
+		_uk_test_do_assert(esac, __LINE__, cond, fmt,		\
+				   ##__VA_ARGS__);			\
+	} while (0)
 
 /**
- * Assert a boolean condition with formatted string.
+ * Assert a boolean condition with formatted string (fatal).
  *
  * @param cond
  *   The boolean condition to be evaluated for this assertion.
@@ -680,9 +720,10 @@ _uk_test_do_assert(struct uk_testcase *esac, unsigned short line, int cond,
 #define UK_TEST_ASSERTF(cond, fmt, ...)					\
 	do {								\
 		_UK_TEST_ASSERTTAB_ENTRY(UK_TEST_ASSERT_NOT_RUN);	\
-		_uk_test_do_assert(esac, __LINE__, cond, fmt, ##__VA_ARGS__);\
+		if (!_uk_test_do_assert(esac, __LINE__, cond, fmt,	\
+					##__VA_ARGS__))			\
+			return;						\
 	} while (0)
-
 
 /**
  * Expect a condition to be true.
@@ -691,14 +732,37 @@ _uk_test_do_assert(struct uk_testcase *esac, unsigned short line, int cond,
  *   The boolean condition which will render at runtime.
  */
 #define UK_TEST_EXPECT(cond)						\
-	UK_TEST_ASSERTF(						\
+	UK_TEST_EXPECTF(						\
 		(cond),							\
 		"expected `%s` to be true",				\
 		STRINGIFY(cond)						\
 	)
 
-#define UK_TEST_ASSERT(cond) UK_TEST_EXPECT(cond)
+/**
+ * Assert a condition to be true.
+ *
+ * @param cond
+ *   The boolean condition which will render at runtime.
+ */
+#define UK_TEST_ASSERT(cond)						\
+	UK_TEST_ASSERTF(						\
+		(cond),							\
+		"asserted `%s` to be true",				\
+		STRINGIFY(cond)						\
+	)
 
+/**
+ * Assert that a statement does not generate any fatal failure.
+ *
+ * @param stmt
+ *   The statement to execute and check for failure.
+ */
+#define UK_TEST_ASSERT_NO_FATAL_FAILURE(stmt)				\
+	do {								\
+		stmt;							\
+		if (uk_testcase_failed(esac))				\
+			return;						\
+	} while (0)
 
 /**
  * Helper macro to compare expression a with expression b of same type.
@@ -721,7 +785,7 @@ _uk_test_do_assert(struct uk_testcase *esac, unsigned short line, int cond,
 		type a_v = (type)(a);					\
 		type b_v = (type)(b);					\
 		int _cond = (a_v cond b_v);				\
-		UK_TEST_ASSERTF(					\
+		UK_TEST_EXPECTF(					\
 			_cond,						\
 			"expected `%s` to " desc			\
 			" " fmt " %s was " fmt,				\
@@ -730,6 +794,35 @@ _uk_test_do_assert(struct uk_testcase *esac, unsigned short line, int cond,
 		);							\
 	} while (0)
 
+/**
+ * Helper macro to compare expression a with expression b of same type.
+ *
+ * @param a
+ *   The left-hand operand.
+ * @param cond
+ *   The comparison operator (e.g., ==).
+ * @param b
+ *   The right-hand operand.
+ * @param desc
+ *   A textual description of the comparison.
+ * @param type
+ *   The type of the evaluated expression.
+ * @param fmt
+ *   A printf format specifier to print the expression values.
+ */
+#define _UK_TEST_ASSERT_A_COND_B(a, cond, b, desc, type, fmt)		\
+	do {								\
+		type a_v = (type)(a);					\
+		type b_v = (type)(b);					\
+		int _cond = (a_v cond b_v);				\
+		UK_TEST_ASSERTF(					\
+			_cond,						\
+			"asserted `%s` to " desc			\
+			" " fmt " %s was " fmt,				\
+			STRINGIFY(a), b_v,				\
+			_cond ? "and" : "but", a_v			\
+		);							\
+	} while (0)
 
 /**
  * Expect an expression to be NULL.
@@ -740,6 +833,14 @@ _uk_test_do_assert(struct uk_testcase *esac, unsigned short line, int cond,
 #define UK_TEST_EXPECT_NULL(exp)					\
 	_UK_TEST_EXPECT_A_COND_B(exp, ==, NULL, "be", void *, "%p")
 
+/**
+ * Assert an expression to be NULL.
+ *
+ * @param exp
+ *   The expression under consideration.
+ */
+#define UK_TEST_ASSERT_NULL(exp)					\
+	_UK_TEST_ASSERT_A_COND_B(exp, ==, NULL, "be", void *, "%p")
 
 /**
  * Expect an expression to not be NULL.
@@ -750,6 +851,14 @@ _uk_test_do_assert(struct uk_testcase *esac, unsigned short line, int cond,
 #define UK_TEST_EXPECT_NOT_NULL(exp)					\
 	_UK_TEST_EXPECT_A_COND_B(exp, !=, NULL, "not be", void *, "%p")
 
+/**
+ * Assert an expression to not be NULL.
+ *
+ * @param exp
+ *   The expression under consideration.
+ */
+#define UK_TEST_ASSERT_NOT_NULL(exp)					\
+	_UK_TEST_ASSERT_A_COND_B(exp, !=, NULL, "not be", void *, "%p")
 
 /**
  * Expect an expression to evaluate to zero.
@@ -760,6 +869,14 @@ _uk_test_do_assert(struct uk_testcase *esac, unsigned short line, int cond,
 #define UK_TEST_EXPECT_ZERO(exp)					\
 	_UK_TEST_EXPECT_A_COND_B(exp, ==, 0, "be", long, "%ld")
 
+/**
+ * Assert an expression to evaluate to zero.
+ *
+ * @param exp
+ *   The expression under consideration.
+ */
+#define UK_TEST_ASSERT_ZERO(exp)					\
+	_UK_TEST_ASSERT_A_COND_B(exp, ==, 0, "be", long, "%ld")
 
 /**
  * Expect an expression to not evaluate to zero.
@@ -770,6 +887,14 @@ _uk_test_do_assert(struct uk_testcase *esac, unsigned short line, int cond,
 #define UK_TEST_EXPECT_NOT_ZERO(exp)					\
 	_UK_TEST_EXPECT_A_COND_B(exp, !=, 0, "not be", long, "%ld")
 
+/**
+ * Assert an expression to not evaluate to zero.
+ *
+ * @param exp
+ *   The expression under consideration.
+ */
+#define UK_TEST_ASSERT_NOT_ZERO(exp)					\
+	_UK_TEST_ASSERT_A_COND_B(exp, !=, 0, "not be", long, "%ld")
 
 /**
  * Expect two pointers to be equal to each other.
@@ -782,6 +907,16 @@ _uk_test_do_assert(struct uk_testcase *esac, unsigned short line, int cond,
 #define UK_TEST_EXPECT_PTR_EQ(a, b)					\
 	_UK_TEST_EXPECT_A_COND_B(a, ==, b, "be", void *, "%p")
 
+/**
+ * Assert two pointers to be equal to each other.
+ *
+ * @param a
+ *   The left-hand operand.
+ * @param b
+ *   The right-hand operand.
+ */
+#define UK_TEST_ASSERT_PTR_EQ(a, b)					\
+	_UK_TEST_ASSERT_A_COND_B(a, ==, b, "be", void *, "%p")
 
 /**
  * Expect the contents of two buffers to be equal.
@@ -795,7 +930,7 @@ _uk_test_do_assert(struct uk_testcase *esac, unsigned short line, int cond,
 	do {								\
 		void *a_p = (void *)(a);				\
 		void *b_p = (void *)(b);				\
-		UK_TEST_ASSERTF(					\
+		UK_TEST_EXPECTF(					\
 			memcmp(a_p, b_p, size) == 0,			\
 			"expected `%s` at %p "				\
 			"to equal `%s` at %p",				\
@@ -803,6 +938,27 @@ _uk_test_do_assert(struct uk_testcase *esac, unsigned short line, int cond,
 		);							\
 	} while (0)
 
+/**
+ * Assert the contents of two buffers to be equal.
+ *
+ * @param a
+ *   The left-hand operand.
+ * @param b
+ *   The right-hand operand.
+ * @param size
+ *   The length of the buffers to compare in bytes.
+ */
+#define UK_TEST_ASSERT_BYTES_EQ(a, b, size)				\
+	do {								\
+		void *a_p = (void *)(a);				\
+		void *b_p = (void *)(b);				\
+		UK_TEST_ASSERTF(					\
+			memcmp(a_p, b_p, size) == 0,			\
+			"asserted `%s` at %p "				\
+			"to equal `%s` at %p",				\
+			STRINGIFY(a), b_p, STRINGIFY(b), a_p		\
+		);							\
+	} while (0)
 
 /**
  * Expect two long integers to be equal to each other.
@@ -815,6 +971,16 @@ _uk_test_do_assert(struct uk_testcase *esac, unsigned short line, int cond,
 #define UK_TEST_EXPECT_SNUM_EQ(a, b)					\
 	_UK_TEST_EXPECT_A_COND_B(a, ==, b, "be", long, "%ld")
 
+/**
+ * Assert two long integers to be equal to each other.
+ *
+ * @param a
+ *   The left-hand operand.
+ * @param b
+ *   The right-hand operand.
+ */
+#define UK_TEST_ASSERT_SNUM_EQ(a, b)					\
+	_UK_TEST_ASSERT_A_COND_B(a, ==, b, "be", long, "%ld")
 
 /**
  * Expect two long integers to not be equal to each other.
@@ -827,6 +993,16 @@ _uk_test_do_assert(struct uk_testcase *esac, unsigned short line, int cond,
 #define UK_TEST_EXPECT_SNUM_NQ(a, b)					\
 	_UK_TEST_EXPECT_A_COND_B(a, !=, b, "not be", long, "%ld")
 
+/**
+ * Assert two long integers to not be equal to each other.
+ *
+ * @param a
+ *   The left-hand operand.
+ * @param b
+ *   The right-hand operand.
+ */
+#define UK_TEST_ASSERT_SNUM_NQ(a, b)					\
+	_UK_TEST_ASSERT_A_COND_B(a, !=, b, "not be", long, "%ld")
 
 /**
  * Expect the left-hand long integer to be greater than the right.
@@ -839,6 +1015,16 @@ _uk_test_do_assert(struct uk_testcase *esac, unsigned short line, int cond,
 #define UK_TEST_EXPECT_SNUM_GT(a, b)					\
 	_UK_TEST_EXPECT_A_COND_B(a, >, b, "be greater than", long, "%ld")
 
+/**
+ * Assert the left-hand long integer to be greater than the right.
+ *
+ * @param a
+ *   The left-hand operand.
+ * @param b
+ *   The right-hand operand.
+ */
+#define UK_TEST_ASSERT_SNUM_GT(a, b)					\
+	_UK_TEST_ASSERT_A_COND_B(a, >, b, "be greater than", long, "%ld")
 
 /**
  * Expect the left-hand long integer to be greater or equal to the right.
@@ -852,6 +1038,17 @@ _uk_test_do_assert(struct uk_testcase *esac, unsigned short line, int cond,
 	_UK_TEST_EXPECT_A_COND_B(a, >=, b, "be greater than or equal to",\
 				 long, "%ld")
 
+/**
+ * Assert the left-hand long integer to be greater or equal to the right.
+ *
+ * @param a
+ *   The left-hand operand.
+ * @param b
+ *   The right-hand operand.
+ */
+#define UK_TEST_ASSERT_SNUM_GE(a, b)					\
+	_UK_TEST_ASSERT_A_COND_B(a, >=, b, "be greater than or equal to",\
+				 long, "%ld")
 
 /**
  * Expect the left-hand long integer to be less than the right.
@@ -864,6 +1061,16 @@ _uk_test_do_assert(struct uk_testcase *esac, unsigned short line, int cond,
 #define UK_TEST_EXPECT_SNUM_LT(a, b)					\
 	_UK_TEST_EXPECT_A_COND_B(a, <, b, "be less than", long, "%ld")
 
+/**
+ * Assert the left-hand long integer to be less than the right.
+ *
+ * @param a
+ *   The left-hand operand.
+ * @param b
+ *   The right-hand operand.
+ */
+#define UK_TEST_ASSERT_SNUM_LT(a, b)					\
+	_UK_TEST_ASSERT_A_COND_B(a, <, b, "be less than", long, "%ld")
 
 /**
  * Expect the left-hand long integer to be less than or equal the right.
@@ -877,5 +1084,16 @@ _uk_test_do_assert(struct uk_testcase *esac, unsigned short line, int cond,
 	_UK_TEST_EXPECT_A_COND_B(a, <=, b, "be less than or equal to",	\
 				 long, "%ld")
 
+/**
+ * Assert the left-hand long integer to be less than or equal the right.
+ *
+ * @param a
+ *   The left-hand operand.
+ * @param b
+ *   The right-hand operand.
+ */
+#define UK_TEST_ASSERT_SNUM_LE(a, b)					\
+	_UK_TEST_ASSERT_A_COND_B(a, <=, b, "be less than or equal to",	\
+				 long, "%ld")
 
 #endif /* __UK_TEST_H__ */

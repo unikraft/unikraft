@@ -77,4 +77,65 @@ UK_TESTCASE(uktest_myself_testsuite, uktest_test_sanity)
 	UK_TEST_EXPECT_SNUM_LE(1, 2);
 }
 
+UK_TESTCASE(uktest_myself_testsuite, uktest_test_assert_sanity)
+{
+	unsigned int x = 0xdeadb0b0;
+	unsigned int *a = &x;
+	unsigned int *b = &x;
+
+	/* Assert a condition to be true */
+	UK_TEST_ASSERT(1);
+
+	/* Assert an expression to be NULL */
+	UK_TEST_ASSERT_NULL(NULL);
+
+	/* Assert an expression to not be NULL */
+	UK_TEST_ASSERT_NOT_NULL(a);
+
+	/* Assert an expression to evaluate to zero */
+	UK_TEST_ASSERT_ZERO(0);
+
+	/* Assert an expression to not evaluate to zero */
+	UK_TEST_ASSERT_NOT_ZERO(1);
+
+	/* Assert two pointers to be equal to each other */
+	UK_TEST_ASSERT_PTR_EQ(a, b);
+
+	/* Assert the contents of two buffers to be equal */
+	UK_TEST_ASSERT_BYTES_EQ(a, b, sizeof(x));
+
+	/* Assert two long integers to be equal to each other */
+	UK_TEST_ASSERT_SNUM_EQ(1, 1);
+
+	/* Assert two long integers to not be equal to each other */
+	UK_TEST_ASSERT_SNUM_NQ(0, 1);
+
+	/* Assert the left-hand long integer to be greater than the right */
+	UK_TEST_ASSERT_SNUM_GT(1, 0);
+
+	/* Assert the left-hand long integer to be greater or equal to
+	 * the right
+	 */
+	UK_TEST_ASSERT_SNUM_GE(1, 1);
+	UK_TEST_ASSERT_SNUM_GE(2, 1);
+
+	/* Assert the left-hand long integer to be less than the right */
+	UK_TEST_ASSERT_SNUM_LT(0, 1);
+
+	/* Assert the left-hand long integer to be less than or equal
+	 * the right
+	 */
+	UK_TEST_ASSERT_SNUM_LE(1, 1);
+	UK_TEST_ASSERT_SNUM_LE(1, 2);
+}
+
+#define helper_assert_success(val)					\
+	UK_TEST_ASSERT_NOT_ZERO(val)
+
+UK_TESTCASE(uktest_myself_testsuite, uktest_test_assert_nested)
+{
+	UK_TEST_ASSERT_NO_FATAL_FAILURE(helper_assert_success(1));
+	UK_TEST_EXPECT_ZERO(0);
+}
+
 UK_TESTSUITE_AT_CTORCALL_PRIO(uktest_myself_testsuite, NULL, 0);

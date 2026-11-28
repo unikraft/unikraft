@@ -19,9 +19,12 @@ However, by inspiration, we can organize the `uktest` library following a simila
 ### Assertions
 
 Assertions are often used in-line and their usage should be no different from the traditional use of the `ASSERT` macro.
-In `uktest`, we introduce a new definition: `UK_TEST_EXPECT` which has one parameter: the same boolean operation which is true-to-form of the traditional `ASSERT` macro.
-With `uktest`, however, the macro is intelligently placed in context within a case (see the next point).
-Additional text or descriptive explanation of the text can also be provided with the auxiliary and similar macro `UK_TEST_ASSERTF`.
+In `uktest`, we distinguish between non-fatal checks and fatal assertions:
+- **`UK_TEST_EXPECT*`**: Non-fatal checks. If a condition evaluates to false, the failure is recorded and execution continues in the test case.
+- **`UK_TEST_ASSERT*`**: Fatal assertions. If a condition evaluates to false, the failure is recorded and the execution of the current test case is immediately aborted, allowing the test suite to proceed to the next test case.
+
+Additional descriptive messages can be provided with formatted variants `UK_TEST_EXPECTF` and `UK_TEST_ASSERTF`.
+For helper functions called within a test case, `UK_TEST_ASSERT_NO_FATAL_FAILURE(statement)` can be used to abort the calling test case if the helper encountered a fatal assertion failure.
 
 ### Test Cases
 
