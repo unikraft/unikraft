@@ -8,3 +8,12 @@ config LIBUKLIBPARAM
 		kernel command line at boot time and overwrites default values
 		(e.g., network interface IP addresses). A help summary with a
 		list of available arguments is printed with: "help --".
+
+if LIBUKLIBPARAM
+
+config LIBUKLIBPARAM_TEST
+	bool "Enable unit tests"
+	default n
+	select LIBUKTEST
+
+endif
