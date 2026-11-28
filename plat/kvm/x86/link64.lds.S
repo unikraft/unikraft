@@ -115,9 +115,9 @@ SECTIONS
 	}
 	_ectors = .;
 
-	TLS_SECTIONS
-
 	DATA_SECTIONS
+
+	TLS_SECTIONS
 
 	_end = .;
 
