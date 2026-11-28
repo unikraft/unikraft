@@ -75,6 +75,19 @@ UK_TESTCASE(uktest_myself_testsuite, uktest_test_sanity)
 	// Expect the left-hand long integer to be less than or equal the right
 	UK_TEST_EXPECT_SNUM_LE(1, 1);
 	UK_TEST_EXPECT_SNUM_LE(1, 2);
+
+	// Expect FIX_ME tests to pass regardless of success or failure
+	UK_FIXME_EXPECT(1);
+	UK_FIXME_EXPECT(0);
+
+	UK_FIXME_EXPECT_NOT_NULL(1);
+	UK_FIXME_EXPECT_NOT_NULL(0);
+
+	UK_FIXME_EXPECT_ZERO(0);
+	UK_FIXME_EXPECT_ZERO(1);
+
+	UK_FIXME_EXPECT_SNUM_EQ(1, 1);
+	UK_FIXME_EXPECT_SNUM_EQ(1, 0);
 }
 
 UK_TESTSUITE_AT_CTORCALL_PRIO(uktest_myself_testsuite, NULL, 0);
